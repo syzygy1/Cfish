@@ -200,8 +200,10 @@ void bitboards_init()
   Square RookDeltas[] = { DELTA_N,  DELTA_E,  DELTA_S,  DELTA_W  };
   Square BishopDeltas[] = { DELTA_NE, DELTA_SE, DELTA_SW, DELTA_NW };
 
-  init_magics(RookTable, RookAttacks, RookMagics, RookMasks, RookShifts, RookDeltas, magic_index_rook);
-  init_magics(BishopTable, BishopAttacks, BishopMagics, BishopMasks, BishopShifts, BishopDeltas, magic_index_bishop);
+  init_magics(RookTable, RookAttacks, RookMagics, RookMasks,
+              RookShifts, RookDeltas, magic_index_rook);
+  init_magics(BishopTable, BishopAttacks, BishopMagics, BishopMasks,
+              BishopShifts, BishopDeltas, magic_index_bishop);
 
   for (Square s1 = 0; s1 < 64; s1++) {
     PseudoAttacks[QUEEN][s1] = PseudoAttacks[BISHOP][s1] = attacks_bb_bishop(s1, 0);
@@ -225,10 +227,10 @@ Bitboard sliding_attack(Square deltas[], Square sq, Bitboard occupied)
 
   for (int i = 0; i < 4; i++)
     for (Square s = sq + deltas[i];
-         square_is_ok(s) && distance(s, s - deltas[i]) == 1; s += deltas[i]) {
+         square_is_ok(s) && distance(s, s - deltas[i]) == 1; s += deltas[i])
+    {
       attack |= sq_bb(s);
-
-      if (occupied & s)
+      if (occupied & sq_bb(s))
         break;
     }
 

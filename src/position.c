@@ -150,17 +150,6 @@ void zob_init(void) {
       zob_castling[cr] ^= k ? k : prng_rand(&rng);
     }
   }
-    
-  for (int cr = NO_CASTLING; cr <= ANY_CASTLING; ++cr)
-  {
-      zob_castling[cr] = 0;
-      Bitboard b = cr;
-      while (b)
-      {
-          Key k = zob_castling[1ULL << pop_lsb(&b)];
-          zob_castling[cr] ^= k ? k : prng_rand(&rng);
-      }
-  }
 
   zob_side = prng_rand(&rng);
   zob_exclusion = prng_rand(&rng);
