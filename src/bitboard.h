@@ -74,7 +74,7 @@ static inline Bitboard sq_bb(Square s)
   return SquareBB[s];
 }
 
-static inline int more_than_one(Bitboard b)
+static inline uint64_t more_than_one(Bitboard b)
 {
   return b & (b - 1);
 }
@@ -179,9 +179,9 @@ static inline Bitboard passed_pawn_mask(int c, Square s)
 // aligned() returns true if the squares s1, s2 and s3 are aligned either
 // on a straight or on a diagonal line.
 
-static inline int aligned(Square s1, Square s2, Square s3)
+static inline uint64_t aligned(Square s1, Square s2, Square s3)
 {
-  return LineBB[s1][s2] & s3;
+  return LineBB[s1][s2] & sq_bb(s3);
 }
 
 

@@ -211,7 +211,7 @@ void bitboards_init()
 
     for (Piece pc = W_BISHOP; pc <= W_ROOK; pc++)
       for (Square s2 = 0; s2 < 64; s2++) {
-        if (!(PseudoAttacks[pc][s1] & s2))
+        if (!(PseudoAttacks[pc][s1] & sq_bb(s2)))
           continue;
 
         LineBB[s1][s2] = (attacks_bb(pc, s1, 0) & attacks_bb(pc, s2, 0)) | sq_bb(s1) | sq_bb(s2);

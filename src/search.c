@@ -252,9 +252,9 @@ static uint64_t perft_helper(Pos *pos, Depth depth)
     do_move(pos, m->move, &st, gives_check(pos, m->move, &ci));
     if (depth == 2 * ONE_PLY) {
       ExtMove list2[MAX_MOVES];
-      return generate_legal(pos, list2) - list2;
+      cnt = generate_legal(pos, list2) - list2;
     } else
-      return perft_helper(pos, depth - ONE_PLY);
+      cnt = perft_helper(pos, depth - ONE_PLY);
     nodes += cnt;
     undo_move(pos, m->move);
   }
@@ -272,15 +272,16 @@ uint64_t perft(Pos *pos, Depth depth)
   ExtMove list[MAX_MOVES];
   ExtMove *last = generate_legal(pos, list);
   for (ExtMove *m = list; m < last; m++) {
-    if (depth <= ONE_PLY)
-      cnt = 1, nodes++;
-    else {
+    if (depth <= ONE_PLY) {
+      cnt = 1;
+      nodes++;
+    } else {
       do_move(pos, m->move, &st, gives_check(pos, m->move, &ci));
       if (depth == 2 * ONE_PLY) {
         ExtMove list2[MAX_MOVES];
-        return generate_legal(pos, list2) - list2;
+        cnt = generate_legal(pos, list2) - list2;
       } else
-        return perft_helper(pos, depth - ONE_PLY);
+        cnt = perft_helper(pos, depth - ONE_PLY);
       nodes += cnt;
       undo_move(pos, m->move);
     }

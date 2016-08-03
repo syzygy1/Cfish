@@ -77,8 +77,8 @@ Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score* mobility,
 
 #define MINOR(Pt) \
   bb = OutpostRanks & ~ei->pi->pawnAttacksSpan[Them]; \
-  if (bb & s) \
-    score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & s)]; \
+  if (bb & sq_bb(s)) \
+    score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & sq_bb(s))]; \
   else { \
     bb &= b & ~pieces_c(Us); \
     if (bb) \
@@ -217,7 +217,7 @@ Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score* mobility,
     if (Pt == BISHOP || Pt == KNIGHT) {
       // Bonus for outpost squares
       bb = OutpostRanks & ~ei->pi->pawn_attacks_span(Them);
-      if (bb & s)
+      if (bb & sq_bb(s))
         score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & s)];
       else {
         bb &= b & ~pieces_c(Us);

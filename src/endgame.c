@@ -332,7 +332,7 @@ Value EvaluateKQKP(Pos *pos, int strongSide)
 
   if (   relative_rank_s(weakSide, pawnSq) != RANK_7
       || distance(loserKSq, pawnSq) != 1
-      || !((FileABB | FileCBB | FileFBB | FileHBB) & pawnSq))
+      || !((FileABB | FileCBB | FileFBB | FileHBB) & sq_bb(pawnSq)))
     result += QueenValueEg - PawnValueEg;
 
   return strongSide == pos_stm() ? result : -result;

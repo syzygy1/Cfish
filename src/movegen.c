@@ -137,7 +137,7 @@ static ExtMove *gen_pawn_pushes_black(Pos *pos, ExtMove *list)
 
   // Single and double regular pushes.
   b1 = shift_bb_S(pawns & ~Rank2BB) & empty;
-  b2 = shift_bb_S(b1 & Rank4BB) & empty;
+  b2 = shift_bb_S(b1 & Rank6BB) & empty;
   while (b1) {
     Square to = pop_lsb(&b1);
     (list++)->move = make_move(to - DELTA_S, to);
@@ -262,13 +262,13 @@ static ExtMove *gen_pawn_captures_black(Pos *pos, ExtMove *list)
   }
 
   // Regular pawn captures.
-  b1 = shift_bb_SW(pawns & ~Rank7BB) & target;
+  b1 = shift_bb_SW(pawns & ~Rank2BB) & target;
   while (b1) {
     Square to = pop_lsb(&b1);
     (list++)->move = make_move(to - DELTA_SW, to);
   }
 
-  b1 = shift_bb_SE(pawns & ~Rank7BB) & target;
+  b1 = shift_bb_SE(pawns & ~Rank2BB) & target;
   while (b1) {
     Square to = pop_lsb(&b1);
     (list++)->move = make_move(to - DELTA_SE, to);
@@ -549,10 +549,13 @@ static ExtMove *gen_piece_moves(Pos *pos, ExtMove *list, Bitboard source,
       (list++)->move = make_move(from, pop_lsb(&b2));
   }
 
-  from = lsb(pieces_p(KING) & source);
-  b2 = attacks_from_king(from) & target;
-  while (b2)
-    (list++)->move = make_move(from, pop_lsb(&b2));
+  b1 = pieces_p(KING) & source;
+  if (b1) {
+    from = lsb(pieces_p(KING) & source);
+    b2 = attacks_from_king(from) & target;
+    while (b2)
+      (list++)->move = make_move(from, pop_lsb(&b2));
+  }
 
   return list;
 }
@@ -711,7 +714,7 @@ ExtMove *generate_evasions(Pos *pos, ExtMove *list)
     sliderAttacks |= LineBB[checksq][ksq] ^ sq_bb(checksq);
   }
 
-  // Generate evasions for king, capture and non capture moves.
+  // Generate evasions for king, capture and non-capture moves.
   Bitboard b = attacks_from_king(ksq) & ~pieces_c(pos_stm()) & ~sliderAttacks;
   while (b)
     (list++)->move = make_move(ksq, pop_lsb(&b));
@@ -728,7 +731,7 @@ ExtMove *generate_evasions(Pos *pos, ExtMove *list)
   else
     list = gen_pawn_evasions_black(pos, list, target, checksq);
 
-  return gen_piece_moves(pos, list, pieces_c(pos_stm()),
+  return gen_piece_moves(pos, list, pieces_c(pos_stm()) & ~pieces_p(KING),
                          target | sq_bb(checksq));
 }
 

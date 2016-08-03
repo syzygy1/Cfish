@@ -265,11 +265,11 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
 
   for (Square s = min(rfrom, rto); s <= max(rfrom, rto); s++)
     if (s != kfrom && s != rfrom)
-      pos->castlingPath[cr] |= s;
+      pos->castlingPath[cr] |= sq_bb(s);
 
   for (Square s = min(kfrom, kto); s <= max(kfrom, kto); s++)
     if (s != kfrom && s != rfrom)
-      pos->castlingPath[cr] |= s;
+      pos->castlingPath[cr] |= sq_bb(s);
 }
 
 
@@ -459,7 +459,7 @@ int is_legal(Pos *pos, Move m, Bitboard pinned)
 
   // A non-king move is legal if and only if it is not pinned or it
   // is moving along the ray towards or away from the king.
-  return   !(pinned & from)
+  return   !(pinned & sq_bb(from))
         ||  aligned(from, to_sq(m), square_of(us, KING));
 }
 
@@ -495,7 +495,7 @@ int is_pseudo_legal(Pos *pos, Move m)
     return 0;
 
   // The destination square cannot be occupied by a friendly piece
-  if (pieces_c(us) & to)
+  if (pieces_c(us) & sq_bb(to))
     return 0;
 
   // Handle the special case of a pawn move
@@ -506,7 +506,7 @@ int is_pseudo_legal(Pos *pos, Move m)
     if (rank_of(to) == relative_rank(us, RANK_8))
       return 0;
 
-    if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & to) // Not a capture
+    if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to)) // Not a capture
         && !((from + pawn_push(us) == to) && is_empty(to))       // Not a single push
         && !( (from + 2 * pawn_push(us) == to)              // Not a double push
            && (rank_of(from) == relative_rank(us, RANK_2))
@@ -514,7 +514,7 @@ int is_pseudo_legal(Pos *pos, Move m)
            && is_empty(to - pawn_push(us))))
       return 0;
   }
-  else if (!(attacks_from(pc, from) & to))
+  else if (!(attacks_from(pc, from) & sq_bb(to)))
       return 0;
 
   // Evasions generator already takes care to avoid some kind of illegal moves
@@ -552,7 +552,7 @@ int gives_check(Pos *pos, Move m, CheckInfo *ci)
   Square to = to_sq(m);
 
   // Is there a direct check?
-  if (ci->checkSquares[type_of_p(piece_on(from))] & to)
+  if (ci->checkSquares[type_of_p(piece_on(from))] & sq_bb(to))
     return 1;
 
   // Is there a discovered check?
@@ -1127,12 +1127,13 @@ int pos_is_ok(Pos *pos, int *failedStep)
     if (step == Castling)
       for (int c = 0; c < 2; c++)
         for (int s = 0; s < 2; s++) {
-          if (!can_castle_c(c | s))
+          int cr = make_castling_right(c, s);
+          if (!can_castle_cr(cr))
             continue;
 
-          if (   piece_on(pos->castlingRookSquare[c | s]) != make_piece(c, ROOK)
-              || pos->castlingRightsMask[pos->castlingRookSquare[c | s]] != (c | s)
-              || (pos->castlingRightsMask[square_of(c, KING)] & (c | s)) != (c | s))
+          if (   piece_on(pos->castlingRookSquare[cr]) != make_piece(c, ROOK)
+              || pos->castlingRightsMask[pos->castlingRookSquare[cr]] != cr
+              || (pos->castlingRightsMask[square_of(c, KING)] & cr) != cr)
             return 0;
         }
   }

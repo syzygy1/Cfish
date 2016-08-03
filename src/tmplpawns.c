@@ -75,7 +75,7 @@ static Score func(pawn_evaluate)(Pos *pos, PawnEntry *e)
     // Passed pawns will be properly scored in evaluation because we need
     // full attack info to evaluate them.
     if (!stoppers && !(ourPawns & forward_bb(Us, s)))
-      e->passedPawns[Us] |= s;
+      e->passedPawns[Us] |= sq_bb(s);
 
     // Score this pawn
     if (!neighbours)
