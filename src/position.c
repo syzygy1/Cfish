@@ -564,8 +564,8 @@ int gives_check(Pos *pos, Move m, CheckInfo *ci)
     return 0;
 
   case PROMOTION:
-    return  attacks_bb(promotion_type(m), to, pieces() ^ sq_bb(from))
-          & sq_bb(ci->ksq);
+    return (  attacks_bb(promotion_type(m), to, pieces() ^ sq_bb(from))
+            & sq_bb(ci->ksq)) != 0;
 
   // En passant capture with check? We have already handled the case
   // of direct checks and ordinary discovered check, so the only case we
@@ -577,7 +577,7 @@ int gives_check(Pos *pos, Move m, CheckInfo *ci)
     Bitboard b = (pieces() ^ sq_bb(from) ^ sq_bb(capsq)) | sq_bb(to);
 
     return  (attacks_bb_rook  (ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, ROOK))
-          | (attacks_bb_bishop(ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, BISHOP));
+          || (attacks_bb_bishop(ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, BISHOP));
   }
   case CASTLING:
   {

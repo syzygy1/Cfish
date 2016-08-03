@@ -311,7 +311,7 @@ static inline ExtMove *gen_pawn_evasions_white(Pos *pos, ExtMove *list,
   }
 
   if (ep_square() != 0 && ep_square() == checksq + DELTA_N) {
-    b1 = attacks_from_pawn(ep_square(), BLACK);
+    b1 = attacks_from_pawn(ep_square(), BLACK) & pawns;
     while (b1) {
       Square from = pop_lsb(&b1);
       (list++)->move = make_enpassant(from, ep_square());
@@ -363,7 +363,7 @@ static inline ExtMove *gen_pawn_evasions_black(Pos *pos, ExtMove *list,
   }
 
   if (ep_square() != 0 && ep_square() == checksq + DELTA_S) {
-    b1 = attacks_from_pawn(ep_square(), WHITE);
+    b1 = attacks_from_pawn(ep_square(), WHITE) & pawns;
     while (b1) {
       Square from = pop_lsb(&b1);
       (list++)->move = make_enpassant(from, ep_square());
