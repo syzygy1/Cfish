@@ -50,7 +50,7 @@ static ExtMove *gen_castling_white(Pos *pos, ExtMove *list)
     Square kfrom = square_of(WHITE, KING);
     if (free_path(pos, kfrom, SQ_C1, pieces_c(BLACK)) && (!is_chess960()
                        || !(pieces_cpp(BLACK, ROOK, QUEEN) & sq_bb(SQ_A1)))) {
-      Square rfrom = castling_rook_square(WHITE_OO);
+      Square rfrom = castling_rook_square(WHITE_OOO);
       (list++)->move = make_castling(kfrom, rfrom);
     }
   }
@@ -71,7 +71,7 @@ static ExtMove *gen_castling_black(Pos *pos, ExtMove *list)
     Square kfrom = square_of(BLACK, KING);
     if (free_path(pos, kfrom, SQ_C8, pieces_c(WHITE)) && (!is_chess960()
                        || !(pieces_cpp(WHITE, ROOK, QUEEN) & sq_bb(SQ_A8)))) {
-      Square rfrom = castling_rook_square(BLACK_OO);
+      Square rfrom = castling_rook_square(BLACK_OOO);
       (list++)->move = make_castling(kfrom, rfrom);
     }
   }

@@ -32,7 +32,8 @@ PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
 
 ### Built-in benchmark for pgo-builds
-PGOBENCH = ./$(EXE) bench 16 1 1000 default time
+#PGOBENCH = ./$(EXE) bench 16 1 1000 default time
+PGOBENCH = ./$(EXE) bench 16 1 6 current perft
 
 ### Object files
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
@@ -407,14 +408,14 @@ profile-build:
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_prepare)
 	@echo ""
 	@echo "Step 1/4. Building executable for benchmark ..."
-	@touch *.cpp *.h syzygy/*.cpp syzygy/*.h
+	@touch *.c *.h
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_make)
 	@echo ""
 	@echo "Step 2/4. Running benchmark for pgo-build ..."
 	$(PGOBENCH) > /dev/null
 	@echo ""
 	@echo "Step 3/4. Building final executable ..."
-	@touch *.cpp *.h syzygy/*.cpp syzygy/*.h
+	@touch *.c *.h
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_use)
 	@echo ""
 	@echo "Step 4/4. Deleting profile data ..."
@@ -509,7 +510,7 @@ icc-profile-clean:
 	@rm -rf profdir bench.txt
 
 .depend:
-	-@$(CC) $(DEPENDFLAGS) -MM $(OBJS:.o=.cpp) > $@ 2> /dev/null
+	-@$(CC) $(DEPENDFLAGS) -MM $(OBJS:.o=.c) > $@ 2> /dev/null
 
 -include .depend
 
