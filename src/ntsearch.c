@@ -30,7 +30,7 @@ Value func(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
 
   // Step 1. Initialize node
   Thread *thisThread = pos->thisThread;
-  inCheck = pos_checkers();
+  inCheck = !!pos_checkers();
   moveCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
   ss->ply = (ss-1)->ply + 1;
@@ -305,10 +305,10 @@ moves_loop: // When in check search starts from here.
     // mode we also skip PV moves which have been already searched.
     if (rootNode) {
       size_t idx;
-      for (idx = 0; idx < thisThread->rootMoves->size; idx++)
+      for (idx = thisThread->PVIdx; idx < thisThread->rootMoves->size; idx++)
         if (thisThread->rootMoves->move[idx].pv[0] == move)
           break;
-      if (idx < thisThread->rootMoves->size)
+      if (idx == thisThread->rootMoves->size)
         continue;
     }
 
@@ -332,7 +332,7 @@ moves_loop: // When in check search starts from here.
     moved_piece = moved_piece(move);
 
     givesCheck =  type_of_m(move) == NORMAL && !ci.dcCandidates
-               ? (int)(ci.checkSquares[type_of_p(moved_piece(move))] & sq_bb(to_sq(move)))
+               ? !!(ci.checkSquares[type_of_p(moved_piece(move))] & sq_bb(to_sq(move)))
                : gives_check(pos, move, &ci);
 
     moveCountPruning =   depth < 16 * ONE_PLY

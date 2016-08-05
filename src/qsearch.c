@@ -120,7 +120,7 @@ Value func(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta, Depth depth)
     assert(move_is_ok(move));
 
     givesCheck =  type_of_m(move) == NORMAL && !ci.dcCandidates
-                ? (int)(ci.checkSquares[type_of_p(moved_piece(move))]
+                ? !!(ci.checkSquares[type_of_p(moved_piece(move))]
                         & sq_bb(to_sq(move)))
                 : gives_check(pos, move, &ci);
 

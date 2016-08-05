@@ -242,11 +242,135 @@ static const int KingAttackWeights[8] = { 0, 0, 7, 5, 4, 1 };
 #include "tmpleval.c"
 #undef Us
 
+#if 1
+static inline Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
+                                   Bitboard *mobilityArea,
+                                   const int Us, const int Pt)
+{
+  Bitboard b, bb;
+  Square s;
+  Score score = SCORE_ZERO;
+
+  const int Them = (Us == WHITE ? BLACK : WHITE);
+  const Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
+                                       : Rank5BB | Rank4BB | Rank3BB);
+  Square* pl = piece_list(Us, Pt);
+
+  ei->attackedBy[Us][Pt] = 0;
+
+  while ((s = *pl++) != SQ_NONE) {
+    // Find attacked squares, including x-ray attacks for bishops and rooks
+    b = Pt == BISHOP ? attacks_bb_bishop(s, pieces() ^ pieces_cpp(Us, QUEEN, ROOK))
+      : Pt ==   ROOK ? attacks_bb_rook(s, pieces() ^ pieces_cpp(Us, QUEEN, ROOK))
+                     : attacks_from(Pt, s);
+
+    if (ei->pinnedPieces[Us] & sq_bb(s))
+      b &= LineBB[square_of(Us, KING)][s];
+
+    ei->attackedBy2[Us] |= ei->attackedBy[Us][0] & b;
+    ei->attackedBy[Us][0] |= ei->attackedBy[Us][Pt] |= b;
+
+    if (b & ei->kingRing[Them]) {
+      ei->kingAttackersCount[Us]++;
+      ei->kingAttackersWeight[Us] += KingAttackWeights[Pt];
+      ei->kingAdjacentZoneAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
+    }
+
+    if (Pt == QUEEN)
+      b &= ~(  ei->attackedBy[Them][KNIGHT]
+             | ei->attackedBy[Them][BISHOP]
+             | ei->attackedBy[Them][ROOK]);
+
+    int mob = popcount(b & mobilityArea[Us]);
+
+    mobility[Us] += MobilityBonus[Pt][mob];
+
+    if (Pt == BISHOP || Pt == KNIGHT) {
+      // Bonus for outpost squares
+      bb = OutpostRanks & ~ei->pi->pawnAttacksSpan[Them];
+      if (bb & sq_bb(s))
+        score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & s)];
+      else {
+        bb &= b & ~pieces_c(Us);
+        if (bb)
+          score += ReachableOutpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & bb)];
+      }
+
+      // Bonus when behind a pawn
+      if (    relative_rank(Us, rank_of(s)) < RANK_5
+          && (pieces_p(PAWN) & sq_bb(s + pawn_push(Us))))
+        score += MinorBehindPawn;
+
+      // Penalty for pawns on the same color square as the bishop
+      if (Pt == BISHOP)
+        score -= BishopPawns * pawns_on_same_color_squares(ei->pi, Us, s);
+
+      // An important Chess960 pattern: A cornered bishop blocked by a friendly
+      // pawn diagonally in front of it is a very serious problem, especially
+      // when that pawn is also blocked.
+      if (   Pt == BISHOP
+          && is_chess960()
+          && (s == relative_square(Us, SQ_A1) || s == relative_square(Us, SQ_H1))) {
+        Square d = pawn_push(Us) + (file_of(s) == FILE_A ? DELTA_E : DELTA_W);
+        if (piece_on(s + d) == make_piece(Us, PAWN))
+          score -=  piece_on(s + d + pawn_push(Us))             ? TrappedBishopA1H1 * 4
+                  : piece_on(s + d + d) == make_piece(Us, PAWN) ? TrappedBishopA1H1 * 2
+                                                                : TrappedBishopA1H1;
+      }
+    }
+
+    if (Pt == ROOK) {
+      // Bonus for aligning with enemy pawns on the same rank/file
+      if (relative_rank(Us, rank_of(s)) >= RANK_5)
+        score += RookOnPawn * popcount(pieces_c(Them) & PseudoAttacks[ROOK][s]);
+
+      // Bonus when on an open or semi-open file
+      if (semiopen_file(ei->pi, Us, file_of(s)))
+        score += RookOnFile[!!semiopen_file(ei->pi, Them, file_of(s))];
+
+      // Penalize when trapped by the king, even more if the king cannot castle
+      else if (mob <= 3) {
+        Square ksq = square_of(Us, KING);
+
+        if (   ((file_of(ksq) < FILE_E) == (file_of(s) < file_of(ksq)))
+            && (rank_of(ksq) == rank_of(s) || relative_rank_s(Us, ksq) == RANK_1)
+            && !semiopen_side(ei->pi, Us, file_of(ksq), file_of(s) < file_of(ksq)))
+          score -= (TrappedRook - make_score(mob * 22, 0)) * (1 + !can_castle_c(Us));
+      }
+    }
+
+    if (Pt == QUEEN) {
+      // Penalty if any relative pin or discovered attack against the queen
+      if (slider_blockers(pos, pieces(), pieces_cpp(Them, ROOK, BISHOP), s))
+          score -= WeakQueen;
+    }
+  }
+
+//  if (DoTrace)
+//    Trace::add(Pt, Us, score);
+
+  return score;
+}
+
+static inline Score evaluate_pieces(Pos *pos, EvalInfo *ei, Score *mobility,
+                                    Bitboard *mobilityArea)
+{
+  return  evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, KNIGHT)
+        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, KNIGHT)
+        + evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, BISHOP)
+        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, BISHOP)
+        + evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, ROOK)
+        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, ROOK)
+        + evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, QUEEN)
+        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, QUEEN);
+}
+#endif
+
 
 // evaluate_initiative() computes the initiative correction value for the
 // position, i.e., second order bonus/malus based on the known
 // attacking/defending status of the players.
-Score evaluate_initiative(Pos *pos, int asymmetry, Value eg)
+static Score evaluate_initiative(Pos *pos, int asymmetry, Value eg)
 {
   int kingDistance =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                     - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
@@ -264,7 +388,7 @@ Score evaluate_initiative(Pos *pos, int asymmetry, Value eg)
 }
 
 // evaluate_scale_factor() computes the scale factor for the winning side
-int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
+static int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
 {
   int strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
   int sf = material_scale_factor(ei->me, pos, strongSide);
@@ -348,8 +472,12 @@ Value evaluate(Pos *pos)
   };
 
   // Evaluate all pieces but king and pawns
+#if 0
   score +=  evaluate_pieces_white(pos, &ei, mobility, mobilityArea)
           - evaluate_pieces_black(pos, &ei, mobility, mobilityArea);
+#else
+  score += evaluate_pieces(pos, &ei, mobility, mobilityArea);
+#endif
   score += mobility[WHITE] - mobility[BLACK];
 
   // Evaluate kings after all other pieces because we need full attack
@@ -405,6 +533,7 @@ Value evaluate(Pos *pos)
       Trace::add(TOTAL, score);
   }
 #endif
+assert(v > -VALUE_INFINITE + Tempo && v < VALUE_INFINITE - Tempo);
 
   return (pos_stm() == WHITE ? v : -v) + Tempo; // Side to move point of view
 }

@@ -856,7 +856,7 @@ static void undo_castling(Pos *pos, int us, Square from, Square *to, Square *rfr
 
 void do_null_move(Pos *pos, State *st)
 {
-  assert(pos_checkers());
+  assert(!pos_checkers());
   assert(pos->st != st);
 
   memcpy(st, pos->st, sizeof(State));
@@ -979,10 +979,10 @@ Value see(Pos *pos, Move m)
 
     // Locate and remove the next least valuable attacker
     Bitboard bb;
-    for (captured = KNIGHT; captured <= KING; captured++)
+    for (captured = PAWN; captured <= KING; captured++)
       if ((bb = stmAttackers & pieces_p(captured)))
         break;
-    occ ^= (bb & ~bb);
+    occ ^= (bb & -bb);
     if (captured & 1) // PAWN, BISHOP, QUEEN
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
     if ((captured & 4) && captured != KING) // ROOK, QUEEN

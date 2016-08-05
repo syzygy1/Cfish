@@ -17,7 +17,7 @@
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
 
-void func(eval_init)(Pos *pos, EvalInfo *ei)
+static void func(eval_init)(Pos *pos, EvalInfo *ei)
 {
   ei->pinnedPieces[Us] = pinned_pieces(pos, Us);
   Bitboard b = ei->attackedBy[Them][KING];
@@ -36,13 +36,13 @@ void func(eval_init)(Pos *pos, EvalInfo *ei)
       ei->kingRing[Them] = ei->kingAttackersCount[Us] = 0;
 }
 
-
+#if 0
 // evaluate_pieces() assigns bonuses and penalties to the pieces of a
 // given color and type.
 
 //  template<bool DoTrace, Color Us = WHITE, PieceType Pt = KNIGHT>
-Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score* mobility,
-                            Bitboard *mobilityArea)
+static Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score *mobility,
+                                   Bitboard *mobilityArea)
 {
   Bitboard b, bb;
   Square s;
@@ -86,7 +86,7 @@ Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score* mobility,
   } \
 \
   if (    relative_rank(Us, rank_of(s)) < RANK_5 \
-      && (pieces_c(PAWN) & sq_bb(s + pawn_push(Us)))) \
+      && (pieces_p(PAWN) & sq_bb(s + pawn_push(Us)))) \
     score += MinorBehindPawn;
 
 
@@ -146,7 +146,7 @@ Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score* mobility,
       Square ksq = square_of(Us, KING);
 
       if (   ((file_of(ksq) < FILE_E) == (file_of(s) < file_of(ksq)))
-          && (rank_of(ksq) == rank_of(s) || relative_rank(Us, rank_of(ksq)) == RANK_1)
+          && (rank_of(ksq) == rank_of(s) || relative_rank_s(Us, ksq) == RANK_1)
           && !semiopen_side(ei->pi, Us, file_of(ksq), file_of(s) < file_of(ksq)))
         score -= (TrappedRook - make_score(mob * 22, 0)) * (1 + !can_castle_c(Us));
     }
@@ -171,122 +171,12 @@ Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score* mobility,
 
   return score;
 }
-
-#if 0
-Score func(evaluate_pieces)(Pos *pos, EvalInfo *ei, Score* mobility,
-                            Bitboard *mobilityArea)
-{
-  Bitboard b, bb;
-  Square s;
-  Score score = SCORE_ZERO;
-
-  int NextPt = (Us == WHITE ? Pt : PieceType(Pt + 1));
-  Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
-                                       : Rank5BB | Rank4BB | Rank3BB);
-  Square* pl = piece_list(us, pt);
-
-  ei->attackedBy[Us][Pt] = 0;
-
-  while ((s = *pl++) != SQ_NONE) {
-    // Find attacked squares, including x-ray attacks for bishops and rooks
-    b = Pt == BISHOP ? attacks_bb_bishop(s, pieces() ^ pieces_cpp(Us, QUEEN, ROOK))
-      : Pt ==   ROOK ? attacks_bb_rook(s, pieces() ^ pieces_cpp(Us, QUEEN, ROOK))
-                     : pos_attacks_from<Pt>(s);
-
-    if (ei->pinnedPieces[Us] & sq_bb(s))
-      b &= LineBB[square_of(Us, KING)][s];
-
-    ei->attackedBy2[Us] |= ei->attackedBy[Us][0] & b;
-    ei->attackedBy[Us][0] |= ei->attackedBy[Us][Pt] |= b;
-
-    if (b & ei->kingRing[Them]) {
-      ei->kingAttackersCount[Us]++;
-      ei->kingAttackersWeight[Us] += KingAttackWeights[Pt];
-      ei->kingAdjacentZoneAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
-    }
-
-    if (Pt == QUEEN)
-      b &= ~(  ei->attackedBy[Them][KNIGHT]
-             | ei->attackedBy[Them][BISHOP]
-             | ei->attackedBy[Them][ROOK]);
-
-    int mob = popcount(b & mobilityArea[Us]);
-
-    mobility[Us] += MobilityBonus[Pt][mob];
-
-    if (Pt == BISHOP || Pt == KNIGHT) {
-      // Bonus for outpost squares
-      bb = OutpostRanks & ~ei->pi->pawn_attacks_span(Them);
-      if (bb & sq_bb(s))
-        score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & s)];
-      else {
-        bb &= b & ~pieces_c(Us);
-        if (bb)
-          score += ReachableOutpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & bb)];
-      }
-
-      // Bonus when behind a pawn
-      if (    relative_rank(Us, rank_of(s)) < RANK_5
-          && (pieces_c(PAWN) & sq_bb(s + pawn_push(Us))))
-        score += MinorBehindPawn;
-
-      // Penalty for pawns on the same color square as the bishop
-      if (Pt == BISHOP)
-        score -= BishopPawns * ei->pi->pawns_on_same_color_squares(Us, s);
-
-      // An important Chess960 pattern: A cornered bishop blocked by a friendly
-      // pawn diagonally in front of it is a very serious problem, especially
-      // when that pawn is also blocked.
-      if (   Pt == BISHOP
-          && is_chess960()
-          && (s == relative_square(Us, SQ_A1) || s == relative_square(Us, SQ_H1))) {
-        Square d = pawn_push(Us) + (file_of(s) == FILE_A ? DELTA_E : DELTA_W);
-        if (pos.piece_on(s + d) == make_piece(Us, PAWN))
-          score -=  piece_on(s + d + pawn_push(Us))             ? TrappedBishopA1H1 * 4
-                  : piece_on(s + d + d) == make_piece(Us, PAWN) ? TrappedBishopA1H1 * 2
-                                                                : TrappedBishopA1H1;
-      }
-    }
-
-    if (Pt == ROOK) {
-      // Bonus for aligning with enemy pawns on the same rank/file
-      if (relative_rank(Us, rank_of(s)) >= RANK_5)
-        score += RookOnPawn * popcount(pieces_c(Them) & PseudoAttacks[ROOK][s]);
-
-      // Bonus when on an open or semi-open file
-      if (ei->pi->semiopen_file(Us, file_of(s)))
-        score += RookOnFile[!!ei->pi->semiopen_file(Them, file_of(s))];
-
-      // Penalize when trapped by the king, even more if the king cannot castle
-      else if (mob <= 3) {
-        Square ksq = square_of(Us, KING);
-
-        if (   ((file_of(ksq) < FILE_E) == (file_of(s) < file_of(ksq)))
-            && (rank_of(ksq) == rank_of(s) || relative_rank(Us, rank_of(ksq)) == RANK_1)
-            && !ei->pi->semiopen_side(Us, file_of(ksq), file_of(s) < file_of(ksq)))
-          score -= (TrappedRook - make_score(mob * 22, 0)) * (1 + !can_castle(Us));
-      }
-    }
-
-    if (Pt == QUEEN) {
-      // Penalty if any relative pin or discovered attack against the queen
-      if (slider_blockers(pos, pieces(), pieces_cpp(Them, ROOK, BISHOP), s))
-          score -= WeakQueen;
-    }
-  }
-
-  if (DoTrace)
-    Trace::add(Pt, Us, score);
-
-  // Recursively call evaluate_pieces() of next piece type until KING is excluded
-  return score - evaluate_pieces<DoTrace, Them, NextPt>(pos, ei, mobility, mobilityArea);
-}
 #endif
 
 // evaluate_king() assigns bonuses and penalties to a king of a given color
 
 //  template<Color Us, bool DoTrace>
-Score func(evaluate_king)(Pos *pos, EvalInfo *ei)
+static inline Score func(evaluate_king)(Pos *pos, EvalInfo *ei)
 {
   Bitboard undefended, b, b1, b2, safe, other;
   int attackUnits;
@@ -331,7 +221,7 @@ Score func(evaluate_king)(Pos *pos, EvalInfo *ei)
     // ... and some other potential checks, only requiring the square to be
     // safe from pawn-attacks, and not being occupied by a blocked pawn.
     other = ~(   ei->attackedBy[Us][PAWN]
-              | (pieces_cp(Them, PAWN) & shift_bb_Up(pieces_c(PAWN))));
+              | (pieces_cp(Them, PAWN) & shift_bb_Up(pieces_p(PAWN))));
 
     b1 = attacks_from_rook(ksq);
     b2 = attacks_from_bishop(ksq);
@@ -394,7 +284,7 @@ Score func(evaluate_king)(Pos *pos, EvalInfo *ei)
 // and the attacked pieces.
 
 //  template<Color Us, bool DoTrace>
-Score func(evaluate_threats)(Pos *pos, EvalInfo *ei)
+static inline Score func(evaluate_threats)(Pos *pos, EvalInfo *ei)
 {
   const Bitboard TRank2BB = (Us == WHITE ? Rank2BB  : Rank7BB);
   const Bitboard TRank7BB = (Us == WHITE ? Rank7BB  : Rank2BB);
@@ -459,7 +349,7 @@ Score func(evaluate_threats)(Pos *pos, EvalInfo *ei)
 
     b = weak & ei->attackedBy[Us][KING];
     if (b)
-      score += ThreatByKing[more_than_one(b)];
+      score += ThreatByKing[!!more_than_one(b)];
   }
 
   // Bonus if some pawns can safely push and attack an enemy piece
@@ -498,7 +388,7 @@ Score func(evaluate_threats)(Pos *pos, EvalInfo *ei)
 // evaluate_passed_pawns() evaluates the passed pawns of the given color
 
 //  template<Color Us, bool DoTrace>
-Score func(evaluate_passed_pawns)(Pos *pos, EvalInfo *ei)
+static inline Score func(evaluate_passed_pawns)(Pos *pos, EvalInfo *ei)
 {
   Bitboard b, squaresToQueen, defendedSquares, unsafeSquares;
   Score score = SCORE_ZERO;
@@ -578,7 +468,7 @@ Score func(evaluate_passed_pawns)(Pos *pos, EvalInfo *ei)
 // twice. Finally, the space bonus is multiplied by a weight. The aim is to
 // improve play on game opening.
 //  template<Color Us>
-Score func(evaluate_space)(Pos *pos, EvalInfo *ei)
+static inline Score func(evaluate_space)(Pos *pos, EvalInfo *ei)
 {
   const Bitboard SpaceMask =
     Us == WHITE ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)

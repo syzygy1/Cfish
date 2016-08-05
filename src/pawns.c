@@ -118,7 +118,7 @@ void pawn_init(void)
 PawnEntry *pawn_probe(Pos *pos)
 {
   Key key = pos_pawn_key();
-  PawnEntry* e = pos->thisThread->pawnTable[key & 16383];
+  PawnEntry* e = &(*pos->thisThread->pawnTable)[key & 16383];
 
   if (e->key == key)
     return e;

@@ -717,16 +717,16 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
 
   // Decrease all the other played quiet moves
   for (int i = 0; i < quietsCnt; i++) {
-    hs_update(*thisThread->history, piece_on(quiets[i]), to_sq(quiets[i]), -bonus);
+    hs_update(*thisThread->history, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
 
     if (cmh)
-      cms_update(*cmh, piece_on(quiets[i]), to_sq(quiets[i]), -bonus);
+      cms_update(*cmh, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
 
     if (fmh)
-      cms_update(*fmh, piece_on(quiets[i]), to_sq(quiets[i]), -bonus);
+      cms_update(*fmh, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
 
     if (fmh2)
-      cms_update(*fmh2, piece_on(quiets[i]), to_sq(quiets[i]), -bonus);
+      cms_update(*fmh2, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
   }
 
   // Extra penalty for a quiet TT move in previous ply when it gets refuted
@@ -828,9 +828,6 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_PLY;
     v = tb ? TB_Score : v;
 
-    if (i > 0)
-      printf("\n");
-
     printf("info depth %d seldepth %d multipv %"PRIu64" score %s",
            d / ONE_PLY, pos->thisThread->maxPly, i + 1, uci_value(buf, v));
 
@@ -847,6 +844,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 
     for (size_t idx = 0; idx < rootMoves->move[i].pv_size; idx++)
       printf(" %s", uci_move(buf, rootMoves->move[i].pv[idx], is_chess960()));
+    printf("\n");
   }
 }
 

@@ -100,7 +100,7 @@ int imbalance(int us, int pieceCount[][8])
   return bonus;
 }
 
-typedef int PieceListType[2][8];
+typedef int PieceCountType[2][8];
 
 // material_probe() looks up the current position's material configuration
 // in the material hash table. It returns a pointer to the MaterialEntry
@@ -111,7 +111,7 @@ typedef int PieceListType[2][8];
 MaterialEntry *material_probe(Pos *pos)
 {
   Key key = pos_material_key();
-  MaterialEntry *e = pos->thisThread->materialTable[key & 8191];
+  MaterialEntry *e = &(*pos->thisThread->materialTable)[key & 8191];
 
   if (e->key == key)
       return e;
@@ -204,12 +204,12 @@ MaterialEntry *material_probe(Pos *pos)
   // Evaluate the material imbalance. We use PIECE_TYPE_NONE as a place
   // holder for the bishop pair "extended piece", which allows us to be
   // more flexible in defining bishop pair bonuses.
-  PieceListType *pc = &(pos->pieceCount);
+  PieceCountType *pc = &(pos->pieceCount);
   int PieceCount[2][8] = {
-    { *pc[0][BISHOP] > 1, *pc[0][PAWN], *pc[0][KNIGHT],
-      *pc[0][BISHOP]    , *pc[0][ROOK], *pc[0][QUEEN] },
-    { *pc[1][BISHOP] > 1, *pc[1][PAWN], *pc[1][KNIGHT],
-      *pc[1][BISHOP]    , *pc[1][ROOK], *pc[1][QUEEN] }
+    { (*pc)[0][BISHOP] > 1, (*pc)[0][PAWN], (*pc)[0][KNIGHT],
+      (*pc)[0][BISHOP]    , (*pc)[0][ROOK], (*pc)[0][QUEEN] },
+    { (*pc)[1][BISHOP] > 1, (*pc)[1][PAWN], (*pc)[1][KNIGHT],
+      (*pc)[1][BISHOP]    , (*pc)[1][ROOK], (*pc)[1][QUEEN] }
   };
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
 

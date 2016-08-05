@@ -150,7 +150,10 @@ void go(Pos *pos, char *str)
 
   limits.startTime = now(); // As early as possible!
 
-  limits.num_searchmoves = 0;
+  limits.time[0] = limits.time[1] = limits.inc[0] = limits.inc[1] = 0;
+  limits.npmsec = limits.movestogo = limits.depth = limits.movetime = 0;
+  limits.mate = limits.infinite = limits.ponder = limits.num_searchmoves = 0;
+  limits.nodes = 0;
 
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
     if (strcmp(token, "searchmoves") == 0)

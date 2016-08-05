@@ -207,7 +207,7 @@ static inline int pawn_passed(Pos *pos, int c, Square s)
 
 static inline int advanced_pawn_push(Pos *pos, Move m)
 {
-  return   type_of_m(moved_piece(m)) == PAWN
+  return   type_of_p(moved_piece(m)) == PAWN
         && relative_rank_s(pos_stm(), from_sq(m)) > RANK_4;
 }
 

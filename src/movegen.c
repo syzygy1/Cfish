@@ -399,7 +399,7 @@ static inline ExtMove *gen_pawn_checks_white(Pos *pos, ExtMove *list,
   Bitboard pawns, target, b1, b2;
 
   pawns = pieces_cp(WHITE, PAWN);
-  target = shift_bb_S(attacks_from_pawn(ci->ksq, BLACK));
+  target = shift_bb_S(attacks_from_pawn(ci->ksq, BLACK) & ~pieces());
 
   // Single pawn pushes.
   b1 = target & pawns;
@@ -462,7 +462,7 @@ static inline ExtMove *gen_pawn_checks_black(Pos *pos, ExtMove *list,
   Bitboard pawns, target, b1, b2;
 
   pawns = pieces_cp(BLACK, PAWN);
-  target = shift_bb_N(attacks_from_pawn(ci->ksq, WHITE));
+  target = shift_bb_N(attacks_from_pawn(ci->ksq, WHITE) & ~pieces());
 
   // Single pawn pushes.
   b1 = target & pawns;

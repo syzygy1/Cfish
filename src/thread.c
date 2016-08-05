@@ -238,7 +238,8 @@ void threads_start_thinking(Pos *pos, State *states, LimitsType *limits)
   State tmp = setupStates->back();
 #endif
 
-  State tmp = *states;
+//  State tmp = *states;
+  State tmp = *(pos->st);
 
   char fen[80];
   pos_fen(pos, fen);

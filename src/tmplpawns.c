@@ -47,14 +47,14 @@ static Score func(pawn_evaluate)(Pos *pos, PawnEntry *e)
     e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s);
 
     // Flag the pawn
-    opposed    = theirPawns & forward_bb(Us, s);
+    opposed    = !!(theirPawns & forward_bb(Us, s));
     stoppers   = theirPawns & passed_pawn_mask(Us, s);
-    lever      = theirPawns & pawnAttacksBB[s];
+    lever      = !!(theirPawns & pawnAttacksBB[s]);
     doubled    = ourPawns   & sq_bb(s + Up);
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
     supported  = neighbours & rank_bb_s(s - Up);
-    connected  = supported | phalanx;
+    connected  = !!(supported | phalanx);
 
     // A pawn is backward when it is behind all pawns of the same color on the
     // adjacent files and cannot be safely advanced.
@@ -67,7 +67,7 @@ static Score func(pawn_evaluate)(Pos *pos, PawnEntry *e)
       // The pawn is backward when it cannot safely progress to that rank:
       // either there is a stopper in the way on this rank, or there is a
       // stopper on adjacent file which controls the way to that rank.
-      backward = (b | shift_bb_Up(b & adjacent_files_bb(f))) & stoppers;
+      backward = !!((b | shift_bb_Up(b & adjacent_files_bb(f))) & stoppers);
 
       assert(!backward || !(pawn_attack_span(Them, s + Up) & neighbours));
     }
@@ -85,10 +85,10 @@ static Score func(pawn_evaluate)(Pos *pos, PawnEntry *e)
       score -= Backward[opposed];
 
     else if (!supported)
-      score -= Unsupported[more_than_one(neighbours & pawnAttacksBB[s])];
+      score -= Unsupported[!!more_than_one(neighbours & pawnAttacksBB[s])];
 
     if (connected)
-      score += Connected[opposed][!!phalanx][more_than_one(supported)][relative_rank_s(Us, s)];
+      score += Connected[opposed][!!phalanx][!!more_than_one(supported)][relative_rank_s(Us, s)];
 
     if (doubled)
       score -= Doubled;
