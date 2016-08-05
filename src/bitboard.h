@@ -105,6 +105,13 @@ static inline Bitboard file_bb_s(Square s)
 
 
 // shift_bb() moves a bitboard one step along direction Delta.
+static inline Bitboard shift_bb(int Delta, Bitboard b)
+{
+  return  Delta == DELTA_N  ?  b             << 8 : Delta == DELTA_S  ?  b             >> 8
+        : Delta == DELTA_NE ? (b & ~FileHBB) << 9 : Delta == DELTA_SE ? (b & ~FileHBB) >> 7
+        : Delta == DELTA_NW ? (b & ~FileABB) << 7 : Delta == DELTA_SW ? (b & ~FileABB) >> 9
+        : 0;
+}
 
 #define shift_bb_N(b)  ((b) << 8)
 #define shift_bb_S(b)  ((b) >> 8)
