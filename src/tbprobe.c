@@ -513,7 +513,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     return wdl_to_dtz[wdl + 2];
 
   ExtMove stack[MAX_MOVES];
-  ExtMove *end;
+  ExtMove *end = NULL; // Get rid of a bogus gcc warning.
   State st;
   CheckInfo ci;
   checkinfo_init(&ci, pos);
@@ -555,7 +555,7 @@ int TB_probe_dtz(Pos *pos, int *success)
   int best;
   if (wdl > 0) {
     best = INT32_MAX;
-    // If wdl > 0, we already generated all moves.
+    // If wdl > 0, we have already generated all moves.
   } else {
     // If (cursed) loss, the worst case is a losing capture or pawn move
     // as the "best" move, leading to dtz of -1 or -101.

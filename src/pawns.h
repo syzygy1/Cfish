@@ -33,7 +33,7 @@ struct PawnEntry {
   Key key;
   Score score;
   Bitboard passedPawns[2];
-  Bitboard pawnAttacks[22];
+  Bitboard pawnAttacks[2];
   Bitboard pawnAttacksSpan[2];
   Square kingSquares[2];
   Score kingSafety[2];

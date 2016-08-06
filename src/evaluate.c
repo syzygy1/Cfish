@@ -257,7 +257,7 @@ static inline void evalinfo_init(Pos *pos, EvalInfo *ei, const int Us)
     ei->kingAdjacentZoneAttacksCount[Us] = ei->kingAttackersWeight[Us] = 0;
   }
   else
-      ei->kingRing[Them] = ei->kingAttackersCount[Us] = 0;
+    ei->kingRing[Them] = ei->kingAttackersCount[Us] = 0;
 }
 
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
@@ -273,16 +273,16 @@ static inline Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
 
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
-                                       : Rank5BB | Rank4BB | Rank3BB);
+                                             : Rank5BB | Rank4BB | Rank3BB);
   Square* pl = piece_list(Us, Pt);
 
   ei->attackedBy[Us][Pt] = 0;
 
   while ((s = *pl++) != SQ_NONE) {
     // Find attacked squares, including x-ray attacks for bishops and rooks
-    b = Pt == BISHOP ? attacks_bb_bishop(s, pieces() ^ pieces_cpp(Us, QUEEN, ROOK))
-      : Pt ==   ROOK ? attacks_bb_rook(s, pieces() ^ pieces_cpp(Us, QUEEN, ROOK))
-                     : attacks_from(Pt, s);
+    b = Pt == BISHOP ? attacks_bb_bishop(s, pieces() ^ pieces_cp(Us, QUEEN))
+      : Pt == ROOK ? attacks_bb_rook(s, pieces() ^ pieces_cpp(Us, ROOK, QUEEN))
+                   : attacks_from(Pt, s);
 
     if (ei->pinnedPieces[Us] & sq_bb(s))
       b &= LineBB[square_of(Us, KING)][s];
@@ -309,7 +309,7 @@ static inline Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
       // Bonus for outpost squares
       bb = OutpostRanks & ~ei->pi->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & s)];
+        score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & sq_bb(s))];
       else {
         bb &= b & ~pieces_c(Us);
         if (bb)
@@ -317,7 +317,7 @@ static inline Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
       }
 
       // Bonus when behind a pawn
-      if (    relative_rank(Us, rank_of(s)) < RANK_5
+      if (    relative_rank_s(Us, s) < RANK_5
           && (pieces_p(PAWN) & sq_bb(s + pawn_push(Us))))
         score += MinorBehindPawn;
 
@@ -341,8 +341,8 @@ static inline Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
 
     if (Pt == ROOK) {
       // Bonus for aligning with enemy pawns on the same rank/file
-      if (relative_rank(Us, rank_of(s)) >= RANK_5)
-        score += RookOnPawn * popcount(pieces_c(Them) & PseudoAttacks[ROOK][s]);
+      if (relative_rank_s(Us, s) >= RANK_5)
+        score += RookOnPawn * popcount(pieces_cp(Them, PAWN) & PseudoAttacks[ROOK][s]);
 
       // Bonus when on an open or semi-open file
       if (semiopen_file(ei->pi, Us, file_of(s)))
@@ -643,13 +643,13 @@ static inline Score evaluate_passed_pawns(Pos *pos, EvalInfo *ei,
         ebonus -= distance(square_of(Us, KING), blockSq + pawn_push(Us)) * rr;
 
       // If the pawn is free to advance, then increase the bonus
-      if (!piece_on(blockSq)) {
+      if (is_empty(blockSq)) {
         // If there is a rook or queen attacking/defending the pawn from behind,
         // consider all the squaresToQueen. Otherwise consider only the squares
         // in the pawn's path attacked or occupied by the enemy.
         defendedSquares = unsafeSquares = squaresToQueen = forward_bb(Us, s);
 
-        Bitboard bb = forward_bb(Them, s) & pieces_pp(QUEEN, ROOK) & attacks_from_rook(s);
+        Bitboard bb = forward_bb(Them, s) & pieces_pp(ROOK, QUEEN) & attacks_from_rook(s);
 
         if (!(pieces_c(Us) & bb))
           defendedSquares &= ei->attackedBy[Us][0];
@@ -666,7 +666,7 @@ static inline Score evaluate_passed_pawns(Pos *pos, EvalInfo *ei,
         if (defendedSquares == squaresToQueen)
           k += 6;
 
-        else if (defendedSquares & blockSq)
+        else if (defendedSquares & sq_bb(blockSq))
           k += 4;
 
         mbonus += k * rr, ebonus += k * rr;
@@ -810,7 +810,7 @@ Value evaluate(Pos *pos)
   ei.pi = pawn_probe(pos);
   score += ei.pi->score;
 
-  // Initialize attack and king safety bitboards
+  // Initialize attack and king safety bitboards.
   ei.attackedBy[WHITE][0] = ei.attackedBy[BLACK][0] = 0;
   ei.attackedBy[WHITE][KING] = attacks_from_king(square_of(WHITE, KING));
   ei.attackedBy[BLACK][KING] = attacks_from_king(square_of(BLACK, KING));
@@ -823,8 +823,8 @@ Value evaluate(Pos *pos)
     pieces_cp(BLACK, PAWN) & (shift_bb_N(pieces()) | Rank7BB | Rank6BB)
   };
 
-  // Do not include in mobility area squares protected by enemy pawns, or occupied
-  // by our blocked pawns or king.
+  // Do not include in mobility area squares protected by enemy pawns, or
+  // occupied by our blocked pawns or king.
   Bitboard mobilityArea[] = {
     ~(ei.attackedBy[BLACK][PAWN] | blockedPawns[WHITE] | pieces_cp(WHITE, KING)),
     ~(ei.attackedBy[WHITE][PAWN] | blockedPawns[BLACK] | pieces_cp(BLACK, KING))

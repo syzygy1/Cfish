@@ -144,7 +144,7 @@ void zob_init(void) {
 
   for (int cr = 0; cr < 16; cr++) {
     zob_castling[cr] = 0;
-    Bitboard b = cr;
+    Bitboard b = (Bitboard)cr;
     while (b) {
       Key k = zob_castling[1ULL << pop_lsb(&b)];
       zob_castling[cr] ^= k ? k : prng_rand(&rng);
@@ -542,7 +542,7 @@ int is_pseudo_legal(Pos *pos, Move m)
 
 // gives_check() tests whether a pseudo-legal move gives a check.
 
-int gives_check(Pos *pos, Move m, CheckInfo *ci)
+int gives_check(Pos *pos, Move m, const CheckInfo *ci)
 {
   assert(move_is_ok(m));
   assert(ci->dcCandidates == discovered_check_candidates(pos));

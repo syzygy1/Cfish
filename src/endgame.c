@@ -450,7 +450,7 @@ int ScaleKQKRPs(Pos *pos, int strongSide)
 
   assert(verify_material(pos, strongSide, QueenValueMg, 0));
   assert(popcount(pieces_cp(weakSide, ROOK)) == 1);
-  assert(more_than_one(pieces_cp(weakSide, PAWN)));
+  assert(pieces_cp(weakSide, PAWN));
 
   Square kingSq = square_of(weakSide, KING);
   Square rsq = lsb(pieces_p(ROOK));

@@ -1,22 +1,23 @@
 #if NT == PV
-#define func2(name,chk) name##_PV_##chk
+#define name_NT(name,chk) name##_PV_##chk
 #if InCheck == false
-#define func(name) name##_PV_false
+#define name_NT_InCheck(name) name##_PV_false
 #else
-#define func(name) name##_PV_true
+#define name_NT_InCheck(name) name##_PV_true
 #endif
 #else
-#define func2(name,chk) name##_NonPV_##chk
+#define name_NT(name,chk) name##_NonPV_##chk
 #if InCheck == false
-#define func(name) name##_NonPV_false
+#define name_NT_InCheck(name) name##_NonPV_false
 #else
-#define func(name) name##_NonPV_true
+#define name_NT_InCheck(name) name##_NonPV_true
 #endif
 #endif
 
 #define PvNode (NT == PV)
 
-Value func(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta, Depth depth)
+Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta,
+                               Depth depth)
 {
   assert(InCheck == !!pos_checkers());
   assert(alpha >= -VALUE_INFINITE && alpha < beta && beta <= VALUE_INFINITE);
@@ -65,7 +66,7 @@ Value func(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta, Depth depth)
       && tte_depth(tte) >= ttDepth
       && ttValue != VALUE_NONE // Only in case of TT access race
       && (ttValue >= beta ? (tte_bound(tte) &  BOUND_LOWER)
-                            : (tte_bound(tte) &  BOUND_UPPER))) {
+                          : (tte_bound(tte) &  BOUND_UPPER))) {
     ss->currentMove = ttMove; // Can be MOVE_NONE
     return ttValue;
   }
@@ -166,8 +167,8 @@ Value func(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta, Depth depth)
 
     // Make and search the move
     do_move(pos, move, &st, givesCheck);
-    value = givesCheck ? -func2(qsearch,  true)(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
-                       : -func2(qsearch, false)(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
+    value = givesCheck ? -name_NT(qsearch,  true)(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
+                       : -name_NT(qsearch, false)(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
     undo_move(pos, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
@@ -208,6 +209,6 @@ Value func(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta, Depth depth)
 }
 
 #undef PvNode
-#undef func
-#undef func2
+#undef name_NT_InCheck
+#undef name_NT
 

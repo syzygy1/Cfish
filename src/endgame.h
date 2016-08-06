@@ -45,5 +45,7 @@ struct EndgameFunc {
 
 struct EndgameFunc endgame_funcs[NUM_EVAL + NUM_SCALING];
 
+void endgames_init(void);
+
 #endif
 

@@ -18,6 +18,9 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#if 1
+#include "movegen2.c"
+#else
 #include <assert.h>
 
 #include "movegen.h"
@@ -756,4 +759,5 @@ ExtMove *generate_legal(Pos *pos, ExtMove *list)
 
   return list;
 }
+#endif
 

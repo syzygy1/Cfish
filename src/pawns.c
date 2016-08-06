@@ -90,7 +90,6 @@ static const Value MaxSafetyBonus = V(258);
 
 static inline Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
 {
-//  const int    Them  = (Us == WHITE ? BLACK    : WHITE);
   const Square Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
   const Square Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
   const Square Left  = (Us == WHITE ? DELTA_NW : DELTA_SE);
@@ -144,7 +143,7 @@ static inline Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
       // stopper on adjacent file which controls the way to that rank.
       backward = !!((b | shift_bb(Up, b & adjacent_files_bb(f))) & stoppers);
 
-      assert(!backward || !(pawn_attack_span(Them, s + Up) & neighbours));
+      assert(!backward || !(pawn_attack_span(Us ^ 1, s + Up) & neighbours));
     }
 
     // Passed pawns will be properly scored in evaluation because we need
@@ -172,7 +171,7 @@ static inline Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
       score += Lever[relative_rank_s(Us, s)];
   }
 
-  b = e->semiopenFiles[Us] ^ 0xFF;
+  b = e->semiopenFiles[Us] ^ 0xFFULL;
   e->pawnSpan[Us] = b ? (msb(b) - lsb(b)) : 0;
 
   return score;

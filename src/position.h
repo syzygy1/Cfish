@@ -115,7 +115,7 @@ int is_legal(Pos *pos, Move m, Bitboard pinned);
 int is_pseudo_legal(Pos *pos, Move m);
 static int is_capture(Pos *pos, Move m);
 static int is_capture_or_promotion(Pos *pos, Move m);
-int gives_check(Pos *pos, Move m, CheckInfo *ci);
+int gives_check(Pos *pos, Move m, const CheckInfo *ci);
 
 // Doing and undoing moves
 void do_move(Pos *pos, Move m, State *st, int givesCheck);

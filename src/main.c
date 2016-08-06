@@ -21,6 +21,7 @@
 #include <stdio.h>
 
 #include "bitboard.h"
+#include "endgame.h"
 #include "evaluate.h"
 #include "position.h"
 #include "search.h"
@@ -40,6 +41,7 @@ int main(int argc, char **argv)
   search_init();
   eval_init();
   pawn_init();
+  endgames_init();
   threads_init();
   options_init();
 //  TB_init(); // Options["SyzygyPath"]

@@ -169,22 +169,22 @@ static const int HalfDensityRowSize[HalfDensitySize] = {
   8, 8, 8, 8, 8, 8, 8, 8
 };
 
-Value DrawValue[2];
-CounterMoveHistoryStats CounterMoveHistory;
+static Value DrawValue[2];
+static CounterMoveHistoryStats CounterMoveHistory;
 
-Value search_PV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth, int cutNode);
-Value search_NonPV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth, int cutNode);
+static Value search_PV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth, int cutNode);
+static Value search_NonPV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth, int cutNode);
 
-Value qsearch_PV_true(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-Value qsearch_PV_false(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-Value qsearch_NonPV_true(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-Value qsearch_NonPV_false(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
+static Value qsearch_PV_true(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
+static Value qsearch_PV_false(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
+static Value qsearch_NonPV_true(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
+static Value qsearch_NonPV_false(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
 
 static Value value_to_tt(Value v, int ply);
 static Value value_from_tt(Value v, int ply);
 static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_stats(const Pos *pos, Stack* ss, Move move, Depth depth, Move* quiets, int quietsCnt);
-static void check_time();
+static void check_time(void);
 static void stable_sort(RootMove *rm, size_t num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
 static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
@@ -202,7 +202,7 @@ void search_init(void)
         if (r < 0.80)
           continue;
 
-        Reductions[NonPV][imp][d][mc] = lround(r) * ONE_PLY;
+        Reductions[NonPV][imp][d][mc] = ((int)lround(r)) * ONE_PLY;
         Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - ONE_PLY, DEPTH_ZERO);
 
         // Increase reduction for non-PV nodes when eval is not improving
@@ -349,8 +349,8 @@ void mainthread_search(void)
       &&  option_value(OPT_MULTI_PV) == 1
       && !Limits.depth
 //      && !Skill(option_value(OPT_SKILL_LEVEL)).enabled()
-      &&  th->rootMoves->move[0].pv[0] != MOVE_NONE) {
-
+      &&  th->rootMoves->move[0].pv[0] != MOVE_NONE)
+  {
     for (size_t idx = 0; idx < Threads.num_threads; idx++) {
       Thread *t = Threads.thread[idx];
       if (   t->completedDepth > bestThread->completedDepth
@@ -633,7 +633,8 @@ void thread_search(Thread *thread)
 #undef true
 #undef false
 
-// stable_sort() sorts RootMoves while preserving order of equal elements.
+// stable_sort() sorts RootMoves from highest-scoring move to lowest-scoring
+// move while preserving order of equal elements.
 static void stable_sort(RootMove *rm, size_t num)
 {
   size_t i, j;

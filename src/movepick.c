@@ -117,7 +117,7 @@ void mp_init_q(MovePicker *mp, Pos *pos, Move ttm, Depth depth, Square s)
     ttm = 0;
   }
 
-  mp->ttMove = ttm & is_pseudo_legal(pos, ttm) ? ttm : 0;
+  mp->ttMove = ttm && is_pseudo_legal(pos, ttm) ? ttm : 0;
   mp->cur = mp->moves;
   mp->endMoves = mp->moves + (mp->ttMove != 0);
   mp->endBadCaptures = mp->moves + MAX_MOVES - 1;

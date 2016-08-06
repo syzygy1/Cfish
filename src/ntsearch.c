@@ -1,12 +1,12 @@
 #if (NT == PV)
 #define PvNode 1
-#define func(name) name##_PV
+#define name_NT(name) name##_PV
 #else
 #define PvNode 0
-#define func(name) name##_NonPV
+#define name_NT(name) name##_NonPV
 #endif
 
-Value func(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
+Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
                   Depth depth, int cutNode)
 {
   int rootNode = PvNode && (ss-1)->ply == 0;
@@ -261,7 +261,7 @@ Value func(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
 
     Depth d = depth - 2 * ONE_PLY - (PvNode ? DEPTH_ZERO : depth / 4);
     ss->skipEarlyPruning = 1;
-    func(search)(pos, ss, alpha, beta, d, cutNode);
+    name_NT(search)(pos, ss, alpha, beta, d, cutNode);
     ss->skipEarlyPruning = 0;
 
     tte = tt_probe(posKey, &ttHit);
@@ -270,9 +270,9 @@ Value func(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
 
 moves_loop: // When in check search starts from here.
   ;  // Avoid a compiler warning. A label must be followed by a statement.
-  CounterMoveStats* cmh  = (ss-1)->counterMoves;
-  CounterMoveStats* fmh  = (ss-2)->counterMoves;
-  CounterMoveStats* fmh2 = (ss-4)->counterMoves;
+  CounterMoveStats *cmh  = (ss-1)->counterMoves;
+  CounterMoveStats *fmh  = (ss-2)->counterMoves;
+  CounterMoveStats *fmh2 = (ss-4)->counterMoves;
 
   MovePicker mp;
   mp_init(&mp, pos, ttMove, depth, ss);
@@ -300,9 +300,10 @@ moves_loop: // When in check search starts from here.
     if (move == excludedMove)
       continue;
 
-    // At root obey the "searchmoves" option and skip moves not listed in Root
-    // Move List. As a consequence any illegal move is also skipped. In MultiPV
-    // mode we also skip PV moves which have been already searched.
+    // At root obey the "searchmoves" option and skip moves not listed
+    // inRoot Move List. As a consequence any illegal move is also skipped.
+    // In MultiPV mode we also skip PV moves which have been already
+    // searched.
     if (rootNode) {
       size_t idx;
       for (idx = thisThread->PVIdx; idx < thisThread->rootMoves->size; idx++)
@@ -352,8 +353,8 @@ moves_loop: // When in check search starts from here.
     if (    singularExtensionNode
         &&  move == ttMove
         && !extension
-        &&  is_legal(pos, move, ci.pinned)) {
-
+        &&  is_legal(pos, move, ci.pinned))
+    {
       Value rBeta = ttValue - 2 * depth / ONE_PLY;
       ss->excludedMove = move;
       ss->skipEarlyPruning = 1;
@@ -388,7 +389,7 @@ moves_loop: // When in check search starts from here.
           && (!fmh2 || (*fmh2)[moved_piece][to_sq(move)] < VALUE_ZERO || (cmh && fmh)))
         continue;
 
-      predictedDepth = max(newDepth - func(reduction)(improving, depth, moveCount), DEPTH_ZERO);
+      predictedDepth = max(newDepth - name_NT(reduction)(improving, depth, moveCount), DEPTH_ZERO);
 
       // Futility pruning: parent node
       if (   predictedDepth < 7 * ONE_PLY
@@ -419,9 +420,9 @@ moves_loop: // When in check search starts from here.
     // re-searched at full depth.
     if (    depth >= 3 * ONE_PLY
         &&  moveCount > 1
-        && !captureOrPromotion) {
-
-      Depth r = func(reduction)(improving, depth, moveCount);
+        && !captureOrPromotion)
+    {
+      Depth r = name_NT(reduction)(improving, depth, moveCount);
       Value val = (*thisThread->history)[moved_piece][to_sq(move)]
                  +    (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
                  +    (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
@@ -544,18 +545,18 @@ moves_loop: // When in check search starts from here.
       quietsSearched[quietCount++] = move;
   }
 
-  // The following condition would detect a stop only after move loop has been
-  // completed. But in this case bestValue is valid because we have fully
-  // searched our subtree, and we can anyhow save the result in TT.
+  // The following condition would detect a stop only after move loop has
+  // been completed. But in this case bestValue is valid because we have
+  // fully searched our subtree, and we can anyhow save the result in TT.
   /*
   if (Signals.stop)
     return VALUE_DRAW;
   */
 
   // Step 20. Check for mate and stalemate
-  // All legal moves have been searched and if there are no legal moves, it
-  // must be a mate or a stalemate. If we are in a singular extension search then
-  // return a fail low score.
+  // All legal moves have been searched and if there are no legal moves,
+  // it must be a mate or a stalemate. If we are in a singular extension
+  // search then return a fail low score.
   if (!moveCount)
     bestValue = excludedMove ? alpha
                :     inCheck ? mated_in(ss->ply) : DrawValue[pos_stm()];
@@ -568,7 +569,8 @@ moves_loop: // When in check search starts from here.
   else if (    depth >= 3 * ONE_PLY
            && !bestMove
            && !captured_piece_type()
-           && move_is_ok((ss-1)->currentMove)) {
+           && move_is_ok((ss-1)->currentMove))
+  {
     Square prevSq = to_sq((ss-1)->currentMove);
     Value bonus = (Value)((depth / ONE_PLY) * (depth / ONE_PLY) + 2 * depth / ONE_PLY - 2);
     if ((ss-2)->counterMoves)
@@ -592,5 +594,5 @@ moves_loop: // When in check search starts from here.
 }
 
 #undef PvNode
-#undef func
+#undef name_NT
 
