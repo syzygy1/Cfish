@@ -64,7 +64,8 @@ struct Option {
   char *val_string;
 };
 
-void options_init();
+void options_init(void);
+void options_free(void);
 void print_options(void);
 int option_value(int opt);
 char *option_string_value(int opt);

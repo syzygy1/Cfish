@@ -253,6 +253,11 @@ static void init_tb(char *str)
   if (key2 != key) add_to_hash(entry, key2);
 }
 
+void TB_free(void)
+{
+  TB_init("");
+}
+
 void TB_init(char *path)
 {
   char str[16];

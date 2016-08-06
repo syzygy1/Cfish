@@ -110,6 +110,13 @@ void options_init()
   }
 }
 
+void options_free(void)
+{
+  for (Option *opt = options_map; opt->name != NULL; opt++)
+    if (opt->type == OPT_TYPE_STRING)
+      free(opt->val_string);
+}
+
 static char *opt_type_str[] =
 {
   "check", "spin", "button", "string"

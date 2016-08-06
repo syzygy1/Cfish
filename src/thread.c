@@ -38,8 +38,8 @@ Thread *thread_create(int idx)
   Thread *th = malloc(sizeof(Thread));
   th->idx = idx;
 
-  th->pawnTable = malloc(sizeof(PawnTable));
-  th->materialTable = malloc(sizeof(MaterialTable));
+  th->pawnTable = calloc(sizeof(PawnTable), 1);
+  th->materialTable = calloc(sizeof(MaterialTable), 1);
   th->history = malloc(sizeof(HistoryStats));
   th->counterMoves = malloc(sizeof(MoveStats));
   th->rootMoves = malloc(sizeof(RootMoves));
@@ -138,8 +138,12 @@ void thread_idle_loop(Thread *th)
 
     pthread_mutex_unlock(&th->mutex);
 
-    if (!th->exit)
-      thread_search(th);
+    if (!th->exit) {
+      if (th->idx == 0)
+        mainthread_search();
+      else
+        thread_search(th);
+    }
   }
 }
 
@@ -209,6 +213,7 @@ void threads_start_thinking(Pos *pos, State *states, LimitsType *limits)
   Signals.stopOnPonderhit = Signals.stop = 0;
   Limits = *limits;
   RootMoves rootMoves;
+  rootMoves.size = 0;
 
   ExtMove list[MAX_MOVES];
   ExtMove *end = generate_legal(pos, list);
@@ -227,21 +232,9 @@ void threads_start_thinking(Pos *pos, State *states, LimitsType *limits)
 
   TB_filter_root_moves(pos, &rootMoves);
 
-#if 0
-  // After ownership transfer 'states' becomes empty, so if we stop the search
-  // and call 'go' again without setting a new position states.get() == NULL.
-  assert(states.get() || setupStates.get());
-
-  if (states.get())
-    setupStates = std::move(states); // Ownership transfer, states is now empty
-
-  State tmp = setupStates->back();
-#endif
-
-//  State tmp = *states;
   State tmp = *(pos->st);
 
-  char fen[80];
+  char fen[100];
   pos_fen(pos, fen);
 
   for (size_t idx = 0; idx < Threads.num_threads; idx++) {
@@ -254,6 +247,6 @@ void threads_start_thinking(Pos *pos, State *states, LimitsType *limits)
 
   *states = tmp; // Restore st->previous, cleared by Position::set()
 
-  mainthread_search();
+  thread_start_searching(threads_main(), 0);
 }
 

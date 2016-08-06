@@ -865,7 +865,7 @@ int ScaleKPKP(Pos *pos, int strongSide)
   // Assume strongSide is white and the pawn is on files A-D
   Square wksq = normalize(pos, strongSide, square_of(strongSide, KING));
   Square bksq = normalize(pos, strongSide, square_of(weakSide, KING));
-  Square psq  = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
+  Square psq  = normalize(pos, strongSide, square_of(strongSide, PAWN));
 
   int us = strongSide == pos_stm() ? WHITE : BLACK;
 

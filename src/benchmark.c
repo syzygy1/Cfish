@@ -90,6 +90,11 @@ void benchmark(Pos *current, char *str)
   size_t num_fens;
   LimitsType limits;
 
+  limits.time[0] = limits.time[1] = limits.inc[0] = limits.inc[1] = 0;
+  limits.npmsec = limits.movestogo = limits.depth = limits.movetime = 0;
+  limits.mate = limits.infinite = limits.ponder = limits.num_searchmoves = 0;
+  limits.nodes = 0;
+
   int ttSize = 16, threads = 1, limit = 13;
   char *fenFile = NULL, *limitType = "";
 
@@ -172,7 +177,7 @@ void benchmark(Pos *current, char *str)
     else {
       limits.startTime = now();
       threads_start_thinking(&pos, &st, &limits);
-      thread_wait_for_search_finished(Threads.thread[0]);
+      thread_wait_for_search_finished(threads_main());
       nodes += threads_nodes_searched();
     }
   }

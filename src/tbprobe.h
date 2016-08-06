@@ -6,6 +6,7 @@
 extern int TB_MaxCardinality;
 
 void TB_init(char *path);
+void TB_free(void);
 int TB_probe_wdl(Pos *pos, int *success);
 int TB_probe_dtz(Pos *pos, int *success);
 int TB_root_probe(Pos *pos, RootMoves *rootMoves, Value *score);
