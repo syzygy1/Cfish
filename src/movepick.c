@@ -45,7 +45,7 @@
 
 // Our insertion sort, which is guaranteed to be stable, as it should be.
 
-void insertion_sort(ExtMove* begin, ExtMove* end)
+static inline void insertion_sort(ExtMove *begin, ExtMove *end)
 {
   ExtMove tmp, *p, *q;
 
@@ -57,11 +57,40 @@ void insertion_sort(ExtMove* begin, ExtMove* end)
   }
 }
 
+// Our non-stable partition function, the one that Stockfish uses.
+
+static inline ExtMove *partition(ExtMove *first, ExtMove *last)
+{
+  ExtMove tmp;
+
+  while (1) {
+    while (1)
+      if (first == last)
+        return first;
+      else if (first->value > 0)
+        first++;
+      else
+        break;
+    last--;
+    while (1)
+      if (first == last)
+        return first;
+      else if (!(last->value > 0))
+        last--;
+      else
+        break;
+    tmp = *first;
+    *first = *last;
+    *last = tmp;
+    first++;
+  }
+}
+
 // pick_best() finds the best move in the range (begin, end) and moves
 // it to the front. It's faster than sorting all the moves in advance
 // when there are few moves, e.g., the possible captures.
 
-Move pick_best(ExtMove* begin, ExtMove* end)
+Move pick_best(ExtMove *begin, ExtMove *end)
 {
   ExtMove *p, *q, tmp;
 
@@ -173,7 +202,7 @@ void score_quiets(MovePicker *mp)
   CounterMoveStats *f2 = (mp->ss-4)->counterMoves;
 
   for (ExtMove *m = mp->moves; m < mp->endMoves; m++)
-    m->value =    (*history)[moved_piece(m->move)][to_sq(m->move)]
+    m->value =   (*history)[moved_piece(m->move)][to_sq(m->move)]
               + (cm ? (*cm)[moved_piece(m->move)][to_sq(m->move)] : 0)
               + (fm ? (*fm)[moved_piece(m->move)][to_sq(m->move)] : 0)
               + (f2 ? (*f2)[moved_piece(m->move)][to_sq(m->move)] : 0);
@@ -195,7 +224,7 @@ void score_evasions(MovePicker *mp)
       m->value = see - HistoryStats_Max; // At the bottom
     else if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - (Value)type_of_p(moved_piece(m->move)) // weird
+                - (Value)type_of_p(moved_piece(m->move))
                 + HistoryStats_Max;
     else
       m->value = (*history)[moved_piece(m->move)][to_sq(m->move)];
@@ -231,18 +260,8 @@ void generate_next_stage(MovePicker *mp)
     mp->endMoves = generate_quiets(mp->pos, mp->moves);
     score_quiets(mp);
     if (mp->depth < 3 * ONE_PLY) {
-      ExtMove *p = mp->cur, *q = mp->endMoves - 1;
-      while (1) {
-        while (p < q && p->value > 0) p++;
-        while (p < q && q->value <= 0) q--;
-        if (p < q) {
-          ExtMove tmp = *p;
-          *p = *q;
-          *q = tmp;
-        } else
-          break;
-      }
-      insertion_sort(mp->cur, p);
+      ExtMove *goodQuiet = partition(mp->cur, mp->endMoves);
+      insertion_sort(mp->cur, goodQuiet);
     } else
       insertion_sort(mp->cur, mp->endMoves);
     break;

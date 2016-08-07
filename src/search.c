@@ -709,7 +709,7 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
   hs_update(*thisThread->history, moved_piece(move), to_sq(move), bonus);
 
   if (cmh) {
-    cms_update(*thisThread->counterMoves, piece_on(prevSq), prevSq, move);
+    (*thisThread->counterMoves)[piece_on(prevSq)][prevSq] = move;
     cms_update(*cmh, moved_piece(move), to_sq(move), bonus);
   }
 
