@@ -35,9 +35,11 @@ static inline void put_piece(Pos *pos, int c, int pt, Square s)
   pos->byTypeBB[0] |= sq_bb(s);
   pos->byTypeBB[pt] |= sq_bb(s);
   pos->byColorBB[c] |= sq_bb(s);
+#ifdef PIECELISTS
   pos->index[s] = pos->pieceCount[c][pt]++;
   pos->pieceList[c][pt][pos->index[s]] = s;
   pos->pieceCount[c][0]++;
+#endif
 }
 
 static inline void remove_piece(Pos *pos, int c, int pt, Square s)
@@ -51,11 +53,13 @@ static inline void remove_piece(Pos *pos, int c, int pt, Square s)
   pos->byTypeBB[pt] ^= sq_bb(s);
   pos->byColorBB[c] ^= sq_bb(s);
   /* board[s] = 0;  Not needed, overwritten by the capturing one */
+#ifdef PIECELISTS
   Square lastSquare = pos->pieceList[c][pt][--pos->pieceCount[c][pt]];
   pos->index[lastSquare] = pos->index[s];
   pos->pieceList[c][pt][pos->index[lastSquare]] = lastSquare;
   pos->pieceList[c][pt][pos->pieceCount[c][pt]] = SQ_NONE;
   pos->pieceCount[c][0]--;
+#endif
 }
 
 static inline void move_piece(Pos *pos, int c, int pt, Square from, Square to)
@@ -68,8 +72,10 @@ static inline void move_piece(Pos *pos, int c, int pt, Square from, Square to)
   pos->byColorBB[c] ^= from_to_bb;
   pos->board[from] = 0;
   pos->board[to] = make_piece(c, pt);
+#ifdef PIECELISTS
   pos->index[to] = pos->index[from];
   pos->pieceList[c][pt][pos->index[to]] = to;
+#endif
 }
 
 
@@ -165,10 +171,14 @@ void pos_set(Pos *pos, char *fen, int isChess960, State *st)
   unsigned char col, row, token;
   Square sq = SQ_A8;
 
-  memset(pos, 0, sizeof(Pos));
+  memset(pos, 0, offsetof(Pos, st));
   memset(st, 0, sizeof(State));
-  for (size_t i = 0; i < sizeof(pos->pieceList) / sizeof(int); i++)
-    ((int *)&(pos->pieceList))[i] = SQ_NONE;
+#ifdef PIECELISTS
+  for (int c = 0; c < 2; c++)
+    for (int pt = 0; pt < 8; pt++)
+      for (int i = 0; i < 16; i++)
+        pos->pieceList[c][pt][i] = SQ_NONE;
+#endif
   pos->st = st;
 
   // Piece placement
@@ -306,10 +316,16 @@ static void set_state(Pos *pos, State* st)
     st->pawnKey ^= zob_psq[color_of(piece_on(s))][PAWN][s];
   }
 
+#ifdef PIECELISTS
   for (int c = 0; c < 2; c++)
     for (int pt = PAWN; pt <= KING; pt++)
       for (int cnt = 0; cnt < piece_count(c, pt); cnt++)
         st->materialKey ^= zob_psq[c][pt][cnt];
+#else
+  for (int c = 0; c < 2; c++)
+    for (int pt = PAWN; pt <= KING; p++)
+      st->materialKey += mat_key[c][pt];
+#endif
 
   for (int c = 0; c < 2; c++)
     for (int pt = KNIGHT; pt <= QUEEN; pt++)

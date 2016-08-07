@@ -45,7 +45,6 @@ SignalsType Signals;
 LimitsType Limits;
 
 int TB_Cardinality;
-uint64_t TB_Hits;
 int TB_RootInTB;
 int TB_UseRule50;
 Depth TB_ProbeDepth;
@@ -816,6 +815,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
   size_t PVIdx = pos->PVIdx;
   size_t multiPV = min((size_t)option_value(OPT_MULTI_PV), rootMoves->size);
   uint64_t nodes_searched = threads_nodes_searched();
+  uint64_t tbhits = threads_tb_hits();
   char buf[16];
 
   for (size_t i = 0; i < multiPV; ++i) {
@@ -843,7 +843,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     if (elapsed > 1000)
       printf(" hashfull %d", tt_hashfull());
 
-    printf(" tbhits %"PRIu64" time %d pv", TB_Hits, elapsed);
+    printf(" tbhits %"PRIu64" time %d pv", tbhits, elapsed);
 
     for (size_t idx = 0; idx < rootMoves->move[i].pv_size; idx++)
       printf(" %s", uci_move(buf, rootMoves->move[i].pv[idx], is_chess960()));
@@ -888,7 +888,6 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
 
 ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
 {
-  TB_Hits = 0;
   TB_RootInTB = 0;
   TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);
   TB_ProbeDepth = option_value(OPT_SYZ_PROBE_DEPTH) * ONE_PLY;
@@ -922,8 +921,6 @@ ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
   }
 
   if (TB_RootInTB) {
-    TB_Hits = num_moves;
-
     if (!TB_UseRule50)
       TB_Score =  TB_Score > VALUE_DRAW ?  VALUE_MATE - MAX_PLY - 1
                 : TB_Score < VALUE_DRAW ? -VALUE_MATE + MAX_PLY + 1

@@ -21,6 +21,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#define PIECELISTS
+
 // When compiling with provided Makefile (e.g. for Linux and OSX),
 // configuration is done automatically. To get started type 'make help'.
 //

@@ -208,6 +208,17 @@ uint64_t threads_nodes_searched(void)
 }
 
 
+// threads_tb_hits() returns the number of TB hits.
+
+uint64_t threads_tb_hits(void)
+{
+  uint64_t hits = 0;
+  for (size_t idx = 0; idx < Threads.num_threads; idx++)
+    hits += Threads.pos[idx]->tb_hits;
+  return hits;
+}
+
+
 // threads_start_thinking() wakes up the main thread sleeping in
 // idle_loop() and starts a new search, then returns immediately.
 
@@ -238,6 +249,7 @@ void threads_start_thinking(Pos *root, LimitsType *limits)
     Pos *pos = Threads.pos[idx];
     pos->maxPly = 0;
     pos->rootDepth = DEPTH_ZERO;
+    pos->nodes = pos->tb_hits = 0;
     RootMoves *rm = pos->rootMoves;
     rm->size = end - list;
     for (size_t i = 0; i < rm->size; i++) {
@@ -247,6 +259,9 @@ void threads_start_thinking(Pos *root, LimitsType *limits)
     }
     copy_position(pos, root);
   }
+
+  if (TB_RootInTB)
+    Threads.pos[0]->tb_hits = end - list;
 
   thread_start_searching(threads_main(), 0);
 }

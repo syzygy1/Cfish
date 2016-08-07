@@ -83,16 +83,17 @@ typedef struct State State;
 
 struct Pos {
   // Board / game representation.
-  Piece board[64];
-  Bitboard byTypeBB[8];
+  int board[64];
+  Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
+#ifdef PIECELISTS
   int pieceCount[2][8];
   Square pieceList[2][8][16];
   int index[64];
+#endif
   int castlingRightsMask[64];
   Square castlingRookSquare[16];
   Bitboard castlingPath[16];
-  uint64_t nodes;
   int sideToMove;
   uint16_t gamePly;
   uint16_t chess960;
@@ -101,6 +102,8 @@ struct Pos {
 
   // Relevant mainly to the search of the root position.
   RootMoves *rootMoves;
+  uint64_t nodes;
+  uint64_t tb_hits;
   int PVIdx;
   int maxPly;
   Depth rootDepth;
@@ -204,7 +207,6 @@ int pos_is_ok(Pos *pos, int* failedStep);
 #define pos_game_ply() (pos->gamePly)
 #define is_chess960() (pos->chess960)
 #define pos_nodes_searched() (pos->nodes)
-#define pos_set_nodes_searched(n) (pos->nodes = (n))
 #define pos_rule50_count() (pos->st->rule50)
 #define pos_psq_score() (pos->st->psq)
 #define pos_non_pawn_material(c) (pos->st->nonPawnMaterial[c])

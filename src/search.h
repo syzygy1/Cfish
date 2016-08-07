@@ -108,6 +108,7 @@ typedef struct SignalsType SignalsType;
 
 extern SignalsType Signals;
 extern LimitsType Limits;
+extern int TB_RootInTB;
 
 void search_init();
 void search_clear();

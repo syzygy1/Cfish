@@ -114,7 +114,7 @@ Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
       int found, v = TB_probe_wdl(pos, &found);
 
       if (found) {
-        TB_Hits++;
+        pos->tb_hits++;
 
         int drawScore = TB_UseRule50 ? 1 : 0;
 
