@@ -55,6 +55,7 @@ struct Thread {
   Depth rootDepth;
   HistoryStats *history;
   MoveStats *counterMoves;
+  FromToStats *fromTo;
   Depth completedDepth;
   atomic_bool resetCalls;
 };

@@ -503,6 +503,19 @@ static inline Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 // evaluate_threats() assigns bonuses according to the types of the
 // attacking and the attacked pieces.
 
+#define WhiteCamp   (Rank4BB | Rank5BB | Rank6BB | Rank7BB | Rank8BB)
+#define BlackCamp   (Rank5BB | Rank4BB | Rank3BB | Rank2BB | Rank1BB)
+#define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
+#define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
+#define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
+
+static const Bitboard KingFlank[2][8] = {
+  { QueenSide   & WhiteCamp, QueenSide & WhiteCamp, QueenSide & WhiteCamp, CenterFiles & WhiteCamp,
+    CenterFiles & WhiteCamp, KingSide  & WhiteCamp, KingSide  & WhiteCamp, KingSide    & WhiteCamp },
+  { QueenSide   & BlackCamp, QueenSide & BlackCamp, QueenSide & BlackCamp, CenterFiles & BlackCamp,
+    CenterFiles & BlackCamp, KingSide  & BlackCamp, KingSide  & BlackCamp, KingSide    & BlackCamp },
+};
+
 static inline Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them          = (Us == WHITE ? BLACK    : WHITE);
@@ -511,18 +524,6 @@ static inline Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
   const Square Right      = (Us == WHITE ? DELTA_NE : DELTA_SW);
   const Bitboard TRank2BB = (Us == WHITE ? Rank2BB  : Rank7BB);
   const Bitboard TRank7BB = (Us == WHITE ? Rank7BB  : Rank2BB);
-
-  const Bitboard TheirCamp = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB | Rank7BB | Rank8BB
-                                          : Rank5BB | Rank4BB | Rank3BB | Rank2BB | Rank1BB);
-
-  const Bitboard QueenSide   = TheirCamp & (FileABB | FileBBB | FileCBB | FileDBB);
-  const Bitboard CenterFiles = TheirCamp & (FileCBB | FileDBB | FileEBB | FileFBB);
-  const Bitboard KingSide    = TheirCamp & (FileEBB | FileFBB | FileGBB | FileHBB);
-
-  Bitboard KingFlank[8] = {
-    QueenSide, QueenSide, QueenSide, CenterFiles,
-    CenterFiles, KingSide, KingSide, KingSide
-  };
 
   enum { Minor, Rook };
 
@@ -590,7 +591,7 @@ static inline Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
   score += ThreatByPawnPush * popcount(b);
 
   // King tropism: firstly, find squares that we attack in the enemy king flank
-  b = ei->attackedBy[Us][0] & KingFlank[file_of(square_of(Them, KING))];
+  b = ei->attackedBy[Us][0] & KingFlank[Us][file_of(square_of(Them, KING))];
 
   // Secondly, add to the bitboard the squares which we attack twice in that flank
   // but which are not protected by a enemy pawn. Note the trick to shift away the

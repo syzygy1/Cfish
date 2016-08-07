@@ -42,6 +42,7 @@ Thread *thread_create(int idx)
   th->materialTable = calloc(sizeof(MaterialTable), 1);
   th->history = malloc(sizeof(HistoryStats));
   th->counterMoves = malloc(sizeof(MoveStats));
+  th->fromTo = malloc(sizeof(FromToStats));
   th->rootMoves = malloc(sizeof(RootMoves));
 
   stats_clear(th->history);
@@ -79,6 +80,7 @@ void thread_destroy(Thread *th)
   free(th->materialTable);
   free(th->history);
   free(th->counterMoves);
+  free(th->fromTo);
   free(th->rootMoves);
   
   free(th);

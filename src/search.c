@@ -59,7 +59,7 @@ Value TB_Score;
 // Razoring and futility margin based on depth
 static const int razor_margin[4] = { 483, 570, 603, 554 };
 
-#define futility_margin(d) ((Value)(200 * (d)))
+#define futility_margin(d) ((Value)(150 * (d)))
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16];  // [improving][depth]
@@ -230,6 +230,7 @@ void search_clear()
     Thread *th = Threads.thread[idx];
     stats_clear(th->history);
     stats_clear(th->counterMoves);
+    stats_clear(th->fromTo);
   }
 
   mainThread.previousScore = VALUE_INFINITE;
@@ -698,6 +699,7 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
     ss->killers[0] = move;
   }
 
+  int c = pos_stm();
   Value bonus = (Value)((depth / ONE_PLY) * (depth / ONE_PLY) + 2 * depth / ONE_PLY - 2);
 
   Square prevSq = to_sq((ss-1)->currentMove);
@@ -707,6 +709,7 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
   Thread* thisThread = pos->thisThread;
 
   hs_update(*thisThread->history, moved_piece(move), to_sq(move), bonus);
+  ft_update(*thisThread->fromTo, c, move, bonus);
 
   if (cmh) {
     (*thisThread->counterMoves)[piece_on(prevSq)][prevSq] = move;
@@ -722,6 +725,7 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
   // Decrease all the other played quiet moves
   for (int i = 0; i < quietsCnt; i++) {
     hs_update(*thisThread->history, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
+    ft_update(*thisThread->fromTo, c, quiets[i], -bonus);
 
     if (cmh)
       cms_update(*cmh, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);

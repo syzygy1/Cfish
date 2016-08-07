@@ -30,52 +30,20 @@
 
 #define max(a,b) ((a) > (b) ? (a) : (b))
 
-
-// The Stats struct stores moves statistics. According to the template
-// parameter the class can store History and Countermoves. History records
-// how often different moves have been successful or unsuccessful during
-// the current search and is used for reduction and move ordering decisions.
+// History records how often different moves have been successful or
+// unsuccessful during the current search and is used for reduction and
+// move ordering decisions.
+//
 // Countermoves store the move that refute a previous one. Entries are
 // stored using only the moving piece and destination square, hence two
 // moves with different origin but same destination and piece will be
 // considered identical.
 
-// note: it's just a 16x64 table.
-/*
-template<typename T, bool CM = false>
-struct Stats {
-
-  static const Value Max = Value(1 << 28);
-
-  const T* operator[](Piece pc) const { return table[pc]; }
-  T* operator[](Piece pc) { return table[pc]; }
-  void clear() { std::memset(table, 0, sizeof(table)); }
-
-  void update(Piece pc, Square to, Move m) { table[pc][to] = m; }
-
-  void update(Piece pc, Square to, Value v) {
-
-    if (abs(int(v)) >= 324)
-        return;
-
-    table[pc][to] -= table[pc][to] * abs(int(v)) / (CM ? 936 : 324);
-    table[pc][to] += int(v) * 32;
-  }
-
-private:
-  T table[16][64];
-};
-
-typedef Stats<Move> MoveStats;
-typedef Stats<Value, false> HistoryStats;
-typedef Stats<Value,  true> CounterMoveStats;
-typedef Stats<CounterMoveStats> CounterMoveHistoryStats;
-*/
-
 typedef Move MoveStats[16][64];
 typedef Value HistoryStats[16][64];
 typedef Value CounterMoveStats[16][64];
 typedef CounterMoveStats CounterMoveHistoryStats[16][64];
+typedef Value FromToStats[2][64][64];
 
 #define stats_clear(s) memset(s, 0, sizeof(*s))
 
@@ -98,6 +66,23 @@ static inline void cms_update(CounterMoveStats cms, Piece pc, Square to, Value v
   cms[pc][to] -= cms[pc][to] * w / 936;
   cms[pc][to] += ((int)v) * 32;
 }
+
+static inline void ft_update(FromToStats ft, int c, Move m, Value v)
+{
+  int w = v >= 0 ? v : -v;
+  if (w >= 324)
+    return;
+
+  int f = from_sq(m), t = to_sq(m);
+  ft[c][f][t] -= ft[c][f][t] * w / 324;
+  ft[c][f][t] += ((int)v) * 32;
+}
+
+static inline Value ft_get(FromToStats ft, int c, Move m)
+{
+  return ft[c][from_sq(m)][to_sq(m)];
+}
+
 
 // MovePicker struct is used to pick one pseudo legal move at a time from
 // the current position. The most important method is next_move(), which

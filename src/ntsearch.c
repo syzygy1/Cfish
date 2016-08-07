@@ -183,9 +183,8 @@ Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
 
   // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
-      &&  depth >= 2 * ONE_PLY
       &&  eval >= beta
-      && (ss->staticEval >= beta || depth >= 12 * ONE_PLY)
+      && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
       &&  pos_non_pawn_material(pos_stm())) {
 
     ss->currentMove = MOVE_NULL;
@@ -394,12 +393,17 @@ moves_loop: // When in check search starts from here.
 
       // Futility pruning: parent node
       if (   predictedDepth < 7 * ONE_PLY
-          && ss->staticEval + futility_margin(predictedDepth) + 256 <= alpha)
+          && ss->staticEval + 256 + 200 * predictedDepth / ONE_PLY <= alpha)
         continue;
 
-      // Prune moves with negative SEE at low depths
-      if (predictedDepth < 4 * ONE_PLY && see_sign(pos, move) < VALUE_ZERO)
-        continue;
+      // Prune moves with negative SEE at low depths and below a decreasing
+      // threshold at higher depths.
+      if (predictedDepth < 8 * ONE_PLY) {
+        Value see_v = predictedDepth < 4 * ONE_PLY ? VALUE_ZERO
+                      : -PawnValueMg * 2 * (int)(predictedDepth - 3 * ONE_PLY);
+        if (see_sign(pos, move) < see_v)
+          continue;
+      }
     }
 
     // Speculative prefetch as early as possible
@@ -427,7 +431,8 @@ moves_loop: // When in check search starts from here.
       Value val = (*thisThread->history)[moved_piece][to_sq(move)]
                  +    (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
                  +    (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
-                 +    (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0);
+                 +    (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
+                 +    ft_get(*thisThread->fromTo, pos_stm() ^ 1, move);
 
       // Increase reduction for cut nodes
       if (cutNode)

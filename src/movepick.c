@@ -196,16 +196,20 @@ void score_quiets(MovePicker *mp)
 {
   Pos *pos = mp->pos;
   HistoryStats *history = pos->thisThread->history;
+  FromToStats *fromTo = pos->thisThread->fromTo;
 
   CounterMoveStats *cm = (mp->ss-1)->counterMoves;
   CounterMoveStats *fm = (mp->ss-2)->counterMoves;
   CounterMoveStats *f2 = (mp->ss-4)->counterMoves;
 
+  int c = pos_stm();
+
   for (ExtMove *m = mp->moves; m < mp->endMoves; m++)
     m->value =   (*history)[moved_piece(m->move)][to_sq(m->move)]
               + (cm ? (*cm)[moved_piece(m->move)][to_sq(m->move)] : 0)
               + (fm ? (*fm)[moved_piece(m->move)][to_sq(m->move)] : 0)
-              + (f2 ? (*f2)[moved_piece(m->move)][to_sq(m->move)] : 0);
+              + (f2 ? (*f2)[moved_piece(m->move)][to_sq(m->move)] : 0)
+              + ft_get(*fromTo, c, m->move);
 }
 
 void score_evasions(MovePicker *mp)
@@ -217,6 +221,8 @@ void score_evasions(MovePicker *mp)
   // negative SEE ordered by SEE value.
 
   HistoryStats *history = pos->thisThread->history;
+  FromToStats *fromTo = pos->thisThread->fromTo;
+  int c = pos_stm();
   Value see;
 
   for (ExtMove *m = mp->moves; m < mp->endMoves; m++)
@@ -224,10 +230,10 @@ void score_evasions(MovePicker *mp)
       m->value = see - HistoryStats_Max; // At the bottom
     else if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - (Value)type_of_p(moved_piece(m->move))
-                + HistoryStats_Max;
+                - (Value)type_of_p(moved_piece(m->move)) + HistoryStats_Max;
     else
-      m->value = (*history)[moved_piece(m->move)][to_sq(m->move)];
+      m->value =  (*history)[moved_piece(m->move)][to_sq(m->move)]
+                + ft_get(*fromTo, c, m->move);
 }
 
 
