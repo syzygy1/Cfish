@@ -22,7 +22,7 @@
 #include <string.h>   // For std::memset
 
 #include "material.h"
-#include "thread.h"
+#include "position.h"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
@@ -111,7 +111,7 @@ typedef int PieceCountType[2][8];
 MaterialEntry *material_probe(Pos *pos)
 {
   Key key = pos_material_key();
-  MaterialEntry *e = &(*pos->thisThread->materialTable)[key & 8191];
+  MaterialEntry *e = &pos->materialTable[key & 8191];
 
   if (e->key == key)
       return e;

@@ -29,27 +29,26 @@ Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
   int moveCount, quietCount;
 
   // Step 1. Initialize node
-  Thread *thisThread = pos->thisThread;
   inCheck = !!pos_checkers();
   moveCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
   ss->ply = (ss-1)->ply + 1;
 
   // Check for the available remaining time
-  if (load_rlx(thisThread->resetCalls)) {
-    store_rlx(thisThread->resetCalls, 0);
-    thisThread->callsCnt = 0;
+  if (load_rlx(pos->resetCalls)) {
+    store_rlx(pos->resetCalls, 0);
+    pos->callsCnt = 0;
   }
-  if (++thisThread->callsCnt > 4096) {
+  if (++pos->callsCnt > 4096) {
     for (size_t idx = 0; idx < Threads.num_threads; idx++)
-      store_rlx(Threads.thread[idx]->resetCalls, 1);
+      store_rlx(Threads.pos[idx]->resetCalls, 1);
 
     check_time();
   }
 
   // Used to send selDepth info to GUI
-  if (PvNode && thisThread->maxPly < ss->ply)
-    thisThread->maxPly = ss->ply;
+  if (PvNode && pos->maxPly < ss->ply)
+    pos->maxPly = ss->ply;
 
   if (!rootNode) {
     // Step 2. Check for aborted search and immediate draw
@@ -84,7 +83,7 @@ Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
   posKey = excludedMove ? pos_exclusion_key() : pos_key();
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
-  ttMove =  rootNode ? thisThread->rootMoves->move[thisThread->PVIdx].pv[0]
+  ttMove =  rootNode ? pos->rootMoves->move[pos->PVIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
 
   // At non-PV nodes we check for an early TT cutoff
@@ -305,22 +304,22 @@ moves_loop: // When in check search starts from here.
     // searched.
     if (rootNode) {
       size_t idx;
-      for (idx = thisThread->PVIdx; idx < thisThread->rootMoves->size; idx++)
-        if (thisThread->rootMoves->move[idx].pv[0] == move)
+      for (idx = pos->PVIdx; idx < pos->rootMoves->size; idx++)
+        if (pos->rootMoves->move[idx].pv[0] == move)
           break;
-      if (idx == thisThread->rootMoves->size)
+      if (idx == pos->rootMoves->size)
         continue;
     }
 
     ss->moveCount = ++moveCount;
 
-    if (rootNode && thisThread->idx == 0 && time_elapsed() > 3000) {
+    if (rootNode && pos->thread_idx == 0 && time_elapsed() > 3000) {
       char buf[16];
       IO_LOCK;
-      printf("info depth %d currmove %s currmovenumber %"PRIu64"\n",
+      printf("info depth %d currmove %s currmovenumber %d\n",
              depth / ONE_PLY,
              uci_move(buf, move, is_chess960()),
-             moveCount + thisThread->PVIdx);
+             moveCount + pos->PVIdx);
       fflush(stdout);
       IO_UNLOCK;
     }
@@ -428,11 +427,11 @@ moves_loop: // When in check search starts from here.
         && !captureOrPromotion)
     {
       Depth r = name_NT(reduction)(improving, depth, moveCount);
-      Value val = (*thisThread->history)[moved_piece][to_sq(move)]
-                 +    (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
-                 +    (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
-                 +    (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
-                 +    ft_get(*thisThread->fromTo, pos_stm() ^ 1, move);
+      Value val =  (*pos->history)[moved_piece][to_sq(move)]
+                 + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
+                 + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
+                 + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
+                 + ft_get(*pos->fromTo, pos_stm() ^ 1, move);
 
       // Increase reduction for cut nodes
       if (cutNode)
@@ -494,9 +493,9 @@ moves_loop: // When in check search starts from here.
 
     if (rootNode) {
       RootMove *rm = NULL;
-      for (size_t idx = 0; idx < thisThread->rootMoves->size; idx++)
-        if (thisThread->rootMoves->move[idx].pv[0] == move) {
-          rm = &thisThread->rootMoves->move[idx];
+      for (size_t idx = 0; idx < pos->rootMoves->size; idx++)
+        if (pos->rootMoves->move[idx].pv[0] == move) {
+          rm = &pos->rootMoves->move[idx];
           break;
         }
 
@@ -513,7 +512,7 @@ moves_loop: // When in check search starts from here.
         // We record how often the best move has been changed in each
         // iteration. This information is used for time management: When
         // the best move changes frequently, we allocate some more time.
-        if (moveCount > 1 && thisThread->idx == 0)
+        if (moveCount > 1 && pos->thread_idx == 0)
           mainThread.bestMoveChanges++;
       } else
         // All other moves but the PV are set to the lowest value: this is
@@ -528,7 +527,7 @@ moves_loop: // When in check search starts from here.
       if (value > alpha) {
         // If there is an easy move for this position, clear it if unstable
         if (    PvNode
-            &&  thisThread == threads_main()
+            &&  pos->thread_idx == 0
             &&  easy_move_get(pos_key())
             && (move != easy_move_get(pos_key()) || moveCount > 1))
           easy_move_clear();

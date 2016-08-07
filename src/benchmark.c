@@ -168,7 +168,7 @@ void benchmark(Pos *current, char *str)
 
   for (size_t i = 0; i < num_fens; i++) {
     State st;
-    pos_set(&pos, fens[i], option_value(OPT_CHESS960), &st, Threads.thread[0]);
+    pos_set(&pos, fens[i], option_value(OPT_CHESS960), &st);
 
     fprintf(stderr, "\nPosition: %zu/%zu\n", i + 1, num_fens);
 
@@ -176,7 +176,7 @@ void benchmark(Pos *current, char *str)
       nodes += perft(&pos, limits.depth * ONE_PLY);
     else {
       limits.startTime = now();
-      threads_start_thinking(&pos, &st, &limits);
+      threads_start_thinking(&pos, &limits);
       thread_wait_for_search_finished(threads_main());
       nodes += threads_nodes_searched();
     }

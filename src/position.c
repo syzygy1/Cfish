@@ -160,7 +160,7 @@ void zob_init(void) {
 // This function is not very robust - make sure that input FENs are correct,
 // this is assumed to be the responsibility of the GUI.
 
-void pos_set(Pos *pos, char *fen, int isChess960, State *st, Thread *th)
+void pos_set(Pos *pos, char *fen, int isChess960, State *st)
 {
   unsigned char col, row, token;
   Square sq = SQ_A8;
@@ -191,11 +191,12 @@ void pos_set(Pos *pos, char *fen, int isChess960, State *st, Thread *th)
   pos->sideToMove = token == 'w' ? WHITE : BLACK;
   token = *fen++;
 
-  // Castling availability. Compatible with 3 standards: Normal FEN standard,
-  // Shredder-FEN that uses the letters of the columns on which the rooks began
-  // the game instead of KQkq and also X-FEN standard that, in case of Chess960,
-  // if an inner rook is associated with the castling right, the castling tag is
-  // replaced by the file letter of the involved rook, as for the Shredder-FEN.
+  // Castling availability. Compatible with 3 standards: Normal FEN
+  // standard, Shredder-FEN that uses the letters of the columns on which
+  // the rooks began the game instead of KQkq and also X-FEN standard
+  // that, in case of Chess960, // if an inner rook is associated with
+  // the castling right, the castling tag is replaced by the file letter
+  // of the involved rook, as for the Shredder-FEN.
   while ((token = *fen++) && !isspace(token)) {
     Square rsq;
     int c = islower(token) ? BLACK : WHITE;
@@ -239,7 +240,6 @@ void pos_set(Pos *pos, char *fen, int isChess960, State *st, Thread *th)
   pos->gamePly = max(2 * (pos->gamePly - 1), 0) + (pos_stm() == BLACK);
 
   pos->chess960 = isChess960;
-  pos->thisThread = th;
   set_state(pos, st);
 
   assert(pos_is_ok(pos, &failed_step));
@@ -675,7 +675,7 @@ void do_move(Pos *pos, Move m, State *st, int givesCheck)
     // Update material hash key and prefetch access to materialTable
     k ^= zob_psq[them][captured][capsq];
     st->materialKey ^= zob_psq[them][captured][piece_count(them, captured)];
-    prefetch(pos->thisThread->materialTable[st->materialKey & 8191]);
+    prefetch(&pos->materialTable[st->materialKey & 8191]);
 
     // Update incremental scores
     st->psq -= psqt_psq[them][captured][capsq];
@@ -736,7 +736,7 @@ void do_move(Pos *pos, Move m, State *st, int givesCheck)
 
     // Update pawn hash key and prefetch access to pawnsTable
     st->pawnKey ^= zob_psq[us][PAWN][from] ^ zob_psq[us][PAWN][to];
-    prefetch(pos->thisThread->pawnTable[st->pawnKey & 16383]);
+    prefetch(&pos->pawnTable[st->pawnKey & 16383]);
 
     // Reset rule 50 draw counter
     st->rule50 = 0;
@@ -1028,6 +1028,13 @@ int is_draw(Pos *pos)
 
   return 0;
 }
+
+
+void copy_position(Pos *dest, Pos *src)
+{
+  memcpy(dest, src, offsetof(Pos, rootMoves));
+}
+
 
 #if 0
 // flip() flips position with the white and black sides reversed. This

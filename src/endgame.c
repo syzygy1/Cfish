@@ -23,6 +23,7 @@
 #include "bitboard.h"
 #include "endgame.h"
 #include "movegen.h"
+#include "position.h"
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))

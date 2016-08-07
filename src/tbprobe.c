@@ -617,13 +617,13 @@ static Value wdl_to_Value[5] = {
   VALUE_MATE - MAX_PLY - 1
 };
 
-// Use the DTZ tables to filter out moves that don't preserve the win or draw.
-// If the position is lost, but DTZ is fairly high, only keep moves that
-// maximise DTZ.
+// Use the DTZ tables to filter out root moves that do not preserve the
+// win or draw. If the position is lost, but DTZ is fairly high, only keep
+// moves that maximise DTZ.
 //
-// A return value false indicates that not all probes were successful and that
-// no moves were filtered out.
-int TB_root_probe(Pos *pos, RootMoves *rootMoves, Value *score)
+// A return value of 0 indicates that not all probes were successful and
+// that no moves were filtered out.
+int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 {
   int success;
 
@@ -635,10 +635,11 @@ int TB_root_probe(Pos *pos, RootMoves *rootMoves, Value *score)
   checkinfo_init(&ci, pos);
 
   // Probe each move.
-  for (size_t i = 0; i < rootMoves->size; i++) {
-    Move move = rootMoves->move[i].pv[0];
-    do_move(pos, move, &st, gives_check(pos, move, &ci));
+  size_t num = *num_moves;
+  for (size_t i = 0; i < num; i++) {
+    do_move(pos, rm[i].move, &st, gives_check(pos, rm[i].move, &ci));
     int v = 0;
+    // Testing for mate should only be necessary if dtz == 1.
     if (pos_checkers() && dtz > 0) {
       ExtMove s[MAX_MOVES];
       if (generate_legal(pos, s) == s)
@@ -654,9 +655,9 @@ int TB_root_probe(Pos *pos, RootMoves *rootMoves, Value *score)
         v = wdl_to_dtz[v + 2];
       }
     }
-    undo_move(pos, move);
+    undo_move(pos, rm[i].move);
     if (!success) return 0;
-    rootMoves->move[i].score = (Value)v;
+    rm[i].value = v;
   }
 
   // Obtain 50-move counter for the root position.
@@ -672,8 +673,8 @@ int TB_root_probe(Pos *pos, RootMoves *rootMoves, Value *score)
 
   // Determine the score to report to the user.
   *score = wdl_to_Value[wdl + 2];
-  // If the position is winning or losing, but too few moves left, adjust the
-  // score to show how close it is to winning or losing.
+  // If the position is winning or losing, but too few moves are left,
+  // adjust the score to show how close it is to winning or losing.
   // NOTE: (int)PawnValueEg is used as scaling factor in score_to_uci().
   if (wdl == 1 && dtz <= 100)
     *score = (Value)(((200 - dtz - cnt50) * (int)(PawnValueEg)) / 200);
@@ -684,43 +685,46 @@ int TB_root_probe(Pos *pos, RootMoves *rootMoves, Value *score)
   size_t j = 0;
   if (dtz > 0) { // winning (or 50-move rule draw)
     int best = 0xffff;
-    for (size_t i = 0; i < rootMoves->size; i++) {
-      int v = rootMoves->move[i].score;
+    for (size_t i = 0; i < num; i++) {
+      int v = rm[i].value;
       if (v > 0 && v < best)
         best = v;
     }
-    int max_allowed = best;
-    // If the current phase has not seen repetitions, then try all moves
-    // that stay safely within the 50-move budget, if there are any.
+    // If there has been any repetition since the last capture or pawn
+    // move, we might stumble into a third repetition == draw if we are
+    // not careful.
+    // So first set max_dtz_allowed to the DTZ-optimal value.
+    int max_dtz_allowed = best;
+    // If there was no repetition and we have 50-move budget left,
+    // relax max_dtz_allowed.
     if (!has_repeated(st.previous) && best + cnt50 <= 99)
-      max_allowed = 99 - cnt50;
-    for (size_t i = 0; i < rootMoves->size; i++) {
-      int v = rootMoves->move[i].score;
-      if (v > 0 && v <= max_allowed)
-        rootMoves[j++] = rootMoves[i];
+      max_dtz_allowed = 99 - cnt50;
+    // Now keep all winning moves with dtz <= max_allowed.
+    for (size_t i = 0; i < num; i++) {
+      int v = rm[i].value;
+      if (v > 0 && v <= max_dtz_allowed)
+        rm[j++].move = rm[i].move;
     }
   } else if (dtz < 0) { // losing (or 50-move rule draw)
     int best = 0;
-    for (size_t i = 0; i < rootMoves->size; i++) {
-      int v = rootMoves->move[i].score;
-      if (v < best)
-        best = v;
-    }
+    for (size_t i = 0; i < num; i++)
+      if (best < rm[i].value)
+        best = rm[i].value;
     // Try all moves, unless we approach or have a 50-move rule draw.
     if (-best * 2 + cnt50 < 100)
       return 1;
-    for (size_t i = 0; i < rootMoves->size; i++) {
-      if (rootMoves->move[i].score == best)
-        rootMoves[j++] = rootMoves[i];
+    // Since we approach or have a 50-move rule draw, we play DTZ-optimal.
+    for (size_t i = 0; i < num; i++) {
+      if (rm[i].value == best)
+        rm[j++].move = rm[i].move;
     }
   } else { // drawing
     // Try all moves that preserve the draw.
-    for (size_t i = 0; i < rootMoves->size; i++) {
-      if (rootMoves->move[i].score == 0)
-        rootMoves[j++] = rootMoves[i];
-    }
+    for (size_t i = 0; i < num; i++)
+      if (rm[i].value == 0)
+        rm[j++].move = rm[i].move;
   }
-  rootMoves->size = j;
+  *num_moves = j;
 
   return 1;
 }
@@ -730,7 +734,7 @@ int TB_root_probe(Pos *pos, RootMoves *rootMoves, Value *score)
 //
 // A return value false indicates that not all probes were successful and that
 // no moves were filtered out.
-int TB_root_probe_wdl(Pos *pos, RootMoves *rootMoves, Value *score)
+int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 {
   int success;
 
@@ -745,23 +749,22 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rootMoves, Value *score)
   int best = -2;
 
   // Probe each move.
-  for (size_t i = 0; i < rootMoves->size; i++) {
-    Move move = rootMoves->move[i].pv[0];
-    do_move(pos, move, &st, gives_check(pos, move, &ci));
+  size_t num = *num_moves;
+  for (size_t i = 0; i < num; i++) {
+    do_move(pos, rm[i].move, &st, gives_check(pos, rm[i].move, &ci));
     int v = -TB_probe_wdl(pos, &success);
-    undo_move(pos, move);
+    undo_move(pos, rm[i].move);
     if (!success) return 0;
-    rootMoves->move[i].score = (Value)v;
+    rm[i].value = v;
     if (v > best)
       best = v;
   }
 
   size_t j = 0;
-  for (size_t i = 0; i < rootMoves->size; i++) {
-    if (rootMoves->move[i].score == best)
-      rootMoves->move[j++] = rootMoves->move[i];
-  }
-  rootMoves->size = j;
+  for (size_t i = 0; i < num; i++)
+    if (rm[i].value == best)
+      rm[j++].move = rm[i].move;
+  *num_moves = j;
 
   return 1;
 }

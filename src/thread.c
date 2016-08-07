@@ -33,118 +33,121 @@ MainThread mainThread;
 // thread_create() launches the thread and then waits until it goes to sleep
 // in idle_loop().
 
-Thread *thread_create(int idx)
+Pos *thread_create(int idx)
 {
-  Thread *th = malloc(sizeof(Thread));
-  th->idx = idx;
+  Pos *pos = malloc(sizeof(Pos));
+  pos->thread_idx = idx;
 
-  th->pawnTable = calloc(sizeof(PawnTable), 1);
-  th->materialTable = calloc(sizeof(MaterialTable), 1);
-  th->history = malloc(sizeof(HistoryStats));
-  th->counterMoves = malloc(sizeof(MoveStats));
-  th->fromTo = malloc(sizeof(FromToStats));
-  th->rootMoves = malloc(sizeof(RootMoves));
+  pos->pawnTable = calloc(16384, sizeof(PawnEntry));
+  pos->materialTable = calloc(8192, sizeof(MaterialEntry));
+  pos->history = malloc(sizeof(HistoryStats));
+  pos->counterMoves = malloc(sizeof(MoveStats));
+  pos->fromTo = malloc(sizeof(FromToStats));
 
-  stats_clear(th->history);
-  stats_clear(th->counterMoves);
+  pos->rootMoves = malloc(sizeof(RootMoves));
 
-  atomic_store(&th->resetCalls, 0);
-  th->exit = 0;
-  th->maxPly = th->callsCnt = 0;
+  stats_clear(pos->history);
+  stats_clear(pos->counterMoves);
+  stats_clear(pos->fromTo);
 
-  pthread_mutex_init(&th->mutex, NULL);
-  pthread_cond_init(&th->sleepCondition, NULL);
+  atomic_store(&pos->resetCalls, 0);
+  pos->exit = 0;
+  pos->maxPly = pos->callsCnt = 0;
 
-  pthread_mutex_lock(&th->mutex);
-  th->searching = 1;
-  pthread_create(&th->nativeThread, NULL, (void*(*)(void*))thread_idle_loop, th);
-  while (th->searching)
-    pthread_cond_wait(&th->sleepCondition, &th->mutex);
-  pthread_mutex_unlock(&th->mutex);
+  pthread_mutex_init(&pos->mutex, NULL);
+  pthread_cond_init(&pos->sleepCondition, NULL);
 
-  return th;
+  pthread_mutex_lock(&pos->mutex);
+  pos->searching = 1;
+  pthread_create(&pos->nativeThread, NULL, (void*(*)(void*))thread_idle_loop, pos);
+  while (pos->searching)
+    pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
+  pthread_mutex_unlock(&pos->mutex);
+
+  return pos;
 }
 
 
 // thread_destroy() waits for thread termination before returning.
 
-void thread_destroy(Thread *th)
+void thread_destroy(Pos *pos)
 {
-  pthread_mutex_lock(&th->mutex);
-  th->exit = 1;
-  pthread_cond_signal(&th->sleepCondition);
-  pthread_mutex_unlock(&th->mutex);
-  pthread_join(th->nativeThread, NULL);
+  pthread_mutex_lock(&pos->mutex);
+  pos->exit = 1;
+  pthread_cond_signal(&pos->sleepCondition);
+  pthread_mutex_unlock(&pos->mutex);
+  pthread_join(pos->nativeThread, NULL);
 
-  free(th->pawnTable);
-  free(th->materialTable);
-  free(th->history);
-  free(th->counterMoves);
-  free(th->fromTo);
-  free(th->rootMoves);
+  free(pos->pawnTable);
+  free(pos->materialTable);
+  free(pos->history);
+  free(pos->counterMoves);
+  free(pos->fromTo);
+
+  free(pos->rootMoves);
   
-  free(th);
+  free(pos);
 }
 
 
 // thread_wait_for_search_finished() waits on sleep condition until
 // not searching.
 
-void thread_wait_for_search_finished(Thread *th)
+void thread_wait_for_search_finished(Pos *pos)
 {
-  pthread_mutex_lock(&th->mutex);
-  while (th->searching)
-    pthread_cond_wait(&th->sleepCondition, &th->mutex);
-  pthread_mutex_unlock(&th->mutex);
+  pthread_mutex_lock(&pos->mutex);
+  while (pos->searching)
+    pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
+  pthread_mutex_unlock(&pos->mutex);
 }
 
 
 // thread_wait() waits on sleep condition until condition is true.
 
-void thread_wait(Thread *th, atomic_bool *condition)
+void thread_wait(Pos *pos, atomic_bool *condition)
 {
-  pthread_mutex_lock(&th->mutex);
+  pthread_mutex_lock(&pos->mutex);
   while (!atomic_load(condition))
-    pthread_cond_wait(&th->sleepCondition, &th->mutex);
-  pthread_mutex_unlock(&th->mutex);
+    pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
+  pthread_mutex_unlock(&pos->mutex);
 }
 
 
 // thread_start_searching() wakes up the thread that will start the search.
 
-void thread_start_searching(Thread *th, int resume)
+void thread_start_searching(Pos *pos, int resume)
 {
-  pthread_mutex_lock(&th->mutex);
+  pthread_mutex_lock(&pos->mutex);
 
   if (!resume)
-    th->searching = 1;
+    pos->searching = 1;
 
-  pthread_cond_signal(&th->sleepCondition);
-  pthread_mutex_unlock(&th->mutex);
+  pthread_cond_signal(&pos->sleepCondition);
+  pthread_mutex_unlock(&pos->mutex);
 }
 
 
 // thread_idle_loop() is where the thread is parked when it has no work to do.
 
-void thread_idle_loop(Thread *th)
+void thread_idle_loop(Pos *pos)
 {
-  while (!th->exit) {
-    pthread_mutex_lock(&th->mutex);
+  while (!pos->exit) {
+    pthread_mutex_lock(&pos->mutex);
 
-    th->searching = 0;
+    pos->searching = 0;
 
-    while (!th->searching && !th->exit) {
-      pthread_cond_signal(&th->sleepCondition); // Wake up any waiting thread
-      pthread_cond_wait(&th->sleepCondition, &th->mutex);
+    while (!pos->searching && !pos->exit) {
+      pthread_cond_signal(&pos->sleepCondition); // Wake up any waiting thread
+      pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
     }
 
-    pthread_mutex_unlock(&th->mutex);
+    pthread_mutex_unlock(&pos->mutex);
 
-    if (!th->exit) {
-      if (th->idx == 0)
+    if (!pos->exit) {
+      if (pos->thread_idx == 0)
         mainthread_search();
       else
-        thread_search(th);
+        thread_search(pos);
     }
   }
 }
@@ -158,7 +161,7 @@ void thread_idle_loop(Thread *th)
 void threads_init(void)
 {
   Threads.num_threads = 1;
-  Threads.thread[0] = thread_create(0);
+  Threads.pos[0] = thread_create(0);
 //  threads_read_uci_options();
 }
 
@@ -170,7 +173,7 @@ void threads_init(void)
 void threads_exit(void)
 {
   while (Threads.num_threads > 0)
-    thread_destroy(Threads.thread[--Threads.num_threads]);
+    thread_destroy(Threads.pos[--Threads.num_threads]);
 }
 
 
@@ -185,12 +188,12 @@ void threads_read_uci_options(void)
   assert(requested > 0);
 
   while (Threads.num_threads < requested) {
-    Threads.thread[Threads.num_threads] = thread_create(Threads.num_threads);
+    Threads.pos[Threads.num_threads] = thread_create(Threads.num_threads);
     Threads.num_threads++;
   }
 
   while (Threads.num_threads > requested)
-    thread_destroy(Threads.thread[--Threads.num_threads]);
+    thread_destroy(Threads.pos[--Threads.num_threads]);
 }
 
 
@@ -200,7 +203,7 @@ uint64_t threads_nodes_searched(void)
 {
   uint64_t nodes = 0;
   for (size_t idx = 0; idx < Threads.num_threads; idx++)
-    nodes += Threads.thread[idx]->rootPos.nodes;
+    nodes += Threads.pos[idx]->nodes;
   return nodes;
 }
 
@@ -208,46 +211,42 @@ uint64_t threads_nodes_searched(void)
 // threads_start_thinking() wakes up the main thread sleeping in
 // idle_loop() and starts a new search, then returns immediately.
 
-void threads_start_thinking(Pos *pos, State *states, LimitsType *limits)
+void threads_start_thinking(Pos *root, LimitsType *limits)
 {
   thread_wait_for_search_finished(threads_main());
 
   Signals.stopOnPonderhit = Signals.stop = 0;
   Limits = *limits;
-  RootMoves rootMoves;
-  rootMoves.size = 0;
 
   ExtMove list[MAX_MOVES];
-  ExtMove *end = generate_legal(pos, list);
-  for (ExtMove *m = list; m < end; m++) {
+  ExtMove *end = generate_legal(root, list);
+
+  end = TB_filter_root_moves(root, list, end);
+
+  ExtMove *p = list;
+  for (ExtMove *m = p; m < end; m++) {
     int i;
     for (i = 0; i < limits->num_searchmoves; i++)
       if (m->move == limits->searchmoves[i])
         break;
-    if (i == limits->num_searchmoves) {
-      rootMoves.move[rootMoves.size].pv[0] = m->move;
-      rootMoves.move[rootMoves.size].score = -VALUE_INFINITE;
-      rootMoves.move[rootMoves.size].previousScore = -VALUE_INFINITE;
-      rootMoves.size++;
-    }
+    if (i == limits->num_searchmoves)
+      *p++ = *m;
   }
-
-  TB_filter_root_moves(pos, &rootMoves);
-
-  State tmp = *(pos->st);
-
-  char fen[100];
-  pos_fen(pos, fen);
+  end = p;
 
   for (size_t idx = 0; idx < Threads.num_threads; idx++) {
-    Thread *th = Threads.thread[idx];
-    th->maxPly = 0;
-    th->rootDepth = DEPTH_ZERO;
-    *(th->rootMoves) = rootMoves;
-    pos_set(&th->rootPos, fen, is_chess960(), states, th);
+    Pos *pos = Threads.pos[idx];
+    pos->maxPly = 0;
+    pos->rootDepth = DEPTH_ZERO;
+    RootMoves *rm = pos->rootMoves;
+    rm->size = end - list;
+    for (size_t i = 0; i < rm->size; i++) {
+      rm->move[i].pv[0] = list[i].move;
+      rm->move[i].score = -VALUE_INFINITE;
+      rm->move[i].previousScore = -VALUE_INFINITE;
+    }
+    copy_position(pos, root);
   }
-
-  *states = tmp; // Restore st->previous, cleared by Position::set()
 
   thread_start_searching(threads_main(), 0);
 }

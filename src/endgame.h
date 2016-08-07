@@ -21,8 +21,9 @@
 #ifndef ENDGAME_H
 #define ENDGAME_H
 
-#include "position.h"
 #include "types.h"
+
+typedef struct Pos Pos;
 
 typedef Value (EgFunc)(Pos *, int);
 

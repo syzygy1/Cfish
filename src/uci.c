@@ -68,7 +68,7 @@ void position(Pos *pos, char *str)
   else
     return;
 
-  pos_set(pos, fen, option_value(OPT_CHESS960), &state[0], threads_main());
+  pos_set(pos, fen, option_value(OPT_CHESS960), &state[0]);
   state_idx = 1;
 
   // Parse move list (if any)
@@ -168,7 +168,7 @@ void go(Pos *pos, char *str)
       limits.ponder = 1;
   }
 
-  threads_start_thinking(pos, &state[state_idx], &limits);
+  threads_start_thinking(pos, &limits);
 }
 
 
@@ -201,7 +201,7 @@ void uci_loop(int argc, char **argv)
 
   strcpy(fen, StartFEN);
   state_idx = 0;
-  pos_set(&pos, fen, 0, &state[state_idx++], threads_main());
+  pos_set(&pos, fen, 0, &state[state_idx++]);
 
   do {
     if (argc == 1 && !getline(&cmd, &buf_size, stdin))

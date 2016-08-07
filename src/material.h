@@ -23,8 +23,9 @@
 
 #include "endgame.h"
 #include "misc.h"
-#include "position.h"
 #include "types.h"
+
+typedef struct Pos Pos;
 
 // MaterialEntry contains various information about a material
 // configuration. It contains a material imbalance evaluation, a function

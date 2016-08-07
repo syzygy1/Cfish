@@ -377,5 +377,16 @@ static inline int opposite_colors(Square s1, Square s2)
   return ((s >> 3) ^ s) & 1;
 }
 
+typedef struct Pos Pos;
+typedef struct RootMoves RootMoves;
+typedef struct PawnEntry PawnEntry;
+typedef struct MaterialEntry MaterialEntry;
+
+typedef Move MoveStats[16][64];
+typedef Value HistoryStats[16][64];
+typedef Value CounterMoveStats[16][64];
+typedef CounterMoveStats CounterMoveHistoryStats[16][64];
+typedef Value FromToStats[2][64][64];
+
 #endif
 

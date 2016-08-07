@@ -22,17 +22,13 @@
 #define POSITION_H
 
 #include <assert.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stddef.h>  // For offsetof()
 #include <string.h>
 
 #include "bitboard.h"
 #include "types.h"
-
-struct Pos;
-struct Thread;
-
-typedef struct Pos Pos;
-typedef struct Thread Thread;
 
 extern Score psqt_psq[2][8][64];
 void psqt_init(void);
@@ -86,6 +82,7 @@ typedef struct State State;
 // the search tree.
 
 struct Pos {
+  // Board / game representation.
   Piece board[64];
   Bitboard byTypeBB[8];
   Bitboard byColorBB[2];
@@ -96,15 +93,38 @@ struct Pos {
   Square castlingRookSquare[16];
   Bitboard castlingPath[16];
   uint64_t nodes;
-  int gamePly;
   int sideToMove;
-  Thread *thisThread;
+  uint16_t gamePly;
+  uint16_t chess960;
+
   State *st;
-  int chess960;
+
+  // Relevant mainly to the search of the root position.
+  RootMoves *rootMoves;
+  int PVIdx;
+  int maxPly;
+  Depth rootDepth;
+  Depth completedDepth;
+
+  // Pointers to thread-specific tables.
+  HistoryStats *history;
+  MoveStats *counterMoves;
+  FromToStats *fromTo;
+  PawnEntry *pawnTable;
+  MaterialEntry *materialTable;
+
+  // Thread-control data.
+  atomic_bool resetCalls;
+  int callsCnt;
+  int exit, searching;
+  int thread_idx;
+  pthread_t nativeThread;
+  pthread_mutex_t mutex;
+  pthread_cond_t sleepCondition;
 };
 
 // FEN string input/output
-void pos_set(Pos *pos, char *fen, int isChess960, State *st, Thread* th);
+void pos_set(Pos *pos, char *fen, int isChess960, State *st);
 void pos_fen(Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
@@ -230,6 +250,8 @@ static inline int is_capture(Pos *pos, Move m)
   assert(move_is_ok(m));
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
 }
+
+void copy_position(Pos *dest, Pos *src);
 
 #endif
 

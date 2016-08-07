@@ -33,7 +33,7 @@
 
 #define MAX_THREADS 128
 
-
+#if 0
 // Thread struct keeps together all the thread-related stuff. We also use
 // per-thread pawn and material hash tables so that once we get a pointer to an
 // entry its life time is unlimited and we don't have to care about someone
@@ -45,32 +45,24 @@ struct Thread {
   pthread_cond_t sleepCondition;
   int exit, searching;
 
-  PawnTable *pawnTable;
-  MaterialTable *materialTable;
   size_t idx, PVIdx;
-  int maxPly, callsCnt;
 
   Pos rootPos;
   RootMoves *rootMoves;
   Depth rootDepth;
-  HistoryStats *history;
-  MoveStats *counterMoves;
-  FromToStats *fromTo;
   Depth completedDepth;
-  atomic_bool resetCalls;
 };
+#endif
 
-typedef struct Thread Thread;
-
-Thread *thread_create(int idx);
-void thread_search(Thread *thread ); // virtual?
-void thread_idle_loop(Thread *thread);
-void thread_start_searching(Thread *thread, int resume);
-void thread_wait_for_search_finished(Thread *thread);
-void thread_wait(Thread *thread, atomic_bool *b);
+Pos *thread_create(int idx);
+void thread_search(Pos *pos);
+void thread_idle_loop(Pos *pos);
+void thread_start_searching(Pos *pos, int resume);
+void thread_wait_for_search_finished(Pos *pos);
+void thread_wait(Pos *pos, atomic_bool *b);
 
 
-// MainThread is a derived class with a specific overload for the main thread
+// MainThread struct seems to exist mostly for easy move.
 
 struct MainThread {
   int easyMovePlayed, failedLow;
@@ -90,7 +82,7 @@ void mainthread_search();
 // access to threads data is done through this class.
 
 struct ThreadPool {
-  Thread *thread[MAX_THREADS];
+  Pos *pos[MAX_THREADS];
   size_t num_threads;
 //  StateListPtr setupStates; // ??
 };
@@ -99,15 +91,15 @@ typedef struct ThreadPool ThreadPool;
 
 void threads_init(void);
 void threads_exit(void);
-void threads_start_thinking(Pos *pos, State *, LimitsType *);
+void threads_start_thinking(Pos *pos, LimitsType *);
 void threads_read_uci_options(void);
 uint64_t threads_nodes_searched(void);
 
 extern ThreadPool Threads;
 
-static inline Thread *threads_main(void)
+static inline Pos *threads_main(void)
 {
-  return Threads.thread[0];
+  return Threads.pos[0];
 }
 
 #endif

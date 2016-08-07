@@ -119,7 +119,7 @@ void mp_init(MovePicker *mp, Pos *pos, Move ttm, Depth depth, Stack *ss)
   mp->depth = depth;
 
   Square prevSq = to_sq((ss-1)->currentMove);
-  mp->countermove = (*pos->thisThread->counterMoves)[piece_on(prevSq)][prevSq];
+  mp->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
 
   mp->stage = pos_checkers() ? ST_EVASION : ST_MAIN_SEARCH;
   mp->ttMove = ttm && is_pseudo_legal(pos, ttm) ? ttm : 0;
@@ -195,8 +195,8 @@ void score_captures(MovePicker *mp)
 void score_quiets(MovePicker *mp)
 {
   Pos *pos = mp->pos;
-  HistoryStats *history = pos->thisThread->history;
-  FromToStats *fromTo = pos->thisThread->fromTo;
+  HistoryStats *history = pos->history;
+  FromToStats *fromTo = pos->fromTo;
 
   CounterMoveStats *cm = (mp->ss-1)->counterMoves;
   CounterMoveStats *fm = (mp->ss-2)->counterMoves;
@@ -220,8 +220,8 @@ void score_evasions(MovePicker *mp)
   // ordered by history value, then bad captures and quiet moves with a
   // negative SEE ordered by SEE value.
 
-  HistoryStats *history = pos->thisThread->history;
-  FromToStats *fromTo = pos->thisThread->fromTo;
+  HistoryStats *history = pos->history;
+  FromToStats *fromTo = pos->fromTo;
   int c = pos_stm();
   Value see;
 
