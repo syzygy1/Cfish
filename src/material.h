@@ -51,7 +51,7 @@ typedef struct MaterialEntry MaterialEntry;
 
 static inline Score material_imbalance(MaterialEntry *me)
 {
-  return make_score(me->value, me->value);
+  return make_score((unsigned)me->value, me->value);
 }
 
 static inline int material_specialized_eval_exists(MaterialEntry *me)

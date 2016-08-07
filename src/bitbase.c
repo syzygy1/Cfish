@@ -146,7 +146,7 @@ void bitbases_init()
   // Map 32 results into one KPKBitbase[] entry
   for (idx = 0; idx < MAX_INDEX; ++idx)
       if (db[idx] == RES_WIN)
-          KPKBitbase[idx / 32] |= 1 << (idx & 0x1F);
+          KPKBitbase[idx / 32] |= 1UL << (idx & 0x1F);
 
   free(db);
 }

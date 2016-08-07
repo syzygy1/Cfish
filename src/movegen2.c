@@ -143,7 +143,7 @@ static inline ExtMove *generate_pawn_moves(Pos *pos, ExtMove *list,
       // don't generate captures. Note that a possible discovery check
       // promotion has been already generated amongst the captures.
       if (pawnsNotOn7 & ci->dcCandidates) {
-        Bitboard dc1 = shift_bb(Up, pawnsNotOn7 & ci->dcCandidates) & emptySquares & ~file_bb(ci->ksq);
+        Bitboard dc1 = shift_bb(Up, pawnsNotOn7 & ci->dcCandidates) & emptySquares & ~file_bb_s(ci->ksq);
         Bitboard dc2 = shift_bb(Up, dc1 & TRank3BB) & emptySquares;
 
         b1 |= dc1;

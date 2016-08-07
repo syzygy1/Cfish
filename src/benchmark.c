@@ -170,7 +170,7 @@ void benchmark(Pos *current, char *str)
     State st;
     pos_set(&pos, fens[i], option_value(OPT_CHESS960), &st, Threads.thread[0]);
 
-    fprintf(stderr, "\bPosition: %zu/%zu\n", i + 1, num_fens);
+    fprintf(stderr, "\nPosition: %zu/%zu\n", i + 1, num_fens);
 
     if (strcmp(limitType, "perft") == 0)
       nodes += perft(&pos, limits.depth * ONE_PLY);
