@@ -322,6 +322,7 @@ moves_loop: // When in check search starts from here.
              depth / ONE_PLY,
              uci_move(buf, move, is_chess960()),
              moveCount + thisThread->PVIdx);
+      fflush(stdout);
       IO_UNLOCK;
     }
 

@@ -121,6 +121,7 @@ void print_engine_info(int to_uci)
                      , HasPext ? " BMI2" : (HasPopCnt ? " POPCNT" : "")
                      , to_uci ? "\nid author " : " by "
                      , "T. Romstad, M. Costalba, J. Kiiski, G. Linscott");
+  fflush(stdout);
 }
 
 

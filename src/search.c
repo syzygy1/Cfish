@@ -311,6 +311,7 @@ void mainthread_search(void)
     IO_LOCK;
     printf("info depth 0 score %s\n",
            uci_value(buf, pos_checkers() ? -VALUE_MATE : VALUE_DRAW));
+    fflush(stdout);
     IO_UNLOCK;
   } else {
     for (size_t idx = 0; idx < Threads.num_threads; idx++)
@@ -376,6 +377,7 @@ void mainthread_search(void)
   }
 
   printf("\n");
+  fflush(stdout);
   IO_UNLOCK;
 }
 
@@ -517,6 +519,7 @@ void thread_search(Thread *thread)
         IO_LOCK;
         printf("info nodes %"PRIu64" time %d\n",
                          threads_nodes_searched(), time_elapsed());
+        fflush(stdout);
         IO_UNLOCK;
       }
 
@@ -847,6 +850,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
       printf(" %s", uci_move(buf, rootMoves->move[i].pv[idx], is_chess960()));
     printf("\n");
   }
+  fflush(stdout);
 }
 
 

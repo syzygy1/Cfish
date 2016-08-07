@@ -185,8 +185,6 @@ void uci_loop(int argc, char **argv)
   char fen[strlen(StartFEN) + 1];
   char *token;
 
-  setbuf(stdout, NULL);
-
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
     buf_size += strlen(argv[i]) + 1;
@@ -247,12 +245,16 @@ void uci_loop(int argc, char **argv)
       printf("\n");
       print_options();
       printf("uciok\n");
+      fflush(stdout);
     }
     else if (strcmp(token, "ucinewgame") == 0) {
       search_clear();
       Time.availableNodes = 0;
     }
-    else if (strcmp(token, "isready") == 0)   printf("readyok\n");
+    else if (strcmp(token, "isready") == 0) {
+      printf("readyok\n");
+      fflush(stdout);
+    }
     else if (strcmp(token, "go") == 0)        go(&pos, str);
     else if (strcmp(token, "position") == 0)  position(&pos, str);
     else if (strcmp(token, "setoption") == 0) setoption(str);
@@ -268,8 +270,10 @@ void uci_loop(int argc, char **argv)
                     option_value(OPT_THREADS), atoi(str));
       benchmark(&pos, str2);
     }
-    else
+    else {
       printf("Unknown command: %s %s\n", token, str);
+      fflush(stdout);
+    }
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
   free(cmd);

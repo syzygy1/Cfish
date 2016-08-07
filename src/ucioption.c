@@ -143,6 +143,7 @@ void print_options(void)
     }
     printf("\n");
   }
+  fflush(stdout);
 }
 
 int option_value(int opt_idx)
