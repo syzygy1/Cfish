@@ -36,10 +36,11 @@ extern void benchmark(Pos *pos, char *str);
 // FEN string of the initial position, normal chess
 const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-// A list to keep track of the position states along the setup moves
-// (from the start position or position after the last zeroing move to
-// the position just before the search starts). Needed by 'draw by
-// repetition' detection.
+// A circular buffer to keep track of the position states for the moves
+// received with the position command. These are used for draw by repetition
+// detection. It is OK to wrap them around, since the 50-move rule ensures
+// we don't need to look back more than 100 ply.
+
 static State state[128];
 static int state_idx;
 
@@ -67,8 +68,8 @@ void position(Pos *pos, char *str)
   else
     return;
 
-  state_idx = 0;
-  pos_set(pos, fen, option_value(OPT_CHESS960), &state[state_idx++], threads_main());
+  pos_set(pos, fen, option_value(OPT_CHESS960), &state[0], threads_main());
+  state_idx = 1;
 
   // Parse move list (if any)
   if (moves)
@@ -77,24 +78,8 @@ void position(Pos *pos, char *str)
       if (m == MOVE_NONE) break;
       CheckInfo ci;
       checkinfo_init(&ci, pos);
-      do_move(pos, m, &state[state_idx++], gives_check(pos, m, &ci));
-      if (pos_rule50_count() == 0) {
-        state[0] = state[state_idx - 1];
-        state_idx = 0;
-        pos->st = &state[0];
-        pos->st->previous = NULL;
-      }
-      if (state_idx == 128) {
-        // Only possible if 50-move rule was ignored.
-        state[0] = state[28];
-        state[0].previous = NULL;
-        for (int i = 1; i < 100; i++) {
-          state[i] = state[i + 28];
-          state[i].previous = &state[i - 1];
-        }
-        pos->st = &state[99];
-        state_idx = 100;
-      }
+      do_move(pos, m, &state[state_idx], gives_check(pos, m, &ci));
+      state_idx = (state_idx + 1) & 127;
     }
 }
 
@@ -200,6 +185,8 @@ void uci_loop(int argc, char **argv)
   char fen[strlen(StartFEN) + 1];
   char *token;
 
+  setbuf(stdout, NULL);
+
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
     buf_size += strlen(argv[i]) + 1;
@@ -220,6 +207,7 @@ void uci_loop(int argc, char **argv)
 
   do {
     if (argc == 1 && !getline(&cmd, &buf_size, stdin))
+//    if (argc == 1 && !getdelim(&cmd, &buf_size, 0, stdin))
       strcpy(cmd, "quit");
 
     if (cmd[strlen(cmd) - 1] == '\n')

@@ -378,7 +378,7 @@ int TB_probe_wdl(Pos *pos, int *success)
   State st;
 
   // Generate (at least) all legal captures including (under)promotions.
-  if (pos_checkers()) {
+  if (!pos_checkers()) {
     end = generate_captures(pos, stack);
     end = add_underprom_caps(pos, stack, end);
   } else
