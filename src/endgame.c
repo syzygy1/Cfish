@@ -159,7 +159,7 @@ Value EvaluateKXK(Pos *pos, int strongSide)
   assert(!pos_checkers()); // Eval is never called when in check
 
   // Stalemate detection with lone king
-  if (pos_stm() == (strongSide ^ 1)) {
+  if (pos_stm() == weakSide) {
     ExtMove list[MAX_MOVES];
     if (generate_legal(pos, list) == list)
       return VALUE_DRAW;
@@ -209,7 +209,7 @@ Value EvaluateKBNK(Pos *pos, int strongSide)
                 + PushClose[distance(winnerKSq, loserKSq)]
                 + PushToCorners[loserKSq];
 
-  return pos_stm() ? result : -result;
+  return strongSide == pos_stm() ? result : -result;
 }
 
 
@@ -276,8 +276,8 @@ Value EvaluateKRKP(Pos *pos, int strongSide)
 
   else
     result =  (Value)(200) - 8 * (  distance(wksq, psq + DELTA_S)
-                                - distance(bksq, psq + DELTA_S)
-                                - distance(psq, queeningSq));
+                                  - distance(bksq, psq + DELTA_S)
+                                  - distance(psq, queeningSq));
 
   return strongSide == pos_stm() ? result : -result;
 }
@@ -414,10 +414,10 @@ int ScaleKBPsK(Pos *pos, int strongSide)
 
     Square strongKingSq = square_of(strongSide, KING);
     Square weakKingSq = square_of(weakSide, KING);
-    Square bishopSq = lsb(pieces_p(BISHOP));
+    Square bishopSq = square_of(strongSide, BISHOP);
 
-    // There's potential for a draw if our pawn is blocked on the 7th rank,
-    // the bishop cannot attack it or they only have one pawn left
+    // There is potential for a draw if our pawn is blocked on the 7th rank,
+    // the bishop cannot attack it or they only have one pawn left.
     if (   relative_rank_s(strongSide, weakPawnSq) == RANK_7
         && (pieces_cp(strongSide, PAWN) & sq_bb(weakPawnSq + pawn_push(weakSide)))
         && (opposite_colors(bishopSq, weakPawnSq) || piece_count(strongSide, PAWN) == 1)) {
@@ -425,12 +425,12 @@ int ScaleKBPsK(Pos *pos, int strongSide)
       int strongKingDist = distance(weakPawnSq, strongKingSq);
       int weakKingDist = distance(weakPawnSq, weakKingSq);
 
-      // It's a draw if the weak king is on its back two ranks, within 2
-      // squares of the blocking pawn and the strong king is not
-      // closer. (I think this rule fails only in practically
-      // unreachable positions such as 5k1K/6p1/6P1/8/8/3B4/8/8 w
-      // and positions where qsearch will immediately correct the
-      // problem such as 8/4k1p1/6P1/1K6/3B4/8/8/8 w)
+      // It is a draw if the weak king is on its back two ranks, within 2
+      // squares of the blocking pawn and the strong king is not closer.
+      // (I think this rule fails only in practically unreachable
+      // positions such as 5k1K/6p1/6P1/8/8/3B4/8/8 w and positions where
+      // qsearch will immediately correct the problem such as
+      // 8/4k1p1/6P1/1K6/3B4/8/8/8 w)
       if (   relative_rank_s(strongSide, weakKingSq) >= RANK_7
           && weakKingDist <= 2
           && weakKingDist <= strongKingDist)
@@ -449,7 +449,7 @@ int ScaleKQKRPs(Pos *pos, int strongSide)
   int weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, QueenValueMg, 0));
-  assert(popcount(pieces_cp(weakSide, ROOK)) == 1);
+  assert(piece_count(weakSide, ROOK) == 1);
   assert(pieces_cp(weakSide, PAWN));
 
   Square kingSq = square_of(weakSide, KING);
@@ -749,7 +749,7 @@ int ScaleKBPPKB(Pos *pos, int strongSide)
 
   switch (distance_f(psq1, psq2)) {
   case 0:
-    // Both pawns are on the same file. It's an easy draw if the defender
+    // Both pawns are on the same file. It is an easy draw if the defender
     // firmly controls some square in the frontmost pawn's path.
     if (   file_of(ksq) == file_of(blockSq1)
         && relative_rank_s(strongSide, ksq) >= relative_rank_s(strongSide, blockSq1)
@@ -759,7 +759,7 @@ int ScaleKBPPKB(Pos *pos, int strongSide)
       return SCALE_FACTOR_NONE;
 
   case 1:
-    // Pawns on adjacent files. It's a draw if the defender firmly controls
+    // Pawns on adjacent files. It is a draw if the defender firmly controls
     // the square in front of the frontmost pawn's path, and the square
     // diagonally behind this square on the file of the other pawn.
     if (   ksq == blockSq1

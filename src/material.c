@@ -149,9 +149,9 @@ MaterialEntry *material_probe(Pos *pos)
       }
   }
 
-  // We didn't find any specialized scaling function, so fall back on generic
-  // ones that refer to more than one material distribution. Note that in this
-  // case we don't return after setting the function.
+  // We did not find any specialized scaling function, so fall back on
+  // generic ones that refer to more than one material distribution. Note
+  // that in this case we do not return after setting the function.
   for (int c = 0; c < 2; c++) {
     if (is_KBPsKs(pos, c))
       e->scal_func[c] = &ScaleKBPsK;
@@ -163,7 +163,7 @@ MaterialEntry *material_probe(Pos *pos)
   Value npm_w = pos_non_pawn_material(WHITE);
   Value npm_b = pos_non_pawn_material(BLACK);
 
-  if (npm_w + npm_b == 0 && pieces_p(PAWN)) { // Only pawns on the board
+  if (npm_w + npm_b == 0 && pieces_p(PAWN)) { // Only pawns on the board.
     if (!piece_count(BLACK, PAWN)) {
       assert(piece_count(WHITE, PAWN) >= 2);
 
