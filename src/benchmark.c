@@ -129,7 +129,7 @@ void benchmark(Pos *current, char *str)
   else
     limits.depth = limit;
 
-  if (!fenFile) {
+  if (!fenFile || strcmp(fenFile, "default") == 0) {
     fens = Defaults;
     num_fens = sizeof(Defaults) / sizeof(char *);
   }
