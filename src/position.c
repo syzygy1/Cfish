@@ -657,7 +657,6 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   // Increment ply counters. In particular, rule50 will be reset to zero
   // later on in case of a capture or a pawn move.
-  pos->gamePly++;
   st->rule50++;
   st->pliesFromNull++;
 
@@ -859,7 +858,6 @@ void undo_move(Pos *pos, Move m)
 
   // Finally point our state pointer back to the previous state
   pos->st--;
-  pos->gamePly--;
 
   assert(pos_is_ok(pos, &failed_step));
 }

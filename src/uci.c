@@ -36,14 +36,6 @@ extern void benchmark(Pos *pos, char *str);
 // FEN string of the initial position, normal chess
 const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-// A circular buffer to keep track of the position states for the moves
-// received with the position command. These are used for draw by repetition
-// detection. It is OK to wrap them around, since the 50-move rule ensures
-// we don't need to look back more than 100 ply.
-
-//static State state[128];
-//static int state_idx;
-
 // position() is called when the engine receives the "position" UCI
 // command. The function sets up the position described in the given FEN
 // string ("fen") or the starting position ("startpos") and then makes
@@ -69,7 +61,6 @@ void position(Pos *pos, char *str)
     return;
 
   pos_set(pos, fen, option_value(OPT_CHESS960));
-//  state_idx = 1;
 
   // Parse move list (if any)
   if (moves)
@@ -79,7 +70,7 @@ void position(Pos *pos, char *str)
       CheckInfo ci;
       checkinfo_init(&ci, pos);
       do_move(pos, m, gives_check(pos, m, &ci));
-//      state_idx = (state_idx + 1) & 127;
+      pos->gamePly++;
     }
 }
 
@@ -126,7 +117,6 @@ error:
 // go() is called when engine receives the "go" UCI command. The function sets
 // the thinking time and other parameters from the input string, then starts
 // the search.
-
 
 void go(Pos *pos, char *str)
 {
@@ -202,12 +192,10 @@ void uci_loop(int argc, char **argv)
   }
 
   strcpy(fen, StartFEN);
-//  state_idx = 0;
   pos_set(&pos, fen, 0);
 
   do {
     if (argc == 1 && !getline(&cmd, &buf_size, stdin))
-//    if (argc == 1 && !getdelim(&cmd, &buf_size, 0, stdin))
       strcpy(cmd, "quit");
 
     if (cmd[strlen(cmd) - 1] == '\n')
