@@ -163,12 +163,12 @@ void benchmark(Pos *current, char *str)
   }
 
   uint64_t nodes = 0;
-  TimePoint elapsed = now();
   Pos pos;
+  pos.states = malloc(101 * sizeof(State)); // max perft 100
+  TimePoint elapsed = now();
 
   for (size_t i = 0; i < num_fens; i++) {
-    State st;
-    pos_set(&pos, fens[i], option_value(OPT_CHESS960), &st);
+    pos_set(&pos, fens[i], option_value(OPT_CHESS960));
 
     fprintf(stderr, "\nPosition: %zu/%zu\n", i + 1, num_fens);
 
@@ -197,5 +197,6 @@ void benchmark(Pos *current, char *str)
       free(fens[i]);
     free(fens);
   }
+  free(pos.states);
 }
 

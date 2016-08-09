@@ -85,7 +85,7 @@ static int probe_wdl_table(Pos *pos, int *success)
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
   uint64 idx;
-  uint64 key;
+  Key key;
   int i;
   ubyte res;
   int p[TBPIECES];
@@ -94,8 +94,13 @@ static int probe_wdl_table(Pos *pos, int *success)
   key = pos_material_key();
 
   // Test for KvK.
+#ifdef PIECELISTS
   if (key == (zob_psq[WHITE][KING][0] ^ zob_psq[BLACK][KING][0]))
     return 0;
+#else
+  if (key == 0ULL)
+    return 0;
+#endif
 
   ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
   for (i = 0; i < HSHMAX; i++)
@@ -106,9 +111,11 @@ static int probe_wdl_table(Pos *pos, int *success)
   }
 
   ptr = ptr2[i].ptr;
-  if (!ptr->ready) {
+  // With the help of C11 atomics, we implement double-checked locking
+  // correctly.
+  if (!atomic_load_explicit(&ptr->ready, memory_order_acquire)) {
     LOCK(TB_mutex);
-    if (!ptr->ready) {
+    if (!atomic_load_explicit(&ptr->ready, memory_order_relaxed)) {
       char str[16];
       prt_str(pos, str, ptr->key != key);
       if (!init_table_wdl(ptr, str)) {
@@ -117,13 +124,7 @@ static int probe_wdl_table(Pos *pos, int *success)
         UNLOCK(TB_mutex);
         return 0;
       }
-      // Memory barrier to ensure ptr->ready = 1 is not reordered.
-#ifdef _MSC_VER
-      _ReadWriteBarrier();
-#else
-      __asm__ __volatile__ ("" ::: "memory");
-#endif
-      ptr->ready = 1;
+      atomic_store_explicit(&ptr->ready, 1, memory_order_release);
     }
     UNLOCK(TB_mutex);
   }
@@ -191,7 +192,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
   int p[TBPIECES];
 
   // Obtain the position's material signature key.
-  uint64 key = pos_material_key();
+  Key key = pos_material_key();
 
   if (DTZ_table[0].key1 != key && DTZ_table[0].key2 != key) {
     for (i = 1; i < DTZ_ENTRIES; i++)
@@ -319,7 +320,6 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
   int v;
   ExtMove stack[64];
   ExtMove *end;
-  State st;
 
   // Generate (at least) all legal captures including (under)promotions.
   // It is OK to generate more, as long as they are filtered out below.
@@ -337,7 +337,7 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
     Move move = p->move;
     if (!is_capture(pos, move) || !is_legal(pos, move, ci.pinned))
       continue;
-    do_move(pos, move, &st, gives_check(pos, move, &ci));
+    do_move(pos, move, gives_check(pos, move, &ci));
     v = -probe_ab(pos, -beta, -alpha, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -375,7 +375,6 @@ int TB_probe_wdl(Pos *pos, int *success)
   // Generate (at least) all legal en passant captures.
   ExtMove stack[MAX_MOVES];
   ExtMove *end;
-  State st;
 
   // Generate (at least) all legal captures including (under)promotions.
   if (!pos_checkers()) {
@@ -397,7 +396,7 @@ int TB_probe_wdl(Pos *pos, int *success)
     Move move = p->move;
     if (!is_capture(pos, move) || !is_legal(pos, move, ci.pinned))
       continue;
-    do_move(pos, move, &st, gives_check(pos, move, &ci));
+    do_move(pos, move, gives_check(pos, move, &ci));
     int v = -probe_ab(pos, -2, -best_cap, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -514,7 +513,6 @@ int TB_probe_dtz(Pos *pos, int *success)
 
   ExtMove stack[MAX_MOVES];
   ExtMove *end = NULL; // Get rid of a bogus gcc warning.
-  State st;
   CheckInfo ci;
   checkinfo_init(&ci, pos);
 
@@ -533,7 +531,7 @@ int TB_probe_dtz(Pos *pos, int *success)
       if (type_of_p(moved_piece(move)) != PAWN || is_capture(pos, move)
                 || !is_legal(pos, move, ci.pinned))
         continue;
-      do_move(pos, move, &st, gives_check(pos, move, &ci));
+      do_move(pos, move, gives_check(pos, move, &ci));
       int v = -TB_probe_wdl(pos, success);
       undo_move(pos, move);
       if (*success == 0) return 0;
@@ -575,7 +573,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     if (is_capture(pos, move) || type_of_p(moved_piece(move)) == PAWN
               || !is_legal(pos, move, ci.pinned))
       continue;
-    do_move(pos, move, &st, gives_check(pos, move, &ci));
+    do_move(pos, move, gives_check(pos, move, &ci));
     int v = -TB_probe_dtz(pos, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -630,14 +628,13 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
   int dtz = TB_probe_dtz(pos, &success);
   if (!success) return 0;
 
-  State st;
   CheckInfo ci;
   checkinfo_init(&ci, pos);
 
   // Probe each move.
   size_t num = *num_moves;
   for (size_t i = 0; i < num; i++) {
-    do_move(pos, rm[i].move, &st, gives_check(pos, rm[i].move, &ci));
+    do_move(pos, rm[i].move, gives_check(pos, rm[i].move, &ci));
     int v = 0;
     // Testing for mate should only be necessary if dtz == 1.
     if (pos_checkers() && dtz > 0) {
@@ -673,6 +670,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
   // Determine the score to report to the user.
   *score = wdl_to_Value[wdl + 2];
+
   // If the position is winning or losing, but too few moves are left,
   // adjust the score to show how close it is to winning or losing.
   // NOTE: (int)PawnValueEg is used as scaling factor in score_to_uci().
@@ -695,10 +693,12 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
     // not careful.
     // So first set max_dtz_allowed to the DTZ-optimal value.
     int max_dtz_allowed = best;
+
     // If there was no repetition and we have 50-move budget left,
     // relax max_dtz_allowed.
-    if (!has_repeated(st.previous) && best + cnt50 <= 99)
+    if (!has_repeated(pos->st) && best + cnt50 <= 99)
       max_dtz_allowed = 99 - cnt50;
+
     // Now keep all winning moves with dtz <= max_allowed.
     for (size_t i = 0; i < num; i++) {
       int v = rm[i].value;
@@ -710,14 +710,15 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
     for (size_t i = 0; i < num; i++)
       if (best < rm[i].value)
         best = rm[i].value;
+
     // Try all moves, unless we approach or have a 50-move rule draw.
     if (-best * 2 + cnt50 < 100)
       return 1;
+
     // Since we approach or have a 50-move rule draw, we play DTZ-optimal.
-    for (size_t i = 0; i < num; i++) {
+    for (size_t i = 0; i < num; i++)
       if (rm[i].value == best)
         rm[j++].move = rm[i].move;
-    }
   } else { // drawing
     // Try all moves that preserve the draw.
     for (size_t i = 0; i < num; i++)
@@ -742,7 +743,6 @@ int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
   if (!success) return 0;
   *score = wdl_to_Value[wdl + 2];
 
-  State st;
   CheckInfo ci;
   checkinfo_init(&ci, pos);
 
@@ -751,7 +751,7 @@ int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
   // Probe each move.
   size_t num = *num_moves;
   for (size_t i = 0; i < num; i++) {
-    do_move(pos, rm[i].move, &st, gives_check(pos, rm[i].move, &ci));
+    do_move(pos, rm[i].move, gives_check(pos, rm[i].move, &ci));
     int v = -TB_probe_wdl(pos, &success);
     undo_move(pos, rm[i].move);
     if (!success) return 0;

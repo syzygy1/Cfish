@@ -25,7 +25,6 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta,
   assert(depth <= DEPTH_ZERO);
 
   Move pv[MAX_PLY+1];
-  State st;
   TTEntry *tte;
   Key posKey;
   Move ttMove, move, bestMove;
@@ -166,7 +165,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta,
     ss->currentMove = move;
 
     // Make and search the move
-    do_move(pos, move, &st, givesCheck);
+    do_move(pos, move, givesCheck);
     value = givesCheck ? -name_NT(qsearch,  true)(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
                        : -name_NT(qsearch, false)(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
     undo_move(pos, move);

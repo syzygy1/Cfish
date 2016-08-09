@@ -45,6 +45,7 @@ Pos *thread_create(int idx)
   pos->fromTo = malloc(sizeof(FromToStats));
 
   pos->rootMoves = malloc(sizeof(RootMoves));
+  pos->states = malloc((MAX_PLY + 10) * sizeof(State));
 
   stats_clear(pos->history);
   stats_clear(pos->counterMoves);
@@ -85,6 +86,7 @@ void thread_destroy(Pos *pos)
   free(pos->fromTo);
 
   free(pos->rootMoves);
+  free(pos->states);
   
   free(pos);
 }
@@ -257,7 +259,7 @@ void threads_start_thinking(Pos *root, LimitsType *limits)
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
     }
-    copy_position(pos, root);
+    pos_copy(pos, root);
   }
 
   if (TB_RootInTB)

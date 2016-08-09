@@ -121,12 +121,11 @@ static void easy_move_update(Pos *pos, Move *newPv)
     EM.stableCnt = 0;
 
   if (newPv[0] != EM.pv[0] || newPv[1] != EM.pv[1] || newPv[2] != EM.pv[2]) {
-    State st[2];
     CheckInfo ci;
     checkinfo_init(&ci, pos);
-    do_move(pos, newPv[0], &st[0], gives_check(pos, newPv[0], &ci));
+    do_move(pos, newPv[0], gives_check(pos, newPv[0], &ci));
     checkinfo_init(&ci, pos);
-    do_move(pos, newPv[1], &st[1], gives_check(pos, newPv[1], &ci));
+    do_move(pos, newPv[1], gives_check(pos, newPv[1], &ci));
     EM.expectedPosKey = pos_key();
     undo_move(pos, newPv[1]);
     undo_move(pos, newPv[0]);
@@ -241,7 +240,6 @@ void search_clear()
 
 static uint64_t perft_helper(Pos *pos, Depth depth)
 {
-  State st;
   uint64_t cnt, nodes = 0;
   CheckInfo ci;
   checkinfo_init(&ci, pos);
@@ -249,7 +247,7 @@ static uint64_t perft_helper(Pos *pos, Depth depth)
   ExtMove list[MAX_MOVES];
   ExtMove *last = generate_legal(pos, list);
   for (ExtMove *m = list; m < last; m++) {
-    do_move(pos, m->move, &st, gives_check(pos, m->move, &ci));
+    do_move(pos, m->move, gives_check(pos, m->move, &ci));
     if (depth == 2 * ONE_PLY) {
       ExtMove list2[MAX_MOVES];
       cnt = generate_legal(pos, list2) - list2;
@@ -263,7 +261,6 @@ static uint64_t perft_helper(Pos *pos, Depth depth)
 
 uint64_t perft(Pos *pos, Depth depth)
 {
-  State st;
   uint64_t cnt, nodes = 0;
   CheckInfo ci;
   checkinfo_init(&ci, pos);
@@ -276,7 +273,7 @@ uint64_t perft(Pos *pos, Depth depth)
       cnt = 1;
       nodes++;
     } else {
-      do_move(pos, m->move, &st, gives_check(pos, m->move, &ci));
+      do_move(pos, m->move, gives_check(pos, m->move, &ci));
       if (depth == 2 * ONE_PLY) {
         ExtMove list2[MAX_MOVES];
         cnt = generate_legal(pos, list2) - list2;
@@ -861,14 +858,13 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 
 static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
 {
-  State st;
   int ttHit;
 
   assert(rm->pv_size == 1);
 
   CheckInfo ci;
   checkinfo_init(&ci, pos);
-  do_move(pos, rm->pv[0], &st, gives_check(pos, rm->pv[0], &ci));
+  do_move(pos, rm->pv[0], gives_check(pos, rm->pv[0], &ci));
   TTEntry *tte = tt_probe(pos_key(), &ttHit);
 
   if (ttHit) {

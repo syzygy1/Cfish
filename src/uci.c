@@ -41,8 +41,8 @@ const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 // detection. It is OK to wrap them around, since the 50-move rule ensures
 // we don't need to look back more than 100 ply.
 
-static State state[128];
-static int state_idx;
+//static State state[128];
+//static int state_idx;
 
 // position() is called when the engine receives the "position" UCI
 // command. The function sets up the position described in the given FEN
@@ -68,8 +68,8 @@ void position(Pos *pos, char *str)
   else
     return;
 
-  pos_set(pos, fen, option_value(OPT_CHESS960), &state[0]);
-  state_idx = 1;
+  pos_set(pos, fen, option_value(OPT_CHESS960));
+//  state_idx = 1;
 
   // Parse move list (if any)
   if (moves)
@@ -78,8 +78,8 @@ void position(Pos *pos, char *str)
       if (m == MOVE_NONE) break;
       CheckInfo ci;
       checkinfo_init(&ci, pos);
-      do_move(pos, m, &state[state_idx], gives_check(pos, m, &ci));
-      state_idx = (state_idx + 1) & 127;
+      do_move(pos, m, gives_check(pos, m, &ci));
+//      state_idx = (state_idx + 1) & 127;
     }
 }
 
@@ -185,6 +185,8 @@ void uci_loop(int argc, char **argv)
   char fen[strlen(StartFEN) + 1];
   char *token;
 
+  pos.states = malloc(1000 * sizeof(State));
+
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
     buf_size += strlen(argv[i]) + 1;
@@ -200,8 +202,8 @@ void uci_loop(int argc, char **argv)
   }
 
   strcpy(fen, StartFEN);
-  state_idx = 0;
-  pos_set(&pos, fen, 0, &state[state_idx++]);
+//  state_idx = 0;
+  pos_set(&pos, fen, 0);
 
   do {
     if (argc == 1 && !getline(&cmd, &buf_size, stdin))
@@ -277,6 +279,7 @@ void uci_loop(int argc, char **argv)
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
   free(cmd);
+  free(pos.states);
 
   thread_wait_for_search_finished(threads_main());
 }

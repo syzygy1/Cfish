@@ -52,8 +52,7 @@ void checkinfo_init(CheckInfo *ci, Pos *pos);
 
 
 // State struct stores information needed to restore a Position object to
-// its previous state when we retract a move. Whenever a move is made on
-// the board (by calling do_move), a State object must be passed.
+// its previous state when we retract a move.
 
 struct State {
   // Copied when making a move
@@ -102,6 +101,7 @@ struct Pos {
 
   // Relevant mainly to the search of the root position.
   RootMoves *rootMoves;
+  State *states;
   uint64_t nodes;
   uint64_t tb_hits;
   int PVIdx;
@@ -127,7 +127,7 @@ struct Pos {
 };
 
 // FEN string input/output
-void pos_set(Pos *pos, char *fen, int isChess960, State *st);
+void pos_set(Pos *pos, char *fen, int isChess960);
 void pos_fen(Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
@@ -141,9 +141,9 @@ static int is_capture_or_promotion(Pos *pos, Move m);
 int gives_check(Pos *pos, Move m, const CheckInfo *ci);
 
 // Doing and undoing moves
-void do_move(Pos *pos, Move m, State *st, int givesCheck);
+void do_move(Pos *pos, Move m, int givesCheck);
 void undo_move(Pos *pos, Move m);
-void do_null_move(Pos *pos, State *st);
+void do_null_move(Pos *pos);
 void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
@@ -253,7 +253,7 @@ static inline int is_capture(Pos *pos, Move m)
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
 }
 
-void copy_position(Pos *dest, Pos *src);
+void pos_copy(Pos *dest, Pos *src);
 
 #endif
 

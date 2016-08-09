@@ -5,6 +5,8 @@
 #ifndef TBCORE_H
 #define TBCORE_H
 
+#include <stdatomic.h>
+
 #ifndef _WIN32
 #include <pthread.h>
 #define SEP_CHAR ':'
@@ -69,14 +71,14 @@ struct PairsData {
   int blocksize;
   int idxbits;
   int min_len;
-  base_t base[1]; // C++ complains about base[]...
+  base_t base[]; // must be base[1] in C++
 };
 
 struct TBEntry {
   char *data;
-  uint64 key;
+  Key key;
   uint64 mapping;
-  ubyte ready;
+  atomic_uchar ready;
   ubyte num;
   ubyte symmetric;
   ubyte has_pawns;
@@ -88,9 +90,9 @@ __attribute__((__may_alias__))
 
 struct TBEntry_piece {
   char *data;
-  uint64 key;
+  Key key;
   uint64 mapping;
-  ubyte ready;
+  atomic_uchar ready;
   ubyte num;
   ubyte symmetric;
   ubyte has_pawns;
@@ -103,9 +105,9 @@ struct TBEntry_piece {
 
 struct TBEntry_pawn {
   char *data;
-  uint64 key;
+  Key key;
   uint64 mapping;
-  ubyte ready;
+  atomic_uchar ready;
   ubyte num;
   ubyte symmetric;
   ubyte has_pawns;
@@ -120,9 +122,9 @@ struct TBEntry_pawn {
 
 struct DTZEntry_piece {
   char *data;
-  uint64 key;
+  Key key;
   uint64 mapping;
-  ubyte ready;
+  atomic_uchar ready;
   ubyte num;
   ubyte symmetric;
   ubyte has_pawns;
@@ -138,9 +140,9 @@ struct DTZEntry_piece {
 
 struct DTZEntry_pawn {
   char *data;
-  uint64 key;
+  Key key;
   uint64 mapping;
-  ubyte ready;
+  atomic_uchar ready;
   ubyte num;
   ubyte symmetric;
   ubyte has_pawns;
@@ -157,13 +159,13 @@ struct DTZEntry_pawn {
 };
 
 struct TBHashEntry {
-  uint64 key;
+  Key key;
   struct TBEntry *ptr;
 };
 
 struct DTZTableEntry {
-  uint64 key1;
-  uint64 key2;
+  Key key1;
+  Key key2;
   struct TBEntry *entry;
 };
 

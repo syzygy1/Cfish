@@ -25,6 +25,27 @@ Key zob_castling[16];
 Key zob_side;
 Key zob_exclusion;
 
+#ifndef PIECELISTS
+Key mat_key[2][8] = {
+  { 0ULL,
+    0x5ced000000000001ULL,
+    0xe173000000000010ULL,
+    0xd64d000000000100ULL,
+    0xab88000000001000ULL,
+    0x680b000000010000ULL,
+    0x0000000000000000ULL,
+    0ULL },
+  { 0ULL,
+    0xf209000000100000ULL,
+    0xbb14000001000000ULL,
+    0x58df000010000000ULL,
+    0xa15f000100000000ULL,
+    0x7c94001000000000ULL,
+    0x0000000000000000ULL,
+    0ULL }
+};
+#endif
+
 const char *PieceToChar = " PNBRQK  pnbrqk";
 
 int failed_step;
@@ -166,12 +187,13 @@ void zob_init(void) {
 // This function is not very robust - make sure that input FENs are correct,
 // this is assumed to be the responsibility of the GUI.
 
-void pos_set(Pos *pos, char *fen, int isChess960, State *st)
+void pos_set(Pos *pos, char *fen, int isChess960)
 {
   unsigned char col, row, token;
   Square sq = SQ_A8;
 
   memset(pos, 0, offsetof(Pos, st));
+  State *st = pos->st = pos->states;
   memset(st, 0, sizeof(State));
 #ifdef PIECELISTS
   for (int c = 0; c < 2; c++)
@@ -179,7 +201,6 @@ void pos_set(Pos *pos, char *fen, int isChess960, State *st)
       for (int i = 0; i < 16; i++)
         pos->pieceList[c][pt][i] = SQ_NONE;
 #endif
-  pos->st = st;
 
   // Piece placement
   while ((token = *fen++) && token != ' ') {
@@ -618,21 +639,21 @@ int gives_check(Pos *pos, Move m, const CheckInfo *ci)
 // State object. The move is assumed to be legal. Pseudo-legal moves
 // should be filtered out before this function is called.
 
-void do_move(Pos *pos, Move m, State *st, int givesCheck)
+void do_move(Pos *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
-  assert(st != pos->st);
+//  assert(st != pos->st);
 
   pos->nodes++;
   Key k = pos_key() ^ zob_side;
 
-  // Copy some fields of the old state to our new StateInfo object except
-  // the ones which are going to be recalculated from scratch anyway and
-  // then switch our state pointer to point to the new (ready to be updated)
+  // Copy some fields of the old state to our new State object except the
+  // ones which are going to be recalculated from scratch anyway and then
+  // switch our state pointer to point to the new (ready to be updated)
   // state.
-  memcpy(st, pos->st, offsetof(State, key));
-  st->previous = pos->st;
-  pos->st = st;
+  State *st = ++pos->st;
+  memcpy(st, st - 1, offsetof(State, key));
+  st->previous = st - 1;
 
   // Increment ply counters. In particular, rule50 will be reset to zero
   // later on in case of a capture or a pawn move.
@@ -690,8 +711,13 @@ void do_move(Pos *pos, Move m, State *st, int givesCheck)
 
     // Update material hash key and prefetch access to materialTable
     k ^= zob_psq[them][captured][capsq];
+#ifdef PIECELISTS
     st->materialKey ^= zob_psq[them][captured][piece_count(them, captured)];
     prefetch(&pos->materialTable[st->materialKey & 8191]);
+#else
+    st->materialKey -= mat_key[them[captured];
+    prefetch(&pos->materialTable[st->materialKey >> (64- 13)]);
+#endif
 
     // Update incremental scores
     st->psq -= psqt_psq[them][captured][capsq];
@@ -740,8 +766,12 @@ void do_move(Pos *pos, Move m, State *st, int givesCheck)
       // Update hash keys
       k ^= zob_psq[us][PAWN][to] ^ zob_psq[us][promotion][to];
       st->pawnKey ^= zob_psq[us][PAWN][to];
+#ifdef PIECELISTS
       st->materialKey ^=  zob_psq[us][promotion][piece_count(us, promotion)-1]
                         ^ zob_psq[us][PAWN][piece_count(us, PAWN)];
+#else
+      st->materialKey += mat_key[us][promotion] - mat_key[us][PAWN];
+#endif
 
       // Update incremental score
       st->psq += psqt_psq[us][promotion][to] - psqt_psq[us][PAWN][to];
@@ -828,7 +858,7 @@ void undo_move(Pos *pos, Move m)
   }
 
   // Finally point our state pointer back to the previous state
-  pos->st = pos->st->previous;
+  pos->st--;
   pos->gamePly--;
 
   assert(pos_is_ok(pos, &failed_step));
@@ -870,14 +900,14 @@ static void undo_castling(Pos *pos, int us, Square from, Square *to, Square *rfr
 
 // do_null_move() is used to do a "null move".
 
-void do_null_move(Pos *pos, State *st)
+void do_null_move(Pos *pos)
 {
   assert(!pos_checkers());
-  assert(pos->st != st);
+//  assert(pos->st != st);
 
-  memcpy(st, pos->st, sizeof(State));
-  st->previous = pos->st;
-  pos->st = st;
+  State *st = ++pos->st;
+  memcpy(st, st - 1, sizeof(State));
+  st->previous = st - 1;
 
   if (st->epSquare) {
     st->key ^= zob_enpassant[file_of(st->epSquare)];
@@ -1046,9 +1076,11 @@ int is_draw(Pos *pos)
 }
 
 
-void copy_position(Pos *dest, Pos *src)
+void pos_copy(Pos *dest, Pos *src)
 {
-  memcpy(dest, src, offsetof(Pos, rootMoves));
+  memcpy(dest, src, offsetof(Pos, st));
+  dest->st = dest->states;
+  *(dest->st) = *(src->st);
 }
 
 

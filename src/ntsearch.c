@@ -17,7 +17,6 @@ Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
   assert(!(PvNode && cutNode));
 
   Move pv[MAX_PLY+1], quietsSearched[64];
-  State st;
   TTEntry *tte;
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
@@ -194,7 +193,7 @@ Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
     // Null move dynamic reduction based on depth and value
     Depth R = ((823 + 67 * depth) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
 
-    do_null_move(pos, &st);
+    do_null_move(pos);
     (ss+1)->skipEarlyPruning = 1;
     nullValue = depth-R < ONE_PLY ? -qsearch_NonPV_false(pos, ss+1, -beta, -beta+1, DEPTH_ZERO)
                                   : - search_NonPV(pos, ss+1, -beta, -beta+1, depth-R, !cutNode);
@@ -244,7 +243,7 @@ Value name_NT(search)(Pos *pos, Stack *ss, Value alpha, Value beta,
       if (is_legal(pos, move, ci.pinned)) {
         ss->currentMove = move;
         ss->counterMoves = &CounterMoveHistory[moved_piece(move)][to_sq(move)];
-        do_move(pos, move, &st, gives_check(pos, move, &ci));
+        do_move(pos, move, gives_check(pos, move, &ci));
         value = -search_NonPV(pos, ss+1, -rbeta, -rbeta+1, rdepth, !cutNode);
         undo_move(pos, move);
         if (value >= rbeta)
@@ -418,7 +417,7 @@ moves_loop: // When in check search starts from here.
     ss->counterMoves = &CounterMoveHistory[moved_piece][to_sq(move)];
 
     // Step 14. Make the move
-    do_move(pos, move, &st, givesCheck);
+    do_move(pos, move, givesCheck);
 
     // Step 15. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
