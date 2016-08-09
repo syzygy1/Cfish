@@ -383,12 +383,12 @@ void mainthread_search(void)
 
 void thread_search(Pos *pos)
 {
-  Stack stack[MAX_PLY+7];
-  Stack *ss = stack+5; // To allow referencing (ss-5) and (ss+2)
   Value bestValue, alpha, beta, delta;
   Move easyMove = MOVE_NONE;
 
-  memset(ss-5, 0, 8 * sizeof(Stack));
+  Stack *ss = pos->st; // The fifth element of the allocated array.
+  for (int i = -5; i < 3; i++)
+    memset(SStackBegin(ss[i]), 0, SStackSize);
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;

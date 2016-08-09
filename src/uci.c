@@ -175,7 +175,7 @@ void uci_loop(int argc, char **argv)
   char fen[strlen(StartFEN) + 1];
   char *token;
 
-  pos.states = malloc(1000 * sizeof(State));
+  pos.stack = malloc(1000 * sizeof(Stack));
 
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
@@ -267,7 +267,7 @@ void uci_loop(int argc, char **argv)
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
   free(cmd);
-  free(pos.states);
+  free(pos.stack);
 
   thread_wait_for_search_finished(threads_main());
 }

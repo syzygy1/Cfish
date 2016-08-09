@@ -590,13 +590,14 @@ int TB_probe_dtz(Pos *pos, int *success)
 
 // Check whether there has been at least one repetition of positions
 // since the last capture or pawn move.
-static int has_repeated(State *st)
+static int has_repeated(Pos *pos)
 {
+  Stack *st = pos->st;
   while (1) {
     int i = 4, e = min(st->rule50, st->pliesFromNull);
     if (e < i)
       return 0;
-    State *stp = st->previous->previous;
+    Stack *stp = st->previous->previous;
     do {
       stp = stp->previous->previous;
       if (stp->key == st->key)
@@ -696,7 +697,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
     // If there was no repetition and we have 50-move budget left,
     // relax max_dtz_allowed.
-    if (!has_repeated(pos->st) && best + cnt50 <= 99)
+    if (!has_repeated(pos) && best + cnt50 <= 99)
       max_dtz_allowed = 99 - cnt50;
 
     // Now keep all winning moves with dtz <= max_allowed.

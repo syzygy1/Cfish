@@ -14,7 +14,7 @@
 static void do_castling(Pos *pos, int us, Square from, Square *to, Square *rfrom, Square *rto);
 static void undo_castling(Pos *pos, int us, Square from, Square *to, Square *rfrom, Square *rto);
 static void set_castling_right(Pos *pos, int c, Square rfrom);
-static void set_state(Pos *pos, State* st);
+static void set_state(Pos *pos, Stack *st);
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -193,8 +193,8 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   Square sq = SQ_A8;
 
   memset(pos, 0, offsetof(Pos, st));
-  State *st = pos->st = pos->states;
-  memset(st, 0, sizeof(State));
+  Stack *st = pos->st = pos->stack;
+  memset(st, 0, StateSize);
 #ifdef PIECELISTS
   for (int c = 0; c < 2; c++)
     for (int pt = 0; pt < 8; pt++)
@@ -307,9 +307,9 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
 // set_state() computes the hash keys of the position, and other data
 // that once computed is updated incrementally as moves are made. The
 // function is only used when a new position is set up, and to verify
-// the correctness of the StateInfo data when running in debug mode.
+// the correctness of the Stack data when running in debug mode.
 
-static void set_state(Pos *pos, State* st)
+static void set_state(Pos *pos, Stack *st)
 {
   st->key = st->pawnKey = st->materialKey = 0;
   st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = 0;
@@ -636,7 +636,7 @@ int gives_check(Pos *pos, Move m, const CheckInfo *ci)
 
 
 // do_move() makes a move, and saves all information necessary to a
-// State object. The move is assumed to be legal. Pseudo-legal moves
+// Stack object. The move is assumed to be legal. Pseudo-legal moves
 // should be filtered out before this function is called.
 
 void do_move(Pos *pos, Move m, int givesCheck)
@@ -647,12 +647,12 @@ void do_move(Pos *pos, Move m, int givesCheck)
   pos->nodes++;
   Key k = pos_key() ^ zob_side;
 
-  // Copy some fields of the old state to our new State object except the
+  // Copy some fields of the old state to our new Stack object except the
   // ones which are going to be recalculated from scratch anyway and then
   // switch our state pointer to point to the new (ready to be updated)
   // state.
-  State *st = ++pos->st;
-  memcpy(st, st - 1, offsetof(State, key));
+  Stack *st = ++pos->st;
+  memcpy(st, st - 1, StateCopySize);
   st->previous = st - 1;
 
   // Increment ply counters. In particular, rule50 will be reset to zero
@@ -903,8 +903,8 @@ void do_null_move(Pos *pos)
   assert(!pos_checkers());
 //  assert(pos->st != st);
 
-  State *st = ++pos->st;
-  memcpy(st, st - 1, sizeof(State));
+  Stack *st = ++pos->st;
+  memcpy(st, st - 1, StateSize);
   st->previous = st - 1;
 
   if (st->epSquare) {
@@ -1052,7 +1052,7 @@ Value see(Pos *pos, Move m)
 
 int is_draw(Pos *pos)
 {
-  State *st = pos->st;
+  Stack *st = pos->st;
 
   if (st->rule50 > 99) {
     if (!pos_checkers())
@@ -1061,7 +1061,7 @@ int is_draw(Pos *pos)
     return generate_legal(pos, list) != list;
   }
 
-  State *stp = st;
+  Stack *stp = st;
   for (int i = 2, e = min(st->rule50, st->pliesFromNull); i <= e; i += 2)
   {
       stp = stp->previous->previous;
@@ -1077,8 +1077,8 @@ int is_draw(Pos *pos)
 void pos_copy(Pos *dest, Pos *src)
 {
   memcpy(dest, src, offsetof(Pos, st));
-  dest->st = dest->states;
-  *(dest->st) = *(src->st);
+  dest->st = dest->stack;
+  memcpy(dest->st, src->st, StateSize);
 }
 
 
@@ -1126,7 +1126,7 @@ int pos_is_ok(Pos *pos, int *failedStep)
 {
   int Fast = 1; // Quick (default) or full check?
 
-  enum { Default, King, Bitboards, StateOK, Lists, Castling };
+  enum { Default, King, Bitboards, StackOK, Lists, Castling };
 
   for (int step = Default; step <= (Fast ? Default : Castling); step++) {
     if (failedStep)
@@ -1158,10 +1158,10 @@ int pos_is_ok(Pos *pos, int *failedStep)
             return 0;
     }
 
-    if (step == StateOK) {
-      State si = *(pos->st);
+    if (step == StackOK) {
+      Stack si = *(pos->st);
       set_state(pos, &si);
-      if (memcmp(&si, pos->st, sizeof(State)))
+      if (memcmp(&si, pos->st, StateSize))
         return 0;
     }
 

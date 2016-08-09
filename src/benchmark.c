@@ -164,7 +164,7 @@ void benchmark(Pos *current, char *str)
 
   uint64_t nodes = 0;
   Pos pos;
-  pos.states = malloc(101 * sizeof(State)); // max perft 100
+  pos.stack = malloc(101 * sizeof(Stack)); // max perft 100
   TimePoint elapsed = now();
 
   for (size_t i = 0; i < num_fens; i++) {
@@ -197,6 +197,6 @@ void benchmark(Pos *current, char *str)
       free(fens[i]);
     free(fens);
   }
-  free(pos.states);
+  free(pos.stack);
 }
 

@@ -30,24 +30,6 @@
 typedef Value CounterMoveStats[16][64];
 typedef CounterMoveStats CounterMoveHistoryStats[16][64];
 
-// Stack struct keeps track of the information we need to remember from nodes
-// shallower and deeper in the tree during the search. Each search thread has
-// its own array of Stack objects, indexed by the current ply.
-
-struct Stack {
-  Move* pv;
-  int ply;
-  Move currentMove;
-  Move excludedMove;
-  Move killers[2];
-  Value staticEval;
-  int skipEarlyPruning;
-  int moveCount;
-  CounterMoveStats *counterMoves;
-};
-
-typedef struct Stack Stack;
-
 // RootMove struct is used for moves at the root of the tree. For each root
 // move we store a score and a PV (really a refutation in the case of moves
 // which fail low). Score is normally set at -VALUE_INFINITE for all non-pv

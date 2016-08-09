@@ -50,11 +50,10 @@ typedef struct CheckInfo CheckInfo;
 
 void checkinfo_init(CheckInfo *ci, Pos *pos);
 
-
-// State struct stores information needed to restore a Position object to
+// Stack struct stores information needed to restore a Pos struct to
 // its previous state when we retract a move.
 
-struct State {
+struct Stack {
   // Copied when making a move
   Key pawnKey;
   Key materialKey;
@@ -66,13 +65,29 @@ struct State {
   Square epSquare;
 
   // Not copied when making a move
+  int capturedType;
   Key key;
   Bitboard checkersBB;
-  int capturedType;
-  struct State *previous;
+  struct Stack *previous;
+
+  // Original search stack data
+  Move* pv;
+  int ply;
+  Move currentMove;
+  Move excludedMove;
+  Move killers[2];
+  Value staticEval;
+  int skipEarlyPruning;
+  int moveCount;
+  CounterMoveStats *counterMoves;
 };
 
-typedef struct State State;
+typedef struct Stack Stack;
+
+#define StateCopySize offsetof(Stack, capturedType)
+#define StateSize offsetof(Stack, pv)
+#define SStackBegin(st) (&st.pv)
+#define SStackSize (sizeof(Stack) - offsetof(Stack, pv))
 
 
 // Pos struct stores information regarding the board representation as
@@ -97,11 +112,11 @@ struct Pos {
   uint16_t gamePly;
   uint16_t chess960;
 
-  State *st;
+  Stack *st;
 
   // Relevant mainly to the search of the root position.
   RootMoves *rootMoves;
-  State *states;
+  Stack *stack;
   uint64_t nodes;
   uint64_t tb_hits;
   int PVIdx;
