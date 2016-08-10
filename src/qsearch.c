@@ -1,5 +1,6 @@
 #if NT == PV
 #define name_NT(name,chk) name##_PV_##chk
+#define BETA_ARG Value beta,
 #if InCheck == false
 #define name_NT_InCheck(name) name##_PV_false
 #else
@@ -7,6 +8,8 @@
 #endif
 #else
 #define name_NT(name,chk) name##_NonPV_##chk
+#define BETA_ARG
+#define beta (alpha+1)
 #if InCheck == false
 #define name_NT_InCheck(name) name##_NonPV_false
 #else
@@ -16,7 +19,7 @@
 
 #define PvNode (NT == PV)
 
-Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta,
+Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
                                Depth depth)
 {
   assert(InCheck == !!pos_checkers());
@@ -166,8 +169,13 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta,
 
     // Make and search the move
     do_move(pos, move, givesCheck);
-    value = givesCheck ? -name_NT(qsearch,  true)(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
-                       : -name_NT(qsearch, false)(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
+#if PvNode
+    value = givesCheck ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
+                       : -qsearch_PV_false(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
+#else
+    value = givesCheck ? -qsearch_NonPV_true(pos, ss+1, -beta, depth - ONE_PLY)
+                       : -qsearch_NonPV_false(pos, ss+1, -beta, depth - ONE_PLY);
+#endif
     undo_move(pos, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
@@ -210,4 +218,8 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, Value beta,
 #undef PvNode
 #undef name_NT_InCheck
 #undef name_NT
+#undef BETA_ARG
+#ifdef beta
+#undef beta
+#endif
 

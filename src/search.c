@@ -64,14 +64,9 @@ static const int razor_margin[4] = { 483, 570, 603, 554 };
 static int FutilityMoveCounts[2][16];  // [improving][depth]
 static Depth Reductions[2][2][64][64]; // [pv][improving][depth][moveNumber]
 
-static Depth reduction_PV(int i, Depth d, int mn)
+static inline Depth reduction(int i, Depth d, int mn, const int NT)
 {
-  return Reductions[PV][i][min(d, 63 * ONE_PLY)][min(mn, 63)];
-}
-
-static Depth reduction_NonPV(int i, Depth d, int mn)
-{
-  return Reductions[NonPV][i][min(d, 63 * ONE_PLY)][min(mn, 63)];
+  return Reductions[NT][i][min(d, 63 * ONE_PLY)][min(mn, 63)];
 }
 
 // Skill structure is used to implement strength limit
@@ -170,13 +165,13 @@ static const int HalfDensityRowSize[HalfDensitySize] = {
 static Value DrawValue[2];
 static CounterMoveHistoryStats CounterMoveHistory;
 
-static Value search_PV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth, int cutNode);
-static Value search_NonPV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth, int cutNode);
+static Value search_PV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
+static Value search_NonPV(Pos *pos, Stack* ss, Value alpha, Depth depth, int cutNode);
 
 static Value qsearch_PV_true(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
 static Value qsearch_PV_false(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_NonPV_true(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_NonPV_false(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
+static Value qsearch_NonPV_true(Pos *pos, Stack* ss, Value alpha, Depth depth);
+static Value qsearch_NonPV_false(Pos *pos, Stack* ss, Value alpha, Depth depth);
 
 static Value value_to_tt(Value v, int ply);
 static Value value_from_tt(Value v, int ply);
@@ -454,7 +449,7 @@ void thread_search(Pos *pos)
       // high/low, re-search with a bigger window until we're not failing
       // high/low anymore.
       while (1) {
-        bestValue = search_PV(pos, ss, alpha, beta, pos->rootDepth, 0);
+        bestValue = search_PV(pos, ss, alpha, beta, pos->rootDepth);
 
         // Bring the best move to the front. It is critical that sorting
         // is done with a stable algorithm because all the values but the
