@@ -719,9 +719,9 @@ static inline Score evaluate_space(Pos *pos, EvalInfo *ei, const int Us)
 
   // ...count safe + (behind & safe) with a single popcount
   int bonus = popcount((Us == WHITE ? safe << 32 : safe >> 32) | (behind & safe));
-  int weight = popcount(pieces_pp(KNIGHT, BISHOP));
+  int weight = popcount(pieces_c(Us));
 
-  return make_score(bonus * weight * weight * 2 / 11, 0);
+  return make_score(bonus * weight * weight / 22, 0);
 }
 
 
