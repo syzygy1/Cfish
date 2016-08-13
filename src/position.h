@@ -30,11 +30,21 @@
 #include "bitboard.h"
 #include "types.h"
 
-extern Score psqt_psq[2][8][64];
-void psqt_init(void);
+struct Zob {
+  union {
+    Key psq[2][8][64];
+    Key psq2d[16][64];
+  };
+  Key enpassant[8];
+  Key castling[16];
+  Key side;
+  Key exclusion;
+};
 
-extern Key zob_exclusion;
-void zob_init();
+extern struct Zob zob;
+
+void psqt_init(void);
+void zob_init(void);
 
 // CheckInfo struct is initialized at constructor time and keeps info used
 // to detect if a move gives check.
@@ -62,10 +72,10 @@ struct Stack {
   int rule50;
   int pliesFromNull;
   Score psq;
-  Square epSquare;
 
   // Not copied when making a move
   int capturedType;
+  Square epSquare;
   Key key;
   Bitboard checkersBB;
   struct Stack *previous;
@@ -100,14 +110,14 @@ struct Pos {
   int board[64];
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
-#ifdef PIECELISTS
+#ifdef PEDANTIC
   int pieceCount[2][8];
   Square pieceList[2][8][16];
   int index[64];
-#endif
   int castlingRightsMask[64];
   Square castlingRookSquare[16];
   Bitboard castlingPath[16];
+#endif
   int sideToMove;
   uint16_t gamePly;
   uint16_t chess960;
@@ -171,7 +181,6 @@ int is_draw(Pos *pos);
 
 // Position consistency check, for debugging
 int pos_is_ok(Pos *pos, int* failedStep);
-//  void flip();
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])
@@ -183,15 +192,32 @@ int pos_is_ok(Pos *pos, int* failedStep);
 #define piece_on(s) (pos->board[s])
 #define ep_square() (pos->st->epSquare)
 #define is_empty(s) (!piece_on(s))
+#ifdef PEDANTIC
 #define piece_count(c,p) (pos->pieceCount[c][p])
 #define piece_list(c,p) (pos->pieceList[c][p])
 #define square_of(c,p) (pos->pieceList[c][p][0])
+#define loop_through_pieces(c,p,s) \
+  Square *pl = piece_list(c,p); \
+  while ((s = *pl++) != SQ_NONE)
+#else
+#define piece_count(c,p) (popcount(pieces_cp(c, p)))
+#define square_of(c,p) (lsb(pieces_cp(c,p)))
+#define piece_count_mk(c, p) (((pos_material_key()) >> (20 * (c) + 4 * (p) + 4)) & 15)
+#define loop_through_pieces(c,p,s) \
+  Bitboard pcs = pieces_cp(c,p); \
+  while (pcs && (s = pop_lsb(&pcs), 1))
+#endif
 
 // Castling
 #define can_castle_cr(cr) (pos->st->castlingRights & (cr))
 #define can_castle_c(c) can_castle_cr((WHITE_OO | WHITE_OOO) << (2 * (c)))
+#ifdef PEDANTIC
 #define castling_impeded(cr) (pieces() & pos->castlingPath[cr])
 #define castling_rook_square(cr) (pos->castlingRookSquare[cr])
+#else
+#define castling_impeded(cr) (pieces() & CastlingPath[cr])
+#define castling_rook_square(cr) (CastlingRookSquare[cr])
+#endif
 
 // Checking
 #define pos_checkers() (pos->st->checkersBB)
@@ -213,7 +239,7 @@ int pos_is_ok(Pos *pos, int* failedStep);
 
 // Accessing hash keys
 #define pos_key() (pos->st->key)
-#define pos_exclusion_key() (pos_key() ^ zob_exclusion)
+#define pos_exclusion_key() (pos_key() ^ zob.exclusion)
 #define pos_material_key() (pos->st->materialKey)
 #define pos_pawn_key() (pos->st->pawnKey)
 

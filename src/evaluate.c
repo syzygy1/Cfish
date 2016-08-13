@@ -274,11 +274,10 @@ static inline Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
                                              : Rank5BB | Rank4BB | Rank3BB);
-  Square* pl = piece_list(Us, Pt);
 
   ei->attackedBy[Us][Pt] = 0;
 
-  while ((s = *pl++) != SQ_NONE) {
+  loop_through_pieces(Us, Pt, s) {
     // Find attacked squares, including x-ray attacks for bishops and rooks
     b = Pt == BISHOP ? attacks_bb_bishop(s, pieces() ^ pieces_cp(Us, QUEEN))
       : Pt == ROOK ? attacks_bb_rook(s, pieces() ^ pieces_cpp(Us, ROOK, QUEEN))
@@ -425,7 +424,7 @@ static inline Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
                  +  9 * ei->kingAdjacentZoneAttacksCount[Them]
                  + 21 * popcount(undefended)
                  + 12 * (popcount(b) + !!ei->pinnedPieces[Us])
-                 - 64 * !pos->pieceCount[Them][QUEEN]
+                 - 64 * !pieces_cp(Them, QUEEN)
                  - mg_value(score) / 8;
 
     // Analyse the enemy's safe queen contact checks. Firstly, find the
@@ -719,6 +718,7 @@ static inline Score evaluate_space(Pos *pos, EvalInfo *ei, const int Us)
 
   // ...count safe + (behind & safe) with a single popcount
   int bonus = popcount((Us == WHITE ? safe << 32 : safe >> 32) | (behind & safe));
+  bonus = min(16, bonus);
   int weight = popcount(pieces_c(Us));
 
   return make_score(bonus * weight * weight / 22, 0);

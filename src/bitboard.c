@@ -50,6 +50,18 @@ Bitboard PassedPawnMask[2][64];
 Bitboard PawnAttackSpan[2][64];
 Bitboard PseudoAttacks[8][64];
 
+#ifndef PEDANTIC
+Bitboard EPMask[16];
+Bitboard CastlingPath[64];
+int CastlingRightsMask[64];
+Square CastlingRookSquare[16];
+Key CastlingHash[16];
+Bitboard CastlingBits[16];
+Score CastlingPSQ[16];
+Square CastlingRookFrom[16];
+Square CastlingRookTo[16];
+#endif
+
 // De Bruijn sequences. See chessprogramming.wikispaces.com/BitScan.
 
 #define DeBruijn64 0x3F79D71B4CB0A89ULL
@@ -183,6 +195,12 @@ void bitboards_init()
         SquareDistance[s1][s2] = max(distance_f(s1, s2), distance_r(s1, s2));
         DistanceRingBB[s1][SquareDistance[s1][s2] - 1] |= sq_bb(s2);
       }
+
+#ifndef PEDANTIC
+  for (Square s = SQ_A4; s <= SQ_H5; s++)
+    EPMask[s - SQ_A4] =  ((sq_bb(s) >> 1) & ~FileHBB)
+                       | ((sq_bb(s) << 1) & ~FileABB);
+#endif
 
   int steps[][9] = { {0}, { 7, 9 }, { 17, 15, 10, 6, -6, -10, -15, -17 },
                      {0}, {0}, {0}, { 9, 7, -7, -9, 8, 1, -1, -8 } };

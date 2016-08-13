@@ -64,7 +64,11 @@ static inline ExtMove *generate_castling(Pos *pos, ExtMove *list, int us,
                                    & pieces_cpp(us ^ 1, ROOK, QUEEN)))
     return list;
 
+#ifdef PEDANTIC
   Move m = make_castling(kfrom, rfrom);
+#else
+  Move m = make_castling(kfrom, kto);
+#endif
 
   if (Checks && !gives_check(pos, m, ci))
     return list;
@@ -225,12 +229,11 @@ static inline ExtMove *generate_moves(Pos *pos, ExtMove *list, int us,
                                       Bitboard target, const CheckInfo* ci,
                                       const int Pt, const int Checks)
 {
-
   assert(Pt != KING && Pt != PAWN);
 
-  const Square* pl = piece_list(us, Pt);
+  Square from;
 
-  for (Square from = *pl; from != SQ_NONE; from = *++pl) {
+  loop_through_pieces(us, Pt, from) {
     if (Checks) {
       if (    (Pt == BISHOP || Pt == ROOK || Pt == QUEEN)
           && !(PseudoAttacks[Pt][from] & target & ci->checkSquares[Pt]))

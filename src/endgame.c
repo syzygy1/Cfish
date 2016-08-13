@@ -85,11 +85,11 @@ static Square normalize(Pos *pos, int strongSide, Square sq)
 }
 
 extern char *PieceToChar;
-extern Key zob_psq[2][8][64];
 
 
 // Compute material key from an endgame code string.
 
+#ifdef PEDANTIC
 static Key calc_key(char *code, int c)
 {
   int pcs[16];
@@ -108,14 +108,32 @@ static Key calc_key(char *code, int c)
   int color = c == WHITE ? 0 : 8;
   for (int pt = PAWN; pt <= KING; pt++)
     for (int i = 0; i < pcs[color + pt]; i++)
-      key ^= zob_psq[WHITE][pt][i];
+      key ^= zob.psq[WHITE][pt][i];
   color ^= 8;
   for (int pt = PAWN; pt <= KING; pt++)
     for (int i = 0; i < pcs[color + pt]; i++)
-      key ^= zob_psq[BLACK][pt][i];
+      key ^= zob.psq[BLACK][pt][i];
 
   return key;
 }
+#else
+extern Key mat_key[16];
+
+static Key calc_key(char *code, int c)
+{
+  Key key = 0;
+  int color = c << 3;
+
+  for (; *code; code++)
+    for (int i = 1;; i++)
+      if (*code == PieceToChar[i]) {
+        key += mat_key[i ^ color];
+        break;
+      }
+
+  return key;
+}
+#endif
 
 struct EndgameFunc endgame_funcs[16] = {
 // Entries 0-7 are evaluation functions.
@@ -622,8 +640,13 @@ int ScaleKRPPKRP(Pos *pos, int strongSide)
   assert(verify_material(pos, strongSide, RookValueMg, 2));
   assert(verify_material(pos, weakSide,   RookValueMg, 1));
 
+#ifdef PEDANTIC
   Square wpsq1 = piece_list(strongSide, PAWN)[0];
   Square wpsq2 = piece_list(strongSide, PAWN)[1];
+#else
+  Square wpsq1 = lsb(pieces_cp(strongSide, PAWN));
+  Square wpsq2 = msb(pieces_cp(strongSide, PAWN));
+#endif
   Square bksq = square_of(weakSide, KING);
 
   // Does the stronger side have a passed pawn?
@@ -734,8 +757,13 @@ int ScaleKBPPKB(Pos *pos, int strongSide)
     return SCALE_FACTOR_NONE;
 
   Square ksq = square_of(weakSide, KING);
+#ifdef PEDANTIC
   Square psq1 = piece_list(strongSide, PAWN)[0];
   Square psq2 = piece_list(strongSide, PAWN)[1];
+#else
+  Square psq1 = lsb(pieces_cp(strongSide, PAWN));
+  Square psq2 = msb(pieces_cp(strongSide, PAWN));
+#endif
   int r1 = rank_of(psq1);
   int r2 = rank_of(psq2);
   Square blockSq1, blockSq2;

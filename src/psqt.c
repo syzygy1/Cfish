@@ -25,6 +25,7 @@
 Value PieceValue[2][16] = {
 { VALUE_ZERO, PawnValueMg, KnightValueMg, BishopValueMg, RookValueMg, QueenValueMg },
 { VALUE_ZERO, PawnValueEg, KnightValueEg, BishopValueEg, RookValueEg, QueenValueEg } };
+Value NonPawnPieceValue[16];
 
 #define S(mg, eg) make_score((unsigned)(mg), (unsigned)(eg))
 
@@ -98,7 +99,7 @@ const Score Bonus[][8][4] = {
 
 #undef S
 
-Score psqt_psq[2][8][64];
+struct PSQT psqt;
 
 // init() initializes piece-square tables: the white halves of the tables
 // are copied from Bonus[] adding the piece value, then the black  halves
@@ -114,9 +115,12 @@ void psqt_init(void) {
 
     for (Square s = 0; s < 64; s++) {
       int f = min(file_of(s), FILE_H - file_of(s));
-      psqt_psq[WHITE][pt][s] = v + Bonus[pt][rank_of(s)][f];
-      psqt_psq[BLACK][pt][s ^ 0x38] = -psqt_psq[WHITE][pt][s];
+      psqt.psq[WHITE][pt][s] = v + Bonus[pt][rank_of(s)][f];
+      psqt.psq[BLACK][pt][s ^ 0x38] = -psqt.psq[WHITE][pt][s];
     }
   }
+  for (int pt = 0; pt < 16; pt++)
+    NonPawnPieceValue[pt] = PieceValue[MG][pt];
+  NonPawnPieceValue[W_PAWN] = NonPawnPieceValue[B_PAWN] = 0;
 }
 

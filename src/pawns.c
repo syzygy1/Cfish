@@ -98,7 +98,6 @@ static inline Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
   Square s;
   int opposed, lever, connected, backward;
   Score score = SCORE_ZERO;
-  const Square* pl = pos->pieceList[Us][PAWN];
   const Bitboard* pawnAttacksBB = StepAttacksBB[make_piece(Us, PAWN)];
 
   Bitboard ourPawns   = pieces_cp(Us, PAWN);
@@ -112,7 +111,7 @@ static inline Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
 
   // Loop through all pawns of the current color and score each pawn
-  while ((s = *pl++) != SQ_NONE) {
+  loop_through_pieces(Us, PAWN, s) {
     assert(piece_on(s) == make_piece(Us, PAWN));
 
     int f = file_of(s);

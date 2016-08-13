@@ -68,6 +68,19 @@ extern Bitboard PassedPawnMask[2][64];
 extern Bitboard PawnAttackSpan[2][64];
 extern Bitboard PseudoAttacks[8][64];
 
+#ifndef PEDANTIC
+extern Bitboard EPMask[16];
+extern Bitboard CastlingPath[64];
+extern int CastlingRightsMask[64];
+extern Square CastlingRookSquare[16];
+extern int CastlingToSquare[16]; // To correct the KxR encoding.
+extern Key CastlingHash[16];
+extern Bitboard CastlingBits[16];
+extern Score CastlingPSQ[16];
+extern Square CastlingRookFrom[16];
+extern Square CastlingRookTo[16];
+#endif
+
 
 static inline Bitboard sq_bb(Square s)
 {

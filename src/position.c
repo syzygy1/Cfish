@@ -11,38 +11,38 @@
 #include "uci.h"
 #include "tbprobe.h"
 
-static void do_castling(Pos *pos, int us, Square from, Square *to, Square *rfrom, Square *rto);
-static void undo_castling(Pos *pos, int us, Square from, Square *to, Square *rfrom, Square *rto);
 static void set_castling_right(Pos *pos, int c, Square rfrom);
 static void set_state(Pos *pos, Stack *st);
+
+#ifndef NDEBUG
+int check_pos(Pos *pos);
+#else
+#define check_pos(p) do {} while (0)
+#endif
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
 
-Key zob_psq[2][8][64];
-Key zob_enpassant[8];
-Key zob_castling[16];
-Key zob_side;
-Key zob_exclusion;
+struct Zob zob;
 
-#ifndef PIECELISTS
-Key mat_key[2][8] = {
-  { 0ULL,
-    0x5ced000000000001ULL,
-    0xe173000000000010ULL,
-    0xd64d000000000100ULL,
-    0xab88000000001000ULL,
-    0x680b000000010000ULL,
-    0x0000000000000000ULL,
-    0ULL },
-  { 0ULL,
-    0xf209000000100000ULL,
-    0xbb14000001000000ULL,
-    0x58df000010000000ULL,
-    0xa15f000100000000ULL,
-    0x7c94001000000000ULL,
-    0x0000000000000000ULL,
-    0ULL }
+#ifndef PEDANTIC
+Key mat_key[16] = {
+    0ULL,
+    0x5ced000000000101ULL,
+    0xe173000000001001ULL,
+    0xd64d000000010001ULL,
+    0xab88000000100001ULL,
+    0x680b000001000001ULL,
+    0x0000000000000001ULL,
+    0ULL,
+    0ULL,
+    0xf209000010000001ULL,
+    0xbb14000100000001ULL,
+    0x58df001000000001ULL,
+    0xa15f010000000001ULL,
+    0x7c94100000000001ULL,
+    0x0000000000000001ULL,
+    0ULL
 };
 #endif
 
@@ -50,37 +50,28 @@ const char *PieceToChar = " PNBRQK  pnbrqk";
 
 int failed_step;
 
+#ifdef PEDANTIC
 static inline void put_piece(Pos *pos, int c, int pt, Square s)
 {
   pos->board[s] = make_piece(c, pt);
   pos->byTypeBB[0] |= sq_bb(s);
   pos->byTypeBB[pt] |= sq_bb(s);
   pos->byColorBB[c] |= sq_bb(s);
-#ifdef PIECELISTS
   pos->index[s] = pos->pieceCount[c][pt]++;
   pos->pieceList[c][pt][pos->index[s]] = s;
-  pos->pieceCount[c][0]++;
-#endif
 }
 
 static inline void remove_piece(Pos *pos, int c, int pt, Square s)
 {
-  // WARNING: This is not a reversible operation. If we remove a piece
-  // in do_move() and then replace it in undo_move() we will put it at
-  // the end of the list and not in its original place, it means index[]
-  // and pieceList[] are not guaranteed to be invariant under a
-  // do_move() + undo_move() sequence.
+  // WARNING: This is not a reversible operation.
   pos->byTypeBB[0] ^= sq_bb(s);
   pos->byTypeBB[pt] ^= sq_bb(s);
   pos->byColorBB[c] ^= sq_bb(s);
   /* board[s] = 0;  Not needed, overwritten by the capturing one */
-#ifdef PIECELISTS
   Square lastSquare = pos->pieceList[c][pt][--pos->pieceCount[c][pt]];
   pos->index[lastSquare] = pos->index[s];
   pos->pieceList[c][pt][pos->index[lastSquare]] = lastSquare;
   pos->pieceList[c][pt][pos->pieceCount[c][pt]] = SQ_NONE;
-  pos->pieceCount[c][0]--;
-#endif
 }
 
 static inline void move_piece(Pos *pos, int c, int pt, Square from, Square to)
@@ -93,11 +84,10 @@ static inline void move_piece(Pos *pos, int c, int pt, Square from, Square to)
   pos->byColorBB[c] ^= from_to_bb;
   pos->board[from] = 0;
   pos->board[to] = make_piece(c, pt);
-#ifdef PIECELISTS
   pos->index[to] = pos->index[from];
   pos->pieceList[c][pt][pos->index[to]] = to;
-#endif
 }
+#endif
 
 
 // CheckInfo initialisation.
@@ -164,22 +154,22 @@ void zob_init(void) {
   for (int c = 0; c < 2; c++)
     for (int pt = PAWN; pt <= KING; pt++)
       for (Square s = 0; s < 64; s++)
-        zob_psq[c][pt][s] = prng_rand(&rng);
+        zob.psq[c][pt][s] = prng_rand(&rng);
 
   for (int f = 0; f < 8; f++)
-    zob_enpassant[f] = prng_rand(&rng);
+    zob.enpassant[f] = prng_rand(&rng);
 
   for (int cr = 0; cr < 16; cr++) {
-    zob_castling[cr] = 0;
+    zob.castling[cr] = 0;
     Bitboard b = (Bitboard)cr;
     while (b) {
-      Key k = zob_castling[1ULL << pop_lsb(&b)];
-      zob_castling[cr] ^= k ? k : prng_rand(&rng);
+      Key k = zob.castling[1ULL << pop_lsb(&b)];
+      zob.castling[cr] ^= k ? k : prng_rand(&rng);
     }
   }
 
-  zob_side = prng_rand(&rng);
-  zob_exclusion = prng_rand(&rng);
+  zob.side = prng_rand(&rng);
+  zob.exclusion = prng_rand(&rng);
 }
 
 
@@ -195,11 +185,14 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   memset(pos, 0, offsetof(Pos, st));
   Stack *st = pos->st = pos->stack;
   memset(st, 0, StateSize);
-#ifdef PIECELISTS
+#ifdef PEDANTIC
   for (int c = 0; c < 2; c++)
     for (int pt = 0; pt < 8; pt++)
       for (int i = 0; i < 16; i++)
         pos->pieceList[c][pt][i] = SQ_NONE;
+#else
+  for (Square s = 0; s < 64; s++)
+    CastlingRightsMask[s] = ANY_CASTLING;
 #endif
 
   // Piece placement
@@ -211,7 +204,15 @@ void pos_set(Pos *pos, char *fen, int isChess960)
     else {
       for (int pt = 0; pt < 16; pt++)
         if (PieceToChar[pt] == token) {
+#ifdef PEDANTIC
           put_piece(pos, color_of(pt), type_of_p(pt), sq++);
+#else
+          pos->board[sq] = pt;
+          pos->byTypeBB[0] |= sq_bb(sq);
+          pos->byTypeBB[pt & 7] |= sq_bb(sq);
+          pos->byColorBB[pt >> 3] |= sq_bb(sq);
+          sq++;
+#endif
           break;
         }
     }
@@ -286,13 +287,15 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
   int cs = kfrom < rfrom ? KING_SIDE : QUEEN_SIDE;
   int cr = (WHITE_OO << ((cs == QUEEN_SIDE) + 2 * c));
 
+  Square kto = relative_square(c, cs == KING_SIDE ? SQ_G1 : SQ_C1);
+  Square rto = relative_square(c, cs == KING_SIDE ? SQ_F1 : SQ_D1);
+
   pos->st->castlingRights |= cr;
+
+#ifdef PEDANTIC
   pos->castlingRightsMask[kfrom] |= cr;
   pos->castlingRightsMask[rfrom] |= cr;
   pos->castlingRookSquare[cr] = rfrom;
-
-  Square kto = relative_square(c, cs == KING_SIDE ? SQ_G1 : SQ_C1);
-  Square rto = relative_square(c, cs == KING_SIDE ? SQ_F1 : SQ_D1);
 
   for (Square s = min(rfrom, rto); s <= max(rfrom, rto); s++)
     if (s != kfrom && s != rfrom)
@@ -301,6 +304,26 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
   for (Square s = min(kfrom, kto); s <= max(kfrom, kto); s++)
     if (s != kfrom && s != rfrom)
       pos->castlingPath[cr] |= sq_bb(s);
+#else
+  CastlingRightsMask[kfrom] &= ~cr;
+  CastlingRightsMask[rfrom] &= ~cr;
+//  CastlingToSquare[rfrom & 0x0f] = kto;
+  CastlingHash[kto & 0x0f] = zob.psq[c][ROOK][rto] ^ zob.psq[c][ROOK][rfrom];
+  CastlingPSQ[kto & 0x0f] = psqt.psq[c][ROOK][rto] - psqt.psq[c][ROOK][rfrom];
+  CastlingBits[kto & 0x0f] = sq_bb(rto) ^ sq_bb(rfrom);
+  // need 2nd set of from/to, maybe... for undo
+  CastlingRookFrom[kto & 0x0f] = rfrom != kto ? rfrom : rto;
+  CastlingRookTo[kto & 0x0f] = rto;
+  CastlingRookSquare[cr] = rfrom;
+
+  for (Square s = min(rfrom, rto); s <= max(rfrom, rto); s++)
+    if (s != kfrom && s != rfrom)
+      CastlingPath[cr] |= sq_bb(s);
+
+  for (Square s = min(kfrom, kto); s <= max(kfrom, kto); s++)
+    if (s != kfrom && s != rfrom)
+      CastlingPath[cr] |= sq_bb(s);
+#endif
 }
 
 
@@ -320,32 +343,32 @@ static void set_state(Pos *pos, Stack *st)
   for (Bitboard b = pieces(); b; ) {
     Square s = pop_lsb(&b);
     Piece pc = piece_on(s);
-    st->key ^= zob_psq[color_of(pc)][type_of_p(pc)][s];
-    st->psq += psqt_psq[color_of(pc)][type_of_p(pc)][s];
+    st->key ^= zob.psq[color_of(pc)][type_of_p(pc)][s];
+    st->psq += psqt.psq[color_of(pc)][type_of_p(pc)][s];
   }
 
   if (st->epSquare != 0)
-      st->key ^= zob_enpassant[file_of(st->epSquare)];
+      st->key ^= zob.enpassant[file_of(st->epSquare)];
 
   if (pos_stm() == BLACK)
-      st->key ^= zob_side;
+      st->key ^= zob.side;
 
-  st->key ^= zob_castling[st->castlingRights];
+  st->key ^= zob.castling[st->castlingRights];
 
   for (Bitboard b = pieces_p(PAWN); b; ) {
     Square s = pop_lsb(&b);
-    st->pawnKey ^= zob_psq[color_of(piece_on(s))][PAWN][s];
+    st->pawnKey ^= zob.psq[color_of(piece_on(s))][PAWN][s];
   }
 
-#ifdef PIECELISTS
+#ifdef PEDANTIC
   for (int c = 0; c < 2; c++)
     for (int pt = PAWN; pt <= KING; pt++)
       for (int cnt = 0; cnt < piece_count(c, pt); cnt++)
-        st->materialKey ^= zob_psq[c][pt][cnt];
+        st->materialKey ^= zob.psq[c][pt][cnt];
 #else
   for (int c = 0; c < 2; c++)
-    for (int pt = PAWN; pt <= KING; p++)
-      st->materialKey += mat_key[c][pt];
+    for (int pt = PAWN; pt <= KING; pt++)
+      st->materialKey += piece_count(c, pt) * mat_key[8 * c + pt];
 #endif
 
   for (int c = 0; c < 2; c++)
@@ -635,30 +658,188 @@ int gives_check(Pos *pos, Move m, const CheckInfo *ci)
 }
 
 
-// do_move() makes a move, and saves all information necessary to a
-// Stack object. The move is assumed to be legal. Pseudo-legal moves
-// should be filtered out before this function is called.
-
+// do_move() makes a move. The move is assumed to be legal.
+#ifndef PEDANTIC
 void do_move(Pos *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
-//  assert(st != pos->st);
 
+  Stack *st = ++pos->st;
+  st->previous = st - 1;
+  st->nonPawnMaterial[0] = (st-1)->nonPawnMaterial[0];
+  st->nonPawnMaterial[1] = (st-1)->nonPawnMaterial[1];
+  st->psq = (st-1)->psq;
+  st->materialKey = (st-1)->materialKey;
+
+  Square from = from_sq(m);
+  Square to = to_sq(m);
+  Key key = (st-1)->key ^ zob.side;
+  Key pawnKey = (st-1)->pawnKey;
+
+  // Update castling rights.
+  st->castlingRights =  (st-1)->castlingRights
+                      & CastlingRightsMask[from]
+                      & CastlingRightsMask[to];
+  key ^= zob.castling[st->castlingRights ^ (st-1)->castlingRights];
+
+  int capt_piece = pos->board[to];
+  int us = pos->sideToMove;
+
+  // Clear en passant.
+  st->epSquare = 0;
+  if ((st-1)->epSquare) {
+    key ^= zob.enpassant[(st-1)->epSquare & 7];
+    if (type_of_m(m) == ENPASSANT)
+      capt_piece = B_PAWN ^ (us << 3);
+  }
+
+  int piece = piece_on(from);
+  int prom_piece;
+
+  // Move the piece or carry out a promotion.
+  if (type_of_m(m) != PROMOTION) {
+    // In Chess960, the king might seem to capture the friendly rook.
+    if (type_of_m(m) == CASTLING)
+      capt_piece = 0;
+    pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
+    st->psq += psqt.psq2d[piece][to] - psqt.psq2d[piece][from];
+    key ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
+    if (type_of_p(piece) == PAWN)
+      pawnKey ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
+    prom_piece = piece;
+  } else {
+    prom_piece = promotion_type(m);
+    pos->byTypeBB[piece & 7] ^= sq_bb(from);
+    pos->byTypeBB[prom_piece] ^= sq_bb(to);
+    prom_piece |= piece & 8;
+    st->psq += psqt.psq2d[prom_piece][to] - psqt.psq2d[piece][to];
+    st->nonPawnMaterial[us] += NonPawnPieceValue[prom_piece];
+    st->materialKey += mat_key[prom_piece] - mat_key[piece];
+    key ^= zob.psq2d[piece][from] ^ zob.psq2d[prom_piece][to];
+    pawnKey ^= zob.psq2d[piece][from];
+  }
+  pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
+  pos->board[from] = 0;
+  pos->board[to] = prom_piece;
+
+  if (capt_piece) {
+    st->rule50 = 0;
+    if (type_of_m(m) == ENPASSANT) {
+      to += (us == WHITE ? -8 : 8);
+      pos->board[to] = 0;
+    }
+    st->capturedType = capt_piece;
+    st->psq -= psqt.psq2d[capt_piece][to];
+    st->nonPawnMaterial[us ^ 1] -= NonPawnPieceValue[capt_piece];
+    st->materialKey -= mat_key[capt_piece];
+    pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
+    pos->byColorBB[us ^ 1] ^= sq_bb(to);
+    key ^= zob.psq2d[capt_piece][to];
+    if ((st->capturedType & 7) == PAWN)
+      pawnKey ^= zob.psq2d[capt_piece][to];
+  } else { // Not a capture.
+    st->capturedType = 0;
+    st->rule50 = (st-1)->rule50 + 1;
+    if ((piece & 7) == PAWN) {
+      st->rule50 = 0;
+      if ((from ^ to) == 16) {
+        if (EPMask[to - SQ_A4] & pos->byTypeBB[PAWN] & pos->byColorBB[us^1]) {
+          st->epSquare = to + (us == WHITE ? -8 : 8);
+          key ^= zob.enpassant[to & 7];
+        }
+      }
+    } else if (type_of_m(m) == CASTLING) {
+      key ^= CastlingHash[to & 0x0f];
+      pos->byTypeBB[ROOK] ^= CastlingBits[to & 0x0f];
+      pos->byColorBB[us] ^= CastlingBits[to & 0x0f];
+      pos->board[CastlingRookFrom[to & 0x0f]] = 0;
+      pos->board[CastlingRookTo[to & 0x0f]] = ROOK | (to & 0x08);
+      st->psq += CastlingPSQ[to & 0x0f];
+    }
+  }
+  st->key = key;
+  st->pawnKey = pawnKey;
+  pos->byTypeBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
+
+  st->checkersBB =  givesCheck
+                  ? attackers_to(square_of(us ^ 1, KING)) & pieces_c(us) : 0;
+
+  st->pliesFromNull = (st-1)->pliesFromNull + 1;
+
+  pos->sideToMove ^= 1;
   pos->nodes++;
-  Key k = pos_key() ^ zob_side;
+
+  check_pos(pos);
+}
+
+void undo_move(Pos *pos, Move m)
+{
+  int from = from_sq(m);
+  int to = to_sq(m);
+  int piece = pos->board[to];
+  Stack *st = pos->st--;
+  pos->sideToMove ^= 1;
+  int us = pos->sideToMove;
+ 
+  if (type_of_m(m) != PROMOTION) {
+    pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
+  } else {
+    pos->byTypeBB[piece & 7] ^= sq_bb(to);
+    pos->byTypeBB[PAWN] ^= sq_bb(from);
+    piece = PAWN | (piece & 8);
+  }
+  pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
+  pos->board[from] = piece;
+
+  int capt_piece = st->capturedType;
+  pos->board[to] = capt_piece;
+  if (capt_piece) {
+    if (type_of_m(m) == ENPASSANT) {
+      pos->board[to] = 0;
+      to = (st-1)->epSquare + (us == WHITE ? -8 : 8);
+      pos->board[to] = capt_piece;
+    }
+    pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
+    pos->byColorBB[us ^ 1] ^= sq_bb(to);
+  }
+  else if (type_of_m(m) == CASTLING) {
+    pos->byTypeBB[ROOK] ^= CastlingBits[to & 0x0f];
+    pos->byColorBB[us] ^= CastlingBits[to & 0x0f];
+    pos->board[CastlingRookTo[to & 0x0f]] = 0;
+    pos->board[CastlingRookFrom[to & 0x0f]] = ROOK | (to & 0x08);
+  }
+  pos->byTypeBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
+
+  check_pos(pos);
+}
+#else
+void do_move(Pos *pos, Move m, int givesCheck)
+{
+  assert(move_is_ok(m));
+
+  Key key = pos_key() ^ zob.side;
 
   // Copy some fields of the old state to our new Stack object except the
   // ones which are going to be recalculated from scratch anyway and then
   // switch our state pointer to point to the new (ready to be updated)
   // state.
   Stack *st = ++pos->st;
-  memcpy(st, st - 1, StateCopySize);
+//  memcpy(st, st - 1, StateCopySize);
   st->previous = st - 1;
+
+  st->pawnKey = (st-1)->pawnKey;
+  // The following fields should probably be moved to Pos.
+  st->materialKey = (st-1)->materialKey;
+  st->nonPawnMaterial[0] = (st-1)->nonPawnMaterial[0];
+  st->nonPawnMaterial[1] = (st-1)->nonPawnMaterial[1];
+  st->psq = (st-1)->psq;
+
+// castlingRights
+  st->castlingRights = (st-1)->castlingRights;
 
   // Increment ply counters. In particular, rule50 will be reset to zero
   // later on in case of a capture or a pawn move.
-  st->rule50++;
-  st->pliesFromNull++;
+  st->rule50 = (st-1)->rule50 + 1;
 
   int us = pos_stm();
   int them = us ^ 1;
@@ -676,11 +857,22 @@ void do_move(Pos *pos, Move m, int givesCheck)
     assert(pt == KING);
 
     Square rfrom, rto;
-    do_castling(pos, us, from, &to, &rfrom, &rto);
+
+    int kingSide = to > from;
+    rfrom = to; // Castling is encoded as "king captures friendly rook"
+    rto = relative_square(us, kingSide ? SQ_F1 : SQ_D1);
+    to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
+
+    // Remove both pieces first since squares could overlap in Chess960
+    remove_piece(pos, us, KING, from);
+    remove_piece(pos, us, ROOK, rfrom);
+    pos->board[from] = pos->board[rfrom] = 0;
+    put_piece(pos, us, KING, to);
+    put_piece(pos, us, ROOK, rto);
 
     captured = 0;
-    st->psq += psqt_psq[us][ROOK][rto] - psqt_psq[us][ROOK][rfrom];
-    k ^= zob_psq[us][ROOK][rfrom] ^ zob_psq[us][ROOK][rto];
+    st->psq += psqt.psq[us][ROOK][rto] - psqt.psq[us][ROOK][rfrom];
+    key ^= zob.psq[us][ROOK][rfrom] ^ zob.psq[us][ROOK][rto];
   }
 
   if (captured) {
@@ -701,7 +893,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
         pos->board[capsq] = 0; // Not done by remove_piece()
       }
 
-      st->pawnKey ^= zob_psq[them][PAWN][capsq];
+      st->pawnKey ^= zob.psq[them][PAWN][capsq];
     } else
       st->nonPawnMaterial[them] -= PieceValue[MG][captured];
 
@@ -709,36 +901,30 @@ void do_move(Pos *pos, Move m, int givesCheck)
     remove_piece(pos, them, captured, capsq);
 
     // Update material hash key and prefetch access to materialTable
-    k ^= zob_psq[them][captured][capsq];
-#ifdef PIECELISTS
-    st->materialKey ^= zob_psq[them][captured][piece_count(them, captured)];
+    key ^= zob.psq[them][captured][capsq];
+    st->materialKey ^= zob.psq[them][captured][piece_count(them, captured)];
     prefetch(&pos->materialTable[st->materialKey & 8191]);
-#else
-    st->materialKey -= mat_key[them[captured];
-    prefetch(&pos->materialTable[st->materialKey >> (64- 13)]);
-#endif
 
     // Update incremental scores
-    st->psq -= psqt_psq[them][captured][capsq];
+    st->psq -= psqt.psq[them][captured][capsq];
 
     // Reset rule 50 counter
     st->rule50 = 0;
   }
 
   // Update hash key
-  k ^= zob_psq[us][pt][from] ^ zob_psq[us][pt][to];
+  key ^= zob.psq[us][pt][from] ^ zob.psq[us][pt][to];
 
   // Reset en passant square
-  if (st->epSquare != 0) {
-    k ^= zob_enpassant[file_of(st->epSquare)];
-    st->epSquare = 0;
-  }
+  if ((st-1)->epSquare != 0)
+    key ^= zob.enpassant[file_of((st-1)->epSquare)];
+  st->epSquare = 0;
 
   // Update castling rights if needed
   if (    st->castlingRights
       && (pos->castlingRightsMask[from] | pos->castlingRightsMask[to])) {
     int cr = pos->castlingRightsMask[from] | pos->castlingRightsMask[to];
-    k ^= zob_castling[st->castlingRights & cr];
+    key ^= zob.castling[st->castlingRights & cr];
     st->castlingRights &= ~cr;
   }
 
@@ -752,7 +938,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     if ( (to ^ from) == 16
         && (attacks_from_pawn(to - pawn_push(us), us) & pieces_cp(them, PAWN))) {
       st->epSquare = (from + to) / 2;
-      k ^= zob_enpassant[file_of(st->epSquare)];
+      key ^= zob.enpassant[file_of(st->epSquare)];
     } else if (type_of_m(m) == PROMOTION) {
       int promotion = promotion_type(m);
 
@@ -763,24 +949,20 @@ void do_move(Pos *pos, Move m, int givesCheck)
       put_piece(pos, us, promotion, to);
 
       // Update hash keys
-      k ^= zob_psq[us][PAWN][to] ^ zob_psq[us][promotion][to];
-      st->pawnKey ^= zob_psq[us][PAWN][to];
-#ifdef PIECELISTS
-      st->materialKey ^=  zob_psq[us][promotion][piece_count(us, promotion)-1]
-                        ^ zob_psq[us][PAWN][piece_count(us, PAWN)];
-#else
-      st->materialKey += mat_key[us][promotion] - mat_key[us][PAWN];
-#endif
+      key ^= zob.psq[us][PAWN][to] ^ zob.psq[us][promotion][to];
+      st->pawnKey ^= zob.psq[us][PAWN][to];
+      st->materialKey ^=  zob.psq[us][promotion][piece_count(us, promotion)-1]
+                        ^ zob.psq[us][PAWN][piece_count(us, PAWN)];
 
       // Update incremental score
-      st->psq += psqt_psq[us][promotion][to] - psqt_psq[us][PAWN][to];
+      st->psq += psqt.psq[us][promotion][to] - psqt.psq[us][PAWN][to];
 
       // Update material
       st->nonPawnMaterial[us] += PieceValue[MG][promotion];
     }
 
     // Update pawn hash key and prefetch access to pawnsTable
-    st->pawnKey ^= zob_psq[us][PAWN][from] ^ zob_psq[us][PAWN][to];
+    st->pawnKey ^= zob.psq[us][PAWN][from] ^ zob.psq[us][PAWN][to];
     prefetch(&pos->pawnTable[st->pawnKey & 16383]);
 
     // Reset rule 50 draw counter
@@ -788,19 +970,22 @@ void do_move(Pos *pos, Move m, int givesCheck)
   }
 
   // Update incremental scores
-  st->psq += psqt_psq[us][pt][to] - psqt_psq[us][pt][from];
+  st->psq += psqt.psq[us][pt][to] - psqt.psq[us][pt][from];
 
   // Set capture piece
   st->capturedType = captured;
 
   // Update the key with the final value
-  st->key = k;
+  st->key = key;
 
   // Calculate checkers bitboard (if move gives check)
   st->checkersBB =  givesCheck
                   ? attackers_to(square_of(them, KING)) & pieces_c(us) : 0;
 
+  st->pliesFromNull = (st-1)->pliesFromNull + 1;
+
   pos->sideToMove ^= 1;
+  pos->nodes++;
 
   assert(pos_is_ok(pos, &failed_step));
 }
@@ -835,7 +1020,17 @@ void undo_move(Pos *pos, Move m)
 
   if (type_of_m(m) == CASTLING) {
     Square rfrom, rto;
-    undo_castling(pos, us, from, &to, &rfrom, &rto);
+    int kingSide = to > from;
+    rfrom = to; // Castling is encoded as "king captures friendly rook"
+    rto = relative_square(us, kingSide ? SQ_F1 : SQ_D1);
+    to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
+
+    // Remove both pieces first since squares could overlap in Chess960
+    remove_piece(pos, us, KING, to);
+    remove_piece(pos, us, ROOK, rto);
+    pos->board[to] = pos->board[rto] = 0;
+    put_piece(pos, us, KING, from);
+    put_piece(pos, us, ROOK, rfrom);
   } else {
     move_piece(pos, us, pt, to, from); // Put the piece back at the source square
 
@@ -861,39 +1056,7 @@ void undo_move(Pos *pos, Move m)
 
   assert(pos_is_ok(pos, &failed_step));
 }
-
-
-// do_castling() is a helper used to do a castling move.
-static void do_castling(Pos *pos, int us, Square from, Square *to, Square *rfrom, Square *rto)
-{
-  int kingSide = *to > from;
-  *rfrom = *to; // Castling is encoded as "king captures friendly rook"
-  *rto = relative_square(us, kingSide ? SQ_F1 : SQ_D1);
-  *to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
-
-  // Remove both pieces first since squares could overlap in Chess960
-  remove_piece(pos, us, KING, from);
-  remove_piece(pos, us, ROOK, *rfrom);
-  pos->board[from] = pos->board[*rfrom] = 0; // Since remove_piece doesn't do it for us
-  put_piece(pos, us, KING, *to);
-  put_piece(pos, us, ROOK, *rto);
-}
-
-// undo_castling() is a helper used to undo a castling move.
-static void undo_castling(Pos *pos, int us, Square from, Square *to, Square *rfrom, Square *rto)
-{
-  int kingSide = *to > from;
-  *rfrom = *to; // Castling is encoded as "king captures friendly rook"
-  *rto = relative_square(us, kingSide ? SQ_F1 : SQ_D1);
-  *to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
-
-  // Remove both pieces first since squares could overlap in Chess960
-  remove_piece(pos, us, KING, *to);
-  remove_piece(pos, us, ROOK, *rto);
-  pos->board[*to] = pos->board[*rto] = 0; // Since remove_piece doesn't do it for us
-  put_piece(pos, us, KING, from);
-  put_piece(pos, us, ROOK, *rfrom);
-}
+#endif
 
 
 // do_null_move() is used to do a "null move".
@@ -901,18 +1064,17 @@ static void undo_castling(Pos *pos, int us, Square from, Square *to, Square *rfr
 void do_null_move(Pos *pos)
 {
   assert(!pos_checkers());
-//  assert(pos->st != st);
 
   Stack *st = ++pos->st;
   memcpy(st, st - 1, StateSize);
   st->previous = st - 1;
 
   if (st->epSquare) {
-    st->key ^= zob_enpassant[file_of(st->epSquare)];
+    st->key ^= zob.enpassant[file_of(st->epSquare)];
     st->epSquare = 0;
   }
 
-  st->key ^= zob_side;
+  st->key ^= zob.side;
   prefetch(tt_first_entry(st->key));
 
   st->rule50++;
@@ -945,12 +1107,12 @@ Key key_after(Pos *pos, Move m)
   Square to = to_sq(m);
   int pt = type_of_p(piece_on(from));
   int captured = type_of_p(piece_on(to));
-  Key k = pos_key() ^ zob_side;
+  Key k = pos_key() ^ zob.side;
 
   if (captured)
-    k ^= zob_psq[us ^ 1][captured][to];
+    k ^= zob.psq[us ^ 1][captured][to];
 
-  return k ^ zob_psq[us][pt][to] ^ zob_psq[us][pt][from];
+  return k ^ zob.psq[us][pt][to] ^ zob.psq[us][pt][from];
 }
 
 // see() is a static exchange evaluator: It tries to estimate the
@@ -1082,46 +1244,10 @@ void pos_copy(Pos *dest, Pos *src)
 }
 
 
-#if 0
-// flip() flips position with the white and black sides reversed. This
-// is only useful for debugging e.g. for finding evaluation symmetry bugs.
-
-void flip(Pos *pos)
-{
-  string f, token;
-  std::stringstream ss(fen());
-
-  for (Rank r = RANK_8; r >= RANK_1; --r) // Piece placement
-  {
-      std::getline(ss, token, r > RANK_1 ? '/' : ' ');
-      f.insert(0, token + (f.empty() ? " " : "/"));
-  }
-
-  ss >> token; // Active color
-  f += (token == "w" ? "B " : "W "); // Will be lowercased later
-
-  ss >> token; // Castling availability
-  f += token + " ";
-
-  std::transform(f.begin(), f.end(), f.begin(),
-                 [](char c) { return char(islower(c) ? toupper(c) : tolower(c)); });
-
-  ss >> token; // En passant square
-  f += (token == "-" ? token : token.replace(1, 1, token[1] == '3' ? "6" : "3"));
-
-  std::getline(ss, token); // Half and full moves
-  f += token;
-
-  set(f, is_chess960(), st, this_thread());
-
-  assert(pos_is_ok(pos, &failed_step));
-}
-#endif
-
-
 // pos_is_ok() performs some consistency checks for the position object.
 // This is meant to be helpful when debugging.
 
+#ifdef PEDANTIC
 int pos_is_ok(Pos *pos, int *failedStep)
 {
   int Fast = 1; // Quick (default) or full check?
@@ -1193,4 +1319,62 @@ int pos_is_ok(Pos *pos, int *failedStep)
 
   return 1;
 }
+#else
+int pos_is_ok(Pos *pos, int *failedStep)
+{
+(void)pos;
+(void)failedStep;
+  return 1;
+}
+
+#ifndef NDEBUG
+int check_pos(Pos *pos)
+{
+  Bitboard color_bb[2];
+  Bitboard piece_bb[8];
+
+  color_bb[0] = color_bb[1] = 0;
+  for (int i = 0; i < 8; i++)
+    piece_bb[i] = 0;
+
+  for (int sq = 0; sq < 64; sq++)
+    if (pos->board[sq]) {
+      color_bb[pos->board[sq] >> 3] |= sq_bb(sq);
+      piece_bb[pos->board[sq] & 7] |= sq_bb(sq);
+    }
+
+  for (int i = PAWN; i <= KING; i++)
+    assert(pos->byTypeBB[i] == piece_bb[i]);
+
+  assert(pos->byColorBB[0] == color_bb[0]);
+  assert(pos->byColorBB[1] == color_bb[1]);
+  assert(pos->byTypeBB[0] == (color_bb[0] | color_bb[1]));
+
+  Key key = 0, pawnKey = 0, matKey = 0;
+
+  for (int c = 0; c < 2; c++)
+    for (int i = PAWN; i <= KING; i++)
+       matKey += mat_key[8 * c + i] * piece_count(c, i);
+
+  for (int sq = 0; sq < 64; sq++)
+    if (pos->board[sq])
+      key ^= zob.psq2d[pos->board[sq]][sq];
+  if (pos->sideToMove == BLACK)
+    key ^= zob.side;
+  if (pos->st->epSquare)
+    key ^= zob.enpassant[pos->st->epSquare & 7];
+  key ^= zob.castling[pos->st->castlingRights];
+
+  for (int sq = 0; sq < 64; sq++)
+    if ((pos->board[sq] & 7) == PAWN)
+      pawnKey ^= zob.psq2d[pos->board[sq]][sq];
+
+  assert(key == pos->st->key);
+  assert(pawnKey == pos->st->pawnKey);
+  assert(matKey == pos->st->materialKey);
+
+  return 1;
+}
+#endif
+#endif
 

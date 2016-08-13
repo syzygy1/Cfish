@@ -21,7 +21,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#define PIECELISTS
+#define PEDANTIC
 
 // When compiling with provided Makefile (e.g. for Linux and OSX),
 // configuration is done automatically. To get started type 'make help'.
@@ -347,6 +347,7 @@ static inline Score score_divide(Score s, int i)
 }
 
 extern Value PieceValue[2][16];
+extern Value NonPawnPieceValue[16];
 
 #define SQUARE_FLIP(s) (sq ^ 0x38)
 
@@ -389,6 +390,15 @@ typedef Value HistoryStats[16][64];
 typedef Value CounterMoveStats[16][64];
 typedef CounterMoveStats CounterMoveHistoryStats[16][64];
 typedef Value FromToStats[2][64][64];
+
+struct PSQT {
+  union {
+    Score psq[2][8][64];
+    Score psq2d[16][64];
+  };
+};
+
+extern struct PSQT psqt;
 
 #endif
 

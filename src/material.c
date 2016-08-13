@@ -111,7 +111,11 @@ typedef int PieceCountType[2][8];
 MaterialEntry *material_probe(Pos *pos)
 {
   Key key = pos_material_key();
+#ifdef PEDANTIC
   MaterialEntry *e = &pos->materialTable[key & 8191];
+#else
+  MaterialEntry *e = &pos->materialTable[key >> (64 - 13)];
+#endif
 
   if (e->key == key)
       return e;
@@ -204,6 +208,7 @@ MaterialEntry *material_probe(Pos *pos)
   // Evaluate the material imbalance. We use PIECE_TYPE_NONE as a place
   // holder for the bishop pair "extended piece", which allows us to be
   // more flexible in defining bishop pair bonuses.
+#ifdef PEDANTIC
   PieceCountType *pc = &(pos->pieceCount);
   int PieceCount[2][8] = {
     { (*pc)[0][BISHOP] > 1, (*pc)[0][PAWN], (*pc)[0][KNIGHT],
@@ -211,6 +216,16 @@ MaterialEntry *material_probe(Pos *pos)
     { (*pc)[1][BISHOP] > 1, (*pc)[1][PAWN], (*pc)[1][KNIGHT],
       (*pc)[1][BISHOP]    , (*pc)[1][ROOK], (*pc)[1][QUEEN] }
   };
+#else
+#define pc(c,p) piece_count_mk(c,p)
+  int PieceCount[2][8] = {
+    { pc(0, BISHOP) > 1, pc(0, PAWN), pc(0, KNIGHT),
+      pc(0, BISHOP)    , pc(0, ROOK), pc(0, QUEEN) },
+    { pc(1, BISHOP) > 1, pc(1, PAWN), pc(1, KNIGHT),
+      pc(1, BISHOP)    , pc(1, ROOK), pc(1, QUEEN) }
+  };
+#undef pc
+#endif
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
 
   return e;

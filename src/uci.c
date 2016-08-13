@@ -250,7 +250,6 @@ void uci_loop(int argc, char **argv)
     else if (strcmp(token, "setoption") == 0) setoption(str);
 
     // Additional custom non-UCI commands, useful for debugging
-//    else if (strcmp(token, "flip") == 0)      pos_flip(&pos);
     else if (strcmp(token, "bench") == 0)     benchmark(&pos, str);
     else if (strcmp(token, "d") == 0)         print_pos(&pos);
 //    else if (strcmp(token, "eval") == 0)      eval_trace(stdout, &pos);
