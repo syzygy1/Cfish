@@ -111,7 +111,8 @@ typedef int PieceCountType[2][8];
 MaterialEntry *material_probe(Pos *pos)
 {
   Key key = pos_material_key();
-  MaterialEntry *e = &pos->materialTable[(key * 0xb44cede0e4473d6dULL) >> (64 - 13)];
+//  MaterialEntry *e = &pos->materialTable[(key * 0xb44cede0e4473d6dULL) >> (64 - 13)];
+  MaterialEntry *e = &pos->materialTable[key >> (64 - 13)];
 
   if (e->key == key)
       return e;

@@ -22,37 +22,34 @@
 #define THREAD_H
 
 #include <stdatomic.h>
+#ifndef __WIN32__
 #include <pthread.h>
+#else
+#include <windows.h>
+#endif
 
-#include "material.h"
-#include "movepick.h"
-#include "pawns.h"
-#include "position.h"
-#include "search.h"
-#include "thread_win32.h"
+#include "types.h"
 
 #define MAX_THREADS 128
 
-#if 0
-// Thread struct keeps together all the thread-related stuff. We also use
-// per-thread pawn and material hash tables so that once we get a pointer to an
-// entry its life time is unlimited and we don't have to care about someone
-// changing the entry under our feet.
-
-struct Thread {
-  pthread_t nativeThread;
-  pthread_mutex_t mutex;
-  pthread_cond_t sleepCondition;
-  int exit, searching;
-
-  size_t idx, PVIdx;
-
-  Pos rootPos;
-  RootMoves *rootMoves;
-  Depth rootDepth;
-  Depth completedDepth;
-};
+#ifndef __WIN32__
+#define Thread pthread_t
+#define Mutex pthread_mutex_t
+#define Condition pthread_cond_t
+#define Thread_create(x,y,z) pthread_create(&(x), NULL, (void*(*)(void*))(y), z)
+#define Thread_destroy(x) pthread_join(&(x), NULL)
+#define Mutex_init(x) pthread_mutex_init(&(x), NULL)
+#define Mutex_lock(x) pthread_mutex_lock(&(x))
+#define Mutex_unlock(x) pthread_mutex_unlock(&(x))
+#define Conditon_init(x) pthread_cond_init(&(x), NULL)
+#define Condition_wait(x,y) pthread_cond_wait(&(x), &(y))
+#define Condition_signal(x) pthread_cond_signal(&(x))
+#else
+#define Thread HANDLE
+#define Mutex HANDLE
+#define 
 #endif
+
 
 Pos *thread_create(int idx);
 void thread_search(Pos *pos);
@@ -84,7 +81,6 @@ void mainthread_search();
 struct ThreadPool {
   Pos *pos[MAX_THREADS];
   size_t num_threads;
-//  StateListPtr setupStates; // ??
 };
 
 typedef struct ThreadPool ThreadPool;

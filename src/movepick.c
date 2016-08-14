@@ -259,6 +259,7 @@ Move next_move(Pos *pos)
       move = pick_best(st->cur++, st->endMoves);
       if (move != st->ttMove) {
         if (see_sign(pos, move) >= 0)
+//        if (see_quick(pos, move, 0))
           return move;
 
         // Losing capture, move it to the beginning of the array.

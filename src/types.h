@@ -383,6 +383,7 @@ INLINE int opposite_colors(Square s1, Square s2)
 }
 
 typedef struct Pos Pos;
+typedef struct LimitsType LimitsType;
 typedef struct RootMoves RootMoves;
 typedef struct PawnEntry PawnEntry;
 typedef struct MaterialEntry MaterialEntry;

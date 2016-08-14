@@ -3,8 +3,10 @@
 #include <ctype.h>
 
 #include "bitboard.h"
+#include "material.h"
 #include "misc.h"
 #include "movegen.h"
+#include "pawns.h"
 #include "position.h"
 #include "thread.h"
 #include "tt.h"
@@ -713,7 +715,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // In Chess960, the king might seem to capture the friendly rook.
     if (type_of_m(m) == CASTLING)
       capt_piece = 0;
-    pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
+    pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from) ^ sq_bb(to);
     st->psq += psqt.psq2d[piece][to] - psqt.psq2d[piece][from];
     key ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
     if (type_of_p(piece) == PAWN)
@@ -721,7 +723,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     prom_piece = piece;
   } else {
     prom_piece = promotion_type(m);
-    pos->byTypeBB[piece & 7] ^= sq_bb(from);
+    pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from);
     pos->byTypeBB[prom_piece] ^= sq_bb(to);
     prom_piece |= piece & 8;
     st->psq += psqt.psq2d[prom_piece][to] - psqt.psq2d[piece][to];
@@ -1207,6 +1209,60 @@ Value see(Pos *pos, Move m)
     swapList[slIndex - 1] = min(-swapList[slIndex], swapList[slIndex - 1]);
 
   return swapList[0];
+}
+
+// Test whether see(m) >= alpha.
+int see_quick(Pos *pos, Move m, int alpha)
+{
+  if (type_of_m(m) == CASTLING)
+    return 0 >= alpha;
+
+  Square from = from_sq(m), to = to_sq(m);
+
+  int swap = PieceValue[MG][piece_on(to)];
+  if (swap < alpha)
+    return 0;
+  int value = PieceValue[MG][piece_on(from)];
+  if (swap - value >= alpha)
+    return 1;
+
+  Bitboard occ = pieces() ^ sq_bb(from);
+  Bitboard attackers = attackers_to_occ(to, occ) & occ;
+  int stm = pos_stm() ^ 1;
+
+  if (type_of_m(m) == ENPASSANT) {
+    occ ^= sq_bb(to + pawn_push(stm)); // Remove the captured pawn
+    value = PieceValue[MG][PAWN];
+    if (swap - value >= alpha)
+      return 1;
+  }
+
+  int res = 1;
+  Bitboard stmAttackers;
+
+  while ((stmAttackers = attackers & pieces_c(stm))) {
+    Bitboard bb;
+    int captured = PAWN;
+    while (!(bb = stmAttackers & pos->byTypeBB[captured]))
+      captured++;
+    if (captured == KING)
+      return stmAttackers == attackers ? !res : res;
+    int value2 = PieceValue[MG][captured];
+    res = !res;
+    swap = value - swap;
+    alpha = 1 - alpha;
+    if (swap - value2 >= alpha) return res;
+    value = value2;
+    occ ^= (bb & -bb);
+    if (captured & 1) // PAWN, BISHOP, QUEEN
+      attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
+    if (captured & 4) // ROOK, QUEEN
+      attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
+    attackers &= occ;
+    stm ^= 1;
+  }
+
+  return res;
 }
 
 

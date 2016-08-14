@@ -20,7 +20,10 @@
 
 #include <assert.h>
 
+#include "material.h"
 #include "movegen.h"
+#include "movepick.h"
+#include "pawns.h"
 #include "search.h"
 #include "thread.h"
 #include "uci.h"

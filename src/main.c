@@ -23,6 +23,7 @@
 #include "bitboard.h"
 #include "endgame.h"
 #include "evaluate.h"
+#include "pawns.h"
 #include "position.h"
 #include "search.h"
 #include "thread.h"
