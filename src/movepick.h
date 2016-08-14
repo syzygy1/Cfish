@@ -30,21 +30,6 @@
 
 #define max(a,b) ((a) > (b) ? (a) : (b))
 
-// History records how often different moves have been successful or
-// unsuccessful during the current search and is used for reduction and
-// move ordering decisions.
-//
-// Countermoves store the move that refute a previous one. Entries are
-// stored using only the moving piece and destination square, hence two
-// moves with different origin but same destination and piece will be
-// considered identical.
-
-typedef Move MoveStats[16][64];
-typedef Value HistoryStats[16][64];
-typedef Value CounterMoveStats[16][64];
-typedef CounterMoveStats CounterMoveHistoryStats[16][64];
-typedef Value FromToStats[2][64][64];
-
 #define stats_clear(s) memset(s, 0, sizeof(*s))
 
 static inline void hs_update(HistoryStats hs, Piece pc, Square to, Value v)
@@ -73,44 +58,20 @@ static inline void ft_update(FromToStats ft, int c, Move m, Value v)
   if (w >= 324)
     return;
 
-  int f = from_sq(m), t = to_sq(m);
-  ft[c][f][t] -= ft[c][f][t] * w / 324;
-  ft[c][f][t] += ((int)v) * 32;
+  m &= 4095;
+  ft[c][m] -= ft[c][m] * w / 324;
+  ft[c][m] += ((int)v) * 32;
 }
 
 static inline Value ft_get(FromToStats ft, int c, Move m)
 {
-  return ft[c][from_sq(m)][to_sq(m)];
+  return ft[c][m & 4095];
 }
 
-
-// MovePicker struct is used to pick one pseudo legal move at a time from
-// the current position. The most important method is next_move(), which
-// returns a new pseudo legal move each time it is called, until there
-// are no moves left, when MOVE_NONE is returned. In order to improve the
-// efficiency of the alpha beta algorithm, MovePicker attempts to return
-// the moves which are most likely to get a cut-off first.
-
-struct MovePicker {
-  Pos *pos;
-  Stack *ss;
-  Move countermove;
-  Depth depth;
-  Move ttMove;
-  ExtMove killers[3];
-  Square recaptureSquare;
-  Value threshold;
-  int stage;
-  ExtMove *cur, *endMoves, *endBadCaptures;
-  ExtMove moves[MAX_MOVES];
-};
-
-typedef struct MovePicker MovePicker;
-
-void mp_init(MovePicker *mp, Pos *pos, Move ttm, Depth depth, Stack *ss);
-void mp_init_q(MovePicker *mp, Pos *pos, Move ttm, Depth depth, Square s);
-void mp_init_pc(MovePicker *mp, Pos *pos, Move ttm, Value threshold);
-Move next_move(MovePicker *mp);
+void mp_init(Pos *pos, Move ttm, Depth depth);
+void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s);
+void mp_init_pc(Pos *pos, Move ttm, Value threshold);
+Move next_move(Pos *pos);
 
 #endif
 

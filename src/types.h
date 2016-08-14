@@ -389,7 +389,14 @@ typedef Move MoveStats[16][64];
 typedef Value HistoryStats[16][64];
 typedef Value CounterMoveStats[16][64];
 typedef CounterMoveStats CounterMoveHistoryStats[16][64];
-typedef Value FromToStats[2][64][64];
+typedef Value FromToStats[2][4096];
+
+struct ExtMove {
+  Move move;
+  Value value;
+};
+
+typedef struct ExtMove ExtMove;
 
 struct PSQT {
   union {
@@ -399,6 +406,12 @@ struct PSQT {
 };
 
 extern struct PSQT psqt;
+
+#ifdef NDEBUG
+#define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
+#else
+#define assume(x) do {} while (0)
+#endif
 
 #endif
 

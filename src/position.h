@@ -67,15 +67,19 @@ struct Stack {
   // Copied when making a move
   Key pawnKey;
   Key materialKey;
-  Value nonPawnMaterial[2];
-  int castlingRights;
-  int rule50;
-  int pliesFromNull;
-  Score psq;
+  union {
+    struct {
+      Score psq;
+      Value nonPawnMaterial[2];
+    };
+  };
+  uint8_t castlingRights;
+  uint8_t rule50;
+  uint8_t pliesFromNull;
 
   // Not copied when making a move
-  int capturedType;
-  Square epSquare;
+  uint8_t capturedType;
+  uint8_t epSquare;
   Key key;
   Bitboard checkersBB;
   struct Stack *previous;
@@ -90,6 +94,16 @@ struct Stack {
   int skipEarlyPruning;
   int moveCount;
   CounterMoveStats *counterMoves;
+
+  // MovePicker data
+  Move countermove;
+  Depth depth;
+  Move ttMove;
+  Square recaptureSquare;
+  Value threshold;
+  int stage;
+  ExtMove *cur, *endMoves, *endBadCaptures;
+  ExtMove *moves;
 };
 
 typedef struct Stack Stack;
@@ -97,7 +111,7 @@ typedef struct Stack Stack;
 #define StateCopySize offsetof(Stack, capturedType)
 #define StateSize offsetof(Stack, pv)
 #define SStackBegin(st) (&st.pv)
-#define SStackSize (sizeof(Stack) - offsetof(Stack, pv))
+#define SStackSize (offsetof(Stack, countermove) - offsetof(Stack, pv))
 
 
 // Pos struct stores information regarding the board representation as
@@ -107,7 +121,7 @@ typedef struct Stack Stack;
 
 struct Pos {
   // Board / game representation.
-  int board[64];
+  unsigned char board[64];
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
 #ifdef PEDANTIC
@@ -118,9 +132,9 @@ struct Pos {
   Square castlingRookSquare[16];
   Bitboard castlingPath[16];
 #endif
-  int sideToMove;
+  unsigned char sideToMove;
+  unsigned char chess960;
   uint16_t gamePly;
-  uint16_t chess960;
 
   Stack *st;
 
@@ -202,11 +216,11 @@ int pos_is_ok(Pos *pos, int* failedStep);
 #else
 #define piece_count(c,p) (popcount(pieces_cp(c, p)))
 #define square_of(c,p) (lsb(pieces_cp(c,p)))
-#define piece_count_mk(c, p) (((pos_material_key()) >> (20 * (c) + 4 * (p) + 4)) & 15)
 #define loop_through_pieces(c,p,s) \
   Bitboard pcs = pieces_cp(c,p); \
   while (pcs && (s = pop_lsb(&pcs), 1))
 #endif
+#define piece_count_mk(c, p) (((pos_material_key()) >> (20 * (c) + 4 * (p) + 4)) & 15)
 
 // Castling
 #define can_castle_cr(cr) (pos->st->castlingRights & (cr))

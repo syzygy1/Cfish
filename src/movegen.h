@@ -23,22 +23,12 @@
 
 #include "types.h"
 
-struct Pos;
-typedef struct Pos Pos;
-
 #define GEN_CAPTURES     0
 #define GEN_QUIETS       1
 #define GEN_QUIET_CHECKS 2
 #define GEN_EVASIONS     3
 #define GEN_NON_EVASIONS 4
 #define GEN_LEGAL        5
-
-struct ExtMove {
-  Move move;
-  Value value;
-};
-
-typedef struct ExtMove ExtMove;
 
 ExtMove *generate_captures(Pos *pos, ExtMove *list);
 ExtMove *generate_quiets(Pos *pos, ExtMove *list);

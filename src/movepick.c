@@ -27,21 +27,31 @@
 
 #define ST_MAIN_SEARCH            0
 #define ST_GOOD_CAPTURES          1
-#define ST_KILLERS                2
-#define ST_QUIET                  3
-#define ST_BAD_CAPTURES           4
-#define ST_EVASION                5
-#define ST_ALL_EVASIONS           6
-#define ST_QSEARCH_WITH_CHECKS    7
-#define ST_QCAPTURES_1            8
-#define ST_CHECKS                 9
-#define ST_QSEARCH_WITHOUT_CHECKS 10
-#define ST_QCAPTURES_2            11
-#define ST_PROBCUT                12
-#define ST_PROBCUT_CAPTURES       13
-#define ST_RECAPTURE              14
-#define ST_RECAPTURES             15
-#define ST_STOP                   16
+#define ST_GOOD_CAPTURES_2        2
+#define ST_KILLERS                3
+#define ST_KILLERS_2              4
+#define ST_QUIET                  5
+#define ST_QUIET_2                6
+#define ST_BAD_CAPTURES           7
+
+#define ST_EVASIONS               8
+#define ST_EVASIONS_1             9
+
+#define ST_QSEARCH_WITH_CHECKS    10
+#define ST_QCAPTURES_CHECKS_1     11
+#define ST_QCAPTURES_CHECKS_2     12
+#define ST_CHECKS                 13
+
+#define ST_QSEARCH_WITHOUT_CHECKS 14
+#define ST_QCAPTURES_NO_CHECKS_1  15
+#define ST_REMAINING              16
+
+#define ST_RECAPTURES             17
+#define ST_RECAPTURES_2           18
+
+#define ST_PROBCUT                19
+#define ST_PROBCUT_1              20
+#define ST_PROBCUT_2              21
 
 // Our insertion sort, which is guaranteed to be stable, as it should be.
 
@@ -104,107 +114,95 @@ Move pick_best(ExtMove *begin, ExtMove *end)
 }
 
 
-// Constructors of the MovePicker class. As arguments we pass information
-// to help it to return the (presumably) good moves first, to decide which
-// moves to return (in the quiescence search, for instance, we only want
-// to search captures, promotions, and some checks) and how important good
-// move ordering is at the current node.
+// Initialisation of move picker data.
 
-void mp_init(MovePicker *mp, Pos *pos, Move ttm, Depth depth, Stack *ss)
+void mp_init(Pos *pos, Move ttm, Depth depth)
 {
   assert(depth > DEPTH_ZERO);
 
-  mp->pos = pos;
-  mp->ss = ss;
-  mp->depth = depth;
+  Stack *st = pos->st;
 
-  Square prevSq = to_sq((ss-1)->currentMove);
-  mp->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
+  st->depth = depth;
 
-  mp->stage = pos_checkers() ? ST_EVASION : ST_MAIN_SEARCH;
-  mp->ttMove = ttm && is_pseudo_legal(pos, ttm) ? ttm : 0;
-  mp->cur = mp->moves;
-  mp->endMoves = mp->moves + (mp->ttMove != 0);
-  mp->endBadCaptures = mp->moves + MAX_MOVES - 1;
+  Square prevSq = to_sq((st-1)->currentMove);
+  st->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
+
+  st->stage = pos_checkers() ? ST_EVASIONS : ST_MAIN_SEARCH;
+  st->ttMove = ttm;
+  if (!ttm || !is_pseudo_legal(pos, ttm))
+    st->stage++;
 }
 
-void mp_init_q(MovePicker *mp, Pos *pos, Move ttm, Depth depth, Square s)
+void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
 {
   assert (depth <= DEPTH_ZERO);
 
-  mp->pos = pos;
+  Stack *st = pos->st;
 
   if (pos_checkers())
-    mp->stage = ST_EVASION;
+    st->stage = ST_EVASIONS;
   else if (depth > DEPTH_QS_NO_CHECKS)
-    mp->stage = ST_QSEARCH_WITH_CHECKS;
+    st->stage = ST_QSEARCH_WITH_CHECKS;
   else if (depth > DEPTH_QS_RECAPTURES)
-    mp->stage = ST_QSEARCH_WITHOUT_CHECKS;
+    st->stage = ST_QSEARCH_WITHOUT_CHECKS;
   else {
-    mp->stage = ST_RECAPTURE;
-    mp->recaptureSquare = s;
-    ttm = 0;
+    st->stage = ST_RECAPTURES;
+    st->recaptureSquare = s;
+    return;
   }
 
-  mp->ttMove = ttm && is_pseudo_legal(pos, ttm) ? ttm : 0;
-  mp->cur = mp->moves;
-  mp->endMoves = mp->moves + (mp->ttMove != 0);
-  mp->endBadCaptures = mp->moves + MAX_MOVES - 1;
+  st->ttMove = ttm;
+  if (!ttm || !is_pseudo_legal(pos, ttm))
+    st->stage++;
 }
 
-void mp_init_pc(MovePicker *mp, Pos *pos, Move ttm, Value threshold)
+void mp_init_pc(Pos *pos, Move ttm, Value threshold)
 {
   assert(!pos_checkers());
 
-  mp->pos = pos;
-  mp->threshold = threshold;
+  Stack *st = pos->st;
 
-  mp->stage = ST_PROBCUT;
+  st->threshold = threshold;
 
-  // In ProbCut we generate captures with SEE higher than the given threshold
-  mp->ttMove = ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-                   && see(pos, ttm) > threshold ? ttm : 0;
+  st->stage = ST_PROBCUT;
 
-  mp->cur = mp->moves;
-  mp->endMoves = mp->moves + (mp->ttMove != 0);
-  mp->endBadCaptures = mp->moves + MAX_MOVES - 1;
+  // In ProbCut we generate captures with SEE higher than the given
+  // threshold.
+  st->ttMove = ttm;
+  if (!(ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
+            && see(pos, ttm) > threshold))
+    st->stage++;
 }
 
 
 // score() assigns a numerical value to each move in a move list. The moves with
 // highest values will be picked first.
 
-void score_captures(MovePicker *mp)
+void score_captures(Pos *pos)
 {
-  Pos *pos = mp->pos;
+  Stack *st = pos->st;
 
   // Winning and equal captures in the main search are ordered by MVV,
-  // preferring captures near our home rank. Surprisingly, this appears
-  // to perform slightly better than SEE-based move ordering: exchanging
-  // big pieces before capturing a hanging piece probably helps to reduce
-  // the subtree size. In the main search we want to push captures with
-  // negative SEE values to the badCaptures[] array, but instead of doing
-  // it now we delay until the move has been picked up, saving some SEE
-  // calls in case we get a cutoff.
+  // preferring captures near our home rank.
 
-  for (ExtMove *m = mp->moves; m < mp->endMoves; m++)
+  for (ExtMove *m = st->cur; m < st->endMoves; m++)
     m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
               - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
 }
 
-void score_quiets(MovePicker *mp)
+void score_quiets(Pos *pos)
 {
-  Pos *pos = mp->pos;
+  Stack *st = pos->st;
   HistoryStats *history = pos->history;
   FromToStats *fromTo = pos->fromTo;
 
-  CounterMoveStats *cm = (mp->ss-1)->counterMoves;
-  CounterMoveStats *fm = (mp->ss-2)->counterMoves;
-  CounterMoveStats *f2 = (mp->ss-4)->counterMoves;
+  CounterMoveStats *cm = (st-1)->counterMoves;
+  CounterMoveStats *fm = (st-2)->counterMoves;
+  CounterMoveStats *f2 = (st-4)->counterMoves;
 
   int c = pos_stm();
 
-  for (ExtMove *m = mp->moves; m < mp->endMoves; m++)
+  for (ExtMove *m = st->cur; m < st->endMoves; m++)
     m->value =   (*history)[moved_piece(m->move)][to_sq(m->move)]
               + (cm ? (*cm)[moved_piece(m->move)][to_sq(m->move)] : 0)
               + (fm ? (*fm)[moved_piece(m->move)][to_sq(m->move)] : 0)
@@ -212,10 +210,9 @@ void score_quiets(MovePicker *mp)
               + ft_get(*fromTo, c, m->move);
 }
 
-void score_evasions(MovePicker *mp)
+void score_evasions(Pos *pos)
 {
-  Pos *pos = mp->pos;
-
+  Stack *st = pos->st;
   // Try winning and equal captures ordered by MVV/LVA, then non-captures
   // ordered by history value, then bad captures and quiet moves with a
   // negative SEE ordered by SEE value.
@@ -225,7 +222,7 @@ void score_evasions(MovePicker *mp)
   int c = pos_stm();
   Value see;
 
-  for (ExtMove *m = mp->moves; m < mp->endMoves; m++)
+  for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if ((see = see_sign(pos, m->move)) < VALUE_ZERO)
       m->value = see - HistoryStats_Max; // At the bottom
     else if (is_capture(pos, m->move))
@@ -237,147 +234,155 @@ void score_evasions(MovePicker *mp)
 }
 
 
-// generate_next_stage() generates, scores, and sorts the next bunch of
-// moves when there are no more moves to try for the current stage.
+// next_move() returns the next pseudo-legal move to be searched.
 
-void generate_next_stage(MovePicker *mp)
+Move next_move(Pos *pos)
 {
-  assert(mp->stage != ST_STOP);
-
-  mp->cur = mp->moves;
-
-  switch (++(mp->stage)) {
-
-  case ST_GOOD_CAPTURES: case ST_QCAPTURES_1: case ST_QCAPTURES_2:
-  case ST_PROBCUT_CAPTURES: case ST_RECAPTURES:
-    mp->endMoves = generate_captures(mp->pos, mp->moves);
-    score_captures(mp);
-    break;
-
-  case ST_KILLERS:
-    mp->killers[0].move = mp->ss->killers[0];
-    mp->killers[1].move = mp->ss->killers[1];
-    mp->killers[2].move = mp->countermove;
-    mp->cur = mp->killers;
-    mp->endMoves = mp->cur + 2 + (mp->countermove != mp->killers[0].move && mp->countermove != mp->killers[1].move);
-    break;
-
-  case ST_QUIET:
-    mp->endMoves = generate_quiets(mp->pos, mp->moves);
-    score_quiets(mp);
-    if (mp->depth < 3 * ONE_PLY) {
-      ExtMove *goodQuiet = partition(mp->cur, mp->endMoves);
-      insertion_sort(mp->cur, goodQuiet);
-    } else
-      insertion_sort(mp->cur, mp->endMoves);
-    break;
-
-  case ST_BAD_CAPTURES:
-    // Just pick them in reverse order to get correct ordering
-    mp->cur = mp->moves + MAX_MOVES - 1;
-    mp->endMoves = mp->endBadCaptures;
-    break;
-
-  case ST_ALL_EVASIONS:
-    mp->endMoves = generate_evasions(mp->pos, mp->moves);
-    if (mp->endMoves - mp->moves > 1)
-      score_evasions(mp);
-    break;
-
-  case ST_CHECKS:
-    mp->endMoves = generate_quiet_checks(mp->pos, mp->moves);
-    break;
-
-  case ST_EVASION: case ST_QSEARCH_WITH_CHECKS: case ST_QSEARCH_WITHOUT_CHECKS:
-  case ST_PROBCUT: case ST_RECAPTURE: case ST_STOP:
-    mp->stage = ST_STOP;
-    break;
-
-  default:
-    assert(0);
-  }
-}
-
-
-// next_move() is the most important method of the MovePicker class. It
-// returns a new pseudo legal move every time it is called, until there
-// are no more moves left. It picks the move with the biggest value from
-// a list of generated moves taking care not to return the ttMove if it
-// has already been searched.
-
-Move next_move(MovePicker *mp)
-{
+  Stack *st = pos->st;
   Move move;
 
-  while (1) {
-    while (mp->cur == mp->endMoves && mp->stage != ST_STOP)
-      generate_next_stage(mp);
+  switch (st->stage) {
 
-    switch (mp->stage) {
+  case ST_MAIN_SEARCH: case ST_EVASIONS: case ST_QSEARCH_WITH_CHECKS:
+  case ST_QSEARCH_WITHOUT_CHECKS: case ST_PROBCUT:
+    st->stage++;
+    return st->ttMove;
 
-    case ST_MAIN_SEARCH: case ST_EVASION: case ST_QSEARCH_WITH_CHECKS:
-    case ST_QSEARCH_WITHOUT_CHECKS: case ST_PROBCUT:
-      mp->cur++;
-      return mp->ttMove;
+  case ST_GOOD_CAPTURES:
+    st->endBadCaptures = st->cur = st->moves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
 
-    case ST_GOOD_CAPTURES:
-      move = pick_best(mp->cur++, mp->endMoves);
-      if (move != mp->ttMove) {
-        if (see_sign(mp->pos, move) >= 0)
+  case ST_GOOD_CAPTURES_2:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove) {
+        if (see_sign(pos, move) >= 0)
           return move;
 
-        // Losing capture, move it to the tail of the array
-        (mp->endBadCaptures--)->move = move;
+        // Losing capture, move it to the beginning of the array.
+        (st->endBadCaptures++)->move = move;
       }
-      break;
-
-    case ST_KILLERS:
-      move = (mp->cur++)->move;
-      if (   move != 0 && move != mp->ttMove && is_pseudo_legal(mp->pos, move)
-          && !is_capture(mp->pos, move))
-        return move;
-      break;
-
-    case ST_QUIET:
-      move = (mp->cur++)->move;
-      if (   move != mp->ttMove && move != mp->killers[0].move
-          && move != mp->killers[1].move && move != mp->killers[2].move)
-        return move;
-      break;
-
-    case ST_BAD_CAPTURES:
-      return (mp->cur--)->move;
-
-    case ST_ALL_EVASIONS: case ST_QCAPTURES_1: case ST_QCAPTURES_2:
-      move = pick_best(mp->cur++, mp->endMoves);
-      if (move != mp->ttMove)
-        return move;
-      break;
-
-    case ST_PROBCUT_CAPTURES:
-      move = pick_best(mp->cur++, mp->endMoves);
-      if (move != mp->ttMove && see(mp->pos, move) > mp->threshold)
-        return move;
-      break;
-
-    case ST_RECAPTURES:
-      move = pick_best(mp->cur++, mp->endMoves);
-      if (to_sq(move) == mp->recaptureSquare)
-        return move;
-      break;
-
-    case ST_CHECKS:
-      move = (mp->cur++)->move;
-      if (move != mp->ttMove)
-        return move;
-      break;
-
-    case ST_STOP:
-      return 0;
-
-    default:
-      assert(0);
     }
+    st->stage++;
+
+    // First killer move.
+    move = st->killers[0];
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  case ST_KILLERS:
+    st->stage++;
+    move = st->killers[1]; // Second killer move.
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  case ST_KILLERS_2:
+    st->stage++;
+    move = st->countermove;
+    if (move && move != st->ttMove && move != st->killers[0]
+             && move != st->killers[1] && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  case ST_QUIET:
+    st->cur = st->endBadCaptures;
+    st->endMoves = generate_quiets(pos, st->cur);
+    score_quiets(pos);
+    if (st->depth < 3 * ONE_PLY) {
+      ExtMove *goodQuiet = partition(st->cur, st->endMoves);
+      insertion_sort(st->cur, goodQuiet);
+    } else
+      insertion_sort(st->cur, st->endMoves);
+    st->stage++;
+
+  case ST_QUIET_2:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (   move != st->ttMove && move != st->killers[0]
+          && move != st->killers[1] && move != st->countermove)
+        return move;
+    }
+    st->stage++;
+    st->cur = st->moves; // Return to bad captures.
+
+  case ST_BAD_CAPTURES:
+    if (st->cur < st->endBadCaptures)
+      return (st->cur++)->move;
+    return 0;
+
+  case ST_EVASIONS_1:
+    st->cur = st->moves;
+    st->endMoves = generate_evasions(pos, st->cur);
+    if (st->endMoves - st->moves > 1)
+      score_evasions(pos);
+    st->stage = ST_REMAINING;
+    goto remaining;
+
+  case ST_QCAPTURES_CHECKS_1:
+  case ST_QCAPTURES_NO_CHECKS_1:
+    st->cur = st->moves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+remaining:
+  case ST_QCAPTURES_CHECKS_2:
+  case ST_REMAINING:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove)
+        return move;
+    }
+    if (st->stage != ST_QCAPTURES_CHECKS_2)
+      return 0;
+    st->cur = st->moves;
+    st->endMoves = generate_quiet_checks(pos, st->cur);
+    st->stage++;
+
+  case ST_CHECKS:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (move != st->ttMove)
+        return move;
+    }
+    return 0;
+
+  case ST_RECAPTURES:
+    st->cur = st->moves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  case ST_RECAPTURES_2:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (to_sq(move) == st->recaptureSquare)
+        return move;
+    }
+    return 0;
+
+  case ST_PROBCUT_1:
+    st->cur = st->moves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  case ST_PROBCUT_2:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove && see(pos, move) > st->threshold)
+        return move;
+    }
+    return 0;
+
+  default:
+    assume(0);
+    return 0;
+
   }
 }
 

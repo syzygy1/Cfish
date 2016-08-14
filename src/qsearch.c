@@ -108,18 +108,19 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     futilityBase = bestValue + 128;
   }
 
-  // Initialize a MovePicker object for the current position, and prepare
+  // Initialize move picker data for the current position, and prepare
   // to search the moves. Because the depth is <= 0 here, only captures,
   // queen promotions and checks (only if depth >= DEPTH_QS_CHECKS) will
   // be generated.
-  MovePicker mp;
-  mp_init_q(&mp, pos, ttMove, depth, to_sq((ss-1)->currentMove));
+  ExtMove moveList[MAX_MOVES];
+  ss->moves = moveList;
+  mp_init_q(pos, ttMove, depth, to_sq((ss-1)->currentMove));
 
   CheckInfo ci;
   checkinfo_init(&ci, pos);
 
   // Loop through the moves until no moves remain or a beta cutoff occurs
-  while ((move = next_move(&mp)) != 0) {
+  while ((move = next_move(pos)) != 0) {
     assert(move_is_ok(move));
 
     givesCheck =  type_of_m(move) == NORMAL && !ci.dcCandidates

@@ -63,16 +63,16 @@ static int is_KXK(Pos *pos, int us)
 static int is_KBPsKs(Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
-        && piece_count(us, BISHOP) == 1
-        && piece_count(us, PAWN);
+        && pieces_cp(us, BISHOP)
+        && pieces_cp(us, PAWN);
 }
 
 static int is_KQKRPs(Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
-        && piece_count(us, QUEEN) == 1
+        && pieces_cp(us, QUEEN)
         && piece_count(us ^ 1, ROOK) == 1
-        && piece_count(us ^ 1, PAWN);
+        && pieces_cp(us ^ 1, PAWN);
 }
 
 // imbalance() calculates the imbalance by comparing the piece count of each
@@ -111,11 +111,7 @@ typedef int PieceCountType[2][8];
 MaterialEntry *material_probe(Pos *pos)
 {
   Key key = pos_material_key();
-#ifdef PEDANTIC
-  MaterialEntry *e = &pos->materialTable[key & 8191];
-#else
-  MaterialEntry *e = &pos->materialTable[key >> (64 - 13)];
-#endif
+  MaterialEntry *e = &pos->materialTable[(key * 0xb44cede0e4473d6dULL) >> (64 - 13)];
 
   if (e->key == key)
       return e;
@@ -168,18 +164,17 @@ MaterialEntry *material_probe(Pos *pos)
   Value npm_b = pos_non_pawn_material(BLACK);
 
   if (npm_w + npm_b == 0 && pieces_p(PAWN)) { // Only pawns on the board.
-    if (!piece_count(BLACK, PAWN)) {
+    if (!pieces_cp(BLACK, PAWN)) {
       assert(piece_count(WHITE, PAWN) >= 2);
 
       e->scal_func[WHITE] = &ScaleKPsK;
     }
-    else if (!piece_count(WHITE, PAWN)) {
+    else if (!pieces_cp(WHITE, PAWN)) {
       assert(piece_count(BLACK, PAWN) >= 2);
 
       e->scal_func[BLACK] = &ScaleKPsK;
     }
-    else if (   piece_count(WHITE, PAWN) == 1
-             && piece_count(BLACK, PAWN) == 1) {
+    else if (popcount(pieces_p(PAWN)) == 2) { // Each side has one pawn.
       // This is a special case because we set scaling functions
       // for both colors instead of only one.
       e->scal_func[WHITE] = &ScaleKPKP;
@@ -208,15 +203,6 @@ MaterialEntry *material_probe(Pos *pos)
   // Evaluate the material imbalance. We use PIECE_TYPE_NONE as a place
   // holder for the bishop pair "extended piece", which allows us to be
   // more flexible in defining bishop pair bonuses.
-#ifdef PEDANTIC
-  PieceCountType *pc = &(pos->pieceCount);
-  int PieceCount[2][8] = {
-    { (*pc)[0][BISHOP] > 1, (*pc)[0][PAWN], (*pc)[0][KNIGHT],
-      (*pc)[0][BISHOP]    , (*pc)[0][ROOK], (*pc)[0][QUEEN] },
-    { (*pc)[1][BISHOP] > 1, (*pc)[1][PAWN], (*pc)[1][KNIGHT],
-      (*pc)[1][BISHOP]    , (*pc)[1][ROOK], (*pc)[1][QUEEN] }
-  };
-#else
 #define pc(c,p) piece_count_mk(c,p)
   int PieceCount[2][8] = {
     { pc(0, BISHOP) > 1, pc(0, PAWN), pc(0, KNIGHT),
@@ -225,7 +211,6 @@ MaterialEntry *material_probe(Pos *pos)
       pc(1, BISHOP)    , pc(1, ROOK), pc(1, QUEEN) }
   };
 #undef pc
-#endif
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
 
   return e;

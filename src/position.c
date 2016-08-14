@@ -25,24 +25,43 @@ int check_pos(Pos *pos);
 
 struct Zob zob;
 
-#ifndef PEDANTIC
+#if 1
 Key mat_key[16] = {
-    0ULL,
-    0x5ced000000000101ULL,
-    0xe173000000001001ULL,
-    0xd64d000000010001ULL,
-    0xab88000000100001ULL,
-    0x680b000001000001ULL,
-    0x0000000000000001ULL,
-    0ULL,
-    0ULL,
-    0xf209000010000001ULL,
-    0xbb14000100000001ULL,
-    0x58df001000000001ULL,
-    0xa15f010000000001ULL,
-    0x7c94100000000001ULL,
-    0x0000000000000001ULL,
-    0ULL
+  0ULL,
+  0x5ced000000000101ULL,
+  0xe173000000001001ULL,
+  0xd64d000000010001ULL,
+  0xab88000000100001ULL,
+  0x680b000001000001ULL,
+  0x0000000000000001ULL,
+  0ULL,
+  0ULL,
+  0xf219000010000001ULL,
+  0xbb14000100000001ULL,
+  0x58df001000000001ULL,
+  0xa15f010000000001ULL,
+  0x7c94100000000001ULL,
+  0x0000000000000001ULL,
+  0ULL
+};
+#else
+Key mat_key[16] = {
+  0ULL,
+  0x8819000000000101ULL,
+  0x7950000000001001ULL,
+  0x6a4b000000010001ULL,
+  0x18e0000000100001ULL,
+  0x407a000001000001ULL,
+  0x0000000000000001ULL,
+  0ULL,
+  0ULL,
+  0xc102000010000001ULL,
+  0xae7e000100000001ULL,
+  0x8c7a001000000001ULL,
+  0x9fba010000000001ULL,
+  0x3ac6100000000001ULL,
+  0x0000000000000001ULL,
+  0ULL
 };
 #endif
 
@@ -360,16 +379,9 @@ static void set_state(Pos *pos, Stack *st)
     st->pawnKey ^= zob.psq[color_of(piece_on(s))][PAWN][s];
   }
 
-#ifdef PEDANTIC
-  for (int c = 0; c < 2; c++)
-    for (int pt = PAWN; pt <= KING; pt++)
-      for (int cnt = 0; cnt < piece_count(c, pt); cnt++)
-        st->materialKey ^= zob.psq[c][pt][cnt];
-#else
   for (int c = 0; c < 2; c++)
     for (int pt = PAWN; pt <= KING; pt++)
       st->materialKey += piece_count(c, pt) * mat_key[8 * c + pt];
-#endif
 
   for (int c = 0; c < 2; c++)
     for (int pt = KNIGHT; pt <= QUEEN; pt++)
@@ -670,11 +682,11 @@ void do_move(Pos *pos, Move m, int givesCheck)
   st->nonPawnMaterial[1] = (st-1)->nonPawnMaterial[1];
   st->psq = (st-1)->psq;
   st->materialKey = (st-1)->materialKey;
+  st->pawnKey = (st-1)->pawnKey;
 
   Square from = from_sq(m);
   Square to = to_sq(m);
   Key key = (st-1)->key ^ zob.side;
-  Key pawnKey = (st-1)->pawnKey;
 
   // Update castling rights.
   st->castlingRights =  (st-1)->castlingRights
@@ -705,7 +717,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     st->psq += psqt.psq2d[piece][to] - psqt.psq2d[piece][from];
     key ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
     if (type_of_p(piece) == PAWN)
-      pawnKey ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
+      st->pawnKey ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
     prom_piece = piece;
   } else {
     prom_piece = promotion_type(m);
@@ -716,7 +728,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     st->nonPawnMaterial[us] += NonPawnPieceValue[prom_piece];
     st->materialKey += mat_key[prom_piece] - mat_key[piece];
     key ^= zob.psq2d[piece][from] ^ zob.psq2d[prom_piece][to];
-    pawnKey ^= zob.psq2d[piece][from];
+    st->pawnKey ^= zob.psq2d[piece][from];
   }
   pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
   pos->board[from] = 0;
@@ -724,9 +736,12 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   if (capt_piece) {
     st->rule50 = 0;
-    if (type_of_m(m) == ENPASSANT) {
-      to += (us == WHITE ? -8 : 8);
-      pos->board[to] = 0;
+    if ((capt_piece & 7) == PAWN) {
+      if (type_of_m(m) == ENPASSANT) {
+        to += (us == WHITE ? -8 : 8);
+        pos->board[to] = 0;
+      }
+      st->pawnKey ^= zob.psq2d[capt_piece][to];
     }
     st->capturedType = capt_piece;
     st->psq -= psqt.psq2d[capt_piece][to];
@@ -735,8 +750,6 @@ void do_move(Pos *pos, Move m, int givesCheck)
     pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
     key ^= zob.psq2d[capt_piece][to];
-    if ((st->capturedType & 7) == PAWN)
-      pawnKey ^= zob.psq2d[capt_piece][to];
   } else { // Not a capture.
     st->capturedType = 0;
     st->rule50 = (st-1)->rule50 + 1;
@@ -758,7 +771,6 @@ void do_move(Pos *pos, Move m, int givesCheck)
     }
   }
   st->key = key;
-  st->pawnKey = pawnKey;
   pos->byTypeBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
 
   st->checkersBB =  givesCheck
@@ -817,6 +829,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
 
+  pos->nodes++;
   Key key = pos_key() ^ zob.side;
 
   // Copy some fields of the old state to our new Stack object except the
@@ -824,22 +837,13 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // switch our state pointer to point to the new (ready to be updated)
   // state.
   Stack *st = ++pos->st;
-//  memcpy(st, st - 1, StateCopySize);
+  memcpy(st, st - 1, StateCopySize);
   st->previous = st - 1;
-
-  st->pawnKey = (st-1)->pawnKey;
-  // The following fields should probably be moved to Pos.
-  st->materialKey = (st-1)->materialKey;
-  st->nonPawnMaterial[0] = (st-1)->nonPawnMaterial[0];
-  st->nonPawnMaterial[1] = (st-1)->nonPawnMaterial[1];
-  st->psq = (st-1)->psq;
-
-// castlingRights
-  st->castlingRights = (st-1)->castlingRights;
 
   // Increment ply counters. In particular, rule50 will be reset to zero
   // later on in case of a capture or a pawn move.
   st->rule50 = (st-1)->rule50 + 1;
+  st->pliesFromNull++;
 
   int us = pos_stm();
   int them = us ^ 1;
@@ -885,7 +889,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
         capsq -= pawn_push(us);
 
         assert(pt == PAWN);
-        assert(to == st->epSquare);
+        assert(to == (st-1)->epSquare);
         assert(relative_rank_s(us, to) == RANK_6);
         assert(is_empty(to));
         assert(piece_on(capsq) == make_piece(them, PAWN));
@@ -902,8 +906,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
     // Update material hash key and prefetch access to materialTable
     key ^= zob.psq[them][captured][capsq];
-    st->materialKey ^= zob.psq[them][captured][piece_count(them, captured)];
-    prefetch(&pos->materialTable[st->materialKey & 8191]);
+    st->materialKey -= mat_key[8 * them + captured];
+    prefetch(&pos->materialTable[st->materialKey >> (64 - 13)]);
 
     // Update incremental scores
     st->psq -= psqt.psq[them][captured][capsq];
@@ -951,8 +955,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
       // Update hash keys
       key ^= zob.psq[us][PAWN][to] ^ zob.psq[us][promotion][to];
       st->pawnKey ^= zob.psq[us][PAWN][to];
-      st->materialKey ^=  zob.psq[us][promotion][piece_count(us, promotion)-1]
-                        ^ zob.psq[us][PAWN][piece_count(us, PAWN)];
+      st->materialKey += mat_key[8 * us + promotion] - mat_key[8 * us + PAWN];
 
       // Update incremental score
       st->psq += psqt.psq[us][promotion][to] - psqt.psq[us][PAWN][to];
@@ -982,10 +985,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   st->checkersBB =  givesCheck
                   ? attackers_to(square_of(them, KING)) & pieces_c(us) : 0;
 
-  st->pliesFromNull = (st-1)->pliesFromNull + 1;
-
   pos->sideToMove ^= 1;
-  pos->nodes++;
 
   assert(pos_is_ok(pos, &failed_step));
 }
@@ -1051,7 +1051,7 @@ void undo_move(Pos *pos, Move m)
     }
   }
 
-  // Finally point our state pointer back to the previous state
+  // Finally point our state pointer back to the previous state.
   pos->st--;
 
   assert(pos_is_ok(pos, &failed_step));
@@ -1059,7 +1059,7 @@ void undo_move(Pos *pos, Move m)
 #endif
 
 
-// do_null_move() is used to do a "null move".
+// do_null_move() is used to do a null move.
 
 void do_null_move(Pos *pos)
 {
@@ -1085,13 +1085,13 @@ void do_null_move(Pos *pos)
   assert(pos_is_ok(pos, &failed_step));
 }
 
-// undo_null_move() is used to undo a "null move".
+// undo_null_move() is used to undo a null move.
 
 void undo_null_move(Pos *pos)
 {
   assert(!pos_checkers());
 
-  pos->st = pos->st->previous;
+  pos->st--;
   pos->sideToMove ^= 1;
 }
 
@@ -1114,6 +1114,7 @@ Key key_after(Pos *pos, Move m)
 
   return k ^ zob.psq[us][pt][to] ^ zob.psq[us][pt][from];
 }
+
 
 // see() is a static exchange evaluator: It tries to estimate the
 // material gain or loss resulting from a move.

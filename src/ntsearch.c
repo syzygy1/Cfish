@@ -31,6 +31,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
   Piece moved_piece;
   int moveCount, quietCount;
+  ExtMove moveList[MAX_MOVES];
 
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
@@ -246,12 +247,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert((ss-1)->currentMove != MOVE_NONE);
     assert((ss-1)->currentMove != MOVE_NULL);
 
-    MovePicker mp;
-    mp_init_pc(&mp, pos, ttMove, PieceValue[MG][captured_piece_type()]);
+    ss->moves = moveList;
+    mp_init_pc(pos, ttMove, PieceValue[MG][captured_piece_type()]);
     CheckInfo ci;
     checkinfo_init(&ci, pos);
 
-    while ((move = next_move(&mp)) != MOVE_NONE)
+    while ((move = next_move(pos)) != MOVE_NONE)
       if (is_legal(pos, move, ci.pinned)) {
         ss->currentMove = move;
         ss->counterMoves = &CounterMoveHistory[moved_piece(move)][to_sq(move)];
@@ -287,8 +288,8 @@ moves_loop: // When in check search starts from here.
   CounterMoveStats *fmh  = (ss-2)->counterMoves;
   CounterMoveStats *fmh2 = (ss-4)->counterMoves;
 
-  MovePicker mp;
-  mp_init(&mp, pos, ttMove, depth, ss);
+  ss->moves = moveList;
+  mp_init(pos, ttMove, depth);
   CheckInfo ci;
   checkinfo_init(&ci, pos);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
@@ -307,7 +308,7 @@ moves_loop: // When in check search starts from here.
 
   // Step 11. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta cutoff occurs
-  while ((move = next_move(&mp)) != MOVE_NONE) {
+  while ((move = next_move(pos)) != MOVE_NONE) {
     assert(move_is_ok(move));
 
     if (move == excludedMove)
@@ -359,11 +360,11 @@ moves_loop: // When in check search starts from here.
         &&  see_sign(pos, move) >= VALUE_ZERO)
       extension = ONE_PLY;
 
-    // Singular extension search. If all moves but one fail low on a search of
-    // (alpha-s, beta-s), and just one fails high on (alpha, beta), then that move
-    // is singular and should be extended. To verify this we do a reduced search
-    // on all the other moves but the ttMove and if the result is lower than
-    // ttValue minus a margin then we extend the ttMove.
+    // Singular extension search. If all moves but one fail low on a search
+    // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
+    // that move is singular and should be extended. To verify this we do a
+    // reduced search on all the other moves but the ttMove and if the
+    // result is lower than ttValue minus a margin then we extend the ttMove.
     if (    singularExtensionNode
         &&  move == ttMove
         && !extension
@@ -372,12 +373,20 @@ moves_loop: // When in check search starts from here.
       Value rBeta = ttValue - 2 * depth / ONE_PLY;
       ss->excludedMove = move;
       ss->skipEarlyPruning = 1;
+      Move cm = ss->countermove;
       value = search_NonPV(pos, ss, rBeta - 1, depth / 2, cutNode);
       ss->skipEarlyPruning = 0;
-      ss->excludedMove = MOVE_NONE;
+      ss->excludedMove = 0;
 
       if (value < rBeta)
         extension = ONE_PLY;
+
+      // The call to search_NonPV with the same value of ss messed up our
+      // move picker data. So we fix it.
+      ss->moves = moveList;
+      mp_init(pos, ttMove, depth);
+      ss->stage++;
+      ss->countermove = cm; // pedantic
     }
 
     // Update the current move (this must be done after singular extension search)

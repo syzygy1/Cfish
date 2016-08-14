@@ -89,34 +89,6 @@ extern char *PieceToChar;
 
 // Compute material key from an endgame code string.
 
-#ifdef PEDANTIC
-static Key calc_key(char *code, int c)
-{
-  int pcs[16];
-
-  for (int i = 0; i < 16; i++)
-    pcs[i] = 0;
-  for (; *code; code++)
-    for (int i = 0; i < 16; i++)
-      if (*code == PieceToChar[i]) {
-        pcs[i]++;
-        break;
-      }
-
-  Key key = 0;
-
-  int color = c == WHITE ? 0 : 8;
-  for (int pt = PAWN; pt <= KING; pt++)
-    for (int i = 0; i < pcs[color + pt]; i++)
-      key ^= zob.psq[WHITE][pt][i];
-  color ^= 8;
-  for (int pt = PAWN; pt <= KING; pt++)
-    for (int i = 0; i < pcs[color + pt]; i++)
-      key ^= zob.psq[BLACK][pt][i];
-
-  return key;
-}
-#else
 extern Key mat_key[16];
 
 static Key calc_key(char *code, int c)
@@ -133,7 +105,6 @@ static Key calc_key(char *code, int c)
 
   return key;
 }
-#endif
 
 struct EndgameFunc endgame_funcs[16] = {
 // Entries 0-7 are evaluation functions.

@@ -19,9 +19,7 @@
 
 #include "tbcore.c"
 
-#ifndef PEDANTIC
 extern Key mat_key[16];
-#endif
 
 int TB_MaxCardinality = 0;
 
@@ -50,21 +48,11 @@ static Key calc_key(Pos *pos, int mirror)
   Key key = 0;
 
   int color = !mirror ? WHITE : BLACK;
-#ifdef PEDANTIC
-  for (int pt = PAWN; pt <= KING; pt++)
-    for (int i = popcount(pieces_cp(color, pt)); i > 0; i--)
-      key ^= zob.psq[WHITE][pt][i - 1];
-  color ^= 1;
-  for (int pt = PAWN; pt <= KING; pt++)
-    for (int i = popcount(pieces_cp(color, pt)); i > 0; i--)
-      key ^= zob.psq[BLACK][pt][i - 1];
-#else
   for (int pt = PAWN; pt <= KING; pt++)
     key += mat_key[pt] * popcount(pieces_cp(color, pt));
   color ^= 1;
   for (int pt = PAWN; pt <= KING; pt++)
     key += mat_key[pt + 8] * popcount(pieces_cp(color, pt));
-#endif
 
   return key;
 }
@@ -78,18 +66,8 @@ Key calc_key_from_pcs(int *pcs, int mirror)
   Key key = 0;
 
   int color = !mirror ? 0 : 8;
-#ifdef PEDANTIC
-  for (int pt = PAWN; pt <= KING; pt++)
-    for (int i = 0; i < pcs[color + pt]; i++)
-      key ^= zob.psq[WHITE][pt][i];
-  color ^= 8;
-  for (int pt = PAWN; pt <= KING; pt++)
-    for (int i = 0; i < pcs[color + pt]; i++)
-      key ^= zob.psq[BLACK][pt][i];
-#else
   for (int i = W_PAWN; i <= B_KING; i++)
     key += mat_key[i] * pcs[i ^ color];
-#endif
 
   return key;
 }
@@ -100,22 +78,16 @@ static int probe_wdl_table(Pos *pos, int *success)
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
   uint64 idx;
-  Key key;
   int i;
   ubyte res;
   int p[TBPIECES];
 
   // Obtain the position's material signature key.
-  key = pos_material_key();
+  Key key = pos_material_key();
 
   // Test for KvK.
-#ifdef PEDANTIC
-  if (key == (zob.psq[WHITE][KING][0] ^ zob.psq[BLACK][KING][0]))
-    return 0;
-#else
   if (key == 2ULL)
     return 0;
-#endif
 
   ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
   for (i = 0; i < HSHMAX; i++)
