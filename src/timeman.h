@@ -42,7 +42,7 @@ void time_init(LimitsType *limits, int us, int ply);
 #define time_optimum() Time.optimumTime
 #define time_maximum() Time.maximumTime
 
-static inline int time_elapsed(void)
+INLINE int time_elapsed(void)
 {
   return Limits.npmsec ? threads_nodes_searched() : now() - Time.startTime;
 }

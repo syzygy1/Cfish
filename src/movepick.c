@@ -55,7 +55,7 @@
 
 // Our insertion sort, which is guaranteed to be stable, as it should be.
 
-static inline void insertion_sort(ExtMove *begin, ExtMove *end)
+INLINE void insertion_sort(ExtMove *begin, ExtMove *end)
 {
   ExtMove tmp, *p, *q;
 
@@ -69,7 +69,7 @@ static inline void insertion_sort(ExtMove *begin, ExtMove *end)
 
 // Our non-stable partition function, the one that Stockfish uses.
 
-static inline ExtMove *partition(ExtMove *first, ExtMove *last)
+INLINE ExtMove *partition(ExtMove *first, ExtMove *last)
 {
   ExtMove tmp;
 
@@ -100,7 +100,7 @@ static inline ExtMove *partition(ExtMove *first, ExtMove *last)
 // it to the front. It's faster than sorting all the moves in advance
 // when there are few moves, e.g., the possible captures.
 
-Move pick_best(ExtMove *begin, ExtMove *end)
+static Move pick_best(ExtMove *begin, ExtMove *end)
 {
   ExtMove *p, *q, tmp;
 

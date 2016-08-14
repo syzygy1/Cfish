@@ -98,7 +98,7 @@ uint64_t threads_tb_hits(void);
 
 extern ThreadPool Threads;
 
-static inline Pos *threads_main(void)
+INLINE Pos *threads_main(void)
 {
   return Threads.pos[0];
 }

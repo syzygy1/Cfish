@@ -80,7 +80,7 @@ void init_magics(Bitboard table[], Bitboard* attacks[], Bitboard magics[],
 // bsf_index() returns the index into BSFTable[] to look up the bitscan. Uses
 // Matt Taylor's folding for 32 bit case, extended to 64 bit by Kim Walisch.
 
-static inline unsigned bsf_index(Bitboard b)
+INLINE unsigned bsf_index(Bitboard b)
 {
   b ^= b - 1;
   return Is64Bit ? (b * DeBruijn64) >> 58

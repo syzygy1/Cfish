@@ -88,7 +88,7 @@ static const Value MaxSafetyBonus = V(258);
 #undef S
 #undef V
 
-static inline Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
+INLINE Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
 {
   const Square Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
   const Square Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
@@ -215,7 +215,7 @@ PawnEntry *pawn_probe(Pos *pos)
 // shelter_storm() calculates shelter and storm penalties for the file
 // the king is on, as well as the two adjacent files.
 
-static inline Value shelter_storm(Pos *pos, Square ksq, const int Us)
+INLINE Value shelter_storm(Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   
@@ -249,7 +249,7 @@ static inline Value shelter_storm(Pos *pos, Square ksq, const int Us)
 // do_king_safety() calculates a bonus for king safety. It is called only
 // when king square changes, which is about 20% of total king_safety() calls.
 
-static inline Score do_king_safety(PawnEntry *pe, Pos *pos, Square ksq,
+INLINE Score do_king_safety(PawnEntry *pe, Pos *pos, Square ksq,
                                    const int Us)
 {
   pe->kingSquares[Us] = ksq;

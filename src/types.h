@@ -21,7 +21,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#define PEDANTIC
+//#define PEDANTIC
 
 // When compiling with provided Makefile (e.g. for Linux and OSX),
 // configuration is done automatically. To get started type 'make help'.
@@ -45,6 +45,8 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#define INLINE static inline __attribute((always_inline))
 
 // Predefined macros hell:
 //
@@ -131,7 +133,7 @@ typedef uint64_t Bitboard;
 #define BLACK_OOO    8
 #define ANY_CASTLING 15
 
-static inline int make_castling_right(int c, int s)
+INLINE int make_castling_right(int c, int s)
 {
   return c == WHITE ? s == QUEEN_SIDE ? WHITE_OOO : WHITE_OO
                     : s == QUEEN_SIDE ? BLACK_OOO : BLACK_OO;
@@ -328,20 +330,20 @@ typedef uint32_t Score;
 // Extracting the signed lower and upper 16 bits is not so trivial because
 // according to the standard a simple cast to short is implementation
 // defined and so is a right shift of a signed integer.
-static inline Value mg_value(Score s)
+INLINE Value mg_value(Score s)
 {
   union { uint16_t u; int16_t s; } mg = { (uint16_t)((unsigned)(s + 0x8000) >> 16) };
   return mg.s;
 }
 
-static inline Value eg_value(Score s)
+INLINE Value eg_value(Score s)
 {
   union { uint16_t u; int16_t s; } eg = { (uint16_t)((unsigned)s) };
   return eg.s;
 }
 
 /// Division of a Score must be handled separately for each tEerm
-static inline Score score_divide(Score s, int i)
+INLINE Score score_divide(Score s, int i)
 {
   return make_score(mg_value(s) / i, eg_value(s) / i);
 }
@@ -374,7 +376,7 @@ extern Value NonPawnPieceValue[16];
 #define make_castling(from,to) ((Move)((to) | ((from)<<6) | CASTLING))
 #define move_is_ok(m) (from_sq(m) != to_sq(m))
 
-static inline int opposite_colors(Square s1, Square s2)
+INLINE int opposite_colors(Square s1, Square s2)
 {
   int s = (int)(s1) ^ (int)(s2);
   return ((s >> 3) ^ s) & 1;

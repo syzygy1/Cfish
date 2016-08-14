@@ -64,7 +64,7 @@ static const int razor_margin[4] = { 483, 570, 603, 554 };
 static int FutilityMoveCounts[2][16];  // [improving][depth]
 static Depth Reductions[2][2][64][64]; // [pv][improving][depth][moveNumber]
 
-static inline Depth reduction(int i, Depth d, int mn, const int NT)
+INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
   return Reductions[NT][i][min(d, 63 * ONE_PLY)][min(mn, 63)];
 }

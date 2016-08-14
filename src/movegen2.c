@@ -22,7 +22,7 @@
 
 #include "movegen.h"
 #include "position.h"
-
+#include "types.h"
 
 #define CAPTURES     0
 #define QUIETS       1
@@ -32,9 +32,9 @@
 #define LEGAL        5
 
 
-static inline ExtMove *generate_castling(Pos *pos, ExtMove *list, int us,
-                                         const CheckInfo *ci, const int Cr,
-                                         const int Checks, const int Chess960)
+INLINE ExtMove *generate_castling(Pos *pos, ExtMove *list, int us,
+                                    const CheckInfo *ci, const int Cr,
+                                    const int Checks, const int Chess960)
 {
   const int KingSide = (Cr == WHITE_OO || Cr == BLACK_OO);
 
@@ -80,9 +80,9 @@ static inline ExtMove *generate_castling(Pos *pos, ExtMove *list, int us,
 }
 
 
-static inline ExtMove *make_promotions(ExtMove *list, Square to,
-                                       const CheckInfo* ci,
-                                       const int Type, const Square Delta)
+INLINE ExtMove *make_promotions(ExtMove *list, Square to,
+                                  const CheckInfo* ci,
+                                  const int Type, const Square Delta)
 {
   if (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS)
     (list++)->move = make_promotion(to - Delta, to, QUEEN);
@@ -104,9 +104,9 @@ static inline ExtMove *make_promotions(ExtMove *list, Square to,
 }
 
 
-static inline ExtMove *generate_pawn_moves(Pos *pos, ExtMove *list,
-                                           Bitboard target, const CheckInfo* ci,
-                                           const int Us, const int Type)
+INLINE ExtMove *generate_pawn_moves(Pos *pos, ExtMove *list,
+                                      Bitboard target, const CheckInfo* ci,
+                                      const int Us, const int Type)
 {
   // Compute our parametrized parameters at compile time, named according to
   // the point of view of white side.
@@ -225,9 +225,9 @@ static inline ExtMove *generate_pawn_moves(Pos *pos, ExtMove *list,
 }
 
 
-static inline ExtMove *generate_moves(Pos *pos, ExtMove *list, int us,
-                                      Bitboard target, const CheckInfo* ci,
-                                      const int Pt, const int Checks)
+INLINE ExtMove *generate_moves(Pos *pos, ExtMove *list, int us,
+                                 Bitboard target, const CheckInfo* ci,
+                                 const int Pt, const int Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
@@ -256,9 +256,9 @@ static inline ExtMove *generate_moves(Pos *pos, ExtMove *list, int us,
 }
 
 
-static inline ExtMove *generate_all(Pos *pos, ExtMove *list, Bitboard target,
-                                    const CheckInfo* ci, const int Us,
-                                    const int Type)
+INLINE ExtMove *generate_all(Pos *pos, ExtMove *list, Bitboard target,
+                               const CheckInfo* ci, const int Us,
+                               const int Type)
 {
   const int Checks = Type == QUIET_CHECKS;
 
@@ -298,7 +298,7 @@ static inline ExtMove *generate_all(Pos *pos, ExtMove *list, Bitboard target,
 // generate_non_evasions() generates all pseudo-legal captures and
 // non-captures.
 
-static inline ExtMove *generate(Pos *pos, ExtMove *list, const int Type)
+INLINE ExtMove *generate(Pos *pos, ExtMove *list, const int Type)
 {
   assert(Type == CAPTURES || Type == QUIETS || Type == NON_EVASIONS);
   assert(!pos_checkers());

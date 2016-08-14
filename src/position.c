@@ -70,7 +70,7 @@ const char *PieceToChar = " PNBRQK  pnbrqk";
 int failed_step;
 
 #ifdef PEDANTIC
-static inline void put_piece(Pos *pos, int c, int pt, Square s)
+INLINE void put_piece(Pos *pos, int c, int pt, Square s)
 {
   pos->board[s] = make_piece(c, pt);
   pos->byTypeBB[0] |= sq_bb(s);
@@ -80,7 +80,7 @@ static inline void put_piece(Pos *pos, int c, int pt, Square s)
   pos->pieceList[c][pt][pos->index[s]] = s;
 }
 
-static inline void remove_piece(Pos *pos, int c, int pt, Square s)
+INLINE void remove_piece(Pos *pos, int c, int pt, Square s)
 {
   // WARNING: This is not a reversible operation.
   pos->byTypeBB[0] ^= sq_bb(s);
@@ -93,7 +93,7 @@ static inline void remove_piece(Pos *pos, int c, int pt, Square s)
   pos->pieceList[c][pt][pos->pieceCount[c][pt]] = SQ_NONE;
 }
 
-static inline void move_piece(Pos *pos, int c, int pt, Square from, Square to)
+INLINE void move_piece(Pos *pos, int c, int pt, Square from, Square to)
 {
   // index[from] is not updated and becomes stale. This works as long as
   // index[] is accessed just by known occupied squares.

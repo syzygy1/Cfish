@@ -266,42 +266,42 @@ int pos_is_ok(Pos *pos, int* failedStep);
 #define pos_psq_score() (pos->st->psq)
 #define pos_non_pawn_material(c) (pos->st->nonPawnMaterial[c])
 
-static inline Bitboard discovered_check_candidates(Pos *pos)
+INLINE Bitboard discovered_check_candidates(Pos *pos)
 {
   return slider_blockers(pos, pieces_c(pos_stm()), pieces_c(pos_stm()),
                          square_of(pos_stm() ^ 1, KING));
 }
 
-static inline Bitboard pinned_pieces(Pos *pos, int c)
+INLINE Bitboard pinned_pieces(Pos *pos, int c)
 {
   return slider_blockers(pos, pieces_c(c), pieces_c(c ^ 1), square_of(c, KING));
 }
 
-static inline int pawn_passed(Pos *pos, int c, Square s)
+INLINE int pawn_passed(Pos *pos, int c, Square s)
 {
   return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_mask(c, s));
 }
 
-static inline int advanced_pawn_push(Pos *pos, Move m)
+INLINE int advanced_pawn_push(Pos *pos, Move m)
 {
   return   type_of_p(moved_piece(m)) == PAWN
         && relative_rank_s(pos_stm(), from_sq(m)) > RANK_4;
 }
 
-static inline int opposite_bishops(Pos *pos)
+INLINE int opposite_bishops(Pos *pos)
 {
   return   piece_count(WHITE, BISHOP) == 1
         && piece_count(BLACK, BISHOP) == 1
         && opposite_colors(square_of(WHITE, BISHOP), square_of(BLACK, BISHOP));
 }
 
-static inline int is_capture_or_promotion(Pos *pos, Move m)
+INLINE int is_capture_or_promotion(Pos *pos, Move m)
 {
   assert(move_is_ok(m));
   return type_of_m(m) != NORMAL ? type_of_m(m) != CASTLING : !is_empty(to_sq(m));
 }
 
-static inline int is_capture(Pos *pos, Move m)
+INLINE int is_capture(Pos *pos, Move m)
 {
   // Castling is encoded as "king captures the rook"
   assert(move_is_ok(m));

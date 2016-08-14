@@ -954,11 +954,11 @@ static void calc_symlen(struct PairsData *d, int s, char *tmp)
   tmp[s] = 1;
 }
 
-static inline short ReadUshort(ubyte *d) {
+INLINE short ReadUshort(ubyte *d) {
   return d[0] | (d[1] << 8);
 }
 
-static inline uint32 ReadUint32(ubyte *d) {
+INLINE uint32 ReadUint32(ubyte *d) {
   return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24);
 }
 
@@ -1237,7 +1237,7 @@ static int init_table_dtz(struct TBEntry *entry)
   return 1;
 }
 
-static inline int is_little_endian() {
+INLINE int is_little_endian() {
   union {
     int i;
     char c[sizeof(int)];

@@ -292,7 +292,7 @@ static ExtMove *gen_pawn_captures_black(Pos *pos, ExtMove *list)
   return list;
 }
 
-static inline ExtMove *gen_pawn_evasions_white(Pos *pos, ExtMove *list,
+INLINE ExtMove *gen_pawn_evasions_white(Pos *pos, ExtMove *list,
                                                Bitboard target, Square checksq)
 {
   Bitboard pawns, b1, b2;
@@ -344,7 +344,7 @@ static inline ExtMove *gen_pawn_evasions_white(Pos *pos, ExtMove *list,
   return list;
 }
 
-static inline ExtMove *gen_pawn_evasions_black(Pos *pos, ExtMove *list,
+INLINE ExtMove *gen_pawn_evasions_black(Pos *pos, ExtMove *list,
                                                Bitboard target, Square checksq)
 {
   Bitboard pawns, b1, b2;
@@ -396,7 +396,7 @@ static inline ExtMove *gen_pawn_evasions_black(Pos *pos, ExtMove *list,
   return list;
 }
 
-static inline ExtMove *gen_pawn_checks_white(Pos *pos, ExtMove *list,
+INLINE ExtMove *gen_pawn_checks_white(Pos *pos, ExtMove *list,
                                              CheckInfo *ci)
 {
   Bitboard pawns, target, b1, b2;
@@ -459,7 +459,7 @@ static inline ExtMove *gen_pawn_checks_white(Pos *pos, ExtMove *list,
   return list;
 }
 
-static inline ExtMove *gen_pawn_checks_black(Pos *pos, ExtMove *list,
+INLINE ExtMove *gen_pawn_checks_black(Pos *pos, ExtMove *list,
                                              CheckInfo *ci)
 {
   Bitboard pawns, target, b1, b2;

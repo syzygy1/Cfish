@@ -73,7 +73,7 @@ struct LimitsType {
 
 typedef struct LimitsType LimitsType;
 
-static inline int use_time_management(LimitsType *l)
+INLINE int use_time_management(LimitsType *l)
 {
   return !(l->mate | l->movetime | l->depth | l->nodes | l->infinite);
 }

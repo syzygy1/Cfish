@@ -54,22 +54,22 @@ Value shelter_storm_white(Pos *pos, Square ksq);
 Value shelter_storm_black(Pos *pos, Square ksq);
 
 
-static inline int semiopen_file(PawnEntry *pe, int c, int f)
+INLINE int semiopen_file(PawnEntry *pe, int c, int f)
 {
   return pe->semiopenFiles[c] & (1 << f);
 }
 
-static inline int semiopen_side(PawnEntry *pe, int c, int f, int left)
+INLINE int semiopen_side(PawnEntry *pe, int c, int f, int left)
 {
   return pe->semiopenFiles[c] & (left ? (1 << f) - 1 : ~((1 << (f + 1)) - 1));
 }
 
-static inline int pawns_on_same_color_squares(PawnEntry *pe, int c, Square s)
+INLINE int pawns_on_same_color_squares(PawnEntry *pe, int c, Square s)
 {
   return pe->pawnsOnSquares[c][!!(DarkSquares & sq_bb(s))];
 }
 
-static inline Score king_safety_white(PawnEntry *pe, Pos *pos, Square ksq)
+INLINE Score king_safety_white(PawnEntry *pe, Pos *pos, Square ksq)
 {
   if (  pe->kingSquares[WHITE] == ksq
       && pe->castlingRights[WHITE] == can_castle_cr(WHITE_OO | WHITE_OOO))
@@ -78,7 +78,7 @@ static inline Score king_safety_white(PawnEntry *pe, Pos *pos, Square ksq)
     return pe->kingSafety[WHITE] = do_king_safety_white(pe, pos, ksq);
 }
 
-static inline Score king_safety_black(PawnEntry *pe, Pos *pos, Square ksq)
+INLINE Score king_safety_black(PawnEntry *pe, Pos *pos, Square ksq)
 {
   if (  pe->kingSquares[BLACK] == ksq
       && pe->castlingRights[BLACK] == can_castle_cr(BLACK_OO | BLACK_OOO))

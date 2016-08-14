@@ -50,17 +50,17 @@ struct MaterialEntry {
 
 typedef struct MaterialEntry MaterialEntry;
 
-static inline Score material_imbalance(MaterialEntry *me)
+INLINE Score material_imbalance(MaterialEntry *me)
 {
   return make_score((unsigned)me->value, me->value);
 }
 
-static inline int material_specialized_eval_exists(MaterialEntry *me)
+INLINE int material_specialized_eval_exists(MaterialEntry *me)
 {
   return me->eval_func != NULL;
 }
 
-static inline Value material_evaluate(MaterialEntry *me, Pos *pos)
+INLINE Value material_evaluate(MaterialEntry *me, Pos *pos)
 {
   return me->eval_func(pos, me->eval_func_side);
 }
@@ -70,7 +70,7 @@ static inline Value material_evaluate(MaterialEntry *me, Pos *pos)
 // because the scale factor may also be a function which should be applied to
 // the position. For instance, in KBP vs K endgames, the scaling function looks
 // for rook pawns and wrong-colored bishops.
-static inline int material_scale_factor(MaterialEntry *me, Pos *pos, int c)
+INLINE int material_scale_factor(MaterialEntry *me, Pos *pos, int c)
 {
   int sf = SCALE_FACTOR_NONE;
   if (me->scal_func[c])

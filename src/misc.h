@@ -35,7 +35,7 @@ void print_engine_info(int to_uci);
 // a non-blocking function that doesn't stall the CPU waiting for data
 // to be loaded from memory, which can be quite slow.
 
-static inline void prefetch(void *addr)
+INLINE void prefetch(void *addr)
 {
 #ifndef NO_PREFETCH
 
@@ -62,7 +62,7 @@ void dbg_print();
 
 typedef uint64_t TimePoint; // A value in milliseconds
 
-static inline TimePoint now() {
+INLINE TimePoint now() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return 1000 * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec / 1000;

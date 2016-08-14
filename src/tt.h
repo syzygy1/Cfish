@@ -45,7 +45,7 @@ struct TTEntry {
 
 typedef struct TTEntry TTEntry;
 
-static inline void tte_save(TTEntry *tte, Key k, Value v, int b, Depth d,
+INLINE void tte_save(TTEntry *tte, Key k, Value v, int b, Depth d,
                             Move m, Value ev, uint8_t g)
 {
   // Preserve any existing move for the same position
@@ -65,27 +65,27 @@ static inline void tte_save(TTEntry *tte, Key k, Value v, int b, Depth d,
   }
 }
 
-static inline Move tte_move(TTEntry *tte)
+INLINE Move tte_move(TTEntry *tte)
 {
   return (Move)tte->move16;
 }
 
-static inline Value tte_value(TTEntry *tte)
+INLINE Value tte_value(TTEntry *tte)
 {
   return (Value)tte->value16;
 }
 
-static inline Value tte_eval(TTEntry *tte)
+INLINE Value tte_eval(TTEntry *tte)
 {
   return (Value)tte->eval16;
 }
 
-static inline Depth tte_depth(TTEntry *tte)
+INLINE Depth tte_depth(TTEntry *tte)
 {
   return (Depth)tte->depth8;
 }
 
-static inline int tte_bound(TTEntry *tte)
+INLINE int tte_bound(TTEntry *tte)
 {
   return tte->genBound8 & 0x3;
 }
@@ -121,22 +121,22 @@ typedef struct TranspositionTable TranspositionTable;
 
 extern TranspositionTable TT;
 
-static inline void tt_free(void)
+INLINE void tt_free(void)
 {
   free(TT.mem);
 }
 
-static inline void tt_new_search(void)
+INLINE void tt_new_search(void)
 {
   TT.generation8 += 4; // Lower 2 bits are used by Bound
 }
 
-static inline uint8_t tt_generation(void)
+INLINE uint8_t tt_generation(void)
 {
   return TT.generation8;
 }
 
-static inline TTEntry *tt_first_entry(Key key)
+INLINE TTEntry *tt_first_entry(Key key)
 {
   return &TT.table[(size_t)key & (TT.clusterCount - 1)].entry[0];
 }
