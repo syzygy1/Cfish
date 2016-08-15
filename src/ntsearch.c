@@ -404,15 +404,15 @@ moves_loop: // When in check search starts from here.
       if (moveCountPruning)
         continue;
 
+      predictedDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO);
+
       // Countermoves based pruning
-      if (   depth <= 4 * ONE_PLY
+      if (   predictedDepth < 3 * ONE_PLY
           && move != ss->killers[0]
           && (!cmh  || (*cmh )[moved_piece][to_sq(move)] < VALUE_ZERO)
           && (!fmh  || (*fmh )[moved_piece][to_sq(move)] < VALUE_ZERO)
           && (!fmh2 || (*fmh2)[moved_piece][to_sq(move)] < VALUE_ZERO || (cmh && fmh)))
         continue;
-
-      predictedDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO);
 
       // Futility pruning: parent node
       if (   predictedDepth < 7 * ONE_PLY
