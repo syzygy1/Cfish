@@ -170,7 +170,7 @@ void mp_init_pc(Pos *pos, Move ttm, Value threshold)
   // threshold.
   st->ttMove = ttm;
   if (!(ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-            && see(pos, ttm) > threshold))
+            && see_test(pos, ttm, threshold + 1)))
     st->stage++;
 }
 
@@ -258,8 +258,7 @@ Move next_move(Pos *pos)
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
       if (move != st->ttMove) {
-        if (see_sign(pos, move) >= 0)
-//        if (see_quick(pos, move, 0))
+        if (see_test(pos, move, 0))
           return move;
 
         // Losing capture, move it to the beginning of the array.
@@ -375,7 +374,7 @@ remaining:
   case ST_PROBCUT_2:
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
-      if (move != st->ttMove && see(pos, move) > st->threshold)
+      if (move != st->ttMove && see_test(pos, move, st->threshold + 1))
         return move;
     }
     return 0;

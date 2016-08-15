@@ -357,7 +357,7 @@ moves_loop: // When in check search starts from here.
     // Step 12. Extend checks
     if (    givesCheck
         && !moveCountPruning
-        &&  see_sign(pos, move) >= VALUE_ZERO)
+        &&  see_test(pos, move, VALUE_ZERO))
       extension = ONE_PLY;
 
     // Singular extension search. If all moves but one fail low on a search
@@ -424,7 +424,7 @@ moves_loop: // When in check search starts from here.
       if (predictedDepth < 8 * ONE_PLY) {
         Value see_v = predictedDepth < 4 * ONE_PLY ? VALUE_ZERO
                       : -PawnValueMg * 2 * (int)(predictedDepth - 3 * ONE_PLY);
-        if (see_sign(pos, move) < see_v)
+        if (!see_test(pos, move, see_v))
           continue;
       }
     }
@@ -467,7 +467,7 @@ moves_loop: // When in check search starts from here.
       // because the destination square is empty.
       else if (   type_of_m(move) == NORMAL
                && type_of_p(piece_on(to_sq(move))) != PAWN
-               && see(pos, make_move(to_sq(move), from_sq(move))) < VALUE_ZERO)
+               && !see_test(pos, make_move(to_sq(move), from_sq(move)), VALUE_ZERO))
         r -= 2 * ONE_PLY;
 
       // Decrease/increase reduction for moves with a good/bad history

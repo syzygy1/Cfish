@@ -142,7 +142,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
         continue;
       }
 
-      if (futilityBase <= alpha && see(pos, move) <= VALUE_ZERO) {
+      if (futilityBase <= alpha && !see_test(pos, move, VALUE_ZERO + 1)) {
         bestValue = max(bestValue, futilityBase);
         continue;
       }
@@ -156,7 +156,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     // Don't search moves with negative SEE values
     if (  (!InCheck || evasionPrunable)
         &&  type_of_m(move) != PROMOTION
-        &&  see_sign(pos, move) < 0)
+        &&  !see_test(pos, move, 0))
       continue;
 
     // Speculative prefetch as early as possible

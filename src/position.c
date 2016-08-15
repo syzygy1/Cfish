@@ -1211,32 +1211,44 @@ Value see(Pos *pos, Move m)
   return swapList[0];
 }
 
+#if 0
+int see_test(Pos *pos, Move m, int alpha)
+{
+  int s1 = see(pos, m) >= alpha;
+  int s2 = see_test2(pos, m, alpha);
+  if (s1 != s2) {
+    printf("see = %d, see_quick = %d\n", s1, s2);
+    printf("%d\n", see_test2(pos, m, alpha));
+    printf("%d\n", see(pos, m));
+  }
+  return see(pos, m) >= alpha;
+}
+#endif
+
 // Test whether see(m) >= alpha.
-int see_quick(Pos *pos, Move m, int alpha)
+int see_test(Pos *pos, Move m, int alpha)
 {
   if (type_of_m(m) == CASTLING)
     return 0 >= alpha;
 
   Square from = from_sq(m), to = to_sq(m);
+  Bitboard occ = pieces();
 
   int swap = PieceValue[MG][piece_on(to)];
+  if (type_of_m(m) == ENPASSANT) {
+    occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn
+    swap = PieceValue[MG][PAWN];
+  }
   if (swap < alpha)
     return 0;
+
   int value = PieceValue[MG][piece_on(from)];
   if (swap - value >= alpha)
     return 1;
 
-  Bitboard occ = pieces() ^ sq_bb(from);
+  occ ^= sq_bb(from);
   Bitboard attackers = attackers_to_occ(to, occ) & occ;
-  int stm = pos_stm() ^ 1;
-
-  if (type_of_m(m) == ENPASSANT) {
-    occ ^= sq_bb(to + pawn_push(stm)); // Remove the captured pawn
-    value = PieceValue[MG][PAWN];
-    if (swap - value >= alpha)
-      return 1;
-  }
-
+  int stm = color_of(piece_on(from)) ^ 1;
   int res = 1;
   Bitboard stmAttackers;
 
