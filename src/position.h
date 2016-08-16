@@ -188,7 +188,7 @@ void undo_null_move(Pos *pos);
 // Static exchange evaluation
 Value see(Pos *pos, Move m);
 Value see_sign(Pos *pos, Move m);
-Value see_test(Pos *pos, Move m, int alpha);
+Value see_test(Pos *pos, Move m, int value);
 
 Key key_after(Pos *pos, Move m);
 int game_phase(Pos *pos);

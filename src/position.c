@@ -1211,39 +1211,26 @@ Value see(Pos *pos, Move m)
   return swapList[0];
 }
 
-#if 0
-int see_test(Pos *pos, Move m, int alpha)
-{
-  int s1 = see(pos, m) >= alpha;
-  int s2 = see_test2(pos, m, alpha);
-  if (s1 != s2) {
-    printf("see = %d, see_quick = %d\n", s1, s2);
-    printf("%d\n", see_test2(pos, m, alpha));
-    printf("%d\n", see(pos, m));
-  }
-  return see(pos, m) >= alpha;
-}
-#endif
-
-// Test whether see(m) >= alpha.
-int see_test(Pos *pos, Move m, int alpha)
+// Test whether see(m) >= value.
+int see_test(Pos *pos, Move m, int value)
 {
   if (type_of_m(m) == CASTLING)
-    return 0 >= alpha;
+    return 0 >= value;
 
   Square from = from_sq(m), to = to_sq(m);
   Bitboard occ = pieces();
 
-  int swap = PieceValue[MG][piece_on(to)];
+  int swap = PieceValue[MG][piece_on(to)] - value;
   if (type_of_m(m) == ENPASSANT) {
+    assert(pos_stm() == color_of(piece_on(from)));
     occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn
-    swap = PieceValue[MG][PAWN];
+    swap += PieceValue[MG][PAWN];
   }
-  if (swap < alpha)
+  if (swap < 0)
     return 0;
 
-  int value = PieceValue[MG][piece_on(from)];
-  if (swap - value >= alpha)
+  swap = PieceValue[MG][piece_on(from)] - swap;
+  if (swap <= 0)
     return 1;
 
   occ ^= sq_bb(from);
@@ -1258,13 +1245,11 @@ int see_test(Pos *pos, Move m, int alpha)
     while (!(bb = stmAttackers & pos->byTypeBB[captured]))
       captured++;
     if (captured == KING)
-      return stmAttackers == attackers ? !res : res;
-    int value2 = PieceValue[MG][captured];
-    res = !res;
-    swap = value - swap;
-    alpha = 1 - alpha;
-    if (swap - value2 >= alpha) return res;
-    value = value2;
+      return stmAttackers == attackers ? res ^ 1 : res;
+    swap = PieceValue[MG][captured] - swap;
+    res = res ^ 1;
+    // Next line tests alternately for swap < 0 and swap <= 0.
+    if (swap < res) return res;
     occ ^= (bb & -bb);
     if (captured & 1) // PAWN, BISHOP, QUEEN
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
