@@ -239,13 +239,12 @@ static uint64_t perft_helper(Pos *pos, Depth depth)
   CheckInfo ci;
   checkinfo_init(&ci, pos);
 
-  ExtMove list[MAX_MOVES];
-  ExtMove *last = generate_legal(pos, list);
-  for (ExtMove *m = list; m < last; m++) {
+  ExtMove *m = (pos->st-1)->endMoves;
+  ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
+  for (; m < last; m++) {
     do_move(pos, m->move, gives_check(pos, m->move, &ci));
     if (depth == 2 * ONE_PLY) {
-      ExtMove list2[MAX_MOVES];
-      cnt = generate_legal(pos, list2) - list2;
+      cnt = generate_legal(pos, last) - last;
     } else
       cnt = perft_helper(pos, depth - ONE_PLY);
     nodes += cnt;
@@ -261,18 +260,17 @@ uint64_t perft(Pos *pos, Depth depth)
   checkinfo_init(&ci, pos);
   char buf[16];
 
-  ExtMove list[MAX_MOVES];
-  ExtMove *last = generate_legal(pos, list);
-  for (ExtMove *m = list; m < last; m++) {
+  ExtMove *m = pos->moveList;
+  ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
+  for (; m < last; m++) {
     if (depth <= ONE_PLY) {
       cnt = 1;
       nodes++;
     } else {
       do_move(pos, m->move, gives_check(pos, m->move, &ci));
-      if (depth == 2 * ONE_PLY) {
-        ExtMove list2[MAX_MOVES];
-        cnt = generate_legal(pos, list2) - list2;
-      } else
+      if (depth == 2 * ONE_PLY)
+        cnt = generate_legal(pos, last) - last;
+      else
         cnt = perft_helper(pos, depth - ONE_PLY);
       nodes += cnt;
       undo_move(pos, m->move);
@@ -384,6 +382,7 @@ void thread_search(Pos *pos)
   Stack *ss = pos->st; // The fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
     memset(SStackBegin(ss[i]), 0, SStackSize);
+  (ss-1)->endMoves = pos->moveList;
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;

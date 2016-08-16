@@ -176,6 +176,9 @@ void uci_loop(int argc, char **argv)
   char *token;
 
   pos.stack = malloc(1000 * sizeof(Stack));
+  pos.stack++;
+  pos.moveList = malloc(1000 * sizeof(ExtMove));
+  pos.stack[-1].endMoves = pos.moveList;
 
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
@@ -266,7 +269,8 @@ void uci_loop(int argc, char **argv)
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
   free(cmd);
-  free(pos.stack);
+  free(pos.stack - 1);
+  free(pos.moveList);
 
   thread_wait_for_search_finished(threads_main());
 }

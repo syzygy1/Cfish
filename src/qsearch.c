@@ -112,8 +112,6 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   // to search the moves. Because the depth is <= 0 here, only captures,
   // queen promotions and checks (only if depth >= DEPTH_QS_CHECKS) will
   // be generated.
-  ExtMove moveList[MAX_MOVES];
-  ss->moves = moveList;
   mp_init_q(pos, ttMove, depth, to_sq((ss-1)->currentMove));
 
   CheckInfo ci;

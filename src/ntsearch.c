@@ -31,7 +31,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
   Piece moved_piece;
   int moveCount, quietCount;
-  ExtMove moveList[MAX_MOVES];
 
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
@@ -207,6 +206,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     Depth R = ((823 + 67 * depth) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
 
     do_null_move(pos);
+    ss->endMoves = (ss-1)->endMoves;
     (ss+1)->skipEarlyPruning = 1;
     nullValue = depth-R < ONE_PLY ? -qsearch_NonPV_false(pos, ss+1, -beta, DEPTH_ZERO)
                                   : - search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);
@@ -247,7 +247,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert((ss-1)->currentMove != MOVE_NONE);
     assert((ss-1)->currentMove != MOVE_NULL);
 
-    ss->moves = moveList;
     mp_init_pc(pos, ttMove, PieceValue[MG][captured_piece_type()]);
     CheckInfo ci;
     checkinfo_init(&ci, pos);
@@ -288,7 +287,6 @@ moves_loop: // When in check search starts from here.
   CounterMoveStats *fmh  = (ss-2)->counterMoves;
   CounterMoveStats *fmh2 = (ss-4)->counterMoves;
 
-  ss->moves = moveList;
   mp_init(pos, ttMove, depth);
   CheckInfo ci;
   checkinfo_init(&ci, pos);
@@ -383,7 +381,6 @@ moves_loop: // When in check search starts from here.
 
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.
-      ss->moves = moveList;
       mp_init(pos, ttMove, depth);
       ss->stage++;
       ss->countermove = cm; // pedantic

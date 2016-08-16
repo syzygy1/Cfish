@@ -286,12 +286,12 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
 }
 
 // Add underpromotion captures to list of captures.
-static ExtMove *add_underprom_caps(Pos *pos, ExtMove *stack, ExtMove *end)
+static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
 {
-  ExtMove *moves, *extra = end;
+  ExtMove *extra = end;
 
-  for (moves = stack; moves < end; moves++) {
-    Move move = moves->move;
+  for (; m < end; m++) {
+    Move move = m->move;
     if (type_of_m(move) == PROMOTION && piece_on(to_sq(move))) {
       (*extra++).move = (Move)(move - (1 << 12));
       (*extra++).move = (Move)(move - (2 << 12));
@@ -305,23 +305,24 @@ static ExtMove *add_underprom_caps(Pos *pos, ExtMove *stack, ExtMove *end)
 static int probe_ab(Pos *pos, int alpha, int beta, int *success)
 {
   int v;
-  ExtMove stack[64];
+  ExtMove *m = (pos->st-1)->endMoves;
   ExtMove *end;
 
   // Generate (at least) all legal captures including (under)promotions.
   // It is OK to generate more, as long as they are filtered out below.
   if (!pos_checkers()) {
-    end = generate_captures(pos, stack);
+    end = generate_captures(pos, m);
     // Since underpromotion captures are not included, we need to add them.
-    end = add_underprom_caps(pos, stack, end);
+    end = add_underprom_caps(pos, m, end);
   } else
-    end = generate_evasions(pos, stack);
+    end = generate_evasions(pos, m);
+  pos->st->endMoves = end;
 
   CheckInfo ci;
   checkinfo_init(&ci, pos);
 
-  for (ExtMove *p = stack; p < end; p++) {
-    Move move = p->move;
+  for (; m < end; m++) {
+    Move move = m->move;
     if (!is_capture(pos, move) || !is_legal(pos, move, ci.pinned))
       continue;
     do_move(pos, move, gives_check(pos, move, &ci));
@@ -360,15 +361,16 @@ int TB_probe_wdl(Pos *pos, int *success)
   *success = 1;
 
   // Generate (at least) all legal en passant captures.
-  ExtMove stack[MAX_MOVES];
+  ExtMove *m = (pos->st-1)->endMoves;
   ExtMove *end;
 
   // Generate (at least) all legal captures including (under)promotions.
   if (!pos_checkers()) {
-    end = generate_captures(pos, stack);
-    end = add_underprom_caps(pos, stack, end);
+    end = generate_captures(pos, m);
+    end = add_underprom_caps(pos, m, end);
   } else
-    end = generate_evasions(pos, stack);
+    end = generate_evasions(pos, m);
+  pos->st->endMoves = end;
 
   CheckInfo ci;
   checkinfo_init(&ci, pos);
@@ -379,8 +381,8 @@ int TB_probe_wdl(Pos *pos, int *success)
   // capture without ep rights and letting best_ep keep track of still
   // better ep captures if they exist.
 
-  for (ExtMove *p = stack; p < end; p++) {
-    Move move = p->move;
+  for (; m < end; m++) {
+    Move move = m->move;
     if (!is_capture(pos, move) || !is_legal(pos, move, ci.pinned))
       continue;
     do_move(pos, move, gives_check(pos, move, &ci));
@@ -429,21 +431,20 @@ int TB_probe_wdl(Pos *pos, int *success)
   // Now handle the stalemate case.
   if (best_ep > -3 && v == 0) {
     // Check for stalemate in the position with ep captures.
-    ExtMove *p;
-    for (p = stack; p < end; p++) {
-      Move move = p->move;
+    for (m = (pos->st-1)->endMoves; m < end; m++) {
+      Move move = m->move;
       if (type_of_m(move) == ENPASSANT) continue;
       if (is_legal(pos, move, ci.pinned)) break;
     }
-    if (p == end && !pos_checkers()) {
+    if (m == end && !pos_checkers()) {
       end = generate_quiets(pos, end);
-      for (; p < end; p++) {
-        Move move = p->move;
+      for (; m < end; m++) {
+        Move move = m->move;
         if (is_legal(pos, move, ci.pinned))
           break;
       }
     }
-    if (p == end) { // Stalemate detected.
+    if (m == end) { // Stalemate detected.
       *success = 2;
       return best_ep;
     }
@@ -498,10 +499,9 @@ int TB_probe_dtz(Pos *pos, int *success)
   if (*success == 2)
     return wdl_to_dtz[wdl + 2];
 
-  ExtMove stack[MAX_MOVES];
-  ExtMove *end = NULL; // Get rid of a bogus gcc warning.
   CheckInfo ci;
   checkinfo_init(&ci, pos);
+  ExtMove *end, *m = (pos->st-1)->endMoves;
 
   // If winning, check for a winning pawn move.
   if (wdl > 0) {
@@ -509,12 +509,13 @@ int TB_probe_dtz(Pos *pos, int *success)
     // including non-capturing promotions.
     // (The call to generate<>() in fact generates all moves.)
     if (!pos_checkers())
-      end = generate_non_evasions(pos, stack);
+      end = generate_non_evasions(pos, m);
     else
-      end = generate_evasions(pos, stack);
+      end = generate_evasions(pos, m);
+    pos->st->endMoves = end;
 
-    for (ExtMove *p = stack; p < end; p++) {
-      Move move = p->move;
+    for (; m < end; m++) {
+      Move move = m->move;
       if (type_of_p(moved_piece(move)) != PAWN || is_capture(pos, move)
                 || !is_legal(pos, move, ci.pinned))
         continue;
@@ -541,19 +542,22 @@ int TB_probe_dtz(Pos *pos, int *success)
   if (wdl > 0) {
     best = INT32_MAX;
     // If wdl > 0, we have already generated all moves.
+    m = (pos->st-1)->endMoves;
   } else {
     // If (cursed) loss, the worst case is a losing capture or pawn move
     // as the "best" move, leading to dtz of -1 or -101.
     // In case of mate, this will cause -1 to be returned.
     best = wdl_to_dtz[wdl + 2];
+    // If wdl < 0, we still have to generate all moves.
     if (!pos_checkers())
-      end = generate_non_evasions(pos, stack);
+      end = generate_non_evasions(pos, m);
     else
-      end = generate_evasions(pos, stack);
+      end = generate_evasions(pos, m);
+    pos->st->endMoves = end;
   }
 
-  for (ExtMove *p = stack; p < end; p++) {
-    Move move = p->move;
+  for (; m < end; m++) {
+    Move move = m->move;
     // We can skip pawn moves and captures.
     // If wdl > 0, we already caught them. If wdl < 0, the initial value
     // of best already takes account of them.
@@ -626,8 +630,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
     int v = 0;
     // Testing for mate should only be necessary if dtz == 1.
     if (pos_checkers() && dtz > 0) {
-      ExtMove s[MAX_MOVES];
-      if (generate_legal(pos, s) == s)
+      if (generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
         v = 1;
     }
     if (!v) {

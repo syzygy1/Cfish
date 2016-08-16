@@ -103,7 +103,6 @@ struct Stack {
   Value threshold;
   int stage;
   ExtMove *cur, *endMoves, *endBadCaptures;
-  ExtMove *moves;
 };
 
 typedef struct Stack Stack;
@@ -137,6 +136,7 @@ struct Pos {
   uint16_t gamePly;
 
   Stack *st;
+  ExtMove *moveList;
 
   // Relevant mainly to the search of the root position.
   RootMoves *rootMoves;

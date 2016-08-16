@@ -245,11 +245,12 @@ Move next_move(Pos *pos)
 
   case ST_MAIN_SEARCH: case ST_EVASIONS: case ST_QSEARCH_WITH_CHECKS:
   case ST_QSEARCH_WITHOUT_CHECKS: case ST_PROBCUT:
+    st->endMoves = (st-1)->endMoves;
     st->stage++;
     return st->ttMove;
 
   case ST_GOOD_CAPTURES:
-    st->endBadCaptures = st->cur = st->moves;
+    st->endBadCaptures = st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
     st->stage++;
@@ -307,7 +308,7 @@ Move next_move(Pos *pos)
         return move;
     }
     st->stage++;
-    st->cur = st->moves; // Return to bad captures.
+    st->cur = (st-1)->endMoves; // Return to bad captures.
 
   case ST_BAD_CAPTURES:
     if (st->cur < st->endBadCaptures)
@@ -315,16 +316,16 @@ Move next_move(Pos *pos)
     return 0;
 
   case ST_EVASIONS_1:
-    st->cur = st->moves;
+    st->cur = (st-1)->endMoves;
     st->endMoves = generate_evasions(pos, st->cur);
-    if (st->endMoves - st->moves > 1)
+    if (st->endMoves - st->cur > 1)
       score_evasions(pos);
     st->stage = ST_REMAINING;
     goto remaining;
 
   case ST_QCAPTURES_CHECKS_1:
   case ST_QCAPTURES_NO_CHECKS_1:
-    st->cur = st->moves;
+    st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
     st->stage++;
@@ -339,7 +340,7 @@ remaining:
     }
     if (st->stage != ST_QCAPTURES_CHECKS_2)
       return 0;
-    st->cur = st->moves;
+    st->cur = (st-1)->endMoves;
     st->endMoves = generate_quiet_checks(pos, st->cur);
     st->stage++;
 
@@ -352,7 +353,7 @@ remaining:
     return 0;
 
   case ST_RECAPTURES:
-    st->cur = st->moves;
+    st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
     st->stage++;
@@ -366,7 +367,7 @@ remaining:
     return 0;
 
   case ST_PROBCUT_1:
-    st->cur = st->moves;
+    st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
     st->stage++;

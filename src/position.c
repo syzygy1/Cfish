@@ -1241,9 +1241,10 @@ int see_test(Pos *pos, Move m, int value)
 
   while ((stmAttackers = attackers & pieces_c(stm))) {
     Bitboard bb;
-    int captured = PAWN;
-    while (!(bb = stmAttackers & pos->byTypeBB[captured]))
-      captured++;
+    int captured;
+    for (captured = PAWN; captured < KING; captured++)
+      if ((bb = stmAttackers & pieces_p(captured)))
+        break;
     if (captured == KING)
       return stmAttackers == attackers ? res ^ 1 : res;
     swap = PieceValue[MG][captured] - swap;
@@ -1273,8 +1274,7 @@ int is_draw(Pos *pos)
   if (st->rule50 > 99) {
     if (!pos_checkers())
       return 1;
-    ExtMove list[MAX_MOVES];
-    return generate_legal(pos, list) != list;
+    return generate_legal(pos, (pos->st-1)->endMoves) != (pos->st-1)->endMoves;
   }
 
   Stack *stp = st;

@@ -50,6 +50,7 @@ Pos *thread_create(int idx)
   pos->rootMoves = malloc(sizeof(RootMoves));
   pos->stack = malloc((5 + MAX_PLY + 10) * sizeof(Stack));
   pos->stack += 5;
+  pos->moveList = malloc(10000 * sizeof(ExtMove));
 
   stats_clear(pos->history);
   stats_clear(pos->counterMoves);
@@ -91,6 +92,7 @@ void thread_destroy(Pos *pos)
 
   free(pos->rootMoves);
   free(pos->stack - 5);
+  free(pos->moveList);
   
   free(pos);
 }
