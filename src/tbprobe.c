@@ -318,14 +318,13 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
     end = generate_evasions(pos, m);
   pos->st->endMoves = end;
 
-  CheckInfo ci;
-  checkinfo_init(&ci, pos);
+  calc_checkinfo(pos);
 
   for (; m < end; m++) {
     Move move = m->move;
-    if (!is_capture(pos, move) || !is_legal(pos, move, ci.pinned))
+    if (!is_capture(pos, move) || !is_legal(pos, move, pos->st->pinned))
       continue;
-    do_move(pos, move, gives_check(pos, move, &ci));
+    do_move(pos, move, gives_check(pos, pos->st, move));
     v = -probe_ab(pos, -beta, -alpha, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -372,8 +371,7 @@ int TB_probe_wdl(Pos *pos, int *success)
     end = generate_evasions(pos, m);
   pos->st->endMoves = end;
 
-  CheckInfo ci;
-  checkinfo_init(&ci, pos);
+  calc_checkinfo(pos);
 
   int best_cap = -3, best_ep = -3;
 
@@ -383,9 +381,9 @@ int TB_probe_wdl(Pos *pos, int *success)
 
   for (; m < end; m++) {
     Move move = m->move;
-    if (!is_capture(pos, move) || !is_legal(pos, move, ci.pinned))
+    if (!is_capture(pos, move) || !is_legal(pos, move, pos->st->pinned))
       continue;
-    do_move(pos, move, gives_check(pos, move, &ci));
+    do_move(pos, move, gives_check(pos, pos->st, move));
     int v = -probe_ab(pos, -2, -best_cap, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -434,13 +432,13 @@ int TB_probe_wdl(Pos *pos, int *success)
     for (m = (pos->st-1)->endMoves; m < end; m++) {
       Move move = m->move;
       if (type_of_m(move) == ENPASSANT) continue;
-      if (is_legal(pos, move, ci.pinned)) break;
+      if (is_legal(pos, move, pos->st->pinned)) break;
     }
     if (m == end && !pos_checkers()) {
       end = generate_quiets(pos, end);
       for (; m < end; m++) {
         Move move = m->move;
-        if (is_legal(pos, move, ci.pinned))
+        if (is_legal(pos, move, pos->st->pinned))
           break;
       }
     }
@@ -499,8 +497,7 @@ int TB_probe_dtz(Pos *pos, int *success)
   if (*success == 2)
     return wdl_to_dtz[wdl + 2];
 
-  CheckInfo ci;
-  checkinfo_init(&ci, pos);
+  calc_checkinfo(pos);
   ExtMove *end, *m = (pos->st-1)->endMoves;
 
   // If winning, check for a winning pawn move.
@@ -517,9 +514,9 @@ int TB_probe_dtz(Pos *pos, int *success)
     for (; m < end; m++) {
       Move move = m->move;
       if (type_of_p(moved_piece(move)) != PAWN || is_capture(pos, move)
-                || !is_legal(pos, move, ci.pinned))
+                || !is_legal(pos, move, pos->st->pinned))
         continue;
-      do_move(pos, move, gives_check(pos, move, &ci));
+      do_move(pos, move, gives_check(pos, pos->st, move));
       int v = -TB_probe_wdl(pos, success);
       undo_move(pos, move);
       if (*success == 0) return 0;
@@ -562,9 +559,9 @@ int TB_probe_dtz(Pos *pos, int *success)
     // If wdl > 0, we already caught them. If wdl < 0, the initial value
     // of best already takes account of them.
     if (is_capture(pos, move) || type_of_p(moved_piece(move)) == PAWN
-              || !is_legal(pos, move, ci.pinned))
+              || !is_legal(pos, move, pos->st->pinned))
       continue;
-    do_move(pos, move, gives_check(pos, move, &ci));
+    do_move(pos, move, gives_check(pos, pos->st, move));
     int v = -TB_probe_dtz(pos, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -620,13 +617,12 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
   int dtz = TB_probe_dtz(pos, &success);
   if (!success) return 0;
 
-  CheckInfo ci;
-  checkinfo_init(&ci, pos);
+  calc_checkinfo(pos);
 
   // Probe each move.
   size_t num = *num_moves;
   for (size_t i = 0; i < num; i++) {
-    do_move(pos, rm[i].move, gives_check(pos, rm[i].move, &ci));
+    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
     int v = 0;
     // Testing for mate should only be necessary if dtz == 1.
     if (pos_checkers() && dtz > 0) {
@@ -734,15 +730,14 @@ int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
   if (!success) return 0;
   *score = wdl_to_Value[wdl + 2];
 
-  CheckInfo ci;
-  checkinfo_init(&ci, pos);
+  calc_checkinfo(pos);
 
   int best = -2;
 
   // Probe each move.
   size_t num = *num_moves;
   for (size_t i = 0; i < num; i++) {
-    do_move(pos, rm[i].move, gives_check(pos, rm[i].move, &ci));
+    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
     int v = -TB_probe_wdl(pos, &success);
     undo_move(pos, rm[i].move);
     if (!success) return 0;

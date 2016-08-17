@@ -58,7 +58,7 @@ struct CheckInfo {
 
 typedef struct CheckInfo CheckInfo;
 
-void checkinfo_init(CheckInfo *ci, Pos *pos);
+void calc_checkinfo(Pos *pos);
 
 // Stack struct stores information needed to restore a Pos struct to
 // its previous state when we retract a move.
@@ -103,6 +103,14 @@ struct Stack {
   Value threshold;
   int stage;
   ExtMove *cur, *endMoves, *endBadCaptures;
+
+  // CheckInfo data
+  Bitboard dcCandidates;
+  union {
+    Bitboard pinned;
+    Bitboard checkSquares[7];
+  };
+  Square ksq;
 };
 
 typedef struct Stack Stack;
@@ -175,9 +183,7 @@ Bitboard slider_blockers(Pos *pos, Bitboard target, Bitboard sliders, Square s);
 
 int is_legal(Pos *pos, Move m, Bitboard pinned);
 int is_pseudo_legal(Pos *pos, Move m);
-static int is_capture(Pos *pos, Move m);
-static int is_capture_or_promotion(Pos *pos, Move m);
-int gives_check_special(Pos *pos, Move m, const CheckInfo *ci);
+int gives_check_special(Pos *pos, Stack *st, Move m);
 
 // Doing and undoing moves
 void do_move(Pos *pos, Move m, int givesCheck);
@@ -309,11 +315,11 @@ INLINE int is_capture(Pos *pos, Move m)
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
 }
 
-INLINE int gives_check(Pos *pos, Move m, const CheckInfo *ci)
+INLINE int gives_check(Pos *pos, Stack *st, Move m)
 {
-  return  type_of_m(m) == NORMAL && !ci->dcCandidates
-        ? !!(ci->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
-        : gives_check_special(pos, m, ci);
+  return  type_of_m(m) == NORMAL && !st->dcCandidates
+        ? !!(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
+        : gives_check_special(pos, st, m);
 }
 
 void pos_copy(Pos *dest, Pos *src);

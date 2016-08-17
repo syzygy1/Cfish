@@ -111,22 +111,23 @@ INLINE void move_piece(Pos *pos, int c, int pt, Square from, Square to)
 #endif
 
 
-// CheckInfo initialisation.
+// Calculate CheckInfo data.
 
-void checkinfo_init(CheckInfo *ci, Pos *pos)
+void calc_checkinfo(Pos *pos)
 {
+  Stack *st = pos->st;
   int them = pos_stm() ^ 1;
-  ci->ksq = square_of(them, KING);
+  st->ksq = square_of(them, KING);
 
-  ci->pinned = pinned_pieces(pos, pos_stm());
-  ci->dcCandidates = discovered_check_candidates(pos);
+  st->pinned = pinned_pieces(pos, pos_stm());
+  st->dcCandidates = discovered_check_candidates(pos);
 
-  ci->checkSquares[PAWN]   = attacks_from_pawn(ci->ksq, them);
-  ci->checkSquares[KNIGHT] = attacks_from_knight(ci->ksq);
-  ci->checkSquares[BISHOP] = attacks_from_bishop(ci->ksq);
-  ci->checkSquares[ROOK]   = attacks_from_rook(ci->ksq);
-  ci->checkSquares[QUEEN]  = ci->checkSquares[BISHOP] | ci->checkSquares[ROOK];
-  ci->checkSquares[KING]   = 0;
+  st->checkSquares[PAWN]   = attacks_from_pawn(st->ksq, them);
+  st->checkSquares[KNIGHT] = attacks_from_knight(st->ksq);
+  st->checkSquares[BISHOP] = attacks_from_bishop(st->ksq);
+  st->checkSquares[ROOK]   = attacks_from_rook(st->ksq);
+  st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
+  st->checkSquares[KING]   = 0;
 }
 
 
@@ -720,34 +721,34 @@ exit(1);
 // gives_check_special() is invoked by gives_check() in case there are
 // discovered check candidates or the move is of a special type.
 
-int gives_check_special(Pos *pos, Move m, const CheckInfo *ci)
+int gives_check_special(Pos *pos, Stack *st, Move m)
 {
   assert(move_is_ok(m));
-  assert(ci->dcCandidates == discovered_check_candidates(pos));
+  assert(st->dcCandidates == discovered_check_candidates(pos));
   assert(color_of(moved_piece(m)) == pos_stm());
 
   Square from = from_sq(m);
   Square to = to_sq(m);
 
-  if ((ci->dcCandidates & sq_bb(from)) && !aligned(from, to, ci->ksq))
+  if ((st->dcCandidates & sq_bb(from)) && !aligned(from, to, st->ksq))
     return 1;
 
   switch (type_of_m(m)) {
   case NORMAL:
-    return !!(ci->checkSquares[type_of_p(piece_on(from))] & sq_bb(to));
+    return !!(st->checkSquares[type_of_p(piece_on(from))] & sq_bb(to));
 
   case PROMOTION:
     return !!(  attacks_bb(promotion_type(m), to, pieces() ^ sq_bb(from))
-              & sq_bb(ci->ksq));
+              & sq_bb(st->ksq));
 
   case ENPASSANT:
   {
-    if (ci->checkSquares[PAWN] & sq_bb(to))
+    if (st->checkSquares[PAWN] & sq_bb(to))
       return 1;
     Square capsq = make_square(file_of(to), rank_of(from));
     Bitboard b = (pieces() ^ sq_bb(from) ^ sq_bb(capsq)) | sq_bb(to);
-    return  (attacks_bb_rook  (ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, ROOK))
-          ||(attacks_bb_bishop(ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, BISHOP));
+    return  (attacks_bb_rook  (st->ksq, b) & pieces_cpp(pos_stm(), QUEEN, ROOK))
+          ||(attacks_bb_bishop(st->ksq, b) & pieces_cpp(pos_stm(), QUEEN, BISHOP));
   }
   case CASTLING:
   {
@@ -757,14 +758,14 @@ int gives_check_special(Pos *pos, Move m, const CheckInfo *ci)
     Square kto = relative_square(pos_stm(), rfrom > kfrom ? SQ_G1 : SQ_C1);
     Square rto = relative_square(pos_stm(), rfrom > kfrom ? SQ_F1 : SQ_D1);
 
-    return   (PseudoAttacks[ROOK][rto] & sq_bb(ci->ksq))
+    return   (PseudoAttacks[ROOK][rto] & sq_bb(st->ksq))
           && (attacks_bb_rook(rto, (pieces() ^ sq_bb(kfrom) ^ sq_bb(rfrom))
                                     | sq_bb(rto) | sq_bb(kto))
-                  & sq_bb(ci->ksq));
+                  & sq_bb(st->ksq));
 #else
     Square rto = CastlingRookTo[to & 0x0f];
-    return   (PseudoAttacks[ROOK][rto] & sq_bb(ci->ksq))
-          && (attacks_bb_rook(rto, (pieces() ^ sq_bb(from))) & sq_bb(ci->ksq));
+    return   (PseudoAttacks[ROOK][rto] & sq_bb(st->ksq))
+          && (attacks_bb_rook(rto, (pieces() ^ sq_bb(from))) & sq_bb(st->ksq));
 #endif
   }
   default:

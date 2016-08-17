@@ -248,14 +248,14 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert((ss-1)->currentMove != MOVE_NULL);
 
     mp_init_pc(pos, ttMove, PieceValue[MG][captured_piece_type()]);
-    CheckInfo ci;
-    checkinfo_init(&ci, pos);
+
+    calc_checkinfo(pos);
 
     while ((move = next_move(pos)) != MOVE_NONE)
-      if (is_legal(pos, move, ci.pinned)) {
+      if (is_legal(pos, move, ss->pinned)) {
         ss->currentMove = move;
         ss->counterMoves = &CounterMoveHistory[moved_piece(move)][to_sq(move)];
-        do_move(pos, move, gives_check(pos, move, &ci));
+        do_move(pos, move, gives_check(pos, ss, move));
         value = -search_NonPV(pos, ss+1, -rbeta, rdepth, !cutNode);
         undo_move(pos, move);
         if (value >= rbeta)
@@ -288,8 +288,7 @@ moves_loop: // When in check search starts from here.
   CounterMoveStats *fmh2 = (ss-4)->counterMoves;
 
   mp_init(pos, ttMove, depth);
-  CheckInfo ci;
-  checkinfo_init(&ci, pos);
+  calc_checkinfo(pos);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
   improving =   ss->staticEval >= (ss-2)->staticEval
           /* || ss->staticEval == VALUE_NONE Already implicit in the previous condition */
@@ -345,7 +344,7 @@ moves_loop: // When in check search starts from here.
     captureOrPromotion = is_capture_or_promotion(pos, move);
     moved_piece = moved_piece(move);
 
-    givesCheck = gives_check(pos, move, &ci);
+    givesCheck = gives_check(pos, ss, move);
 
     moveCountPruning =   depth < 16 * ONE_PLY
                       && moveCount >= FutilityMoveCounts[improving][depth];
@@ -364,7 +363,7 @@ moves_loop: // When in check search starts from here.
     if (    singularExtensionNode
         &&  move == ttMove
         && !extension
-        &&  is_legal(pos, move, ci.pinned))
+        &&  is_legal(pos, move, ss->pinned))
     {
       Value rBeta = ttValue - 2 * depth / ONE_PLY;
       ss->excludedMove = move;
@@ -428,7 +427,7 @@ moves_loop: // When in check search starts from here.
     prefetch(tt_first_entry(key_after(pos, move)));
 
     // Check for legality just before making the move
-    if (!rootNode && !is_legal(pos, move, ci.pinned)) {
+    if (!rootNode && !is_legal(pos, move, ss->pinned)) {
       ss->moveCount = --moveCount;
       continue;
     }
