@@ -413,7 +413,7 @@ extern struct PSQT psqt;
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
 #else
-#define assume(x) do {} while (0)
+#define assume(x) assert(x)
 #endif
 
 #endif

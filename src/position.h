@@ -120,19 +120,19 @@ typedef struct Stack Stack;
 
 struct Pos {
   // Board / game representation.
-  unsigned char board[64];
+  uint8_t board[64];
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
 #ifdef PEDANTIC
-  int pieceCount[2][8];
-  Square pieceList[2][8][16];
-  int index[64];
-  int castlingRightsMask[64];
-  Square castlingRookSquare[16];
+  uint8_t pieceCount[2][8];
+  uint8_t pieceList[2][8][16];
+  uint8_t index[64];
+  uint8_t castlingRightsMask[64];
+  uint8_t castlingRookSquare[16];
   Bitboard castlingPath[16];
 #endif
-  unsigned char sideToMove;
-  unsigned char chess960;
+  uint8_t sideToMove;
+  uint8_t chess960;
   uint16_t gamePly;
 
   Stack *st;
@@ -177,7 +177,7 @@ int is_legal(Pos *pos, Move m, Bitboard pinned);
 int is_pseudo_legal(Pos *pos, Move m);
 static int is_capture(Pos *pos, Move m);
 static int is_capture_or_promotion(Pos *pos, Move m);
-int gives_check(Pos *pos, Move m, const CheckInfo *ci);
+int gives_check_special(Pos *pos, Move m, const CheckInfo *ci);
 
 // Doing and undoing moves
 void do_move(Pos *pos, Move m, int givesCheck);
@@ -212,7 +212,7 @@ int pos_is_ok(Pos *pos, int* failedStep);
 #define piece_list(c,p) (pos->pieceList[c][p])
 #define square_of(c,p) (pos->pieceList[c][p][0])
 #define loop_through_pieces(c,p,s) \
-  Square *pl = piece_list(c,p); \
+  uint8_t *pl = piece_list(c,p); \
   while ((s = *pl++) != SQ_NONE)
 #else
 #define piece_count(c,p) (popcount(pieces_cp(c, p)))
@@ -307,6 +307,13 @@ INLINE int is_capture(Pos *pos, Move m)
   // Castling is encoded as "king captures the rook"
   assert(move_is_ok(m));
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
+}
+
+INLINE int gives_check(Pos *pos, Move m, const CheckInfo *ci)
+{
+  return  type_of_m(m) == NORMAL && !ci->dcCandidates
+        ? !!(ci->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
+        : gives_check_special(pos, m, ci);
 }
 
 void pos_copy(Pos *dest, Pos *src);

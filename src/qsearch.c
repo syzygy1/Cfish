@@ -121,10 +121,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   while ((move = next_move(pos)) != 0) {
     assert(move_is_ok(move));
 
-    givesCheck =  type_of_m(move) == NORMAL && !ci.dcCandidates
-                ? !!(ci.checkSquares[type_of_p(moved_piece(move))]
-                        & sq_bb(to_sq(move)))
-                : gives_check(pos, move, &ci);
+    givesCheck = gives_check(pos, move, &ci);
 
     // Futility pruning
     if (   !InCheck

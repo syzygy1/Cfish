@@ -542,7 +542,8 @@ int is_legal(Pos *pos, Move m, Bitboard pinned)
 // pseudo legal. It is used to validate moves from TT that can be corrupted
 // due to SMP concurrent access or hash position key aliasing.
 
-int is_pseudo_legal(Pos *pos, Move m)
+#if 0
+int is_pseudo_legal_old(Pos *pos, Move m)
 {
   int us = pos_stm();
   Square from = from_sq(m);
@@ -573,8 +574,7 @@ int is_pseudo_legal(Pos *pos, Move m)
     return 0;
 
   // Handle the special case of a pawn move
-  if (type_of_p(pc) == PAWN)
-  {
+  if (type_of_p(pc) == PAWN) {
     // We have already handled promotion moves, so destination
     // cannot be on the 8th/1st rank.
     if (rank_of(to) == relative_rank(us, RANK_8))
@@ -589,7 +589,7 @@ int is_pseudo_legal(Pos *pos, Move m)
       return 0;
   }
   else if (!(attacks_from(pc, from) & sq_bb(to)))
-      return 0;
+    return 0;
 
   // Evasions generator already takes care to avoid some kind of illegal moves
   // and legal() relies on this. We therefore have to take care that the same
@@ -612,11 +612,115 @@ int is_pseudo_legal(Pos *pos, Move m)
 
   return 1;
 }
+#endif
+
+int is_pseudo_legal(Pos *pos, Move m)
+{
+  int us = pos_stm();
+  Square from = from_sq(m);
+
+  if (!(pieces_c(us) & sq_bb(from)))
+    return 0;
+
+  if (type_of_m(m) == CASTLING) {
+    ExtMove list[MAX_MOVES];
+    ExtMove *end = !pos_checkers() ? generate_quiets(pos, list)
+                                   : generate_evasions(pos, list);;
+    for (ExtMove *p = list; p < end; p++)
+      if (p->move == m) return 1;
+    return 0;
+  }
+
+  Square to = to_sq(m);
+  if (pieces_c(us) & sq_bb(to))
+    return 0;
+
+  Piece pc = piece_on(from);
+  if (type_of_p(pc) != PAWN) {
+    if (type_of_m(m) != NORMAL)
+      return 0;
+    switch (type_of_p(pc)) {
+    case KNIGHT:
+      if (!(attacks_from_knight(from) & sq_bb(to)))
+        return 0;
+      break;
+    case BISHOP:
+      if (!(attacks_from_bishop(from) & sq_bb(to)))
+        return 0;
+      break;
+    case ROOK:
+      if (!(attacks_from_rook(from) & sq_bb(to)))
+        return 0;
+      break;
+    case QUEEN:
+      if (!(attacks_from_queen(from) & sq_bb(to)))
+        return 0;
+      break;
+    case KING:
+      if (!(attacks_from_king(from) & sq_bb(to)))
+        return 0;
+      // is_legal() does not remove "from" square from the "occupied"
+      // bitboard when checking that the king is not in check on the "to"
+      // square. So we need to be careful here.
+      if (   pos_checkers()
+          && (attackers_to_occ(to, pieces() ^ sq_bb(from)) & pieces_c(us ^ 1)))
+        return 0;
+      return 1;
+    default:
+      assume(0);
+      break;
+    }
+  } else {
+    if (type_of_m(m) == NORMAL) {
+      if (rank_of(to) == relative_rank(us, RANK_8))
+        return 0;
+      if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
+          && !((from + pawn_push(us) == to) && is_empty(to))
+          && !( (from + 2 * pawn_push(us) == to)
+            && (rank_of(from) == relative_rank(us, RANK_2))
+            && is_empty(to) && is_empty(to - pawn_push(us))))
+        return 0;
+    }
+    else if (type_of_m(m) == PROMOTION) {
+      // No need to test for pawn to 8th rank.
+      if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
+          && !((from + pawn_push(us) == to) && is_empty(to)))
+        return 0;
+    }
+    else if (type_of_m(m) == ENPASSANT)
+      return to == ep_square() && (attacks_from_pawn(from, us) & sq_bb(to));
+  }
+  if (pos_checkers()) {
+    // Again we need to be a bit careful.
+    if (more_than_one(pos_checkers()))
+      return 0;
+    if (!((between_bb(lsb(pos_checkers()), square_of(us, KING))
+                                      | pos_checkers()) & sq_bb(to)))
+      return 0;
+  }
+  return 1;
+}
+
+#if 0
+int is_pseudo_legal(Pos *pos, Move m)
+{
+  int r1 = is_pseudo_legal_old(pos, m);
+  int r2 = is_pseudo_legal_new(pos, m);
+  if (r1 != r2) {
+    printf("old: %d, new: %d\n", r1, r2);
+    printf("old: %d\n", is_pseudo_legal_old(pos, m));
+    printf("new: %d\n", is_pseudo_legal_new(pos, m));
+exit(1);
+  }
+  return r1;
+}
+#endif
 
 
-// gives_check() tests whether a pseudo-legal move gives a check.
+// gives_check_special() is invoked by gives_check() in case there are
+// discovered check candidates or the move is of a special type.
 
-int gives_check(Pos *pos, Move m, const CheckInfo *ci)
+int gives_check_special(Pos *pos, Move m, const CheckInfo *ci)
 {
   assert(move_is_ok(m));
   assert(ci->dcCandidates == discovered_check_candidates(pos));
@@ -625,36 +729,29 @@ int gives_check(Pos *pos, Move m, const CheckInfo *ci)
   Square from = from_sq(m);
   Square to = to_sq(m);
 
-  // Is there a direct check?
-  if (ci->checkSquares[type_of_p(piece_on(from))] & sq_bb(to))
-    return 1;
-
-  // Is there a discovered check?
   if ((ci->dcCandidates & sq_bb(from)) && !aligned(from, to, ci->ksq))
     return 1;
 
   switch (type_of_m(m)) {
   case NORMAL:
-    return 0;
+    return !!(ci->checkSquares[type_of_p(piece_on(from))] & sq_bb(to));
 
   case PROMOTION:
-    return (  attacks_bb(promotion_type(m), to, pieces() ^ sq_bb(from))
-            & sq_bb(ci->ksq)) != 0;
+    return !!(  attacks_bb(promotion_type(m), to, pieces() ^ sq_bb(from))
+              & sq_bb(ci->ksq));
 
-  // En passant capture with check? We have already handled the case
-  // of direct checks and ordinary discovered check, so the only case we
-  // need to handle is the unusual case of a discovered check through
-  // the captured pawn.
   case ENPASSANT:
   {
+    if (ci->checkSquares[PAWN] & sq_bb(to))
+      return 1;
     Square capsq = make_square(file_of(to), rank_of(from));
     Bitboard b = (pieces() ^ sq_bb(from) ^ sq_bb(capsq)) | sq_bb(to);
-
     return  (attacks_bb_rook  (ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, ROOK))
-          || (attacks_bb_bishop(ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, BISHOP));
+          ||(attacks_bb_bishop(ci->ksq, b) & pieces_cpp(pos_stm(), QUEEN, BISHOP));
   }
   case CASTLING:
   {
+#ifdef PEDANTIC
     Square kfrom = from;
     Square rfrom = to; // Castling is encoded as 'King captures the rook'
     Square kto = relative_square(pos_stm(), rfrom > kfrom ? SQ_G1 : SQ_C1);
@@ -664,9 +761,14 @@ int gives_check(Pos *pos, Move m, const CheckInfo *ci)
           && (attacks_bb_rook(rto, (pieces() ^ sq_bb(kfrom) ^ sq_bb(rfrom))
                                     | sq_bb(rto) | sq_bb(kto))
                   & sq_bb(ci->ksq));
+#else
+    Square rto = CastlingRookTo[to & 0x0f];
+    return   (PseudoAttacks[ROOK][rto] & sq_bb(ci->ksq))
+          && (attacks_bb_rook(rto, (pieces() ^ sq_bb(from))) & sq_bb(ci->ksq));
+#endif
   }
   default:
-    assert(0);
+    assume(0);
     return 0;
   }
 }

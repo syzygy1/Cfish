@@ -345,9 +345,7 @@ moves_loop: // When in check search starts from here.
     captureOrPromotion = is_capture_or_promotion(pos, move);
     moved_piece = moved_piece(move);
 
-    givesCheck =  type_of_m(move) == NORMAL && !ci.dcCandidates
-               ? !!(ci.checkSquares[type_of_p(moved_piece(move))] & sq_bb(to_sq(move)))
-               : gives_check(pos, move, &ci);
+    givesCheck = gives_check(pos, move, &ci);
 
     moveCountPruning =   depth < 16 * ONE_PLY
                       && moveCount >= FutilityMoveCounts[improving][depth];
