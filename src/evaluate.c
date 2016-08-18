@@ -773,9 +773,9 @@ INLINE int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
     // Endings where weaker side can place his king in front of the opponent's
     // pawns are drawish.
     else if (    abs(eg) <= BishopValueEg
-             &&  ei->pi->pawnSpan[strongSide] <= 1
+             &&  piece_count(strongSide, PAWN) <= 2
              && !pawn_passed(pos, strongSide ^ 1, square_of(strongSide ^ 1, KING)))
-      sf = ei->pi->pawnSpan[strongSide] ? 51 : 37;
+      sf = 37 + 7 * piece_count(strongSide, PAWN);
   }
 
   return sf;

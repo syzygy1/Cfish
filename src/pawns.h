@@ -39,7 +39,6 @@ struct PawnEntry {
   Score kingSafety[2];
   int castlingRights[2];
   int semiopenFiles[2];
-  int pawnSpan[2];
   int pawnsOnSquares[2][2]; // [color][light/dark squares]
   int asymmetry;
 };

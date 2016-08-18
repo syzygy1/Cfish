@@ -170,9 +170,6 @@ INLINE Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
       score += Lever[relative_rank_s(Us, s)];
   }
 
-  b = e->semiopenFiles[Us] ^ 0xFFULL;
-  e->pawnSpan[Us] = b ? (msb(b) - lsb(b)) : 0;
-
   return score;
 }
 
