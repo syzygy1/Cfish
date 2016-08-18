@@ -179,7 +179,7 @@ void pos_fen(Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
 Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
-Bitboard slider_blockers(Pos *pos, Bitboard target, Bitboard sliders, Square s);
+Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 
 int is_legal(Pos *pos, Move m, Bitboard pinned);
 int is_pseudo_legal(Pos *pos, Move m);
@@ -275,13 +275,13 @@ int pos_is_ok(Pos *pos, int* failedStep);
 
 INLINE Bitboard discovered_check_candidates(Pos *pos)
 {
-  return slider_blockers(pos, pieces_c(pos_stm()), pieces_c(pos_stm()),
-                         square_of(pos_stm() ^ 1, KING));
+  return slider_blockers(pos, pieces_c(pos_stm()),
+                         square_of(pos_stm() ^ 1, KING)) & pieces_c(pos_stm());
 }
 
 INLINE Bitboard pinned_pieces(Pos *pos, int c)
 {
-  return slider_blockers(pos, pieces_c(c), pieces_c(c ^ 1), square_of(c, KING));
+  return  slider_blockers(pos, pieces_c(c ^ 1), square_of(c, KING)) & pieces_c(c);
 }
 
 INLINE int pawn_passed(Pos *pos, int c, Square s)

@@ -360,7 +360,7 @@ INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
 
     if (Pt == QUEEN) {
       // Penalty if any relative pin or discovered attack against the queen
-      if (slider_blockers(pos, pieces(), pieces_cpp(Them, ROOK, BISHOP), s))
+      if (slider_blockers(pos, pieces_cpp(Them, ROOK, BISHOP), s))
           score -= WeakQueen;
     }
   }

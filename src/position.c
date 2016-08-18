@@ -462,7 +462,7 @@ int game_phase(Pos *pos)
 // can be either a pinned or a discovered check piece, according if its
 // color is the opposite or the same of the color of the slider.
 
-Bitboard slider_blockers(Pos *pos, Bitboard target, Bitboard sliders, Square s)
+Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s)
 {
   Bitboard b, pinners, result = 0;
 
@@ -474,7 +474,7 @@ Bitboard slider_blockers(Pos *pos, Bitboard target, Bitboard sliders, Square s)
     b = between_bb(s, pop_lsb(&pinners)) & pieces();
 
     if (!more_than_one(b))
-      result |= b & target;
+      result |= b;
   }
   return result;
 }
