@@ -355,8 +355,8 @@ extern Value NonPawnPieceValue[16];
 
 #define mate_in(ply) ((Value)(VALUE_MATE - (ply)))
 #define mated_in(ply) ((Value)(-VALUE_MATE + (ply)))
-#define make_square(f,r) ((Square)(((r) << 3) | (f)))
-#define make_piece(c,pt) ((Piece)(((c) << 3) | (pt)))
+#define make_square(f,r) ((Square)(((r) << 3) + (f)))
+#define make_piece(c,pt) ((Piece)(((c) << 3) + (pt)))
 #define type_of_p(p) ((p) & 7)
 #define color_of(p) ((p) >> 3)
 #define square_is_ok(s) ((s) >= SQ_A1 && (s) <= SQ_H8)

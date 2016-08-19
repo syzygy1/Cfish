@@ -132,8 +132,8 @@ struct Pos {
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
 #ifdef PEDANTIC
-  uint8_t pieceCount[2][8];
-  uint8_t pieceList[2][8][16];
+  uint8_t pieceCount[16];
+  uint8_t pieceList[16][16];
   uint8_t index[64];
   uint8_t castlingRightsMask[64];
   uint8_t castlingRookSquare[16];
@@ -214,9 +214,9 @@ int pos_is_ok(Pos *pos, int* failedStep);
 #define ep_square() (pos->st->epSquare)
 #define is_empty(s) (!piece_on(s))
 #ifdef PEDANTIC
-#define piece_count(c,p) (pos->pieceCount[c][p])
-#define piece_list(c,p) (pos->pieceList[c][p])
-#define square_of(c,p) (pos->pieceList[c][p][0])
+#define piece_count(c,p) (pos->pieceCount[8 * (c) + (p)])
+#define piece_list(c,p) (pos->pieceList[8 * (c) + (p)])
+#define square_of(c,p) (pos->pieceList[8 * (c) + (p)][0])
 #define loop_through_pieces(c,p,s) \
   uint8_t *pl = piece_list(c,p); \
   while ((s = *pl++) != SQ_NONE)

@@ -27,7 +27,6 @@ int check_pos(Pos *pos);
 
 struct Zob zob;
 
-#if 1
 Key mat_key[16] = {
   0ULL,
   0x5ced000000000101ULL,
@@ -46,67 +45,47 @@ Key mat_key[16] = {
   0x0000000000000001ULL,
   0ULL
 };
-#else
-Key mat_key[16] = {
-  0ULL,
-  0x8819000000000101ULL,
-  0x7950000000001001ULL,
-  0x6a4b000000010001ULL,
-  0x18e0000000100001ULL,
-  0x407a000001000001ULL,
-  0x0000000000000001ULL,
-  0ULL,
-  0ULL,
-  0xc102000010000001ULL,
-  0xae7e000100000001ULL,
-  0x8c7a001000000001ULL,
-  0x9fba010000000001ULL,
-  0x3ac6100000000001ULL,
-  0x0000000000000001ULL,
-  0ULL
-};
-#endif
 
 const char *PieceToChar = " PNBRQK  pnbrqk";
 
 int failed_step;
 
 #ifdef PEDANTIC
-INLINE void put_piece(Pos *pos, int c, int pt, Square s)
+INLINE void put_piece(Pos *pos, int c, int piece, Square s)
 {
-  pos->board[s] = make_piece(c, pt);
+  pos->board[s] = piece;
   pos->byTypeBB[0] |= sq_bb(s);
-  pos->byTypeBB[pt] |= sq_bb(s);
+  pos->byTypeBB[type_of_p(piece)] |= sq_bb(s);
   pos->byColorBB[c] |= sq_bb(s);
-  pos->index[s] = pos->pieceCount[c][pt]++;
-  pos->pieceList[c][pt][pos->index[s]] = s;
+  pos->index[s] = pos->pieceCount[piece]++;
+  pos->pieceList[piece][pos->index[s]] = s;
 }
 
-INLINE void remove_piece(Pos *pos, int c, int pt, Square s)
+INLINE void remove_piece(Pos *pos, int c, int piece, Square s)
 {
   // WARNING: This is not a reversible operation.
   pos->byTypeBB[0] ^= sq_bb(s);
-  pos->byTypeBB[pt] ^= sq_bb(s);
+  pos->byTypeBB[type_of_p(piece)] ^= sq_bb(s);
   pos->byColorBB[c] ^= sq_bb(s);
   /* board[s] = 0;  Not needed, overwritten by the capturing one */
-  Square lastSquare = pos->pieceList[c][pt][--pos->pieceCount[c][pt]];
+  Square lastSquare = pos->pieceList[piece][--pos->pieceCount[piece]];
   pos->index[lastSquare] = pos->index[s];
-  pos->pieceList[c][pt][pos->index[lastSquare]] = lastSquare;
-  pos->pieceList[c][pt][pos->pieceCount[c][pt]] = SQ_NONE;
+  pos->pieceList[piece][pos->index[lastSquare]] = lastSquare;
+  pos->pieceList[piece][pos->pieceCount[piece]] = SQ_NONE;
 }
 
-INLINE void move_piece(Pos *pos, int c, int pt, Square from, Square to)
+INLINE void move_piece(Pos *pos, int c, int piece, Square from, Square to)
 {
   // index[from] is not updated and becomes stale. This works as long as
   // index[] is accessed just by known occupied squares.
   Bitboard from_to_bb = sq_bb(from) ^ sq_bb(to);
   pos->byTypeBB[0] ^= from_to_bb;
-  pos->byTypeBB[pt] ^= from_to_bb;
+  pos->byTypeBB[type_of_p(piece)] ^= from_to_bb;
   pos->byColorBB[c] ^= from_to_bb;
   pos->board[from] = 0;
-  pos->board[to] = make_piece(c, pt);
+  pos->board[to] = piece;
   pos->index[to] = pos->index[from];
-  pos->pieceList[c][pt][pos->index[to]] = to;
+  pos->pieceList[piece][pos->index[to]] = to;
 }
 #endif
 
@@ -156,7 +135,7 @@ void zob_init(void) {
   for (int c = 0; c < 2; c++)
     for (int pt = PAWN; pt <= KING; pt++)
       for (Square s = 0; s < 64; s++)
-        zob.psq[c][pt][s] = prng_rand(&rng);
+        zob.psq2d[make_piece(c, pt)][s] = prng_rand(&rng);
 
   for (int f = 0; f < 8; f++)
     zob.enpassant[f] = prng_rand(&rng);
@@ -188,10 +167,9 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   Stack *st = pos->st = pos->stack;
   memset(st, 0, StateSize);
 #ifdef PEDANTIC
-  for (int c = 0; c < 2; c++)
-    for (int pt = 0; pt < 8; pt++)
-      for (int i = 0; i < 16; i++)
-        pos->pieceList[c][pt][i] = SQ_NONE;
+  for (int piece = 0; piece < 16; piece++)
+    for (int i = 0; i < 16; i++)
+      pos->pieceList[piece][i] = SQ_NONE;
 #else
   for (Square s = 0; s < 64; s++)
     CastlingRightsMask[s] = ANY_CASTLING;
@@ -204,15 +182,15 @@ void pos_set(Pos *pos, char *fen, int isChess960)
     else if (token == '/')
       sq -= 16;
     else {
-      for (int pt = 0; pt < 16; pt++)
-        if (PieceToChar[pt] == token) {
+      for (int piece = 0; piece < 16; piece++)
+        if (PieceToChar[piece] == token) {
 #ifdef PEDANTIC
-          put_piece(pos, color_of(pt), type_of_p(pt), sq++);
+          put_piece(pos, color_of(piece), piece, sq++);
 #else
-          pos->board[sq] = pt;
+          pos->board[sq] = piece;
           pos->byTypeBB[0] |= sq_bb(sq);
-          pos->byTypeBB[pt & 7] |= sq_bb(sq);
-          pos->byColorBB[pt >> 3] |= sq_bb(sq);
+          pos->byTypeBB[type_of_p(piece)] |= sq_bb(sq);
+          pos->byColorBB[color_of(piece)] |= sq_bb(sq);
           sq++;
 #endif
           break;
@@ -310,8 +288,9 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
   CastlingRightsMask[kfrom] &= ~cr;
   CastlingRightsMask[rfrom] &= ~cr;
 //  CastlingToSquare[rfrom & 0x0f] = kto;
-  CastlingHash[kto & 0x0f] = zob.psq[c][ROOK][rto] ^ zob.psq[c][ROOK][rfrom];
-  CastlingPSQ[kto & 0x0f] = psqt.psq[c][ROOK][rto] - psqt.psq[c][ROOK][rfrom];
+  int rook = make_piece(c, ROOK);
+  CastlingHash[kto & 0x0f] = zob.psq2d[rook][rto] ^ zob.psq2d[rook][rfrom];
+  CastlingPSQ[kto & 0x0f] = psqt.psq2d[rook][rto] - psqt.psq2d[rook][rfrom];
   CastlingBits[kto & 0x0f] = sq_bb(rto) ^ sq_bb(rfrom);
   // need 2nd set of from/to, maybe... for undo
   CastlingRookFrom[kto & 0x0f] = rfrom != kto ? rfrom : rto;
@@ -345,8 +324,8 @@ static void set_state(Pos *pos, Stack *st)
   for (Bitboard b = pieces(); b; ) {
     Square s = pop_lsb(&b);
     Piece pc = piece_on(s);
-    st->key ^= zob.psq[color_of(pc)][type_of_p(pc)][s];
-    st->psq += psqt.psq[color_of(pc)][type_of_p(pc)][s];
+    st->key ^= zob.psq2d[pc][s];
+    st->psq += psqt.psq2d[pc][s];
   }
 
   if (st->epSquare != 0)
@@ -359,7 +338,7 @@ static void set_state(Pos *pos, Stack *st)
 
   for (Bitboard b = pieces_p(PAWN); b; ) {
     Square s = pop_lsb(&b);
-    st->pawnKey ^= zob.psq[color_of(piece_on(s))][PAWN][s];
+    st->pawnKey ^= zob.psq2d[piece_on(s)][s];
   }
 
   for (int c = 0; c < 2; c++)
@@ -435,12 +414,12 @@ int game_phase(Pos *pos)
 }
 
 
-// slider_blockers() returns a bitboard of all the pieces in 'target' that
-// are blocking attacks on the square 's' from 'sliders'. A piece blocks a
-// slider if removing that piece from the board would result in a position
-// where square 's' is attacked. For example, a king attack blocking piece
-// can be either a pinned or a discovered check piece, according if its
-// color is the opposite or the same of the color of the slider.
+// slider_blockers() returns a bitboard of all pieces that are blocking
+// attacks on the square 's' from 'sliders'. A piece blocks a slider if
+// removing that piece from the board would result in a position where
+// square 's' is attacked. Both pinned pieces and discovered check
+// candidates are slider blockers and are calculated by calling this
+// function.
 
 Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s)
 {
@@ -947,16 +926,17 @@ void do_move(Pos *pos, Move m, int givesCheck)
   int them = us ^ 1;
   Square from = from_sq(m);
   Square to = to_sq(m);
-  int pt = type_of_p(piece_on(from));
-  int captured = type_of_m(m) == ENPASSANT ? PAWN : type_of_p(piece_on(to));
+  int piece = piece_on(from);
+  int captured = type_of_m(m) == ENPASSANT
+                 ? make_piece(them, PAWN) : piece_on(to);
 
-  assert(color_of(piece_on(from)) == us);
+  assert(color_of(piece) == us);
   assert(   is_empty(to)
          || color_of(piece_on(to)) == (type_of_m(m) != CASTLING ? them : us));
-  assert(captured != KING);
+  assert(type_of_p(captured) != KING);
 
   if (type_of_m(m) == CASTLING) {
-    assert(pt == KING);
+    assert(piece == make_piece(us, KING));
 
     Square rfrom, rto;
 
@@ -966,15 +946,16 @@ void do_move(Pos *pos, Move m, int givesCheck)
     to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
 
     // Remove both pieces first since squares could overlap in Chess960
-    remove_piece(pos, us, KING, from);
-    remove_piece(pos, us, ROOK, rfrom);
+    int rook = piece_on(rfrom);
+    remove_piece(pos, us, piece, from);
+    remove_piece(pos, us, rook, rfrom);
     pos->board[from] = pos->board[rfrom] = 0;
-    put_piece(pos, us, KING, to);
-    put_piece(pos, us, ROOK, rto);
+    put_piece(pos, us, piece, to);
+    put_piece(pos, us, rook, rto);
 
     captured = 0;
-    st->psq += psqt.psq[us][ROOK][rto] - psqt.psq[us][ROOK][rfrom];
-    key ^= zob.psq[us][ROOK][rfrom] ^ zob.psq[us][ROOK][rto];
+    st->psq += psqt.psq2d[rook][rto] - psqt.psq2d[rook][rfrom];
+    key ^= zob.psq2d[rook][rfrom] ^ zob.psq2d[rook][rto];
   }
 
   if (captured) {
@@ -982,11 +963,11 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
     // If the captured piece is a pawn, update pawn hash key, otherwise
     // update non-pawn material.
-    if (captured == PAWN) {
+    if (type_of_p(captured) == PAWN) {
       if (type_of_m(m) == ENPASSANT) {
         capsq -= pawn_push(us);
 
-        assert(pt == PAWN);
+        assert(piece == make_piece(us, PAWN));
         assert(to == (st-1)->epSquare);
         assert(relative_rank_s(us, to) == RANK_6);
         assert(is_empty(to));
@@ -995,7 +976,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
         pos->board[capsq] = 0; // Not done by remove_piece()
       }
 
-      st->pawnKey ^= zob.psq[them][PAWN][capsq];
+      st->pawnKey ^= zob.psq2d[captured][capsq];
     } else
       st->nonPawnMaterial[them] -= PieceValue[MG][captured];
 
@@ -1003,19 +984,19 @@ void do_move(Pos *pos, Move m, int givesCheck)
     remove_piece(pos, them, captured, capsq);
 
     // Update material hash key and prefetch access to materialTable
-    key ^= zob.psq[them][captured][capsq];
-    st->materialKey -= mat_key[8 * them + captured];
+    key ^= zob.psq2d[captured][capsq];
+    st->materialKey -= mat_key[captured];
     prefetch(&pos->materialTable[st->materialKey >> (64 - 13)]);
 
     // Update incremental scores
-    st->psq -= psqt.psq[them][captured][capsq];
+    st->psq -= psqt.psq2d[captured][capsq];
 
     // Reset rule 50 counter
     st->rule50 = 0;
   }
 
   // Update hash key
-  key ^= zob.psq[us][pt][from] ^ zob.psq[us][pt][to];
+  key ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
 
   // Reset en passant square
   if ((st-1)->epSquare != 0)
@@ -1032,13 +1013,13 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   // Move the piece. The tricky Chess960 castling is handled earlier
   if (type_of_m(m) != CASTLING)
-    move_piece(pos, us, pt, from, to);
+    move_piece(pos, us, piece, from, to);
 
   // If the moving piece is a pawn do some special extra work
-  if (pt == PAWN) {
+  if (type_of_p(piece) == PAWN) {
     // Set en-passant square if the moved pawn can be captured
-    if ( (to ^ from) == 16
-        && (attacks_from_pawn(to - pawn_push(us), us) & pieces_cp(them, PAWN))) {
+    if ((to ^ from) == 16 && (attacks_from_pawn(to - pawn_push(us), us)
+                              & pieces_cp(them, PAWN))) {
       st->epSquare = (from + to) / 2;
       key ^= zob.enpassant[file_of(st->epSquare)];
     } else if (type_of_m(m) == PROMOTION) {
@@ -1047,23 +1028,25 @@ void do_move(Pos *pos, Move m, int givesCheck)
       assert(relative_rank_s(us, to) == RANK_8);
       assert(promotion >= KNIGHT && promotion <= QUEEN);
 
-      remove_piece(pos, us, PAWN, to);
+      promotion = make_piece(us, promotion);
+
+      remove_piece(pos, us, piece, to);
       put_piece(pos, us, promotion, to);
 
       // Update hash keys
-      key ^= zob.psq[us][PAWN][to] ^ zob.psq[us][promotion][to];
-      st->pawnKey ^= zob.psq[us][PAWN][to];
-      st->materialKey += mat_key[8 * us + promotion] - mat_key[8 * us + PAWN];
+      key ^= zob.psq2d[piece][to] ^ zob.psq2d[promotion][to];
+      st->pawnKey ^= zob.psq2d[piece][to];
+      st->materialKey += mat_key[promotion] - mat_key[piece];
 
       // Update incremental score
-      st->psq += psqt.psq[us][promotion][to] - psqt.psq[us][PAWN][to];
+      st->psq += psqt.psq2d[promotion][to] - psqt.psq2d[piece][to];
 
       // Update material
       st->nonPawnMaterial[us] += PieceValue[MG][promotion];
     }
 
     // Update pawn hash key and prefetch access to pawnsTable
-    st->pawnKey ^= zob.psq[us][PAWN][from] ^ zob.psq[us][PAWN][to];
+    st->pawnKey ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
     prefetch(&pos->pawnTable[st->pawnKey & 16383]);
 
     // Reset rule 50 draw counter
@@ -1071,7 +1054,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   }
 
   // Update incremental scores
-  st->psq += psqt.psq[us][pt][to] - psqt.psq[us][pt][from];
+  st->psq += psqt.psq2d[piece][to] - psqt.psq2d[piece][from];
 
   // Set capture piece
   st->capturedType = captured;
@@ -1101,19 +1084,19 @@ void undo_move(Pos *pos, Move m)
   int us = pos_stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
-  int pt = type_of_p(piece_on(to));
+  int piece = piece_on(to);
 
   assert(is_empty(from) || type_of_m(m) == CASTLING);
-  assert(pos->st->capturedType != KING);
+  assert(type_of_p(pos->st->capturedType) != KING);
 
   if (type_of_m(m) == PROMOTION) {
     assert(relative_rank_s(us, to) == RANK_8);
-    assert(pt == promotion_type(m));
-    assert(pt >= KNIGHT && pt <= QUEEN);
+    assert(type_of_p(piece) == promotion_type(m));
+    assert(type_of_p(piece) >= KNIGHT && type_of_p(piece) <= QUEEN);
 
-    remove_piece(pos, us, pt, to);
-    put_piece(pos, us, PAWN, to);
-    pt = PAWN;
+    remove_piece(pos, us, piece, to);
+    piece = make_piece(us, PAWN);
+    put_piece(pos, us, piece, to);
   }
 
   if (type_of_m(m) == CASTLING) {
@@ -1124,13 +1107,15 @@ void undo_move(Pos *pos, Move m)
     to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
 
     // Remove both pieces first since squares could overlap in Chess960
-    remove_piece(pos, us, KING, to);
-    remove_piece(pos, us, ROOK, rto);
+    int king = make_piece(us, KING);
+    int rook = make_piece(us, ROOK);
+    remove_piece(pos, us, king, to);
+    remove_piece(pos, us, rook, rto);
     pos->board[to] = pos->board[rto] = 0;
-    put_piece(pos, us, KING, from);
-    put_piece(pos, us, ROOK, rfrom);
+    put_piece(pos, us, king, from);
+    put_piece(pos, us, rook, rfrom);
   } else {
-    move_piece(pos, us, pt, to, from); // Put the piece back at the source square
+    move_piece(pos, us, piece, to, from); // Put the piece back at the source square
 
     if (pos->st->capturedType) {
       Square capsq = to;
@@ -1138,11 +1123,11 @@ void undo_move(Pos *pos, Move m)
       if (type_of_m(m) == ENPASSANT) {
         capsq -= pawn_push(us);
 
-        assert(pt == PAWN);
+        assert(type_of_p(piece) == PAWN);
         assert(to == pos->st->previous->epSquare);
         assert(relative_rank_s(us, to) == RANK_6);
         assert(is_empty(capsq));
-        assert(pos->st->capturedType == PAWN);
+        assert(pos->st->capturedType == make_piece(us ^ 1, PAWN));
       }
 
       put_piece(pos, us ^ 1, pos->st->capturedType, capsq); // Restore the captured piece
