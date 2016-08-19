@@ -15,8 +15,6 @@
 #include "tbprobe.h"
 #include "tbcore.h"
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-
 #include "tbcore.c"
 
 extern Key mat_key[16];

@@ -24,8 +24,6 @@
 #include "material.h"
 #include "position.h"
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-
 // Polynomial material imbalance parameters.
 
 //                             pair  pawn knight bishop rook queen

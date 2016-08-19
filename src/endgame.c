@@ -25,9 +25,6 @@
 #include "movegen.h"
 #include "position.h"
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#define max(a,b) ((a) > (b) ? (a) : (b))
-
 // Table used to drive the king towards the edge of the board
 // in KX vs K and KQ vs KR endgames.
 const int PushToEdges[64] = {

@@ -134,7 +134,7 @@ void print_options(void)
       printf(" default %s", opt->value ? "true" : "false");
       break;
     case OPT_TYPE_SPIN:
-      printf(" default %d min %d max %d", opt->def, opt->min, opt->max);
+      printf(" default %d min %d max %d", opt->def, opt->min_val, opt->max_val);
     case OPT_TYPE_BUTTON:
       break;
     case OPT_TYPE_STRING:
@@ -181,7 +181,7 @@ int option_set_by_name(char *name, char *value)
         break;
       case OPT_TYPE_SPIN:
         val = atoi(value);
-        if (val < opt->min || val > opt->max)
+        if (val < opt->min_val || val > opt->max_val)
           return 1;
         opt->value = val;
       case OPT_TYPE_BUTTON:

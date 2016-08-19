@@ -22,9 +22,6 @@ int check_pos(Pos *pos);
 #define check_pos(p) do {} while (0)
 #endif
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#define max(a,b) ((a) > (b) ? (a) : (b))
-
 struct Zob zob;
 
 Key mat_key[16] = {

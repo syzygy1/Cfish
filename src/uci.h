@@ -57,7 +57,7 @@ typedef void (*OnChange)(Option *);
 struct Option {
   char *name;
   int type;
-  int def, min, max;
+  int def, min_val, max_val;
   char *def_string;
   OnChange on_change;
   int value;

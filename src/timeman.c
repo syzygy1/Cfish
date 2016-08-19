@@ -25,9 +25,6 @@
 #include "timeman.h"
 #include "uci.h"
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#define max(a,b) ((a) > (b) ? (a) : (b))
-
 struct TimeManagement Time; // Our global time management struct
 
 #define TIMET_OPTIMUM 0

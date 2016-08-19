@@ -25,9 +25,6 @@
 #include "position.h"
 #include "thread.h"
 
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#define min(a,b) ((a) < (b) ? (a) : (b))
-
 #define V(v) ((Value)(v))
 #define S(mg, eg) make_score(mg, eg)
 

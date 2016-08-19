@@ -21,8 +21,6 @@
 #include "bitboard.h"
 #include "misc.h"
 
-#define max(a,b) ((a) > (b) ? (a) : (b))
-
 uint8_t PopCnt16[1 << 16];
 int SquareDistance[64][64];
 

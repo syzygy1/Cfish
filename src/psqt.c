@@ -20,8 +20,6 @@
 
 #include "types.h"
 
-#define min(a,b) ((a) < (b) ? (a) : (b))
-
 Value PieceValue[2][16] = {
 { VALUE_ZERO, PawnValueMg, KnightValueMg, BishopValueMg, RookValueMg, QueenValueMg },
 { VALUE_ZERO, PawnValueEg, KnightValueEg, BishopValueEg, RookValueEg, QueenValueEg } };
