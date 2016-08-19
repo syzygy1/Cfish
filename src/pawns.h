@@ -31,16 +31,16 @@
 
 struct PawnEntry {
   Key key;
-  Score score;
   Bitboard passedPawns[2];
   Bitboard pawnAttacks[2];
   Bitboard pawnAttacksSpan[2];
-  Square kingSquares[2];
   Score kingSafety[2];
-  int castlingRights[2];
-  int semiopenFiles[2];
-  int pawnsOnSquares[2][2]; // [color][light/dark squares]
-  int asymmetry;
+  Score score;
+  uint8_t kingSquares[2];
+  uint8_t castlingRights[2];
+  uint8_t semiopenFiles[2];
+  uint8_t pawnsOnSquares[2][2]; // [color][light/dark squares]
+  uint8_t asymmetry;
 };
 
 typedef struct PawnEntry PawnEntry;

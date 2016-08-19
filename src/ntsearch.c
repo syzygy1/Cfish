@@ -264,16 +264,15 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   // Step 10. Internal iterative deepening (skipped when in check)
-  if (    depth >= (PvNode ? 5 * ONE_PLY : 8 * ONE_PLY)
+  if (    depth >= 6 * ONE_PLY
       && !ttMove
       && (PvNode || ss->staticEval + 256 >= beta)) {
 
-    Depth d = depth - 2 * ONE_PLY - (PvNode ? DEPTH_ZERO : depth / 4);
     ss->skipEarlyPruning = 1;
 #if PvNode
-    search_PV(pos, ss, alpha, beta, d);
+    search_PV(pos, ss, alpha, beta, 3 * depth / 4 - 2 * ONE_PLY);
 #else
-    search_NonPV(pos, ss, alpha, d, cutNode);
+    search_NonPV(pos, ss, alpha, 3 * depth / 4 - 2 * ONE_PLY, cutNode);
 #endif
     ss->skipEarlyPruning = 0;
 
@@ -442,37 +441,41 @@ moves_loop: // When in check search starts from here.
     // re-searched at full depth.
     if (    depth >= 3 * ONE_PLY
         &&  moveCount > 1
-        && !captureOrPromotion)
+        && (!captureOrPromotion || moveCountPruning))
     {
       Depth r = reduction(improving, depth, moveCount, NT);
-      Value val =  (*pos->history)[moved_piece][to_sq(move)]
-                 + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
-                 + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
-                 + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
-                 + ft_get(*pos->fromTo, pos_stm() ^ 1, move);
+      if (captureOrPromotion)
+        r -= r ? ONE_PLY : DEPTH_ZERO;
+      else {
+        Value val =  (*pos->history)[moved_piece][to_sq(move)]
+                   + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
+                   + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
+                   + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
+                   + ft_get(*pos->fromTo, pos_stm() ^ 1, move);
 
-      // Increase reduction for cut nodes
-      if (cutNode)
-        r += 2 * ONE_PLY;
+        // Increase reduction for cut nodes
+        if (cutNode)
+          r += 2 * ONE_PLY;
 
-      // Decrease reduction for moves that escape a capture. Filter out
-      // castling moves, because they are coded as "king captures rook" and
-      // hence break make_move(). Also use see() instead of see_sign(),
-      // because the destination square is empty.
-      else if (   type_of_m(move) == NORMAL
-               && type_of_p(piece_on(to_sq(move))) != PAWN
-               && !see_test(pos, make_move(to_sq(move), from_sq(move)), VALUE_ZERO))
-        r -= 2 * ONE_PLY;
+        // Decrease reduction for moves that escape a capture. Filter out
+        // castling moves, because they are coded as "king captures rook" and
+        // hence break make_move(). Also use see() instead of see_sign(),
+        // because the destination square is empty.
+        else if (   type_of_m(move) == NORMAL
+                 && type_of_p(piece_on(to_sq(move))) != PAWN
+                 && !see_test(pos, make_move(to_sq(move), from_sq(move)), VALUE_ZERO))
+          r -= 2 * ONE_PLY;
 
-      // Decrease/increase reduction for moves with a good/bad history
-      int rHist = (val - 10000) / 20000;
-      r = max(DEPTH_ZERO, r - rHist * ONE_PLY);
+        // Decrease/increase reduction for moves with a good/bad history
+        int rHist = (val - 10000) / 20000;
+        r = max(DEPTH_ZERO, r - rHist * ONE_PLY);
+      }
 
       Depth d = max(newDepth - r, ONE_PLY);
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 
-      doFullDepthSearch = (value > alpha && r != DEPTH_ZERO);
+      doFullDepthSearch = (value > alpha && d != newDepth);
 
     } else
       doFullDepthSearch = !PvNode || moveCount > 1;

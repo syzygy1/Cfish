@@ -287,7 +287,8 @@ INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
       b &= LineBB[square_of(Us, KING)][s];
 
     ei->attackedBy2[Us] |= ei->attackedBy[Us][0] & b;
-    ei->attackedBy[Us][0] |= ei->attackedBy[Us][Pt] |= b;
+    ei->attackedBy[Us][0] |= b;
+    ei->attackedBy[Us][Pt] |= b;
 
     if (b & ei->kingRing[Them]) {
       ei->kingAttackersCount[Us]++;
@@ -530,12 +531,12 @@ INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
   Score score = SCORE_ZERO;
 
   // Small bonus if the opponent has loose pawns or pieces
-  if (   (pieces_c(Them) ^ pieces_cpp(Them, QUEEN, KING))
+  if (  pieces_c(Them) & ~pieces_pp(QUEEN, KING)
       & ~(ei->attackedBy[Us][0] | ei->attackedBy[Them][0]))
     score += LooseEnemies;
 
   // Non-pawn enemies attacked by a pawn
-  weak = (pieces_c(Them) ^ pieces_cp(Them, PAWN)) & ei->attackedBy[Us][PAWN];
+  weak = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Us][PAWN];
 
   if (weak) {
     b = pieces_cp(Us, PAWN) & ( ~ei->attackedBy[Them][0]
@@ -547,11 +548,11 @@ INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByHangingPawn;
 
     while (safeThreats)
-      score += ThreatBySafePawn[type_of_p(piece_on(pop_lsb(&safeThreats)))];
+      score += ThreatBySafePawn[piece_on(pop_lsb(&safeThreats)) - 8 * Them];
   }
 
   // Non-pawn enemies defended by a pawn
-  defended = (pieces_c(Them) ^ pieces_cp(Them, PAWN)) & ei->attackedBy[Them][PAWN];
+  defended = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Them][PAWN];
 
   // Enemies not defended by a pawn and under our attack
   weak =   pieces_c(Them)
@@ -562,11 +563,11 @@ INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
   if (defended | weak) {
     b = (defended | weak) & (ei->attackedBy[Us][KNIGHT] | ei->attackedBy[Us][BISHOP]);
     while (b)
-      score += Threat[Minor][type_of_p(piece_on(pop_lsb(&b)))];
+      score += Threat[Minor][piece_on(pop_lsb(&b)) - 8 * Them];
 
     b = (pieces_cp(Them, QUEEN) | weak) & ei->attackedBy[Us][ROOK];
     while (b)
-      score += Threat[Rook ][type_of_p(piece_on(pop_lsb(&b)))];
+      score += Threat[Rook ][piece_on(pop_lsb(&b)) - 8 * Them];
 
     score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
 

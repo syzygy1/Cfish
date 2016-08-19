@@ -42,10 +42,10 @@ struct MaterialEntry {
   Key key;
   Value (*eval_func)(Pos *, int);
   Value (*scal_func[2])(Pos *, int);
-  int eval_func_side;
   int gamePhase;
   int16_t value;
   uint8_t factor[2];
+  uint8_t eval_func_side;
 };
 
 typedef struct MaterialEntry MaterialEntry;
