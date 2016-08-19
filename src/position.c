@@ -1200,17 +1200,16 @@ void undo_null_move(Pos *pos)
 
 Key key_after(Pos *pos, Move m)
 {
-  int us = pos_stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
-  int pt = type_of_p(piece_on(from));
-  int captured = type_of_p(piece_on(to));
+  int pt = piece_on(from);
+  int captured = piece_on(to);
   Key k = pos_key() ^ zob.side;
 
   if (captured)
-    k ^= zob.psq[us ^ 1][captured][to];
+    k ^= zob.psq2d[captured][to];
 
-  return k ^ zob.psq[us][pt][to] ^ zob.psq[us][pt][from];
+  return k ^ zob.psq2d[pt][to] ^ zob.psq2d[pt][from];
 }
 
 

@@ -136,7 +136,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
         continue;
       }
 
-      if (futilityBase <= alpha && !see_test(pos, move, VALUE_ZERO + 1)) {
+      if (futilityBase <= alpha && !see_test(pos, move, 1)) {
         bestValue = max(bestValue, futilityBase);
         continue;
       }
