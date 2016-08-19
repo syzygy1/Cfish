@@ -31,10 +31,7 @@
 #include "types.h"
 
 struct Zob {
-  union {
-    Key psq[2][8][64];
-    Key psq2d[16][64];
-  };
+  Key psq[16][64];
   Key enpassant[8];
   Key castling[16];
   Key side;

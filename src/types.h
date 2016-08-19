@@ -402,10 +402,7 @@ struct ExtMove {
 typedef struct ExtMove ExtMove;
 
 struct PSQT {
-  union {
-    Score psq[2][8][64];
-    Score psq2d[16][64];
-  };
+  Score psq[16][64];
 };
 
 extern struct PSQT psqt;

@@ -115,8 +115,8 @@ void psqt_init(void) {
 
     for (Square s = 0; s < 64; s++) {
       int f = min(file_of(s), FILE_H - file_of(s));
-      psqt.psq[WHITE][pt][s] = v + Bonus[pt][rank_of(s)][f];
-      psqt.psq[BLACK][pt][s ^ 0x38] = -psqt.psq[WHITE][pt][s];
+      psqt.psq[make_piece(WHITE, pt)][s] = v + Bonus[pt][rank_of(s)][f];
+      psqt.psq[make_piece(BLACK, pt)][s ^ 0x38] = -psqt.psq[make_piece(WHITE, pt)][s];
     }
   }
   for (int pt = 0; pt < 16; pt++)

@@ -135,7 +135,7 @@ void zob_init(void) {
   for (int c = 0; c < 2; c++)
     for (int pt = PAWN; pt <= KING; pt++)
       for (Square s = 0; s < 64; s++)
-        zob.psq2d[make_piece(c, pt)][s] = prng_rand(&rng);
+        zob.psq[make_piece(c, pt)][s] = prng_rand(&rng);
 
   for (int f = 0; f < 8; f++)
     zob.enpassant[f] = prng_rand(&rng);
@@ -289,8 +289,8 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
   CastlingRightsMask[rfrom] &= ~cr;
 //  CastlingToSquare[rfrom & 0x0f] = kto;
   int rook = make_piece(c, ROOK);
-  CastlingHash[kto & 0x0f] = zob.psq2d[rook][rto] ^ zob.psq2d[rook][rfrom];
-  CastlingPSQ[kto & 0x0f] = psqt.psq2d[rook][rto] - psqt.psq2d[rook][rfrom];
+  CastlingHash[kto & 0x0f] = zob.psq[rook][rto] ^ zob.psq[rook][rfrom];
+  CastlingPSQ[kto & 0x0f] = psqt.psq[rook][rto] - psqt.psq[rook][rfrom];
   CastlingBits[kto & 0x0f] = sq_bb(rto) ^ sq_bb(rfrom);
   // need 2nd set of from/to, maybe... for undo
   CastlingRookFrom[kto & 0x0f] = rfrom != kto ? rfrom : rto;
@@ -324,8 +324,8 @@ static void set_state(Pos *pos, Stack *st)
   for (Bitboard b = pieces(); b; ) {
     Square s = pop_lsb(&b);
     Piece pc = piece_on(s);
-    st->key ^= zob.psq2d[pc][s];
-    st->psq += psqt.psq2d[pc][s];
+    st->key ^= zob.psq[pc][s];
+    st->psq += psqt.psq[pc][s];
   }
 
   if (st->epSquare != 0)
@@ -338,7 +338,7 @@ static void set_state(Pos *pos, Stack *st)
 
   for (Bitboard b = pieces_p(PAWN); b; ) {
     Square s = pop_lsb(&b);
-    st->pawnKey ^= zob.psq2d[piece_on(s)][s];
+    st->pawnKey ^= zob.psq[piece_on(s)][s];
   }
 
   for (int c = 0; c < 2; c++)
@@ -791,21 +791,21 @@ void do_move(Pos *pos, Move m, int givesCheck)
     if (type_of_m(m) == CASTLING)
       capt_piece = 0;
     pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from) ^ sq_bb(to);
-    st->psq += psqt.psq2d[piece][to] - psqt.psq2d[piece][from];
-    key ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
+    st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
+    key ^= zob.psq[piece][from] ^ zob.psq[piece][to];
     if (type_of_p(piece) == PAWN)
-      st->pawnKey ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
+      st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
     prom_piece = piece;
   } else {
     prom_piece = promotion_type(m);
     pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from);
     pos->byTypeBB[prom_piece] ^= sq_bb(to);
     prom_piece |= piece & 8;
-    st->psq += psqt.psq2d[prom_piece][to] - psqt.psq2d[piece][to];
+    st->psq += psqt.psq[prom_piece][to] - psqt.psq[piece][to];
     st->nonPawnMaterial[us] += NonPawnPieceValue[prom_piece];
     st->materialKey += mat_key[prom_piece] - mat_key[piece];
-    key ^= zob.psq2d[piece][from] ^ zob.psq2d[prom_piece][to];
-    st->pawnKey ^= zob.psq2d[piece][from];
+    key ^= zob.psq[piece][from] ^ zob.psq[prom_piece][to];
+    st->pawnKey ^= zob.psq[piece][from];
   }
   pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
   pos->board[from] = 0;
@@ -818,15 +818,15 @@ void do_move(Pos *pos, Move m, int givesCheck)
         to += (us == WHITE ? -8 : 8);
         pos->board[to] = 0;
       }
-      st->pawnKey ^= zob.psq2d[capt_piece][to];
+      st->pawnKey ^= zob.psq[capt_piece][to];
     }
     st->capturedType = capt_piece;
-    st->psq -= psqt.psq2d[capt_piece][to];
+    st->psq -= psqt.psq[capt_piece][to];
     st->nonPawnMaterial[us ^ 1] -= NonPawnPieceValue[capt_piece];
     st->materialKey -= mat_key[capt_piece];
     pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
-    key ^= zob.psq2d[capt_piece][to];
+    key ^= zob.psq[capt_piece][to];
   } else { // Not a capture.
     st->capturedType = 0;
     st->rule50 = (st-1)->rule50 + 1;
@@ -954,8 +954,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
     put_piece(pos, us, rook, rto);
 
     captured = 0;
-    st->psq += psqt.psq2d[rook][rto] - psqt.psq2d[rook][rfrom];
-    key ^= zob.psq2d[rook][rfrom] ^ zob.psq2d[rook][rto];
+    st->psq += psqt.psq[rook][rto] - psqt.psq[rook][rfrom];
+    key ^= zob.psq[rook][rfrom] ^ zob.psq[rook][rto];
   }
 
   if (captured) {
@@ -976,7 +976,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
         pos->board[capsq] = 0; // Not done by remove_piece()
       }
 
-      st->pawnKey ^= zob.psq2d[captured][capsq];
+      st->pawnKey ^= zob.psq[captured][capsq];
     } else
       st->nonPawnMaterial[them] -= PieceValue[MG][captured];
 
@@ -984,19 +984,19 @@ void do_move(Pos *pos, Move m, int givesCheck)
     remove_piece(pos, them, captured, capsq);
 
     // Update material hash key and prefetch access to materialTable
-    key ^= zob.psq2d[captured][capsq];
+    key ^= zob.psq[captured][capsq];
     st->materialKey -= mat_key[captured];
     prefetch(&pos->materialTable[st->materialKey >> (64 - 13)]);
 
     // Update incremental scores
-    st->psq -= psqt.psq2d[captured][capsq];
+    st->psq -= psqt.psq[captured][capsq];
 
     // Reset rule 50 counter
     st->rule50 = 0;
   }
 
   // Update hash key
-  key ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
+  key ^= zob.psq[piece][from] ^ zob.psq[piece][to];
 
   // Reset en passant square
   if ((st-1)->epSquare != 0)
@@ -1034,19 +1034,19 @@ void do_move(Pos *pos, Move m, int givesCheck)
       put_piece(pos, us, promotion, to);
 
       // Update hash keys
-      key ^= zob.psq2d[piece][to] ^ zob.psq2d[promotion][to];
-      st->pawnKey ^= zob.psq2d[piece][to];
+      key ^= zob.psq[piece][to] ^ zob.psq[promotion][to];
+      st->pawnKey ^= zob.psq[piece][to];
       st->materialKey += mat_key[promotion] - mat_key[piece];
 
       // Update incremental score
-      st->psq += psqt.psq2d[promotion][to] - psqt.psq2d[piece][to];
+      st->psq += psqt.psq[promotion][to] - psqt.psq[piece][to];
 
       // Update material
       st->nonPawnMaterial[us] += PieceValue[MG][promotion];
     }
 
     // Update pawn hash key and prefetch access to pawnsTable
-    st->pawnKey ^= zob.psq2d[piece][from] ^ zob.psq2d[piece][to];
+    st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
     prefetch(&pos->pawnTable[st->pawnKey & 16383]);
 
     // Reset rule 50 draw counter
@@ -1054,7 +1054,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   }
 
   // Update incremental scores
-  st->psq += psqt.psq2d[piece][to] - psqt.psq2d[piece][from];
+  st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
 
   // Set capture piece
   st->capturedType = captured;
@@ -1192,9 +1192,9 @@ Key key_after(Pos *pos, Move m)
   Key k = pos_key() ^ zob.side;
 
   if (captured)
-    k ^= zob.psq2d[captured][to];
+    k ^= zob.psq[captured][to];
 
-  return k ^ zob.psq2d[pt][to] ^ zob.psq2d[pt][from];
+  return k ^ zob.psq[pt][to] ^ zob.psq[pt][from];
 }
 
 
@@ -1492,7 +1492,7 @@ int check_pos(Pos *pos)
 
   for (int sq = 0; sq < 64; sq++)
     if (pos->board[sq])
-      key ^= zob.psq2d[pos->board[sq]][sq];
+      key ^= zob.psq[pos->board[sq]][sq];
   if (pos->sideToMove == BLACK)
     key ^= zob.side;
   if (pos->st->epSquare)
@@ -1501,7 +1501,7 @@ int check_pos(Pos *pos)
 
   for (int sq = 0; sq < 64; sq++)
     if ((pos->board[sq] & 7) == PAWN)
-      pawnKey ^= zob.psq2d[pos->board[sq]][sq];
+      pawnKey ^= zob.psq[pos->board[sq]][sq];
 
   assert(key == pos->st->key);
   assert(pawnKey == pos->st->pawnKey);
