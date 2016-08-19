@@ -111,26 +111,6 @@ INLINE void move_piece(Pos *pos, int c, int pt, Square from, Square to)
 #endif
 
 
-// Calculate CheckInfo data.
-
-void calc_checkinfo(Pos *pos)
-{
-  Stack *st = pos->st;
-  int them = pos_stm() ^ 1;
-  st->ksq = square_of(them, KING);
-
-  st->pinned = pinned_pieces(pos, pos_stm());
-  st->dcCandidates = discovered_check_candidates(pos);
-
-  st->checkSquares[PAWN]   = attacks_from_pawn(st->ksq, them);
-  st->checkSquares[KNIGHT] = attacks_from_knight(st->ksq);
-  st->checkSquares[BISHOP] = attacks_from_bishop(st->ksq);
-  st->checkSquares[ROOK]   = attacks_from_rook(st->ksq);
-  st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
-  st->checkSquares[KING]   = 0;
-}
-
-
 // print_pos() prints an ASCII representation of the position to stdout.
 
 void print_pos(Pos *pos)
@@ -480,6 +460,26 @@ Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s)
 }
 
 
+// Calculate CheckInfo data.
+
+void calc_checkinfo(Pos *pos)
+{
+  Stack *st = pos->st;
+  int them = pos_stm() ^ 1;
+  st->ksq = square_of(them, KING);
+
+  st->pinned = pinned_pieces(pos, pos_stm());
+  st->dcCandidates = discovered_check_candidates(pos);
+
+  st->checkSquares[PAWN]   = attacks_from_pawn(st->ksq, them);
+  st->checkSquares[KNIGHT] = attacks_from_knight(st->ksq);
+  st->checkSquares[BISHOP] = attacks_from_bishop(st->ksq);
+  st->checkSquares[ROOK]   = attacks_from_rook(st->ksq);
+  st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
+  st->checkSquares[KING]   = 0;
+}
+
+
 // attackers_to() computes a bitboard of all pieces which attack a given
 // square. Slider attacks use the occupied bitboard to indicate occupancy.
 
@@ -514,7 +514,7 @@ int is_legal(Pos *pos, Move m, Bitboard pinned)
     Square ksq = square_of(us, KING);
     Square to = to_sq(m);
     Square capsq = to - pawn_push(us);
-    Bitboard occupied = (pieces() ^ sq_bb(from) ^ sq_bb(capsq)) | sq_bb(to);
+    Bitboard occupied = pieces() ^ sq_bb(from) ^ sq_bb(capsq) ^ sq_bb(to);
 
     assert(to == ep_square());
     assert(moved_piece(m) == make_piece(us, PAWN));
@@ -753,20 +753,13 @@ int gives_check_special(Pos *pos, Stack *st, Move m)
   case CASTLING:
   {
 #ifdef PEDANTIC
-    Square kfrom = from;
-    Square rfrom = to; // Castling is encoded as 'King captures the rook'
-    Square kto = relative_square(pos_stm(), rfrom > kfrom ? SQ_G1 : SQ_C1);
-    Square rto = relative_square(pos_stm(), rfrom > kfrom ? SQ_F1 : SQ_D1);
-
-    return   (PseudoAttacks[ROOK][rto] & sq_bb(st->ksq))
-          && (attacks_bb_rook(rto, (pieces() ^ sq_bb(kfrom) ^ sq_bb(rfrom))
-                                    | sq_bb(rto) | sq_bb(kto))
-                  & sq_bb(st->ksq));
+    // Castling is encoded as 'King captures the rook'
+    Square rto = relative_square(pos_stm(), to > from ? SQ_F1 : SQ_D1);
 #else
     Square rto = CastlingRookTo[to & 0x0f];
-    return   (PseudoAttacks[ROOK][rto] & sq_bb(st->ksq))
-          && (attacks_bb_rook(rto, (pieces() ^ sq_bb(from))) & sq_bb(st->ksq));
 #endif
+    return   (PseudoAttacks[ROOK][rto] & sq_bb(st->ksq))
+          && (attacks_bb_rook(rto, pieces() ^ sq_bb(from)) & sq_bb(st->ksq));
   }
   default:
     assume(0);
