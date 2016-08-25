@@ -107,7 +107,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     ss->currentMove = ttMove; // Can be MOVE_NONE
 
     // If ttMove is quiet, update killers, history, counter move on TT hit
-    if (ttValue >= beta && ttMove && !is_capture_or_promotion(pos, ttMove))
+    if (ttValue >= beta && ttMove)
       update_stats(pos, ss, ttMove, depth, NULL, 0);
 
     return ttValue;
@@ -467,7 +467,7 @@ moves_loop: // When in check search starts from here.
           r -= 2 * ONE_PLY;
 
         // Decrease/increase reduction for moves with a good/bad history
-        int rHist = (val - 10000) / 20000;
+        int rHist = (val - 8000) / 20000;
         r = max(DEPTH_ZERO, r - rHist * ONE_PLY);
       }
 
@@ -588,12 +588,11 @@ moves_loop: // When in check search starts from here.
                :     inCheck ? mated_in(ss->ply) : DrawValue[pos_stm()];
 
   // Quiet best move: update killers, history and countermoves
-  else if (bestMove && !is_capture_or_promotion(pos, bestMove))
+  else if (bestMove)
     update_stats(pos, ss, bestMove, depth, quietsSearched, quietCount);
 
   // Bonus for prior countermove that caused the fail low
   else if (    depth >= 3 * ONE_PLY
-           && !bestMove
            && !captured_piece_type()
            && move_is_ok((ss-1)->currentMove))
   {

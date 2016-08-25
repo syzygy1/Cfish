@@ -229,20 +229,18 @@ void search_clear()
 // perft() is our utility to verify move generation. All the leaf nodes
 // up to the given depth are generated and counted, and the sum is returned.
 
-static uint64_t perft_helper(Pos *pos, Depth depth)
+static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
 {
-  uint64_t cnt, nodes = 0;
   calc_checkinfo(pos);
 
   ExtMove *m = (pos->st-1)->endMoves;
   ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
   for (; m < last; m++) {
     do_move(pos, m->move, gives_check(pos, pos->st, m->move));
-    if (depth == 2 * ONE_PLY) {
-      cnt = generate_legal(pos, last) - last;
+    if (depth == 0) {
+      nodes += generate_legal(pos, last) - last;
     } else
-      cnt = perft_helper(pos, depth - ONE_PLY);
-    nodes += cnt;
+      nodes = perft_helper(pos, depth - ONE_PLY, nodes);
     undo_move(pos, m->move);
   }
   return nodes;
@@ -265,7 +263,7 @@ uint64_t perft(Pos *pos, Depth depth)
       if (depth == 2 * ONE_PLY)
         cnt = generate_legal(pos, last) - last;
       else
-        cnt = perft_helper(pos, depth - ONE_PLY);
+        cnt = perft_helper(pos, depth - 3 * ONE_PLY, 0);
       nodes += cnt;
       undo_move(pos, m->move);
     }
@@ -314,10 +312,15 @@ void mainthread_search(void)
   // move before the GUI sends a "stop" or "ponderhit" command. We
   // therefore simply wait here until the GUI sends one of those commands
   // (which also raises Signals.stop).
+  int wait = 0;
+  LOCK(Signals.lock);
   if (!Signals.stop && (Limits.ponder || Limits.infinite)) {
     Signals.stopOnPonderhit = 1;
-    thread_wait(pos, &Signals.stop);
+    wait = 1;
   }
+  UNLOCK(Signals.lock);
+  if (wait)
+    thread_wait(pos, &Signals.stop);
 
   // Stop the threads if not already stopped
   Signals.stop = 1;
@@ -334,7 +337,7 @@ void mainthread_search(void)
 //      && !Skill(option_value(OPT_SKILL_LEVEL)).enabled()
       &&  pos->rootMoves->move[0].pv[0] != MOVE_NONE)
   {
-    for (size_t idx = 0; idx < Threads.num_threads; idx++) {
+    for (size_t idx = 1; idx < Threads.num_threads; idx++) {
       Pos *p = Threads.pos[idx];
       if (   p->completedDepth > bestThread->completedDepth
           && p->rootMoves->move[0].score > bestThread->rootMoves->move[0].score)
@@ -352,12 +355,9 @@ void mainthread_search(void)
 
   printf("bestmove %s", uci_move(buf, bestThread->rootMoves->move[0].pv[0], is_chess960()));
 
-  if (bestThread->rootMoves->move[0].pv_size > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos)) {
-    printf(" ponder %s",
-           uci_move(buf, bestThread->rootMoves->move[0].pv[1], is_chess960()));
-  }
+  if (bestThread->rootMoves->move[0].pv_size > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos))
+    printf(" ponder %s", uci_move(buf, bestThread->rootMoves->move[0].pv[1], is_chess960()));
 
-  printf("\n");
   fflush(stdout);
   IO_UNLOCK;
 }
@@ -675,18 +675,38 @@ static void update_pv(Move *pv, Move move, Move *childPv)
 static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
                          Move* quiets, int quietsCnt)
 {
+  Value bonus = (depth / ONE_PLY) * (depth / ONE_PLY) + 2 * depth / ONE_PLY - 2;
+  Square prevSq = to_sq((ss-1)->currentMove);
+
+
+  // Extra penalty for a quiet TT move in previous ply when it gets refuted.
+  if ((ss-1)->moveCount == 1 && !captured_piece_type()) {
+    CounterMoveStats *fmh = (ss-2)->counterMoves;
+    CounterMoveStats *cmh2 = (ss-3)->counterMoves;
+    CounterMoveStats *cmh3 = (ss-5)->counterMoves;
+
+    if (fmh)
+      cms_update(*fmh, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
+
+    if (cmh2)
+      cms_update(*cmh2, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
+
+    if (cmh3)
+      cms_update(*cmh3, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
+  }
+
+  if (is_capture_or_promotion(pos, move))
+    return;
+
   if (ss->killers[0] != move) {
     ss->killers[1] = ss->killers[0];
     ss->killers[0] = move;
   }
 
-  int c = pos_stm();
-  Value bonus = (Value)((depth / ONE_PLY) * (depth / ONE_PLY) + 2 * depth / ONE_PLY - 2);
-
-  Square prevSq = to_sq((ss-1)->currentMove);
   CounterMoveStats *cmh  = (ss-1)->counterMoves;
   CounterMoveStats *fmh  = (ss-2)->counterMoves;
   CounterMoveStats *fmh2 = (ss-4)->counterMoves;
+  int c = pos_stm();
 
   hs_update(*pos->history, moved_piece(move), to_sq(move), bonus);
   ft_update(*pos->fromTo, c, move, bonus);
@@ -715,18 +735,6 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
 
     if (fmh2)
       cms_update(*fmh2, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
-  }
-
-  // Extra penalty for a quiet TT move in previous ply when it gets refuted
-  if ((ss-1)->moveCount == 1 && !captured_piece_type()) {
-    if ((ss-2)->counterMoves)
-      cms_update(*(ss-2)->counterMoves, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
-
-    if ((ss-3)->counterMoves)
-      cms_update(*(ss-3)->counterMoves, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
-
-    if ((ss-5)->counterMoves)
-      cms_update(*(ss-5)->counterMoves, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
   }
 }
 

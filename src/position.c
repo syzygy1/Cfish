@@ -313,7 +313,7 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
 static void set_state(Pos *pos, Stack *st)
 {
   st->key = st->pawnKey = st->materialKey = 0;
-  st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = 0;
+  st->nonPawn = 0;
   st->psq = 0;
 
   st->checkersBB = attackers_to(square_of(pos_stm(), KING)) & pieces_c(pos_stm() ^ 1);
@@ -344,7 +344,7 @@ static void set_state(Pos *pos, Stack *st)
 
   for (int c = 0; c < 2; c++)
     for (int pt = KNIGHT; pt <= QUEEN; pt++)
-       st->nonPawnMaterial[c] += piece_count(c, pt) * PieceValue[MG][pt];
+      st->nonPawn += piece_count(c, pt) * NonPawnPieceValue[make_piece(c, pt)];
 }
 
 
@@ -600,9 +600,9 @@ int is_pseudo_legal(Pos *pos, Move m)
     return 0;
 
   if (type_of_m(m) == CASTLING) {
+    if (pos_checkers()) return 0;
     ExtMove list[MAX_MOVES];
-    ExtMove *end = !pos_checkers() ? generate_quiets(pos, list)
-                                   : generate_evasions(pos, list);;
+    ExtMove *end = generate_quiets(pos, list);
     for (ExtMove *p = list; p < end; p++)
       if (p->move == m) return 1;
     return 0;
@@ -636,7 +636,7 @@ int is_pseudo_legal(Pos *pos, Move m)
     case KING:
       if (!(attacks_from_king(from) & sq_bb(to)))
         return 0;
-      // is_legal() does not remove "from" square from the "occupied"
+      // is_legal() does not remove the "from" square from the "occupied"
       // bitboard when checking that the king is not in check on the "to"
       // square. So we need to be careful here.
       if (   pos_checkers()
@@ -664,7 +664,7 @@ int is_pseudo_legal(Pos *pos, Move m)
           && !((from + pawn_push(us) == to) && is_empty(to)))
         return 0;
     }
-    else if (type_of_m(m) == ENPASSANT)
+    else
       return to == ep_square() && (attacks_from_pawn(from, us) & sq_bb(to));
   }
   if (pos_checkers()) {
@@ -694,7 +694,7 @@ exit(1);
 #endif
 
 
-// gives_check_special() is invoked by gives_check() in case there are
+// gives_check_special() is invoked by gives_check() if there are
 // discovered check candidates or the move is of a special type.
 
 int gives_check_special(Pos *pos, Stack *st, Move m)
@@ -722,7 +722,8 @@ int gives_check_special(Pos *pos, Stack *st, Move m)
     if (st->checkSquares[PAWN] & sq_bb(to))
       return 1;
     Square capsq = make_square(file_of(to), rank_of(from));
-    Bitboard b = (pieces() ^ sq_bb(from) ^ sq_bb(capsq)) | sq_bb(to);
+//    Bitboard b = pieces() ^ sq_bb(from) ^ sq_bb(capsq) ^ sq_bb(to);
+    Bitboard b = inv_sq(inv_sq(inv_sq(pieces(), from), to), capsq);
     return  (attacks_bb_rook  (st->ksq, b) & pieces_cpp(pos_stm(), QUEEN, ROOK))
           ||(attacks_bb_bishop(st->ksq, b) & pieces_cpp(pos_stm(), QUEEN, BISHOP));
   }
@@ -799,7 +800,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     pos->byTypeBB[prom_piece] ^= sq_bb(to);
     prom_piece |= piece & 8;
     st->psq += psqt.psq[prom_piece][to] - psqt.psq[piece][to];
-    st->nonPawnMaterial[us] += NonPawnPieceValue[prom_piece];
+    st->nonPawn += NonPawnPieceValue[prom_piece];
     st->materialKey += mat_key[prom_piece] - mat_key[piece];
     key ^= zob.psq[piece][from] ^ zob.psq[prom_piece][to];
     st->pawnKey ^= zob.psq[piece][from];
@@ -819,7 +820,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     }
     st->capturedType = capt_piece;
     st->psq -= psqt.psq[capt_piece][to];
-    st->nonPawnMaterial[us ^ 1] -= NonPawnPieceValue[capt_piece];
+    st->nonPawn -= NonPawnPieceValue[capt_piece];
     st->materialKey -= mat_key[capt_piece];
     pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
@@ -975,7 +976,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
       st->pawnKey ^= zob.psq[captured][capsq];
     } else
-      st->nonPawnMaterial[them] -= PieceValue[MG][captured];
+      st->nonPawn -= NonPawnPieceValue[captured];
 
     // Update board and piece lists
     remove_piece(pos, them, captured, capsq);
@@ -1039,7 +1040,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
       st->psq += psqt.psq[promotion][to] - psqt.psq[piece][to];
 
       // Update material
-      st->nonPawnMaterial[us] += PieceValue[MG][promotion];
+      st->nonPawn += NonPawnPieceValue[promotion];
     }
 
     // Update pawn hash key and prefetch access to pawnsTable

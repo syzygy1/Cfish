@@ -25,6 +25,7 @@
 
 #include "misc.h"
 #include "position.h"
+#include "thread.h"
 #include "types.h"
 
 typedef Value CounterMoveStats[16][64];
@@ -84,6 +85,8 @@ INLINE int use_time_management(LimitsType *l)
 struct SignalsType {
   atomic_bool stop;
   atomic_bool stopOnPonderhit;
+  int searching;
+  LOCK_T lock;
 };
 
 typedef struct SignalsType SignalsType;

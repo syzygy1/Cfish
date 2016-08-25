@@ -24,6 +24,7 @@
 #include <ctype.h>
 
 #include "evaluate.h"
+#include "misc.h"
 #include "movegen.h"
 #include "position.h"
 #include "search.h"
@@ -174,6 +175,11 @@ void uci_loop(int argc, char **argv)
   char fen[strlen(StartFEN) + 1];
   char *token;
 
+  LOCK_INIT(Signals.lock);
+
+  // Signals.searching is only read and set by the UI thread.
+  Signals.searching = 0;
+
   pos.stack = malloc(1000 * sizeof(Stack));
   pos.stack++;
   pos.moveList = malloc(1000 * sizeof(ExtMove));
@@ -222,12 +228,18 @@ void uci_loop(int argc, char **argv)
     // waiting for 'ponderhit' to stop the search (for instance because we
     // already ran out of time), otherwise we should continue searching but
     // switching from pondering to normal search.
-    if (    strcmp(token, "quit") == 0
-        ||  strcmp(token, "stop") == 0
-        || (strcmp(token, "ponderhit") == 0 && Signals.stopOnPonderhit)) {
-
-      Signals.stop = 1;
-      thread_start_searching(threads_main(), 1); // Could be sleeping
+    if (   strcmp(token, "quit") == 0
+        || strcmp(token, "stop") == 0
+        || strcmp(token, "ponderhit") == 0) {
+      if (Signals.searching) {
+        Signals.stop = 1;
+        LOCK(Signals.lock);
+        if (Signals.stopOnPonderhit)
+          thread_start_searching(threads_main(), 1); // Wake up main thread.
+        else if (strcmp(token, "ponderhit") == 0)
+          Limits.ponder = 0; // Switch to normal search.
+        UNLOCK(Signals.lock);
+      }
     }
     else if (strcmp(token, "ponderhit") == 0)
       Limits.ponder = 0; // Switch to normal search
@@ -267,11 +279,14 @@ void uci_loop(int argc, char **argv)
     }
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
+  if (Signals.searching)
+    thread_wait_for_search_finished(threads_main());
+
   free(cmd);
   free(pos.stack - 1);
   free(pos.moveList);
 
-  thread_wait_for_search_finished(threads_main());
+  LOCK_DESTROY(Signals.lock);
 }
 
 

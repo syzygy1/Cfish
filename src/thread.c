@@ -60,6 +60,7 @@ Pos *thread_create(int idx)
   pos->exit = 0;
   pos->maxPly = pos->callsCnt = 0;
 
+#ifndef __WIN32__
   pthread_mutex_init(&pos->mutex, NULL);
   pthread_cond_init(&pos->sleepCondition, NULL);
 
@@ -69,6 +70,11 @@ Pos *thread_create(int idx)
   while (pos->searching)
     pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
   pthread_mutex_unlock(&pos->mutex);
+#else
+  pos->startEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+  pos->stopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+  pos->nativeThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_idle_loop, pos, 0, NULL);
+#endif
 
   return pos;
 }
@@ -78,11 +84,17 @@ Pos *thread_create(int idx)
 
 void thread_destroy(Pos *pos)
 {
+#ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
   pos->exit = 1;
   pthread_cond_signal(&pos->sleepCondition);
   pthread_mutex_unlock(&pos->mutex);
   pthread_join(pos->nativeThread, NULL);
+#else
+  pos->exit = 1;
+  SetEvent(pos->startEvent);
+  WaitForSingleObject(pos->nativeThread, INFINITE);
+#endif
 
   free(pos->pawnTable);
   free(pos->materialTable);
@@ -93,6 +105,12 @@ void thread_destroy(Pos *pos)
   free(pos->rootMoves);
   free(pos->stack - 5);
   free(pos->moveList);
+
+#ifndef __WIN32__
+  pthread_cond_destroy(&pos->sleepCondition);
+  pthread_mutex_destroy(&pos->mutex);
+#else
+#endif
   
   free(pos);
 }
@@ -103,10 +121,17 @@ void thread_destroy(Pos *pos)
 
 void thread_wait_for_search_finished(Pos *pos)
 {
+#ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
   while (pos->searching)
     pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
   pthread_mutex_unlock(&pos->mutex);
+#else
+  WaitForSingleObject(pos->stopEvent, INFINITE);
+#endif
+
+  if (pos->thread_idx == 0)
+    Signals.searching = 0;
 }
 
 
@@ -114,10 +139,15 @@ void thread_wait_for_search_finished(Pos *pos)
 
 void thread_wait(Pos *pos, atomic_bool *condition)
 {
+#ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
   while (!atomic_load(condition))
     pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
   pthread_mutex_unlock(&pos->mutex);
+#else
+  (void)condition;
+  WaitForSingleObject(pos->startEvent, INFINITE);
+#endif
 }
 
 
@@ -125,6 +155,7 @@ void thread_wait(Pos *pos, atomic_bool *condition)
 
 void thread_start_searching(Pos *pos, int resume)
 {
+#ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
 
   if (!resume)
@@ -132,6 +163,10 @@ void thread_start_searching(Pos *pos, int resume)
 
   pthread_cond_signal(&pos->sleepCondition);
   pthread_mutex_unlock(&pos->mutex);
+#else
+  (void)resume;
+  SetEvent(pos->startEvent);
+#endif
 }
 
 
@@ -140,6 +175,7 @@ void thread_start_searching(Pos *pos, int resume)
 void thread_idle_loop(Pos *pos)
 {
   while (!pos->exit) {
+#ifndef __WIN32__
     pthread_mutex_lock(&pos->mutex);
 
     pos->searching = 0;
@@ -157,6 +193,17 @@ void thread_idle_loop(Pos *pos)
       else
         thread_search(pos);
     }
+#else
+//    pos->searching = 0;
+    WaitForSingleObject(pos->startEvent, INFINITE);
+    if (!pos->exit) {
+      if (pos->thread_idx == 0)
+        mainthread_search();
+      else
+        thread_search(pos);
+    }
+    SetEvent(pos->stopEvent);
+#endif
   }
 }
 
@@ -168,9 +215,12 @@ void thread_idle_loop(Pos *pos)
 
 void threads_init(void)
 {
+#ifdef __WIN32__
+  io_mutex = CreateMutex(NULL, FALSE, NULL);
+#endif
+
   Threads.num_threads = 1;
   Threads.pos[0] = thread_create(0);
-//  threads_read_uci_options();
 }
 
 
@@ -182,6 +232,10 @@ void threads_exit(void)
 {
   while (Threads.num_threads > 0)
     thread_destroy(Threads.pos[--Threads.num_threads]);
+
+#ifdef __WIN32__
+  CloseHandle(io_mutex);
+#endif
 }
 
 
@@ -232,7 +286,8 @@ uint64_t threads_tb_hits(void)
 
 void threads_start_thinking(Pos *root, LimitsType *limits)
 {
-  thread_wait_for_search_finished(threads_main());
+  if (Signals.searching)
+    thread_wait_for_search_finished(threads_main());
 
   Signals.stopOnPonderhit = Signals.stop = 0;
   Limits = *limits;
@@ -271,6 +326,7 @@ void threads_start_thinking(Pos *root, LimitsType *limits)
   if (TB_RootInTB)
     Threads.pos[0]->tb_hits = end - list;
 
+  Signals.searching = 1;
   thread_start_searching(threads_main(), 0);
 }
 

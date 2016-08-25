@@ -33,23 +33,18 @@
 #define MAX_THREADS 128
 
 #ifndef __WIN32__
-#define Thread pthread_t
-#define Mutex pthread_mutex_t
-#define Condition pthread_cond_t
-#define Thread_create(x,y,z) pthread_create(&(x), NULL, (void*(*)(void*))(y), z)
-#define Thread_destroy(x) pthread_join(&(x), NULL)
-#define Mutex_init(x) pthread_mutex_init(&(x), NULL)
-#define Mutex_lock(x) pthread_mutex_lock(&(x))
-#define Mutex_unlock(x) pthread_mutex_unlock(&(x))
-#define Conditon_init(x) pthread_cond_init(&(x), NULL)
-#define Condition_wait(x,y) pthread_cond_wait(&(x), &(y))
-#define Condition_signal(x) pthread_cond_signal(&(x))
+#define LOCK_T pthread_mutex_t
+#define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
+#define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
+#define LOCK(x) pthread_mutex_lock(&(x))
+#define UNLOCK(x) pthread_mutex_unlock(&(x))
 #else
-#define Thread HANDLE
-#define Mutex HANDLE
-#define 
+#define LOCK_T HANDLE
+#define LOCK_INIT(x) do { x = CreateMutex(NULL, FALSE, NULL); } while (0)
+#define LOCK_DESTROY(x) CloseHandle(x)
+#define LOCK(x) WaitForSingleObject(x, INFINITE)
+#define UNLOCK(x) ReleaseMutex(x)
 #endif
-
 
 Pos *thread_create(int idx);
 void thread_search(Pos *pos);

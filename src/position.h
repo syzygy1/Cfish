@@ -22,7 +22,9 @@
 #define POSITION_H
 
 #include <assert.h>
+#ifndef __WIN32__
 #include <pthread.h>
+#endif
 #include <stdatomic.h>
 #include <stddef.h>  // For offsetof()
 #include <string.h>
@@ -43,18 +45,6 @@ extern struct Zob zob;
 void psqt_init(void);
 void zob_init(void);
 
-// CheckInfo struct is initialized at constructor time and keeps info used
-// to detect if a move gives check.
-
-struct CheckInfo {
-  Bitboard dcCandidates;
-  Bitboard pinned;
-  Bitboard checkSquares[8];
-  Square   ksq;
-};
-
-typedef struct CheckInfo CheckInfo;
-
 void calc_checkinfo(Pos *pos);
 
 // Stack struct stores information needed to restore a Pos struct to
@@ -67,12 +57,16 @@ struct Stack {
   union {
     struct {
       Score psq;
-      Value nonPawnMaterial[2];
+      union {
+        uint16_t nonPawnMaterial[2];
+        uint32_t nonPawn;
+      };
     };
+    uint64_t psqnpm;
   };
   uint8_t castlingRights;
-  uint8_t rule50;
   uint8_t pliesFromNull;
+  uint8_t rule50;
 
   // Not copied when making a move
   uint8_t capturedType;
@@ -165,9 +159,14 @@ struct Pos {
   int callsCnt;
   int exit, searching;
   int thread_idx;
+#ifndef __WIN32__
   pthread_t nativeThread;
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;
+#else
+  HANDLE nativeThread;
+  HANDLE startEvent, stopEvent;
+#endif
 };
 
 // FEN string input/output
@@ -175,12 +174,13 @@ void pos_set(Pos *pos, char *fen, int isChess960);
 void pos_fen(Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
-Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
-Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
+PURE Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
+PURE Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
+//Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 
-int is_legal(Pos *pos, Move m, Bitboard pinned);
-int is_pseudo_legal(Pos *pos, Move m);
-int gives_check_special(Pos *pos, Stack *st, Move m);
+PURE int is_legal(Pos *pos, Move m, Bitboard pinned);
+PURE int is_pseudo_legal(Pos *pos, Move m);
+PURE int gives_check_special(Pos *pos, Stack *st, Move m);
 
 // Doing and undoing moves
 void do_move(Pos *pos, Move m, int givesCheck);
@@ -189,13 +189,13 @@ void do_null_move(Pos *pos);
 void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
-Value see(Pos *pos, Move m);
-Value see_sign(Pos *pos, Move m);
-Value see_test(Pos *pos, Move m, int value);
+PURE Value see(Pos *pos, Move m);
+PURE Value see_sign(Pos *pos, Move m);
+PURE Value see_test(Pos *pos, Move m, int value);
 
-Key key_after(Pos *pos, Move m);
-int game_phase(Pos *pos);
-int is_draw(Pos *pos);
+PURE Key key_after(Pos *pos, Move m);
+PURE int game_phase(Pos *pos);
+PURE int is_draw(Pos *pos);
 
 // Position consistency check, for debugging
 int pos_is_ok(Pos *pos, int* failedStep);
@@ -278,7 +278,7 @@ INLINE Bitboard discovered_check_candidates(Pos *pos)
 
 INLINE Bitboard pinned_pieces(Pos *pos, int c)
 {
-  return  slider_blockers(pos, pieces_c(c ^ 1), square_of(c, KING)) & pieces_c(c);
+  return slider_blockers(pos, pieces_c(c ^ 1), square_of(c, KING)) & pieces_c(c);
 }
 
 INLINE int pawn_passed(Pos *pos, int c, Square s)
@@ -299,7 +299,7 @@ INLINE int opposite_bishops(Pos *pos)
         && opposite_colors(square_of(WHITE, BISHOP), square_of(BLACK, BISHOP));
 }
 
-INLINE int is_capture_or_promotion(Pos *pos, Move m)
+INLINE int is_capture_or_promotion(const Pos *pos, Move m)
 {
   assert(move_is_ok(m));
   return type_of_m(m) != NORMAL ? type_of_m(m) != CASTLING : !is_empty(to_sq(m));

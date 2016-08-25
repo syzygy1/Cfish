@@ -82,9 +82,18 @@ extern Square CastlingRookTo[16];
 #endif
 
 
-INLINE Bitboard sq_bb(Square s)
+INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
 {
   return SquareBB[s];
+//  Bitboard b;
+//  __asm__("xor %0, %0\n\tbtsq %1, %0" : "=&r" (b) : "r" ((uint64_t)s) : "cc");
+//  return b;
+}
+
+INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
+{
+  __asm__("btcq %1, %0" : "+r" (b) : "r" ((uint64_t)s) : "cc");
+  return b;
 }
 
 INLINE uint64_t more_than_one(Bitboard b)
@@ -321,16 +330,16 @@ INLINE int popcount(Bitboard b)
 
 #if defined(__GNUC__)
 
-INLINE Square lsb(Bitboard b)
+INLINE int lsb(Bitboard b)
 {
   assert(b);
-  return (Square)(__builtin_ctzll(b));
+  return __builtin_ctzll(b);
 }
 
-INLINE Square msb(Bitboard b)
+INLINE int msb(Bitboard b)
 {
   assert(b);
-  return (Square)(63 - __builtin_clzll(b));
+  return 63 - __builtin_clzll(b);
 }
 
 #elif defined(_WIN64) && defined(_MSC_VER)

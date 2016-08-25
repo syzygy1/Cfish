@@ -28,8 +28,6 @@
 #include "search.h"
 #include "types.h"
 
-#define max(a,b) ((a) > (b) ? (a) : (b))
-
 #define stats_clear(s) memset(s, 0, sizeof(*s))
 
 INLINE void hs_update(HistoryStats hs, Piece pc, Square to, Value v)

@@ -21,9 +21,10 @@
 #include "types.h"
 
 Value PieceValue[2][16] = {
-{ VALUE_ZERO, PawnValueMg, KnightValueMg, BishopValueMg, RookValueMg, QueenValueMg },
-{ VALUE_ZERO, PawnValueEg, KnightValueEg, BishopValueEg, RookValueEg, QueenValueEg } };
-Value NonPawnPieceValue[16];
+{ 0, PawnValueMg, KnightValueMg, BishopValueMg, RookValueMg, QueenValueMg },
+{ 0, PawnValueEg, KnightValueEg, BishopValueEg, RookValueEg, QueenValueEg } };
+
+uint32_t NonPawnPieceValue[16];
 
 #define S(mg, eg) make_score((unsigned)(mg), (unsigned)(eg))
 
@@ -117,8 +118,18 @@ void psqt_init(void) {
       psqt.psq[make_piece(BLACK, pt)][s ^ 0x38] = -psqt.psq[make_piece(WHITE, pt)][s];
     }
   }
-  for (int pt = 0; pt < 16; pt++)
-    NonPawnPieceValue[pt] = PieceValue[MG][pt];
+  union {
+    uint16_t val[2];
+    uint32_t combi;
+  } tmp;
   NonPawnPieceValue[W_PAWN] = NonPawnPieceValue[B_PAWN] = 0;
+  for (int pt = KNIGHT; pt < KING; pt++) {
+    tmp.val[0] = PieceValue[MG][pt];
+    tmp.val[1] = 0;
+    NonPawnPieceValue[pt] = tmp.combi;
+    tmp.val[0] = 0;
+    tmp.val[1] = PieceValue[MG][pt];
+    NonPawnPieceValue[pt + 8] = tmp.combi;
+  }
 }
 

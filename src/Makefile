@@ -68,6 +68,7 @@ prefetch = yes
 popcnt = yes
 sse = yes
 pext = no
+EXTRACFLAGS += -march=native
 
 ### 2.2 Architecture specific
 
@@ -157,24 +158,24 @@ ifeq ($(COMP),mingw)
 
 	ifeq ($(UNAME),Linux)
 		ifeq ($(bits),64)
-			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
-				CXX=x86_64-w64-mingw32-cc
-			else
-				CXX=x86_64-w64-mingw32-cc-posix
-			endif
+#			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
+				CC=x86_64-w64-mingw32-gcc
+#			else
+#				CC=x86_64-w64-mingw32-cc-posix
+#			endif
 		else
 			ifeq ($(shell which i686-w64-mingw32-cc-posix),)
-				CXX=i686-w64-mingw32-cc
+				CC=i686-w64-mingw32-cc
 			else
-				CXX=i686-w64-mingw32-cc-posix
+				CC=i686-w64-mingw32-cc-posix
 			endif
 		endif
 	else
-		CXX=gcc
+		CC=gcc
 	endif
 
 	CFLAGS += -Wextra -Wshadow
-	LDFLAGS += -static
+	LDFLAGS += #-static
 endif
 
 ifeq ($(COMP),icc)
@@ -330,7 +331,7 @@ ifeq ($(comp),mingw)
 	ifeq ($(UNAME),Linux)
 	ifeq ($(optimize),yes)
 	ifeq ($(debug),no)
-		CFLAGS += -flto
+		CFLAGS += # -flto
 		LDFLAGS += $(CFLAGS)
 	endif
 	endif

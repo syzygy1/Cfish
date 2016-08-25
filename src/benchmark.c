@@ -19,6 +19,7 @@
 */
 
 #define _GNU_SOURCE
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -171,7 +172,7 @@ void benchmark(Pos *current, char *str)
   for (size_t i = 0; i < num_fens; i++) {
     pos_set(&pos, fens[i], option_value(OPT_CHESS960));
 
-    fprintf(stderr, "\nPosition: %zu/%zu\n", i + 1, num_fens);
+    fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", i + 1, num_fens);
 
     if (strcmp(limitType, "perft") == 0)
       nodes += perft(&pos, limits.depth * ONE_PLY);
@@ -188,9 +189,9 @@ void benchmark(Pos *current, char *str)
   dbg_print(); // Just before exiting
 
   fprintf(stderr, "\n==========================="
-                  "\nTotal time (ms) : %lu"
-                  "\nNodes searched  : %lu" 
-                  "\nNodes/second    : %lu\n",
+                  "\nTotal time (ms) : %" PRIu64
+                  "\nNodes searched  : %" PRIu64
+                  "\nNodes/second    : %" PRIu64 "\n",
                   elapsed, nodes, 1000 * nodes / elapsed);
 
   if (fens != Defaults) {

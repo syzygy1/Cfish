@@ -371,7 +371,7 @@ ExtMove *generate_evasions(Pos *pos, ExtMove *list)
   // avoids any useless legality checks later on.
   while (sliders) {
     Square checksq = pop_lsb(&sliders);
-    sliderAttacks |= LineBB[checksq][ksq] ^ sq_bb(checksq);
+    sliderAttacks |= LineBB[ksq][checksq] ^ sq_bb(checksq);
   }
 
   // Generate evasions for king, capture and non capture moves
@@ -384,7 +384,7 @@ ExtMove *generate_evasions(Pos *pos, ExtMove *list)
 
   // Generate blocking evasions or captures of the checking piece
   Square checksq = lsb(pos_checkers());
-  Bitboard target = between_bb(checksq, ksq) | sq_bb(checksq);
+  Bitboard target = between_bb(ksq, checksq) | sq_bb(checksq);
 
   return us == WHITE ? generate_all(pos, list, target, WHITE, EVASIONS)
                      : generate_all(pos, list, target, BLACK, EVASIONS);

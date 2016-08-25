@@ -44,7 +44,7 @@ void tt_resize(size_t mbSize)
   TT.mem = calloc(count * sizeof(Cluster) + CacheLineSize - 1, 1);
 
   if (!TT.mem) {
-    fprintf(stderr, "Failed to allocate %zuMB for transposition table.\n",
+    fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for transposition table.\n",
             mbSize);
     exit(EXIT_FAILURE);
   }

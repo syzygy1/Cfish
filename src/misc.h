@@ -23,7 +23,9 @@
 
 #include <assert.h>
 #include <stdio.h>
+#ifndef __WIN32__
 #include <pthread.h>
+#endif
 #include <stdatomic.h>
 #include <sys/time.h>
 
@@ -68,10 +70,16 @@ INLINE TimePoint now() {
   return 1000 * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec / 1000;
 }
 
+#ifndef __WIN32__
 extern pthread_mutex_t io_mutex;
-
 #define IO_LOCK   pthread_mutex_lock(&io_mutex)
 #define IO_UNLOCK pthread_mutex_unlock(&io_mutex)
+#else
+ssize_t getline(char **lineptr, size_t *n, FILE *stream);
+extern HANDLE io_mutex;
+#define IO_LOCK WaitForSingleObject(io_mutex, INFINITE)
+#define IO_UNLOCK ReleaseMutex(io_mutex)
+#endif
 
 struct PRNG
 {

@@ -45,8 +45,15 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
+#ifdef __WIN32__
+#include <windows.h>
+#endif
 
-#define INLINE static inline __attribute((always_inline))
+#define INLINE static inline __attribute__((always_inline))
+
+// Declaring pure functions as pure seems not to help. (Investigate later.)
+//#define PURE __attribute__((pure))
+#define PURE
 
 // Predefined macros hell:
 //
@@ -349,7 +356,8 @@ INLINE Score score_divide(Score s, int i)
 }
 
 extern Value PieceValue[2][16];
-extern Value NonPawnPieceValue[16];
+
+extern uint32_t NonPawnPieceValue[16];
 
 #define SQUARE_FLIP(s) (sq ^ 0x38)
 
@@ -407,8 +415,16 @@ struct PSQT {
 
 extern struct PSQT psqt;
 
+#ifndef __WIN32__
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
+#ifndef __WIN32__
+#define FMT_Z "z"
+#else
+#define FMT_Z "I"
+#endif
 
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)

@@ -45,8 +45,6 @@ int main(int argc, char **argv)
   endgames_init();
   threads_init();
   options_init();
-//  TB_init(); // Options["SyzygyPath"]
-//  tt_resize(); // Options["Hash"]
 
   uci_loop(argc, argv);
 
