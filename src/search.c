@@ -358,6 +358,7 @@ void mainthread_search(void)
   if (bestThread->rootMoves->move[0].pv_size > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos))
     printf(" ponder %s", uci_move(buf, bestThread->rootMoves->move[0].pv[1], is_chess960()));
 
+  printf("\n");
   fflush(stdout);
   IO_UNLOCK;
 }
