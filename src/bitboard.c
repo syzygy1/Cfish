@@ -21,18 +21,39 @@
 #include "bitboard.h"
 #include "misc.h"
 
+#ifndef USE_POPCNT
 uint8_t PopCnt16[1 << 16];
+#endif
 int SquareDistance[64][64];
 
-Bitboard  RookMasks  [64];
-Bitboard  RookMagics [64];
-Bitboard* RookAttacks[64];
-unsigned  RookShifts [64];
+static Square RookDeltas[] = { DELTA_N,  DELTA_E,  DELTA_S,  DELTA_W  };
+static Square BishopDeltas[] = { DELTA_NE, DELTA_SE, DELTA_SW, DELTA_NW };
 
-Bitboard  BishopMasks  [64];
-Bitboard  BishopMagics [64];
-Bitboard* BishopAttacks[64];
-unsigned  BishopShifts [64];
+static Bitboard sliding_attack(Square deltas[], Square sq, Bitboard occupied)
+{
+  Bitboard attack = 0;
+
+  for (int i = 0; i < 4; i++)
+    for (Square s = sq + deltas[i];
+         square_is_ok(s) && distance(s, s - deltas[i]) == 1; s += deltas[i])
+    {
+      attack |= sq_bb(s);
+      if (occupied & sq_bb(s))
+        break;
+    }
+
+  return attack;
+}
+
+#if defined(MAGIC_FANCY)
+#include "magic-fancy.c"
+#elif defined(MAGIC_PLAIN)
+#include "magic-plain.c"
+#elif defined(BMI2_FANCY)
+#include "bmi2-fancy.c"
+#elif defined(BMI2_PLAIN)
+#include "bmi2-plain.c"
+#endif
 
 Bitboard SquareBB[64];
 Bitboard FileBB[8];
@@ -65,15 +86,10 @@ Square CastlingRookTo[16];
 #define DeBruijn64 0x3F79D71B4CB0A89ULL
 #define DeBruijn32 0x783A9B23
 
+#ifdef NO_BSF
 static int MSBTable[256];            // To implement software msb()
 static Square BSFTable[64];          // To implement software bitscan
-static Bitboard RookTable[0x19000];  // To store rook attacks
-static Bitboard BishopTable[0x1480]; // To store bishop attacks
-
-typedef unsigned (Fn)(Square, Bitboard);
-
-void init_magics(Bitboard table[], Bitboard* attacks[], Bitboard magics[],
-                 Bitboard masks[], unsigned shifts[], Square deltas[], Fn index);
+#endif
 
 // bsf_index() returns the index into BSFTable[] to look up the bitscan. Uses
 // Matt Taylor's folding for 32 bit case, extended to 64 bit by Kim Walisch.
@@ -88,7 +104,7 @@ INLINE unsigned bsf_index(Bitboard b)
 
 // popcount16() counts the non-zero bits using SWAR-Popcount algorithm.
 
-unsigned popcount16(unsigned u)
+INLINE unsigned popcount16(unsigned u)
 {
   u -= (u >> 1) & 0x5555U;
   u = ((u >> 2) & 0x3333U) + (u & 0x3333U);
@@ -157,9 +173,12 @@ void print_pretty(Bitboard b)
 
 void bitboards_init()
 {
+#ifndef USE_POPCNT
   for (unsigned i = 0; i < (1 << 16); ++i)
     PopCnt16[i] = (uint8_t) popcount16(i);
+#endif
 
+#ifdef NO_BSF
   for (Square s = 0; s < 64; s++) {
     SquareBB[s] = 1ULL << s;
     BSFTable[bsf_index(SquareBB[s])] = s;
@@ -167,6 +186,10 @@ void bitboards_init()
 
   for (Bitboard b = 2; b < 256; b++)
     MSBTable[b] = MSBTable[b - 1] + !more_than_one(b);
+#else
+  for (Square s = 0; s < 64; s++)
+    SquareBB[s] = 1ULL << s;
+#endif
 
   for (int f = 0; f < 8; f++)
     FileBB[f] = f > FILE_A ? FileBB[f - 1] << 1 : FileABB;
@@ -213,13 +236,7 @@ void bitboards_init()
             StepAttacksBB[make_piece(c, pt)][s] |= sq_bb(to);
         }
 
-  Square RookDeltas[] = { DELTA_N,  DELTA_E,  DELTA_S,  DELTA_W  };
-  Square BishopDeltas[] = { DELTA_NE, DELTA_SE, DELTA_SW, DELTA_NW };
-
-  init_magics(RookTable, RookAttacks, RookMagics, RookMasks,
-              RookShifts, RookDeltas, magic_index_rook);
-  init_magics(BishopTable, BishopAttacks, BishopMagics, BishopMasks,
-              BishopShifts, BishopDeltas, magic_index_bishop);
+  init_sliding_attacks();
 
   for (Square s1 = 0; s1 < 64; s1++) {
     PseudoAttacks[QUEEN][s1] = PseudoAttacks[BISHOP][s1] = attacks_bb_bishop(s1, 0);
@@ -233,103 +250,6 @@ void bitboards_init()
         LineBB[s1][s2] = (attacks_bb(pc, s1, 0) & attacks_bb(pc, s2, 0)) | sq_bb(s1) | sq_bb(s2);
         BetweenBB[s1][s2] = attacks_bb(pc, s1, SquareBB[s2]) & attacks_bb(pc, s2, SquareBB[s1]);
       }
-  }
-}
-
-
-Bitboard sliding_attack(Square deltas[], Square sq, Bitboard occupied)
-{
-  Bitboard attack = 0;
-
-  for (int i = 0; i < 4; i++)
-    for (Square s = sq + deltas[i];
-         square_is_ok(s) && distance(s, s - deltas[i]) == 1; s += deltas[i])
-    {
-      attack |= sq_bb(s);
-      if (occupied & sq_bb(s))
-        break;
-    }
-
-  return attack;
-}
-
-
-// init_magics() computes all rook and bishop attacks at startup. Magic
-// bitboards are used to look up attacks of sliding pieces. As a reference see
-// chessprogramming.wikispaces.com/Magic+Bitboards. In particular, here we
-// use the so called "fancy" approach.
-
-void init_magics(Bitboard table[], Bitboard* attacks[], Bitboard magics[],
-                 Bitboard masks[], unsigned shifts[], Square deltas[], Fn index)
-{
-  int seeds[][8] = { { 8977, 44560, 54343, 38998,  5731, 95205, 104912, 17020 },
-                     {  728, 10316, 55013, 32803, 12281, 15100,  16645,   255 } };
-
-  Bitboard occupancy[4096], reference[4096], edges, b;
-  int age[4096] = {0}, current = 0, i, size;
-
-  // attacks[s] is a pointer to the beginning of the attacks table for square 's'
-  attacks[0] = table;
-
-  for (Square s = 0; s < 64; s++) {
-    // Board edges are not considered in the relevant occupancies
-    edges = ((Rank1BB | Rank8BB) & ~rank_bb_s(s)) | ((FileABB | FileHBB) & ~file_bb_s(s));
-
-    // Given a square 's', the mask is the bitboard of sliding attacks from
-    // 's' computed on an empty board. The index must be big enough to contain
-    // all the attacks for each possible subset of the mask and so is 2 power
-    // the number of 1s of the mask. Hence we deduce the size of the shift to
-    // apply to the 64 or 32 bits word to get the index.
-    masks[s]  = sliding_attack(deltas, s, 0) & ~edges;
-    shifts[s] = (Is64Bit ? 64 : 32) - popcount(masks[s]);
-
-    // Use Carry-Rippler trick to enumerate all subsets of masks[s] and
-    // store the corresponding sliding attack bitboard in reference[].
-    b = size = 0;
-    do {
-      occupancy[size] = b;
-      reference[size] = sliding_attack(deltas, s, b);
-
-      if (HasPext)
-        attacks[s][pext(b, masks[s])] = reference[size];
-
-      size++;
-      b = (b - masks[s]) & masks[s];
-    } while (b);
-
-    // Set the offset for the table of the next square. We have individual
-    // table sizes for each square with "Fancy Magic Bitboards".
-    if (s < 63)
-      attacks[s + 1] = attacks[s] + size;
-
-    if (HasPext)
-      continue;
-
-    PRNG rng;
-    prng_init(&rng, seeds[Is64Bit][rank_of(s)]);
-
-    // Find a magic for square 's' picking up an (almost) random number
-    // until we find the one that passes the verification test.
-    do {
-      do
-        magics[s] = prng_sparse_rand(&rng);
-      while (popcount((magics[s] * masks[s]) >> 56) < 6);
-
-      // A good magic must map every possible occupancy to an index that
-      // looks up the correct sliding attack in the attacks[s] database.
-      // Note that we build up the database for square 's' as a side
-      // effect of verifying the magic.
-      for (current++, i = 0; i < size; i++) {
-        unsigned idx = index(s, occupancy[i]);
-
-        if (age[idx] < current) {
-          age[idx] = current;
-          attacks[s][idx] = reference[i];
-        }
-        else if (attacks[s][idx] != reference[i])
-          break;
-      }
-    } while (i < size);
   }
 }
 
