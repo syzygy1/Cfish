@@ -55,7 +55,7 @@ INLINE void put_piece(Pos *pos, int c, int piece, Square s)
   pos->byTypeBB[type_of_p(piece)] |= sq_bb(s);
   pos->byColorBB[c] |= sq_bb(s);
   pos->index[s] = pos->pieceCount[piece]++;
-  pos->pieceList[piece][pos->index[s]] = s;
+  pos->pieceList[pos->index[s]] = s;
 }
 
 INLINE void remove_piece(Pos *pos, int c, int piece, Square s)
@@ -65,10 +65,10 @@ INLINE void remove_piece(Pos *pos, int c, int piece, Square s)
   pos->byTypeBB[type_of_p(piece)] ^= sq_bb(s);
   pos->byColorBB[c] ^= sq_bb(s);
   /* board[s] = 0;  Not needed, overwritten by the capturing one */
-  Square lastSquare = pos->pieceList[piece][--pos->pieceCount[piece]];
+  Square lastSquare = pos->pieceList[--pos->pieceCount[piece]];
   pos->index[lastSquare] = pos->index[s];
-  pos->pieceList[piece][pos->index[lastSquare]] = lastSquare;
-  pos->pieceList[piece][pos->pieceCount[piece]] = SQ_NONE;
+  pos->pieceList[pos->index[lastSquare]] = lastSquare;
+  pos->pieceList[pos->pieceCount[piece]] = SQ_NONE;
 }
 
 INLINE void move_piece(Pos *pos, int c, int piece, Square from, Square to)
@@ -82,7 +82,7 @@ INLINE void move_piece(Pos *pos, int c, int piece, Square from, Square to)
   pos->board[from] = 0;
   pos->board[to] = piece;
   pos->index[to] = pos->index[from];
-  pos->pieceList[piece][pos->index[to]] = to;
+  pos->pieceList[pos->index[to]] = to;
 }
 #endif
 
@@ -164,9 +164,10 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   Stack *st = pos->st = pos->stack;
   memset(st, 0, StateSize);
 #ifdef PEDANTIC
-  for (int piece = 0; piece < 16; piece++)
-    for (int i = 0; i < 16; i++)
-      pos->pieceList[piece][i] = SQ_NONE;
+  for (int i = 0; i < 256; i++)
+    pos->pieceList[i] = SQ_NONE;
+  for (int i = 0; i < 16; i++)
+    pos->pieceCount[i] = 16 * i;
 #else
   for (Square s = 0; s < 64; s++)
     CastlingRightsMask[s] = ANY_CASTLING;
@@ -753,11 +754,9 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   Stack *st = ++pos->st;
   st->previous = st - 1;
-  st->nonPawnMaterial[0] = (st-1)->nonPawnMaterial[0];
-  st->nonPawnMaterial[1] = (st-1)->nonPawnMaterial[1];
-  st->psq = (st-1)->psq;
-  st->materialKey = (st-1)->materialKey;
   st->pawnKey = (st-1)->pawnKey;
+  st->materialKey = (st-1)->materialKey;
+  st->psqnmp = (st-1)->psqnmp; // psq and nonPawnMaterial
 
   Square from = from_sq(m);
   Square to = to_sq(m);
