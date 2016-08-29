@@ -97,19 +97,31 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   ttMove =  rootNode ? pos->rootMoves->move[pos->PVIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
 
-  // At non-PV nodes we check for an early TT cutoff
+  // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
       && ttHit
       && tte_depth(tte) >= depth
-      && ttValue != VALUE_NONE // Possible in case of TT access race
+      && ttValue != VALUE_NONE // Possible in case of TT access race.
       && (ttValue >= beta ? (tte_bound(tte) & BOUND_LOWER)
                           : (tte_bound(tte) & BOUND_UPPER))) {
-    ss->currentMove = ttMove; // Can be MOVE_NONE
+    ss->currentMove = ttMove; // Can be MOVE_NONE.
 
-    // If ttMove is quiet, update killers, history, counter move on TT hit
-    if (ttValue >= beta && ttMove)
-      update_stats(pos, ss, ttMove, depth, NULL, 0);
+    // If ttMove is quiet, update killers, history, counter move on TT hit.
+    if (ttValue >= beta && ttMove) {
+      int d = depth / ONE_PLY;
 
+      if (!is_capture_or_promotion(pos, ttMove)) {
+        Value bonus = d * d + 2 * d - 2;
+        update_stats(pos, ss, ttMove, NULL, 0, bonus);
+      }
+
+      // Extra penalty for a quiet TT move in previous ply when it gets refuted.
+      if ((ss-1)->moveCount == 1 && !captured_piece_type()) {
+        Value penalty = d * d + 4 * d + 1;
+        Square prevSq = to_sq((ss-1)->currentMove);
+        update_cm_stats(ss-1, piece_on(prevSq), prevSq, -penalty);
+      }
+    }
     return ttValue;
   }
 
@@ -170,14 +182,14 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Razoring (skipped when in check)
   if (   !PvNode
       &&  depth < 4 * ONE_PLY
-      &&  eval + razor_margin[depth] <= alpha
+      &&  eval + razor_margin[depth / ONE_PLY] <= alpha
       &&  ttMove == MOVE_NONE) {
 
     if (   depth <= ONE_PLY
         && eval + razor_margin[3 * ONE_PLY] <= alpha)
       return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
 
-    Value ralpha = alpha - razor_margin[depth];
+    Value ralpha = alpha - razor_margin[depth / ONE_PLY];
     Value v = qsearch_NonPV_false(pos, ss, ralpha, DEPTH_ZERO);
     if (v <= ralpha)
       return v;
@@ -203,7 +215,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = ((823 + 67 * depth) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
+    Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
@@ -266,13 +278,14 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 10. Internal iterative deepening (skipped when in check)
   if (    depth >= 6 * ONE_PLY
       && !ttMove
-      && (PvNode || ss->staticEval + 256 >= beta)) {
-
+      && (PvNode || ss->staticEval + 256 >= beta))
+  {
+    Depth d = (3 * depth / (4 * ONE_PLY) - 2) * ONE_PLY;
     ss->skipEarlyPruning = 1;
 #if PvNode
-    search_PV(pos, ss, alpha, beta, 3 * depth / 4 - 2 * ONE_PLY);
+    search_PV(pos, ss, alpha, beta, d);
 #else
-    search_NonPV(pos, ss, alpha, 3 * depth / 4 - 2 * ONE_PLY, cutNode);
+    search_NonPV(pos, ss, alpha, d, cutNode);
 #endif
     ss->skipEarlyPruning = 0;
 
@@ -346,7 +359,7 @@ moves_loop: // When in check search starts from here.
     givesCheck = gives_check(pos, ss, move);
 
     moveCountPruning =   depth < 16 * ONE_PLY
-                      && moveCount >= FutilityMoveCounts[improving][depth];
+                && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
     // Step 12. Extend checks
     if (    givesCheck
@@ -365,10 +378,11 @@ moves_loop: // When in check search starts from here.
         &&  is_legal(pos, move, ss->pinned))
     {
       Value rBeta = ttValue - 2 * depth / ONE_PLY;
+      Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
       ss->excludedMove = move;
       ss->skipEarlyPruning = 1;
       Move cm = ss->countermove;
-      value = search_NonPV(pos, ss, rBeta - 1, depth / 2, cutNode);
+      value = search_NonPV(pos, ss, rBeta - 1, d, cutNode);
       ss->skipEarlyPruning = 0;
       ss->excludedMove = 0;
 
@@ -416,7 +430,8 @@ moves_loop: // When in check search starts from here.
       // threshold at higher depths.
       if (predictedDepth < 8 * ONE_PLY) {
         Value see_v = predictedDepth < 4 * ONE_PLY ? 0
-                      : -PawnValueMg * 2 * (int)(predictedDepth - 3 * ONE_PLY);
+                      : -PawnValueMg * 2
+                         * (int)(predictedDepth - 3 * ONE_PLY) / ONE_PLY;
         if (!see_test(pos, move, see_v))
           continue;
       }
@@ -447,12 +462,6 @@ moves_loop: // When in check search starts from here.
       if (captureOrPromotion)
         r -= r ? ONE_PLY : DEPTH_ZERO;
       else {
-        Value val =  (*pos->history)[moved_piece][to_sq(move)]
-                   + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
-                   + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
-                   + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
-                   + ft_get(*pos->fromTo, pos_stm() ^ 1, move);
-
         // Increase reduction for cut nodes
         if (cutNode)
           r += 2 * ONE_PLY;
@@ -467,8 +476,13 @@ moves_loop: // When in check search starts from here.
           r -= 2 * ONE_PLY;
 
         // Decrease/increase reduction for moves with a good/bad history
+        Value val =  (*pos->history)[moved_piece][to_sq(move)]
+                   + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
+                   + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
+                   + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
+                   + ft_get(*pos->fromTo, pos_stm() ^ 1, move);
         int rHist = (val - 8000) / 20000;
-        r = max(DEPTH_ZERO, r - rHist * ONE_PLY);
+        r = max(DEPTH_ZERO, (r / ONE_PLY - rHist) * ONE_PLY);
       }
 
       Depth d = max(newDepth - r, ONE_PLY);
@@ -586,26 +600,31 @@ moves_loop: // When in check search starts from here.
   if (!moveCount)
     bestValue = excludedMove ? alpha
                :     inCheck ? mated_in(ss->ply) : DrawValue[pos_stm()];
+  else if (bestMove) {
+    int d = depth / ONE_PLY;
 
-  // Quiet best move: update killers, history and countermoves
-  else if (bestMove)
-    update_stats(pos, ss, bestMove, depth, quietsSearched, quietCount);
+    // Quiet best move: update killers, history and countermoves.
+    if (!is_capture_or_promotion(pos, bestMove)) {
+      Value bonus = d * d + 2 * d - 2;
+      update_stats(pos, ss, bestMove, quietsSearched, quietCount, bonus);
+    }
 
-  // Bonus for prior countermove that caused the fail low
+    // Extra penalty for a quiet TT move in previous ply when it gets refuted.
+    if ((ss-1)->moveCount == 1 && !captured_piece_type()) {
+      Value penalty = d * d + 4 * d + 1;
+      Square prevSq = to_sq((ss-1)->currentMove);
+      update_cm_stats(ss-1, piece_on(prevSq), prevSq, -penalty);
+    }
+  }
+  // Bonus for prior countermove that caused the fail low.
   else if (    depth >= 3 * ONE_PLY
            && !captured_piece_type()
            && move_is_ok((ss-1)->currentMove))
   {
+    int d = depth / ONE_PLY;
+    Value bonus = d * d + 2 * d - 2;
     Square prevSq = to_sq((ss-1)->currentMove);
-    Value bonus = (Value)((depth / ONE_PLY) * (depth / ONE_PLY) + 2 * depth / ONE_PLY - 2);
-    if ((ss-2)->counterMoves)
-      cms_update(*(ss-2)->counterMoves, piece_on(prevSq), prevSq, bonus);
-
-    if ((ss-3)->counterMoves)
-      cms_update(*(ss-3)->counterMoves, piece_on(prevSq), prevSq, bonus);
-
-    if ((ss-5)->counterMoves)
-      cms_update(*(ss-5)->counterMoves, piece_on(prevSq), prevSq, bonus);
+    update_cm_stats(ss-1, piece_on(prevSq), prevSq, bonus);
   }
 
   tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),

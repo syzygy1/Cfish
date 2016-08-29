@@ -55,15 +55,15 @@ Value TB_Score;
 // Razoring and futility margin based on depth
 static const int razor_margin[4] = { 483, 570, 603, 554 };
 
-#define futility_margin(d) ((Value)(150 * (d)))
+#define futility_margin(d) ((Value)(150 * (d) / ONE_PLY))
 
 // Futility and reductions lookup tables, initialized at startup
-static int FutilityMoveCounts[2][16];  // [improving][depth]
-static Depth Reductions[2][2][64][64]; // [pv][improving][depth][moveNumber]
+static int FutilityMoveCounts[2][16]; // [improving][depth]
+static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
-  return Reductions[NT][i][min(d, 63 * ONE_PLY)][min(mn, 63)];
+  return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
 }
 
 // Skill structure is used to implement strength limit
@@ -161,18 +161,19 @@ static const int HalfDensityRowSize[HalfDensitySize] = {
 static Value DrawValue[2];
 static CounterMoveHistoryStats CounterMoveHistory;
 
-static Value search_PV(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-static Value search_NonPV(Pos *pos, Stack* ss, Value alpha, Depth depth, int cutNode);
+static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
+static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode);
 
-static Value qsearch_PV_true(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_PV_false(Pos *pos, Stack* ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_NonPV_true(Pos *pos, Stack* ss, Value alpha, Depth depth);
-static Value qsearch_NonPV_false(Pos *pos, Stack* ss, Value alpha, Depth depth);
+static Value qsearch_PV_true(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
+static Value qsearch_PV_false(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
+static Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha, Depth depth);
+static Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha, Depth depth);
 
 static Value value_to_tt(Value v, int ply);
 static Value value_from_tt(Value v, int ply);
 static void update_pv(Move *pv, Move move, Move *childPv);
-static void update_stats(const Pos *pos, Stack* ss, Move move, Depth depth, Move* quiets, int quietsCnt);
+static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus);
+static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, Value bonus);
 static void check_time(void);
 static void stable_sort(RootMove *rm, size_t num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
@@ -191,12 +192,12 @@ void search_init(void)
         if (r < 0.80)
           continue;
 
-        Reductions[NonPV][imp][d][mc] = ((int)lround(r)) * ONE_PLY;
-        Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - ONE_PLY, DEPTH_ZERO);
+        Reductions[NonPV][imp][d][mc] = ((int)lround(r));
+        Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);
 
         // Increase reduction for non-PV nodes when eval is not improving
-        if (!imp && Reductions[NonPV][imp][d][mc] >= 2 * ONE_PLY)
-          Reductions[NonPV][imp][d][mc] += ONE_PLY;
+        if (!imp && Reductions[NonPV][imp][d][mc] >= 2)
+          Reductions[NonPV][imp][d][mc]++;
       }
 
   for (int d = 0; d < 16; ++d) {
@@ -406,14 +407,16 @@ void thread_search(Pos *pos)
 
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.
-  while (   ++pos->rootDepth < DEPTH_MAX && !Signals.stop
-         && (!Limits.depth || threads_main()->rootDepth <= Limits.depth)) {
-
+  while (   (pos->rootDepth += ONE_PLY) < DEPTH_MAX
+         && !Signals.stop
+         && (!Limits.depth || threads_main()->rootDepth <= Limits.depth))
+  {
     // Set up the new depths for the helper threads skipping on average every
     // 2nd ply (using a half-density matrix).
     if (pos->thread_idx != 0) {
       int row = (pos->thread_idx - 1) % HalfDensitySize;
-      int col = (pos->rootDepth + pos_game_ply()) % HalfDensityRowSize[row];
+      int col = (pos->rootDepth / ONE_PLY + pos_game_ply())
+                                               % HalfDensityRowSize[row];
       if (HalfDensity[row][col])
         continue;
     }
@@ -670,72 +673,50 @@ static void update_pv(Move *pv, Move move, Move *childPv)
 }
 
 
-// update_stats() updates killers, history, countermove and countermove plus
-// follow-up move history when a new quiet best move is found.
+// update_cm_stats() updates countermove and follow-up move history.
 
-static void update_stats(const Pos *pos, Stack *ss, Move move, Depth depth,
-                         Move* quiets, int quietsCnt)
+static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus)
 {
-  Value bonus = (depth / ONE_PLY) * (depth / ONE_PLY) + 2 * depth / ONE_PLY - 2;
-  Square prevSq = to_sq((ss-1)->currentMove);
+  CounterMoveStats *cmh  = (ss-1)->counterMoves;
+  CounterMoveStats *fmh1 = (ss-2)->counterMoves;
+  CounterMoveStats *fmh2 = (ss-4)->counterMoves;
 
+  if (cmh)
+    cms_update(*cmh, pc, s, bonus);
 
-  // Extra penalty for a quiet TT move in previous ply when it gets refuted.
-  if ((ss-1)->moveCount == 1 && !captured_piece_type()) {
-    CounterMoveStats *fmh = (ss-2)->counterMoves;
-    CounterMoveStats *cmh2 = (ss-3)->counterMoves;
-    CounterMoveStats *cmh3 = (ss-5)->counterMoves;
+  if (fmh1)
+    cms_update(*fmh1, pc, s, bonus);
 
-    if (fmh)
-      cms_update(*fmh, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
+  if (fmh2)
+    cms_update(*fmh2, pc, s, bonus);
+}
 
-    if (cmh2)
-      cms_update(*cmh2, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
+// update_stats() updates killers, history, countermove and countermove
+// plus follow-up move history when a new quiet best move is found.
 
-    if (cmh3)
-      cms_update(*cmh3, piece_on(prevSq), prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
-  }
-
-  if (is_capture_or_promotion(pos, move))
-    return;
-
+void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
+                  int quietsCnt, Value bonus)
+{
   if (ss->killers[0] != move) {
     ss->killers[1] = ss->killers[0];
     ss->killers[0] = move;
   }
 
-  CounterMoveStats *cmh  = (ss-1)->counterMoves;
-  CounterMoveStats *fmh  = (ss-2)->counterMoves;
-  CounterMoveStats *fmh2 = (ss-4)->counterMoves;
   int c = pos_stm();
-
-  hs_update(*pos->history, moved_piece(move), to_sq(move), bonus);
   ft_update(*pos->fromTo, c, move, bonus);
+  hs_update(*pos->history, moved_piece(move), to_sq(move), bonus);
+  update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 
-  if (cmh) {
+  if ((ss-1)->counterMoves) {
+    Square prevSq = to_sq((ss-1)->currentMove);
     (*pos->counterMoves)[piece_on(prevSq)][prevSq] = move;
-    cms_update(*cmh, moved_piece(move), to_sq(move), bonus);
   }
-
-  if (fmh)
-    cms_update(*fmh, moved_piece(move), to_sq(move), bonus);
-
-  if (fmh2)
-    cms_update(*fmh2, moved_piece(move), to_sq(move), bonus);
 
   // Decrease all the other played quiet moves
   for (int i = 0; i < quietsCnt; i++) {
-    hs_update(*pos->history, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
     ft_update(*pos->fromTo, c, quiets[i], -bonus);
-
-    if (cmh)
-      cms_update(*cmh, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
-
-    if (fmh)
-      cms_update(*fmh, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
-
-    if (fmh2)
-      cms_update(*fmh2, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
+    hs_update(*pos->history, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
+    update_cm_stats(ss, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
   }
 }
 

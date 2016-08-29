@@ -209,13 +209,13 @@ INLINE int make_castling_right(int c, int s)
 
 #define ONE_PLY 1
 
-#define DEPTH_ZERO           0
-#define DEPTH_QS_CHECKS      0
-#define DEPTH_QS_NO_CHECKS  -1
-#define DEPTH_QS_RECAPTURES -5
+#define DEPTH_ZERO          ( 0 * ONE_PLY)
+#define DEPTH_QS_CHECKS     ( 0 * ONE_PLY)
+#define DEPTH_QS_NO_CHECKS  (-1 * ONE_PLY)
+#define DEPTH_QS_RECAPTURES (-5 * ONE_PLY)
 
-#define DEPTH_NONE -6
-#define DEPTH_MAX  MAX_PLY
+#define DEPTH_NONE (-6 * ONE_PLY)
+#define DEPTH_MAX  (MAX_PLY * ONE_PLY)
 
 #define SQ_A1 0
 #define SQ_B1 1

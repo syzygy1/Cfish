@@ -500,8 +500,8 @@ INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 // evaluate_threats() assigns bonuses according to the types of the
 // attacking and the attacked pieces.
 
-#define WhiteCamp   (Rank4BB | Rank5BB | Rank6BB | Rank7BB | Rank8BB)
-#define BlackCamp   (Rank5BB | Rank4BB | Rank3BB | Rank2BB | Rank1BB)
+#define WhiteCamp   (Rank1BB | Rank2BB | Rank3BB | Rank4BB | Rank5BB)
+#define BlackCamp   (Rank8BB | Rank7BB | Rank6BB | Rank5BB | Rank4BB)
 #define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
 #define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
 #define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
@@ -588,7 +588,7 @@ INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
   score += ThreatByPawnPush * popcount(b);
 
   // King tropism: firstly, find squares that we attack in the enemy king flank
-  b = ei->attackedBy[Us][0] & KingFlank[Us][file_of(square_of(Them, KING))];
+  b = ei->attackedBy[Us][0] & KingFlank[Them][file_of(square_of(Them, KING))];
 
   // Secondly, add to the bitboard the squares which we attack twice in that flank
   // but which are not protected by a enemy pawn. Note the trick to shift away the
