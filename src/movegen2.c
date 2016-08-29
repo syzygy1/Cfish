@@ -142,8 +142,9 @@ INLINE ExtMove *generate_pawn_moves(Pos *pos, ExtMove *list, Bitboard target,
       // if the pawn is not on the same file as the enemy king, because we
       // don't generate captures. Note that a possible discovery check
       // promotion has been already generated amongst the captures.
-      if (pawnsNotOn7 & st->dcCandidates) {
-        Bitboard dc1 = shift_bb(Up, pawnsNotOn7 & st->dcCandidates) & emptySquares & ~file_bb_s(st->ksq);
+      Bitboard dcCandidates = discovered_check_candidates(pos);
+      if (pawnsNotOn7 & dcCandidates) {
+        Bitboard dc1 = shift_bb(Up, pawnsNotOn7 & dcCandidates) & emptySquares & ~file_bb_s(st->ksq);
         Bitboard dc2 = shift_bb(Up, dc1 & TRank3BB) & emptySquares;
 
         b1 |= dc1;
@@ -234,7 +235,7 @@ INLINE ExtMove *generate_moves(Pos *pos, ExtMove *list, int us,
           && !(PseudoAttacks[Pt][from] & target & pos->st->checkSquares[Pt]))
           continue;
 
-      if (pos->st->dcCandidates & sq_bb(from))
+      if (discovered_check_candidates(pos) & sq_bb(from))
         continue;
     }
 
@@ -332,7 +333,7 @@ ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list)
   assert(!pos_checkers());
 
   int us = pos_stm();
-  Bitboard dc = pos->st->dcCandidates;
+  Bitboard dc = discovered_check_candidates(pos);
 
   while (dc) {
     Square from = pop_lsb(&dc);
@@ -403,7 +404,7 @@ ExtMove *generate_legal(Pos *pos, ExtMove *list)
   while (cur != list)
     if (   (pinned || from_sq(cur->move) == ksq
                    || type_of_m(cur->move) == ENPASSANT)
-        && !is_legal(pos, cur->move, pinned))
+        && !is_legal(pos, cur->move))
       cur->move = (--list)->move;
     else
       ++cur;

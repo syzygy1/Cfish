@@ -45,8 +45,6 @@ extern struct Zob zob;
 void psqt_init(void);
 void zob_init(void);
 
-void calc_checkinfo(Pos *pos);
-
 // Stack struct stores information needed to restore a Pos struct to
 // its previous state when we retract a move.
 
@@ -96,10 +94,14 @@ struct Stack {
   ExtMove *cur, *endMoves, *endBadCaptures;
 
   // CheckInfo data
-  Bitboard dcCandidates;
   union {
-    Bitboard pinned;
-    Bitboard checkSquares[7];
+    struct {
+      Bitboard blockersForKing[2];
+    };
+    struct {
+      Bitboard dummy; // blockersForKing[WHITE]
+      Bitboard checkSquares[7]; // element 0 is blockersForKing[BLACK]
+    };
   };
   Square ksq;
 };
@@ -178,7 +180,7 @@ PURE Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
 PURE Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 //Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 
-PURE int is_legal(Pos *pos, Move m, Bitboard pinned);
+PURE int is_legal(Pos *pos, Move m);
 PURE int is_pseudo_legal(Pos *pos, Move m);
 PURE int gives_check_special(Pos *pos, Stack *st, Move m);
 
@@ -272,13 +274,15 @@ int pos_is_ok(Pos *pos, int* failedStep);
 
 INLINE Bitboard discovered_check_candidates(Pos *pos)
 {
-  return slider_blockers(pos, pieces_c(pos_stm()),
-                         square_of(pos_stm() ^ 1, KING)) & pieces_c(pos_stm());
+//  return slider_blockers(pos, pieces_c(pos_stm()),
+//                         square_of(pos_stm() ^ 1, KING)) & pieces_c(pos_stm());
+  return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
 }
 
 INLINE Bitboard pinned_pieces(Pos *pos, int c)
 {
-  return slider_blockers(pos, pieces_c(c ^ 1), square_of(c, KING)) & pieces_c(c);
+//  return slider_blockers(pos, pieces_c(c ^ 1), square_of(c, KING)) & pieces_c(c);
+  return pos->st->blockersForKing[c] & pieces_c(c);
 }
 
 INLINE int pawn_passed(Pos *pos, int c, Square s)
@@ -314,7 +318,7 @@ INLINE int is_capture(Pos *pos, Move m)
 
 INLINE int gives_check(Pos *pos, Stack *st, Move m)
 {
-  return  type_of_m(m) == NORMAL && !st->dcCandidates
+  return  type_of_m(m) == NORMAL && !discovered_check_candidates(pos)
         ? !!(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
         : gives_check_special(pos, st, m);
 }

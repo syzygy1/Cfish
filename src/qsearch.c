@@ -114,8 +114,6 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   // be generated.
   mp_init_q(pos, ttMove, depth, to_sq((ss-1)->currentMove));
 
-  calc_checkinfo(pos);
-
   // Loop through the moves until no moves remain or a beta cutoff occurs
   while ((move = next_move(pos)) != 0) {
     assert(move_is_ok(move));
@@ -157,7 +155,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     prefetch(tt_first_entry(key_after(pos, move)));
 
     // Check for legality just before making the move
-    if (!is_legal(pos, move, ss->pinned))
+    if (!is_legal(pos, move))
       continue;
 
     ss->currentMove = move;

@@ -261,10 +261,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     mp_init_pc(pos, ttMove, PieceValue[MG][captured_piece_type()]);
 
-    calc_checkinfo(pos);
-
     while ((move = next_move(pos)) != MOVE_NONE)
-      if (is_legal(pos, move, ss->pinned)) {
+      if (is_legal(pos, move)) {
         ss->currentMove = move;
         ss->counterMoves = &CounterMoveHistory[moved_piece(move)][to_sq(move)];
         do_move(pos, move, gives_check(pos, ss, move));
@@ -300,7 +298,6 @@ moves_loop: // When in check search starts from here.
   CounterMoveStats *fmh2 = (ss-4)->counterMoves;
 
   mp_init(pos, ttMove, depth);
-  calc_checkinfo(pos);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
   improving =   ss->staticEval >= (ss-2)->staticEval
           /* || ss->staticEval == VALUE_NONE Already implicit in the previous condition */
@@ -375,7 +372,7 @@ moves_loop: // When in check search starts from here.
     if (    singularExtensionNode
         &&  move == ttMove
         && !extension
-        &&  is_legal(pos, move, ss->pinned))
+        &&  is_legal(pos, move))
     {
       Value rBeta = ttValue - 2 * depth / ONE_PLY;
       Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
@@ -441,7 +438,7 @@ moves_loop: // When in check search starts from here.
     prefetch(tt_first_entry(key_after(pos, move)));
 
     // Check for legality just before making the move
-    if (!rootNode && !is_legal(pos, move, ss->pinned)) {
+    if (!rootNode && !is_legal(pos, move)) {
       ss->moveCount = --moveCount;
       continue;
     }

@@ -87,6 +87,27 @@ INLINE void move_piece(Pos *pos, int c, int piece, Square from, Square to)
 #endif
 
 
+// Calculate CheckInfo data.
+
+INLINE void set_check_info(Pos *pos)
+{
+  Stack *st = pos->st;
+
+  st->blockersForKing[WHITE] = slider_blockers(pos, pieces_c(BLACK), square_of(WHITE, KING));
+  st->blockersForKing[BLACK] = slider_blockers(pos, pieces_c(WHITE), square_of(BLACK, KING));
+
+  int them = pos_stm() ^ 1;
+  st->ksq = square_of(them, KING);
+
+  st->checkSquares[PAWN]   = attacks_from_pawn(st->ksq, them);
+  st->checkSquares[KNIGHT] = attacks_from_knight(st->ksq);
+  st->checkSquares[BISHOP] = attacks_from_bishop(st->ksq);
+  st->checkSquares[ROOK]   = attacks_from_rook(st->ksq);
+  st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
+  st->checkSquares[KING]   = 0;
+}
+
+
 // print_pos() prints an ASCII representation of the position to stdout.
 
 void print_pos(Pos *pos)
@@ -319,6 +340,8 @@ static void set_state(Pos *pos, Stack *st)
 
   st->checkersBB = attackers_to(square_of(pos_stm(), KING)) & pieces_c(pos_stm() ^ 1);
 
+  set_check_info(pos);
+
   for (Bitboard b = pieces(); b; ) {
     Square s = pop_lsb(&b);
     Piece pc = piece_on(s);
@@ -437,26 +460,6 @@ Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s)
 }
 
 
-// Calculate CheckInfo data.
-
-void calc_checkinfo(Pos *pos)
-{
-  Stack *st = pos->st;
-  int them = pos_stm() ^ 1;
-  st->ksq = square_of(them, KING);
-
-  st->pinned = pinned_pieces(pos, pos_stm());
-  st->dcCandidates = discovered_check_candidates(pos);
-
-  st->checkSquares[PAWN]   = attacks_from_pawn(st->ksq, them);
-  st->checkSquares[KNIGHT] = attacks_from_knight(st->ksq);
-  st->checkSquares[BISHOP] = attacks_from_bishop(st->ksq);
-  st->checkSquares[ROOK]   = attacks_from_rook(st->ksq);
-  st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
-  st->checkSquares[KING]   = 0;
-}
-
-
 // attackers_to() computes a bitboard of all pieces which attack a given
 // square. Slider attacks use the occupied bitboard to indicate occupancy.
 
@@ -473,10 +476,9 @@ Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied)
 
 // is_legal() tests whether a pseudo-legal move is legal
 
-int is_legal(Pos *pos, Move m, Bitboard pinned)
+int is_legal(Pos *pos, Move m)
 {
   assert(move_is_ok(m));
-  assert(pinned == pinned_pieces(pos, pos_stm()));
 
   int us = pos_stm();
   Square from = from_sq(m);
@@ -511,7 +513,7 @@ int is_legal(Pos *pos, Move m, Bitboard pinned)
 
   // A non-king move is legal if and only if it is not pinned or it
   // is moving along the ray towards or away from the king.
-  return   !(pinned & sq_bb(from))
+  return   !(pinned_pieces(pos, us) & sq_bb(from))
         ||  aligned(from, to_sq(m), square_of(us, KING));
 }
 
@@ -701,13 +703,12 @@ exit(1);
 int gives_check_special(Pos *pos, Stack *st, Move m)
 {
   assert(move_is_ok(m));
-  assert(st->dcCandidates == discovered_check_candidates(pos));
   assert(color_of(moved_piece(m)) == pos_stm());
 
   Square from = from_sq(m);
   Square to = to_sq(m);
 
-  if ((st->dcCandidates & sq_bb(from)) && !aligned(from, to, st->ksq))
+  if ((discovered_check_candidates(pos) & sq_bb(from)) && !aligned(from, to, st->ksq))
     return 1;
 
   switch (type_of_m(m)) {
@@ -1065,6 +1066,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   pos->sideToMove ^= 1;
 
+  set_check_info(pos);
+
   assert(pos_is_ok(pos, &failed_step));
 }
 
@@ -1161,6 +1164,8 @@ void do_null_move(Pos *pos)
   st->pliesFromNull = 0;
 
   pos->sideToMove ^= 1;
+
+  set_check_info(pos);
 
   assert(pos_is_ok(pos, &failed_step));
 }
@@ -1372,6 +1377,7 @@ void pos_copy(Pos *dest, Pos *src)
   memcpy(dest, src, offsetof(Pos, st));
   dest->st = dest->stack;
   memcpy(dest->st, src->st, StateSize);
+  set_check_info(dest);
 }
 
 

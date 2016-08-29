@@ -316,11 +316,9 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
     end = generate_evasions(pos, m);
   pos->st->endMoves = end;
 
-  calc_checkinfo(pos);
-
   for (; m < end; m++) {
     Move move = m->move;
-    if (!is_capture(pos, move) || !is_legal(pos, move, pos->st->pinned))
+    if (!is_capture(pos, move) || !is_legal(pos, move))
       continue;
     do_move(pos, move, gives_check(pos, pos->st, move));
     v = -probe_ab(pos, -beta, -alpha, success);
@@ -369,8 +367,6 @@ int TB_probe_wdl(Pos *pos, int *success)
     end = generate_evasions(pos, m);
   pos->st->endMoves = end;
 
-  calc_checkinfo(pos);
-
   int best_cap = -3, best_ep = -3;
 
   // We do capture resolution, letting best_cap keep track of the best
@@ -379,7 +375,7 @@ int TB_probe_wdl(Pos *pos, int *success)
 
   for (; m < end; m++) {
     Move move = m->move;
-    if (!is_capture(pos, move) || !is_legal(pos, move, pos->st->pinned))
+    if (!is_capture(pos, move) || !is_legal(pos, move))
       continue;
     do_move(pos, move, gives_check(pos, pos->st, move));
     int v = -probe_ab(pos, -2, -best_cap, success);
@@ -430,13 +426,13 @@ int TB_probe_wdl(Pos *pos, int *success)
     for (m = (pos->st-1)->endMoves; m < end; m++) {
       Move move = m->move;
       if (type_of_m(move) == ENPASSANT) continue;
-      if (is_legal(pos, move, pos->st->pinned)) break;
+      if (is_legal(pos, move)) break;
     }
     if (m == end && !pos_checkers()) {
       end = generate_quiets(pos, end);
       for (; m < end; m++) {
         Move move = m->move;
-        if (is_legal(pos, move, pos->st->pinned))
+        if (is_legal(pos, move))
           break;
       }
     }
@@ -495,7 +491,6 @@ int TB_probe_dtz(Pos *pos, int *success)
   if (*success == 2)
     return wdl_to_dtz[wdl + 2];
 
-  calc_checkinfo(pos);
   ExtMove *end, *m = (pos->st-1)->endMoves;
 
   // If winning, check for a winning pawn move.
@@ -512,7 +507,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     for (; m < end; m++) {
       Move move = m->move;
       if (type_of_p(moved_piece(move)) != PAWN || is_capture(pos, move)
-                || !is_legal(pos, move, pos->st->pinned))
+                || !is_legal(pos, move))
         continue;
       do_move(pos, move, gives_check(pos, pos->st, move));
       int v = -TB_probe_wdl(pos, success);
@@ -557,7 +552,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     // If wdl > 0, we already caught them. If wdl < 0, the initial value
     // of best already takes account of them.
     if (is_capture(pos, move) || type_of_p(moved_piece(move)) == PAWN
-              || !is_legal(pos, move, pos->st->pinned))
+              || !is_legal(pos, move))
       continue;
     do_move(pos, move, gives_check(pos, pos->st, move));
     int v = -TB_probe_dtz(pos, success);
@@ -614,8 +609,6 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
   int dtz = TB_probe_dtz(pos, &success);
   if (!success) return 0;
-
-  calc_checkinfo(pos);
 
   // Probe each move.
   size_t num = *num_moves;
@@ -727,8 +720,6 @@ int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
   int wdl = TB_probe_wdl(pos, &success);
   if (!success) return 0;
   *score = wdl_to_Value[wdl + 2];
-
-  calc_checkinfo(pos);
 
   int best = -2;
 

@@ -68,7 +68,6 @@ void position(Pos *pos, char *str)
     for (moves = strtok(moves, " \t"); moves; moves = strtok(NULL, " \t")) {
       Move m = uci_to_move(pos, moves);
       if (m == MOVE_NONE) break;
-      calc_checkinfo(pos);
       do_move(pos, m, gives_check(pos, pos->st, m));
       pos->gamePly++;
     }

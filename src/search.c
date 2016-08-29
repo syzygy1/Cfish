@@ -113,9 +113,7 @@ static void easy_move_update(Pos *pos, Move *newPv)
     EM.stableCnt = 0;
 
   if (newPv[0] != EM.pv[0] || newPv[1] != EM.pv[1] || newPv[2] != EM.pv[2]) {
-    calc_checkinfo(pos); // ever necessary?
     do_move(pos, newPv[0], gives_check(pos, pos->st, newPv[0]));
-    calc_checkinfo(pos);
     do_move(pos, newPv[1], gives_check(pos, pos->st, newPv[1]));
     EM.expectedPosKey = pos_key();
     undo_move(pos, newPv[1]);
@@ -232,8 +230,6 @@ void search_clear()
 
 static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
 {
-  calc_checkinfo(pos);
-
   ExtMove *m = (pos->st-1)->endMoves;
   ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
   for (; m < last; m++) {
@@ -250,7 +246,6 @@ static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
 uint64_t perft(Pos *pos, Depth depth)
 {
   uint64_t cnt, nodes = 0;
-  calc_checkinfo(pos);
   char buf[16];
 
   ExtMove *m = pos->moveList;
@@ -840,7 +835,6 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
 
   assert(rm->pv_size == 1);
 
-  calc_checkinfo(pos);
   do_move(pos, rm->pv[0], gives_check(pos, pos->st, rm->pv[0]));
   TTEntry *tte = tt_probe(pos_key(), &ttHit);
 
