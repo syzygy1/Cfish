@@ -198,6 +198,7 @@ static const Score MinorBehindPawn     = S(16,  0);
 static const Score BishopPawns         = S( 8, 12);
 static const Score RookOnPawn          = S( 8, 24);
 static const Score TrappedRook         = S(92,  0);
+static const Score CloseEnemies        = S( 7,  0);
 static const Score SafeCheck           = S(20, 20);
 static const Score OtherCheck          = S(10, 10);
 static const Score ThreatByHangingPawn = S(71, 61);
@@ -389,6 +390,19 @@ INLINE Score evaluate_pieces(Pos *pos, EvalInfo *ei, Score *mobility,
 
 // evaluate_king() assigns bonuses and penalties to a king of a given color.
 
+#define WhiteCamp   (Rank1BB | Rank2BB | Rank3BB | Rank4BB | Rank5BB)
+#define BlackCamp   (Rank8BB | Rank7BB | Rank6BB | Rank5BB | Rank4BB)
+#define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
+#define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
+#define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
+
+static const Bitboard KingFlank[2][8] = {
+  { QueenSide   & WhiteCamp, QueenSide & WhiteCamp, QueenSide & WhiteCamp, CenterFiles & WhiteCamp,
+    CenterFiles & WhiteCamp, KingSide  & WhiteCamp, KingSide  & WhiteCamp, KingSide    & WhiteCamp },
+  { QueenSide   & BlackCamp, QueenSide & BlackCamp, QueenSide & BlackCamp, CenterFiles & BlackCamp,
+    CenterFiles & BlackCamp, KingSide  & BlackCamp, KingSide  & BlackCamp, KingSide    & BlackCamp },
+};
+
 INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 {
   const int  Them = (Us == WHITE ? BLACK   : WHITE);
@@ -488,6 +502,19 @@ INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
     score -= KingDanger[max(min(attackUnits, 399), 0)];
   }
 
+  // King tropism: firstly, find squares that we attack in the enemy king flank
+  b = ei->attackedBy[Them][0] & KingFlank[Us][file_of(ksq)];
+
+  assert(((Us == WHITE ? b << 4 : b >> 4) & b) == 0);
+  assert(popcount(Us == WHITE ? b << 4 : b >> 4) == popcount(b));
+
+  // Secondly, add the squares which are attacked twice in that flank and
+  // which are not defended by our pawns.
+  b =  (Us == WHITE ? b << 4 : b >> 4)
+     | (b & ei->attackedBy2[Them] & ~ei->attackedBy[Us][PAWN]);
+
+  score -= CloseEnemies * popcount(b);
+
 #if 0
   if (DoTrace)
     trace_add(KING, Us, score);
@@ -499,19 +526,6 @@ INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 
 // evaluate_threats() assigns bonuses according to the types of the
 // attacking and the attacked pieces.
-
-#define WhiteCamp   (Rank1BB | Rank2BB | Rank3BB | Rank4BB | Rank5BB)
-#define BlackCamp   (Rank8BB | Rank7BB | Rank6BB | Rank5BB | Rank4BB)
-#define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
-#define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
-#define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
-
-static const Bitboard KingFlank[2][8] = {
-  { QueenSide   & WhiteCamp, QueenSide & WhiteCamp, QueenSide & WhiteCamp, CenterFiles & WhiteCamp,
-    CenterFiles & WhiteCamp, KingSide  & WhiteCamp, KingSide  & WhiteCamp, KingSide    & WhiteCamp },
-  { QueenSide   & BlackCamp, QueenSide & BlackCamp, QueenSide & BlackCamp, CenterFiles & BlackCamp,
-    CenterFiles & BlackCamp, KingSide  & BlackCamp, KingSide  & BlackCamp, KingSide    & BlackCamp },
-};
 
 INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
 {
@@ -586,18 +600,6 @@ INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
      & ~ei->attackedBy[Us][PAWN];
 
   score += ThreatByPawnPush * popcount(b);
-
-  // King tropism: firstly, find squares that we attack in the enemy king flank
-  b = ei->attackedBy[Us][0] & KingFlank[Them][file_of(square_of(Them, KING))];
-
-  // Secondly, add to the bitboard the squares which we attack twice in that flank
-  // but which are not protected by a enemy pawn. Note the trick to shift away the
-  // previous attack bits to the empty part of the bitboard.
-  b =  (b & ei->attackedBy2[Us] & ~ei->attackedBy[Them][PAWN])
-     | (Us == WHITE ? b >> 4 : b << 4);
-
-  // Count all these squares with a single popcount
-  score += make_score(7 * popcount(b), 0);
 
 //  if (DoTrace)
 //    Trace::add(THREAT, Us, score);
