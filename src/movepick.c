@@ -168,10 +168,16 @@ void mp_init_pc(Pos *pos, Move ttm, Value threshold)
 
   // In ProbCut we generate captures with SEE higher than the given
   // threshold.
+#if 0
   st->ttMove = ttm;
   if (!(ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
             && see_test(pos, ttm, threshold + 1)))
     st->stage++;
+#else
+  st->ttMove =   ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
+              && see_test(pos, ttm, threshold + 1) ? ttm : 0;
+  if (st->ttMove == 0) st->stage++;
+#endif
 }
 
 

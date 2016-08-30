@@ -245,9 +245,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   // Step 9. ProbCut (skipped when in check)
-  // If we have a very good capture (i.e. SEE > seeValues[captured_piece_type])
-  // and a reduced search returns a value much above beta, we can (almost)
-  // safely prune the previous move.
+  // If we have a good enough capture and a reduced search returns a value
+  // much above beta, we can (almost) safely prune the previous move.
   if (   !PvNode
       &&  depth >= 5 * ONE_PLY
       &&  abs(beta) < VALUE_MATE_IN_MAX_PLY) {
@@ -259,7 +258,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert((ss-1)->currentMove != MOVE_NONE);
     assert((ss-1)->currentMove != MOVE_NULL);
 
-    mp_init_pc(pos, ttMove, PieceValue[MG][captured_piece_type()]);
+    mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
     while ((move = next_move(pos)) != MOVE_NONE)
       if (is_legal(pos, move)) {
