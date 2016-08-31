@@ -104,7 +104,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && ttValue != VALUE_NONE // Possible in case of TT access race.
       && (ttValue >= beta ? (tte_bound(tte) & BOUND_LOWER)
                           : (tte_bound(tte) & BOUND_UPPER))) {
-    ss->currentMove = ttMove; // Can be MOVE_NONE.
+    ss->currentMove = ttMove; // Can be 0.
 
     // If ttMove is quiet, update killers, history, counter move on TT hit.
     if (ttValue >= beta && ttMove) {
@@ -172,7 +172,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
                                      : -(ss-1)->staticEval + 2 * Tempo;
 
-    tte_save(tte, posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE,
+    tte_save(tte, posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, 0,
              ss->staticEval, tt_generation());
   }
 
@@ -182,8 +182,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Razoring (skipped when in check)
   if (   !PvNode
       &&  depth < 4 * ONE_PLY
-      &&  eval + razor_margin[depth / ONE_PLY] <= alpha
-      &&  ttMove == MOVE_NONE) {
+      &&  !ttMove
+      &&  eval + razor_margin[depth / ONE_PLY] <= alpha) {
 
     if (   depth <= ONE_PLY
         && eval + razor_margin[3 * ONE_PLY] <= alpha)
@@ -255,12 +255,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     Depth rdepth = depth - 4 * ONE_PLY;
 
     assert(rdepth >= ONE_PLY);
-    assert((ss-1)->currentMove != MOVE_NONE);
-    assert((ss-1)->currentMove != MOVE_NULL);
+    assert((ss-1)->currentMove != 0);
+    assert((ss-1)->currentMove != 0);
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
-    while ((move = next_move(pos)) != MOVE_NONE)
+    while ((move = next_move(pos)))
       if (is_legal(pos, move)) {
         ss->currentMove = move;
         ss->counterMoves = &CounterMoveHistory[moved_piece(move)][to_sq(move)];
@@ -304,7 +304,7 @@ moves_loop: // When in check search starts from here.
 
   singularExtensionNode =   !rootNode
                          &&  depth >= 8 * ONE_PLY
-                         &&  ttMove != MOVE_NONE
+                         &&  ttMove
                      /*  &&  ttValue != VALUE_NONE Already implicit in the next condition */
                          &&  abs(ttValue) < VALUE_KNOWN_WIN
                          && !excludedMove // Recursive singular search is not allowed
@@ -313,7 +313,7 @@ moves_loop: // When in check search starts from here.
 
   // Step 11. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta cutoff occurs
-  while ((move = next_move(pos)) != MOVE_NONE) {
+  while ((move = next_move(pos))) {
     assert(move_is_ok(move));
 
     if (move == excludedMove)
@@ -501,7 +501,7 @@ moves_loop: // When in check search starts from here.
     // parent node fail low with value <= alpha and try another move.
     if (PvNode && (moveCount == 1 || (value > alpha && (rootNode || value < beta)))) {
       (ss+1)->pv = pv;
-      (ss+1)->pv[0] = MOVE_NONE;
+      (ss+1)->pv[0] = 0;
 
       value = newDepth <   ONE_PLY ?
                         givesCheck ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
@@ -536,7 +536,7 @@ moves_loop: // When in check search starts from here.
 
         assert((ss+1)->pv);
 
-        for (Move *m = (ss+1)->pv; *m != MOVE_NONE; ++m)
+        for (Move *m = (ss+1)->pv; *m; ++m)
           rm->pv[rm->pv_size++] = *m;
 
         // We record how often the best move has been changed in each

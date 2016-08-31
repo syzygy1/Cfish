@@ -514,7 +514,7 @@ int is_legal(Pos *pos, Move m)
   // A non-king move is legal if and only if it is not pinned or it
   // is moving along the ray towards or away from the king.
   return   !(pinned_pieces(pos, us) & sq_bb(from))
-        ||  aligned(from, to_sq(m), square_of(us, KING));
+        ||  aligned(m, square_of(us, KING));
 }
 
 
@@ -708,7 +708,7 @@ int gives_check_special(Pos *pos, Stack *st, Move m)
   Square from = from_sq(m);
   Square to = to_sq(m);
 
-  if ((discovered_check_candidates(pos) & sq_bb(from)) && !aligned(from, to, st->ksq))
+  if ((discovered_check_candidates(pos) & sq_bb(from)) && !aligned(m, st->ksq))
     return 1;
 
   switch (type_of_m(m)) {
@@ -757,7 +757,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   st->previous = st - 1;
   st->pawnKey = (st-1)->pawnKey;
   st->materialKey = (st-1)->materialKey;
-  st->psqnmp = (st-1)->psqnmp; // psq and nonPawnMaterial
+  st->psqnpm = (st-1)->psqnpm; // psq and nonPawnMaterial
 
   Square from = from_sq(m);
   Square to = to_sq(m);
@@ -855,6 +855,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   pos->sideToMove ^= 1;
   pos->nodes++;
+
+  set_check_info(pos);
 
   check_pos(pos);
 }
@@ -1505,6 +1507,14 @@ int check_pos(Pos *pos)
   for (int sq = 0; sq < 64; sq++)
     if ((pos->board[sq] & 7) == PAWN)
       pawnKey ^= zob.psq[pos->board[sq]][sq];
+
+  int npm_w = 0, npm_b = 0;
+  for (int i = KNIGHT; i <= KING; i++) {
+    npm_w += piece_count(WHITE, i) * PieceValue[MG][i];
+    npm_b += piece_count(BLACK, i) * PieceValue[MG][i];
+  }
+  assert(npm_w == pos_non_pawn_material(WHITE));
+  assert(npm_b == pos_non_pawn_material(BLACK));
 
   assert(key == pos->st->key);
   assert(pawnKey == pos->st->pawnKey);

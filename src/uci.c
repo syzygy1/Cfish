@@ -67,7 +67,7 @@ void position(Pos *pos, char *str)
   if (moves)
     for (moves = strtok(moves, " \t"); moves; moves = strtok(NULL, " \t")) {
       Move m = uci_to_move(pos, moves);
-      if (m == MOVE_NONE) break;
+      if (!m) break;
       do_move(pos, m, gives_check(pos, pos->st, m));
       pos->gamePly++;
     }
@@ -369,6 +369,6 @@ Move uci_to_move(Pos *pos, char *str)
     if (strcmp(str, uci_move(buf, m->move, pos->chess960)) == 0)
       return m->move;
 
-  return MOVE_NONE;
+  return 0;
 }
 

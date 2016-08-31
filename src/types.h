@@ -115,11 +115,8 @@ typedef uint64_t Bitboard;
 // bit 14-15: special move flag: promotion (1), en passant (2), castling (3)
 // NOTE: EN-PASSANT bit is set only when a pawn can be captured
 //
-// Special cases are MOVE_NONE and MOVE_NULL. We can sneak these in because in
-// any normal move destination square is always different from origin square
-// while MOVE_NONE and MOVE_NULL have the same origin and destination square.
+// Null move (MOVE_NULL) is encoded as a2a2.
 
-#define MOVE_NONE 0
 #define MOVE_NULL 65
 
 #define NORMAL     0

@@ -3,12 +3,12 @@
 Bitboard  RookMasks  [64];
 Bitboard  RookMagics [64];
 Bitboard *RookAttacks[64];
-unsigned  RookShifts [64];
+uint8_t   RookShifts [64];
 
 Bitboard  BishopMasks  [64];
 Bitboard  BishopMagics [64];
 Bitboard *BishopAttacks[64];
-unsigned  BishopShifts [64];
+uint8_t   BishopShifts [64];
 
 static Bitboard RookTable[0x19000];  // To store rook attacks
 static Bitboard BishopTable[0x1480]; // To store bishop attacks
@@ -16,7 +16,7 @@ static Bitboard BishopTable[0x1480]; // To store bishop attacks
 typedef unsigned (Fn)(Square, Bitboard);
 
 static void init_magics(Bitboard table[], Bitboard *attacks[],
-                        Bitboard magics[], Bitboard masks[], unsigned shifts[],
+                        Bitboard magics[], Bitboard masks[], uint8_t shifts[],
                         Square deltas[], Fn index)
 {
   int seeds[][8] = { { 8977, 44560, 54343, 38998,  5731, 95205, 104912, 17020 },

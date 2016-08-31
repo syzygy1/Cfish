@@ -274,14 +274,11 @@ int pos_is_ok(Pos *pos, int* failedStep);
 
 INLINE Bitboard discovered_check_candidates(Pos *pos)
 {
-//  return slider_blockers(pos, pieces_c(pos_stm()),
-//                         square_of(pos_stm() ^ 1, KING)) & pieces_c(pos_stm());
   return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
 }
 
 INLINE Bitboard pinned_pieces(Pos *pos, int c)
 {
-//  return slider_blockers(pos, pieces_c(c ^ 1), square_of(c, KING)) & pieces_c(c);
   return pos->st->blockersForKing[c] & pieces_c(c);
 }
 

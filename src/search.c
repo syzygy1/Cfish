@@ -78,7 +78,7 @@ struct Skill {
 
   int level;
   Move best;
-//  Move best = MOVE_NONE;
+//  Move best = 0;
 };
 
 // Easy move code for detecting an 'easy move'. If the PV is stable across
@@ -284,7 +284,7 @@ void mainthread_search(void)
   DrawValue[us ^ 1] = VALUE_DRAW + (Value)contempt;
 
   if (pos->rootMoves->size == 0) {
-    pos->rootMoves->move[pos->rootMoves->size++].pv[0] = MOVE_NONE;
+    pos->rootMoves->move[pos->rootMoves->size++].pv[0] = 0;
     IO_LOCK;
     printf("info depth 0 score %s\n",
            uci_value(buf, pos_checkers() ? -VALUE_MATE : VALUE_DRAW));
@@ -331,7 +331,7 @@ void mainthread_search(void)
       &&  option_value(OPT_MULTI_PV) == 1
       && !Limits.depth
 //      && !Skill(option_value(OPT_SKILL_LEVEL)).enabled()
-      &&  pos->rootMoves->move[0].pv[0] != MOVE_NONE)
+      &&  pos->rootMoves->move[0].pv[0] != 0)
   {
     for (size_t idx = 1; idx < Threads.num_threads; idx++) {
       Pos *p = Threads.pos[idx];
@@ -368,7 +368,7 @@ void mainthread_search(void)
 void thread_search(Pos *pos)
 {
   Value bestValue, alpha, beta, delta;
-  Move easyMove = MOVE_NONE;
+  Move easyMove = 0;
 
   Stack *ss = pos->st; // The fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
@@ -662,9 +662,9 @@ static Value value_from_tt(Value v, int ply)
 
 static void update_pv(Move *pv, Move move, Move *childPv)
 {
-  for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
+  for (*pv++ = move; childPv && *childPv; )
     *pv++ = *childPv++;
-  *pv = MOVE_NONE;
+  *pv = 0;
 }
 
 

@@ -38,10 +38,10 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   if (PvNode) {
     oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
     (ss+1)->pv = pv;
-    ss->pv[0] = MOVE_NONE;
+    ss->pv[0] = 0;
   }
 
-  ss->currentMove = bestMove = MOVE_NONE;
+  ss->currentMove = bestMove = 0;
   ss->ply = (ss-1)->ply + 1;
 
   // Check for an instant draw or if the maximum ply has been reached
@@ -69,7 +69,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
       && ttValue != VALUE_NONE // Only in case of TT access race
       && (ttValue >= beta ? (tte_bound(tte) &  BOUND_LOWER)
                           : (tte_bound(tte) &  BOUND_UPPER))) {
-    ss->currentMove = ttMove; // Can be MOVE_NONE
+    ss->currentMove = ttMove; // Can be 0.
     return ttValue;
   }
 
@@ -96,7 +96,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     if (bestValue >= beta) {
       if (!ttHit)
         tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
-                 BOUND_LOWER, DEPTH_NONE, MOVE_NONE, ss->staticEval,
+                 BOUND_LOWER, DEPTH_NONE, 0, ss->staticEval,
                  tt_generation());
 
       return bestValue;
@@ -115,7 +115,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   mp_init_q(pos, ttMove, depth, to_sq((ss-1)->currentMove));
 
   // Loop through the moves until no moves remain or a beta cutoff occurs
-  while ((move = next_move(pos)) != 0) {
+  while ((move = next_move(pos))) {
     assert(move_is_ok(move));
 
     givesCheck = gives_check(pos, ss, move);

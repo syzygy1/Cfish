@@ -1,9 +1,9 @@
 extern Bitboard RookMasks[64];
 extern Bitboard RookMagics[64];
-extern unsigned RookShifts[64];
+extern uint8_t  RookShifts[64];
 extern Bitboard BishopMasks[64];
 extern Bitboard BishopMagics[64];
-extern unsigned BishopShifts[64];
+extern uint8_t  BishopShifts[64];
 extern Bitboard *RookAttacks[64];
 extern Bitboard *BishopAttacks[64];
 
