@@ -314,7 +314,7 @@ INLINE int make_castling_right(int c, int s)
 // For now we keep the following types, as we might want to change them
 // in the future.
 
-typedef int32_t Move;
+typedef uint32_t Move;
 typedef int32_t Phase;
 typedef int32_t Value;
 typedef int32_t Piece;
@@ -380,7 +380,7 @@ extern uint32_t NonPawnPieceValue[16];
 #define make_promotion(from,to,pt) ((Move)((to) | ((from)<<6) | (PROMOTION<<14) | (((pt)-KNIGHT)<<12)))
 #define make_enpassant(from,to) ((Move)((to) | ((from)<<6) | (ENPASSANT<<14)))
 #define make_castling(from,to) ((Move)((to) | ((from)<<6) | (CASTLING<<14)))
-#define move_is_ok(m) (from_sq(m) != to_sq(m) && m >= 0 && m < 65536)
+#define move_is_ok(m) (from_sq(m) != to_sq(m))
 
 INLINE int opposite_colors(Square s1, Square s2)
 {
