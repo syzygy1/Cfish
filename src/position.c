@@ -480,7 +480,7 @@ int is_legal(Pos *pos, Move m)
 {
   assert(move_is_ok(m));
 
-  int us = pos_stm();
+  uint64_t us = pos_stm();
   Square from = from_sq(m);
 
   assert(color_of(moved_piece(m)) == us);
@@ -507,7 +507,7 @@ int is_legal(Pos *pos, Move m)
   // If the moving piece is a king, check whether the destination
   // square is attacked by the opponent. Castling moves are checked
   // for legality during move generation.
-  if (type_of_p(piece_on(from)) == KING)
+  if (pieces_p(KING) & sq_bb(from))
     return   type_of_m(m) == CASTLING
           || !(attackers_to(to_sq(m)) & pieces_c(us ^ 1));
 
@@ -596,7 +596,7 @@ int is_pseudo_legal_old(Pos *pos, Move m)
 
 int is_pseudo_legal(Pos *pos, Move m)
 {
-  int us = pos_stm();
+  uint64_t us = pos_stm();
   Square from = from_sq(m);
 
   if (!(pieces_c(us) & sq_bb(from)))
@@ -615,11 +615,11 @@ int is_pseudo_legal(Pos *pos, Move m)
   if (pieces_c(us) & sq_bb(to))
     return 0;
 
-  Piece pc = piece_on(from);
-  if (type_of_p(pc) != PAWN) {
+  int pt = type_of_p(piece_on(from));
+  if (pt != PAWN) {
     if (type_of_m(m) != NORMAL)
       return 0;
-    switch (type_of_p(pc)) {
+    switch (pt) {
     case KNIGHT:
       if (!(attacks_from_knight(from) & sq_bb(to)))
         return 0;

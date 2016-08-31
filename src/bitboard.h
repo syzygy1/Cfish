@@ -71,14 +71,14 @@ extern Bitboard PseudoAttacks[8][64];
 #ifndef PEDANTIC
 extern Bitboard EPMask[16];
 extern Bitboard CastlingPath[64];
-extern int CastlingRightsMask[64];
-extern Square CastlingRookSquare[16];
-extern int CastlingToSquare[16]; // To correct the KxR encoding.
+extern uint8_t CastlingRightsMask[64];
+extern uint8_t CastlingRookSquare[16];
+extern uint8_t CastlingToSquare[16]; // To correct the KxR encoding.
 extern Key CastlingHash[16];
 extern Bitboard CastlingBits[16];
 extern Score CastlingPSQ[16];
-extern Square CastlingRookFrom[16];
-extern Square CastlingRookTo[16];
+extern uint8_t CastlingRookFrom[16];
+extern uint8_t CastlingRookTo[16];
 #endif
 
 

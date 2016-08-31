@@ -474,8 +474,8 @@ int ScaleKRPKR(Pos *pos, int strongSide)
   Square wpsq = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
   Square brsq = normalize(pos, strongSide, square_of(weakSide, ROOK));
 
-  int f = file_of(wpsq);
-  int r = rank_of(wpsq);
+  uint32_t f = file_of(wpsq);
+  uint32_t r = rank_of(wpsq);
   Square queeningSq = make_square(f, RANK_8);
   int tempo = (pos_stm() == strongSide);
 
@@ -621,7 +621,7 @@ int ScaleKRPPKRP(Pos *pos, int strongSide)
   if (pawn_passed(pos, strongSide, wpsq1) || pawn_passed(pos, strongSide, wpsq2))
     return SCALE_FACTOR_NONE;
 
-  int r = max(relative_rank_s(strongSide, wpsq1), relative_rank_s(strongSide, wpsq2));
+  uint32_t r = max(relative_rank_s(strongSide, wpsq1), relative_rank_s(strongSide, wpsq2));
 
   if (   distance_f(bksq, wpsq1) <= 1
       && distance_f(bksq, wpsq2) <= 1

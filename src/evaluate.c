@@ -238,8 +238,8 @@ static const int KingAttackWeights[8] = { 0, 0, 7, 5, 4, 1 };
 
 INLINE void evalinfo_init(Pos *pos, EvalInfo *ei, const int Us)
 {
-  const int    Them = (Us == WHITE ? BLACK   : WHITE);
-  const Square Down = (Us == WHITE ? DELTA_S : DELTA_N);
+  const int Them = (Us == WHITE ? BLACK   : WHITE);
+  const int Down = (Us == WHITE ? DELTA_S : DELTA_N);
 
   ei->pinnedPieces[Us] = pinned_pieces(pos, Us);
   Bitboard b = ei->attackedBy[Them][KING];
@@ -405,8 +405,8 @@ static const Bitboard KingFlank[2][8] = {
 
 INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 {
-  const int  Them = (Us == WHITE ? BLACK   : WHITE);
-  const Square Up = (Us == WHITE ? DELTA_N : DELTA_S);
+  const int Them = (Us == WHITE ? BLACK   : WHITE);
+  const int Up = (Us == WHITE ? DELTA_N : DELTA_S);
 
   Bitboard undefended, b, b1, b2, safe, other;
   int attackUnits;
@@ -529,10 +529,10 @@ INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 
 INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
 {
-  const int Them          = (Us == WHITE ? BLACK    : WHITE);
-  const Square Up         = (Us == WHITE ? DELTA_N  : DELTA_S);
-  const Square Left       = (Us == WHITE ? DELTA_NW : DELTA_SE);
-  const Square Right      = (Us == WHITE ? DELTA_NE : DELTA_SW);
+  const int Them  = (Us == WHITE ? BLACK    : WHITE);
+  const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
+  const int Left  = (Us == WHITE ? DELTA_NW : DELTA_SE);
+  const int Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
   const Bitboard TRank2BB = (Us == WHITE ? Rank2BB  : Rank7BB);
   const Bitboard TRank7BB = (Us == WHITE ? Rank7BB  : Rank2BB);
 

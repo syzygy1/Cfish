@@ -87,9 +87,9 @@ static const Value MaxSafetyBonus = V(258);
 
 INLINE Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
 {
-  const Square Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
-  const Square Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
-  const Square Left  = (Us == WHITE ? DELTA_NW : DELTA_SE);
+  const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
+  const int Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
+  const int Left  = (Us == WHITE ? DELTA_NW : DELTA_SE);
 
   Bitboard b, neighbours, stoppers, doubled, supported, phalanx;
   Square s;
@@ -219,14 +219,14 @@ INLINE Value shelter_storm(Pos *pos, Square ksq, const int Us)
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
   Value safety = MaxSafetyBonus;
-  int center = max(FILE_B, min(FILE_G, file_of(ksq)));
+  uint32_t center = max(FILE_B, min(FILE_G, file_of(ksq)));
 
-  for (int f = center - 1; f <= center + 1; f++) {
+  for (uint32_t f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
-    int rkUs = b ? relative_rank_s(Us, backmost_sq(Us, b)) : RANK_1;
+    uint32_t rkUs = b ? relative_rank_s(Us, backmost_sq(Us, b)) : RANK_1;
 
     b  = theirPawns & file_bb(f);
-    int rkThem = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : RANK_1;
+    uint32_t rkThem = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : RANK_1;
 
     safety -=  ShelterWeakness[min(f, FILE_H - f)][rkUs]
              + StormDanger

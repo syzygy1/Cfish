@@ -119,10 +119,10 @@ typedef uint64_t Bitboard;
 
 #define MOVE_NULL 65
 
-#define NORMAL     0
-#define PROMOTION (1 << 14)
-#define ENPASSANT (2 << 14)
-#define CASTLING  (3 << 14)
+#define NORMAL    0
+#define PROMOTION 1
+#define ENPASSANT 2
+#define CASTLING  3
 
 #define WHITE 0
 #define BLACK 1
@@ -319,7 +319,7 @@ typedef int32_t Phase;
 typedef int32_t Value;
 typedef int32_t Piece;
 typedef int32_t Depth;
-typedef int32_t Square;
+typedef uint32_t Square;
 
 // Score type stores a middlegame and an endgame value in a single integer.
 // The least significant 16 bits are used to store the endgame value
@@ -364,7 +364,8 @@ extern uint32_t NonPawnPieceValue[16];
 #define make_piece(c,pt) ((Piece)(((c) << 3) + (pt)))
 #define type_of_p(p) ((p) & 7)
 #define color_of(p) ((p) >> 3)
-#define square_is_ok(s) ((s) >= SQ_A1 && (s) <= SQ_H8)
+// since Square is now unsigned, no need to test for s >= SQ_A1
+#define square_is_ok(s) ((Square)(s) <= SQ_H8)
 #define file_of(s) ((s) & 7)
 #define rank_of(s) ((s) >> 3)
 #define relative_square(c,s) ((Square)((s) ^ ((c) * 56)))
@@ -373,13 +374,13 @@ extern uint32_t NonPawnPieceValue[16];
 #define pawn_push(c) ((c) == WHITE ? 8 : -8)
 #define from_sq(m) ((Square)((m)>>6) & 0x3f)
 #define to_sq(m) ((Square)((m) & 0x3f))
-#define type_of_m(m) ((m) & (3<<14))
+#define type_of_m(m) ((m) >> 14)
 #define promotion_type(m) ((((m)>>12) & 3) + KNIGHT)
 #define make_move(from,to) ((Move)((to) | ((from) << 6)))
-#define make_promotion(from,to,pt) ((Move)((to) | ((from)<<6) | PROMOTION | (((pt)-KNIGHT)<<12)))
-#define make_enpassant(from,to) ((Move)((to) | ((from)<<6) | ENPASSANT))
-#define make_castling(from,to) ((Move)((to) | ((from)<<6) | CASTLING))
-#define move_is_ok(m) (from_sq(m) != to_sq(m))
+#define make_promotion(from,to,pt) ((Move)((to) | ((from)<<6) | (PROMOTION<<14) | (((pt)-KNIGHT)<<12)))
+#define make_enpassant(from,to) ((Move)((to) | ((from)<<6) | (ENPASSANT<<14)))
+#define make_castling(from,to) ((Move)((to) | ((from)<<6) | (CASTLING<<14)))
+#define move_is_ok(m) (from_sq(m) != to_sq(m) && m >= 0 && m < 65536)
 
 INLINE int opposite_colors(Square s1, Square s2)
 {
