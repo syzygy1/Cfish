@@ -876,14 +876,14 @@ ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
   TB_RootInTB = TB_root_probe(pos, begin, &num_moves, &TB_Score);
 
   if (TB_RootInTB)
-    TB_Cardinality = 0; // Do not probe tablebases during the search
+    TB_Cardinality = 0; // Do not probe tablebases during the search.
 
-  else { // If DTZ tables are missing, use WDL tables as a fallback
+  else { // If DTZ tables are missing, use WDL tables as a fallback.
     // Filter out moves that do not preserve the draw or the win.
     TB_RootInTB = TB_root_probe_wdl(pos, begin, &num_moves, &TB_Score);
 
-    // Only probe during search if winning
-    if (TB_Score <= VALUE_DRAW)
+    // Only probe during search if winning.
+    if (TB_RootInTB && TB_Score <= VALUE_DRAW)
       TB_Cardinality = 0;
   }
 
