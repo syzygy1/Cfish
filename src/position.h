@@ -37,7 +37,6 @@ struct Zob {
   Key enpassant[8];
   Key castling[16];
   Key side;
-  Key exclusion;
 };
 
 extern struct Zob zob;
@@ -259,7 +258,6 @@ int pos_is_ok(Pos *pos, int* failedStep);
 
 // Accessing hash keys
 #define pos_key() (pos->st->key)
-#define pos_exclusion_key() (pos_key() ^ zob.exclusion)
 #define pos_material_key() (pos->st->materialKey)
 #define pos_pawn_key() (pos->st->pawnKey)
 

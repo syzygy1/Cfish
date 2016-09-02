@@ -91,7 +91,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // partial search to overwrite a previous full search TT value, so we
   // use a different position key in case of an excluded move.
   excludedMove = ss->excludedMove;
-  posKey = excludedMove ? pos_exclusion_key() : pos_key();
+  posKey = pos_key() ^ (Key)excludedMove;
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->PVIdx].pv[0]

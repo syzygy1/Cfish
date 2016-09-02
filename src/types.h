@@ -169,19 +169,19 @@ INLINE int make_castling_right(int c, int s)
 #define VALUE_MATE_IN_MAX_PLY  (VALUE_MATE - 2 * MAX_PLY)
 #define VALUE_MATED_IN_MAX_PLY (-VALUE_MATE + 2 * MAX_PLY)
 
-#define PawnValueMg   198
-#define PawnValueEg   258
-#define KnightValueMg 817
-#define KnightValueEg 896
-#define BishopValueMg 836
-#define BishopValueEg 907
-#define RookValueMg   1270
-#define RookValueEg   1356
-#define QueenValueMg  2521
-#define QueenValueEg  2658
+#define PawnValueMg   188
+#define PawnValueEg   248
+#define KnightValueMg 753
+#define KnightValueEg 832
+#define BishopValueMg 826
+#define BishopValueEg 897
+#define RookValueMg   1285
+#define RookValueEg   1371
+#define QueenValueMg  2513
+#define QueenValueEg  2650
 
-#define MidgameLimit 15581
-#define EndgameLimit 3998
+#define MidgameLimit 15258
+#define EndgameLimit 3915
 
 #define PAWN   1
 #define KNIGHT 2

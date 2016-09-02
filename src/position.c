@@ -168,7 +168,6 @@ void zob_init(void) {
   }
 
   zob.side = prng_rand(&rng);
-  zob.exclusion = prng_rand(&rng);
 }
 
 
