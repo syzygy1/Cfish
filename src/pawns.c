@@ -202,6 +202,7 @@ PawnEntry *pawn_probe(Pos *pos)
   e->key = key;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
   e->asymmetry = popcount(e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]);
+  e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
   return e;
 }
 
