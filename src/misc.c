@@ -221,7 +221,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
   while ((c = getc(stream)) != EOF) {
     (*lineptr)[i++] = c;
     if (i == *n)
-      *lineptr = realloc(lineptr, *n += 100);
+      *lineptr = realloc(*lineptr, *n += 100);
     if (c == '\n') break;
   }
   (*lineptr)[i] = 0;
