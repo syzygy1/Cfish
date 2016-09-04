@@ -30,6 +30,7 @@
 #include "search.h"
 #include "thread.h"
 #include "timeman.h"
+#include "tt.h"
 #include "uci.h"
 
 extern void benchmark(Pos *pos, char *str);
@@ -121,6 +122,8 @@ void go(Pos *pos, char *str)
 {
   LimitsType limits;
   char *token;
+
+  tt_resize();
 
   limits.startTime = now(); // As early as possible!
 
@@ -255,6 +258,7 @@ void uci_loop(int argc, char **argv)
       Time.availableNodes = 0;
     }
     else if (strcmp(token, "isready") == 0) {
+      tt_resize();
       printf("readyok\n");
       fflush(stdout);
     }

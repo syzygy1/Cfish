@@ -112,6 +112,8 @@ static_assert(CacheLineSize % sizeof(Cluster) == 0, "Cluster size incorrect");
 
 struct TranspositionTable {
   size_t clusterCount;
+  size_t newClusterCount;
+  int largePages;
   Cluster *table;
   void *mem;
   uint8_t generation8; // Size must be not bigger than TTEntry::genBound8
@@ -121,10 +123,7 @@ typedef struct TranspositionTable TranspositionTable;
 
 extern TranspositionTable TT;
 
-INLINE void tt_free(void)
-{
-  free(TT.mem);
-}
+void tt_free(void);
 
 INLINE void tt_new_search(void)
 {
@@ -143,7 +142,8 @@ INLINE TTEntry *tt_first_entry(Key key)
 
 TTEntry *tt_probe(Key key, int *found);
 int tt_hashfull(void);
-void tt_resize(size_t mbSize);
+void tt_resize_delayed(size_t mbSize);
+void tt_resize(void);
 void tt_clear(void);
 
 #endif

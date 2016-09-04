@@ -817,7 +817,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
       }
       st->pawnKey ^= zob.psq[capt_piece][to];
     }
-    st->capturedType = capt_piece;
+    st->capturedPiece = capt_piece;
     st->psq -= psqt.psq[capt_piece][to];
     st->nonPawn -= NonPawnPieceValue[capt_piece];
     st->materialKey -= mat_key[capt_piece];
@@ -825,7 +825,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
     key ^= zob.psq[capt_piece][to];
   } else { // Not a capture.
-    st->capturedType = 0;
+    st->capturedPiece = 0;
     st->rule50 = (st-1)->rule50 + 1;
     if ((piece & 7) == PAWN) {
       st->rule50 = 0;
@@ -879,7 +879,7 @@ void undo_move(Pos *pos, Move m)
   pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
   pos->board[from] = piece;
 
-  int capt_piece = st->capturedType;
+  int capt_piece = st->capturedPiece;
   pos->board[to] = capt_piece;
   if (capt_piece) {
     if (type_of_m(m) == ENPASSANT) {
@@ -936,6 +936,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   if (type_of_m(m) == CASTLING) {
     assert(piece == make_piece(us, KING));
+    assert(captured == make_piece(us, ROOK));
 
     Square rfrom, rto;
 
@@ -945,16 +946,15 @@ void do_move(Pos *pos, Move m, int givesCheck)
     to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
 
     // Remove both pieces first since squares could overlap in Chess960
-    int rook = piece_on(rfrom);
     remove_piece(pos, us, piece, from);
-    remove_piece(pos, us, rook, rfrom);
+    remove_piece(pos, us, captured, rfrom);
     pos->board[from] = pos->board[rfrom] = 0;
     put_piece(pos, us, piece, to);
-    put_piece(pos, us, rook, rto);
+    put_piece(pos, us, captured, rto);
 
+    st->psq += psqt.psq[captured][rto] - psqt.psq[captured][rfrom];
+    key ^= zob.psq[captured][rfrom] ^ zob.psq[captured][rto];
     captured = 0;
-    st->psq += psqt.psq[rook][rto] - psqt.psq[rook][rfrom];
-    key ^= zob.psq[rook][rfrom] ^ zob.psq[rook][rto];
   }
 
   if (captured) {
@@ -1055,8 +1055,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // Update incremental scores
   st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
 
-  // Set capture piece
-  st->capturedType = captured;
+  // Set captured piece
+  st->capturedPiece = captured;
 
   // Update the key with the final value
   st->key = key;
@@ -1088,7 +1088,7 @@ void undo_move(Pos *pos, Move m)
   int piece = piece_on(to);
 
   assert(is_empty(from) || type_of_m(m) == CASTLING);
-  assert(type_of_p(pos->st->capturedType) != KING);
+  assert(type_of_p(pos->st->capturedPiece) != KING);
 
   if (type_of_m(m) == PROMOTION) {
     assert(relative_rank_s(us, to) == RANK_8);
@@ -1118,7 +1118,7 @@ void undo_move(Pos *pos, Move m)
   } else {
     move_piece(pos, us, piece, to, from); // Put the piece back at the source square
 
-    if (pos->st->capturedType) {
+    if (pos->st->capturedPiece) {
       Square capsq = to;
 
       if (type_of_m(m) == ENPASSANT) {
@@ -1128,10 +1128,10 @@ void undo_move(Pos *pos, Move m)
         assert(to == pos->st->previous->epSquare);
         assert(relative_rank_s(us, to) == RANK_6);
         assert(is_empty(capsq));
-        assert(pos->st->capturedType == make_piece(us ^ 1, PAWN));
+        assert(pos->st->capturedPiece == make_piece(us ^ 1, PAWN));
       }
 
-      put_piece(pos, us ^ 1, pos->st->capturedType, capsq); // Restore the captured piece
+      put_piece(pos, us ^ 1, pos->st->capturedPiece, capsq); // Restore the captured piece
     }
   }
 

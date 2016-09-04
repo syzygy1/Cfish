@@ -40,7 +40,7 @@ void on_clear_hash(Option *opt)
 
 void on_hash_size(Option *opt)
 {
-  tt_resize(opt->value);
+  tt_resize_delayed(opt->value);
 }
 
 void on_logger(Option *opt)
@@ -70,20 +70,23 @@ static Option options_map[] = {
   { "Debug Log File", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_logger, 0, NULL },
   { "Contempt", OPT_TYPE_SPIN, 0, -100, 100, NULL, NULL, 0, NULL },
   { "Threads", OPT_TYPE_SPIN, 1, 1, 128, NULL, on_threads, 0, NULL },
-  { "Hash", OPT_TYPE_SPIN,   16, 1, MAXHASHMB, NULL, on_hash_size, 0, NULL },
+  { "Hash", OPT_TYPE_SPIN, 16, 1, MAXHASHMB, NULL, on_hash_size, 0, NULL },
   { "Clear Hash", OPT_TYPE_BUTTON, 0, 0, 0, NULL, on_clear_hash, 0, NULL },
   { "Ponder", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "MultiPV", OPT_TYPE_SPIN, 1, 1, 500, NULL, NULL, 0, NULL },
   { "Skill Level", OPT_TYPE_SPIN, 20, 0, 20, NULL, NULL, 0, NULL },
-  { "Move Overhead", OPT_TYPE_SPIN,   30, 0, 5000, NULL, NULL, 0, NULL },
-  { "Minimum Thinking Time", OPT_TYPE_SPIN,   20, 0, 5000, NULL, NULL, 0, NULL },
+  { "Move Overhead", OPT_TYPE_SPIN, 30, 0, 5000, NULL, NULL, 0, NULL },
+  { "Minimum Thinking Time", OPT_TYPE_SPIN, 20, 0, 5000, NULL, NULL, 0, NULL },
   { "Slow Mover", OPT_TYPE_SPIN, 89, 10, 1000, NULL, NULL, 0, NULL },
-  { "nodestime", OPT_TYPE_SPIN,   0, 0, 10000, NULL, NULL, 0, NULL },
-  { "UCI_Chess960", OPT_TYPE_CHECK,  0, 0, 0, NULL, NULL, 0, NULL },
+  { "nodestime", OPT_TYPE_SPIN, 0, 0, 10000, NULL, NULL, 0, NULL },
+  { "UCI_Chess960", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "SyzygyPath", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_tb_path, 0, NULL },
   { "SyzygyProbeDepth", OPT_TYPE_SPIN, 1, 1, 100, NULL, NULL, 0, NULL },
   { "Syzygy50MoveRule", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
   { "SyzygyProbeLimit", OPT_TYPE_SPIN, 6, 0, 6, NULL, NULL, 0, NULL },
+#ifndef __WIN32__
+  { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
+#endif
   { NULL }
 };
 

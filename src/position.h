@@ -66,7 +66,7 @@ struct Stack {
   uint8_t rule50;
 
   // Not copied when making a move
-  uint8_t capturedType;
+  uint8_t capturedPiece;
   uint8_t epSquare;
   Key key;
   Bitboard checkersBB;
@@ -107,7 +107,7 @@ struct Stack {
 
 typedef struct Stack Stack;
 
-#define StateCopySize offsetof(Stack, capturedType)
+#define StateCopySize offsetof(Stack, capturedPiece)
 #define StateSize offsetof(Stack, pv)
 #define SStackBegin(st) (&st.pv)
 #define SStackSize (offsetof(Stack, countermove) - offsetof(Stack, pv))
@@ -254,7 +254,7 @@ int pos_is_ok(Pos *pos, int* failedStep);
 
 // Properties of moves
 #define moved_piece(m) (piece_on(from_sq(m)))
-#define captured_piece_type() (pos->st->capturedType)
+#define captured_piece() (pos->st->capturedPiece)
 
 // Accessing hash keys
 #define pos_key() (pos->st->key)

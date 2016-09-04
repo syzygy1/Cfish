@@ -23,6 +23,7 @@
 
 #include <stdatomic.h>
 #ifndef __WIN32__
+#include <numa.h>
 #include <pthread.h>
 #else
 #include <windows.h>

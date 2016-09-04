@@ -116,7 +116,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       }
 
       // Extra penalty for a quiet TT move in previous ply when it gets refuted.
-      if ((ss-1)->moveCount == 1 && !captured_piece_type()) {
+      if ((ss-1)->moveCount == 1 && !captured_piece()) {
         Value penalty = d * d + 4 * d + 1;
         Square prevSq = to_sq((ss-1)->currentMove);
         update_cm_stats(ss-1, piece_on(prevSq), prevSq, -penalty);
@@ -400,9 +400,9 @@ moves_loop: // When in check search starts from here.
         && !captureOrPromotion
         && !inCheck
         && !givesCheck
-        && !advanced_pawn_push(pos, move)
-        &&  bestValue > VALUE_MATED_IN_MAX_PLY) {
-
+        &&  bestValue > VALUE_MATED_IN_MAX_PLY
+        && !advanced_pawn_push(pos, move))
+    {
       // Move count based pruning
       if (moveCountPruning)
         continue;
@@ -605,7 +605,7 @@ moves_loop: // When in check search starts from here.
     }
 
     // Extra penalty for a quiet TT move in previous ply when it gets refuted.
-    if ((ss-1)->moveCount == 1 && !captured_piece_type()) {
+    if ((ss-1)->moveCount == 1 && !captured_piece()) {
       Value penalty = d * d + 4 * d + 1;
       Square prevSq = to_sq((ss-1)->currentMove);
       update_cm_stats(ss-1, piece_on(prevSq), prevSq, -penalty);
@@ -613,7 +613,7 @@ moves_loop: // When in check search starts from here.
   }
   // Bonus for prior countermove that caused the fail low.
   else if (    depth >= 3 * ONE_PLY
-           && !captured_piece_type()
+           && !captured_piece()
            && move_is_ok((ss-1)->currentMove))
   {
     int d = depth / ONE_PLY;

@@ -18,39 +18,75 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
+
 #include <string.h>   // For std::memset
 #include <stdio.h>
+#ifndef __WIN32__
+#include <sys/mman.h>
+#endif
 
 #include "bitboard.h"
+#include "uci.h"
 #include "tt.h"
 
 TranspositionTable TT; // Our global transposition table
+
+void tt_free(void)
+{
+#ifdef __WIN32__
+  free(TT.mem);
+#else
+  if (TT.mem)
+    munmap(TT.mem, TT.clusterCount * sizeof(Cluster));
+#endif
+}
 
 
 // tt_resize() sets the size of the transposition table, measured in
 // megabytes. Transposition table consists of a power of 2 number of
 // clusters and each cluster consists of ClusterSize number of TTEntry.
 
-void tt_resize(size_t mbSize)
+void tt_resize_delayed(size_t mbSize)
 {
-  size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
+  TT.newClusterCount = ((size_t)1) << msb((mbSize * 1024 * 1024)
+                                                   / sizeof(Cluster));
+}
 
-  if (count == TT.clusterCount)
+void tt_resize(void)
+{
+  if (!TT.newClusterCount || (TT.newClusterCount == TT.clusterCount
+          && TT.largePages == option_value(OPT_LARGE_PAGES)))
     return;
 
-  TT.clusterCount = count;
+  tt_free();
 
-  free(TT.mem);
-  TT.mem = calloc(count * sizeof(Cluster) + CacheLineSize - 1, 1);
+  TT.clusterCount = TT.newClusterCount;
+  TT.largePages = option_value(OPT_LARGE_PAGES);
+#ifdef __WIN32__
+  TT.mem = calloc(TT.clusterCount * sizeof(Cluster) + CacheLineSize - 1, 1);
+
+#else
+  TT.mem = mmap(NULL, TT.clusterCount * sizeof(Cluster),
+                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#endif
 
   if (!TT.mem) {
     fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for transposition table.\n",
-            mbSize);
+            TT.clusterCount * sizeof(Cluster));
     exit(EXIT_FAILURE);
   }
 
+#ifdef __WIN32__
   TT.table = (Cluster *)((((uintptr_t)TT.mem) + CacheLineSize - 1)
                                                & ~(CacheLineSize - 1));
+#else
+  TT.table = (Cluster *)TT.mem;
+  if (TT.largePages)
+    madvise(TT.mem, TT.clusterCount * sizeof(Cluster), MADV_HUGEPAGE);
+#endif
+
+  TT.newClusterCount = 0;
 }
 
 
