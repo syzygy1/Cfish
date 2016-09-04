@@ -28,6 +28,7 @@
 #include "position.h"
 #include "search.h"
 #include "thread.h"
+#include "tt.h"
 #include "uci.h"
 
 static char *Defaults[] = {
@@ -119,6 +120,7 @@ void benchmark(Pos *current, char *str)
 
   option_set_value(OPT_HASH, ttSize);
   option_set_value(OPT_THREADS, threads);
+  tt_resize();
   search_clear();
 
   if (strcmp(limitType, "time") == 0)
