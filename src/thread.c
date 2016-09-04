@@ -33,11 +33,6 @@
 ThreadPool Threads;
 MainThread mainThread;
 
-static struct {
-  int numNodes;
-  int numCPUs;
-} numa;
-
 // thread_create() launches the thread and then waits until it goes to sleep
 // in idle_loop().
 
@@ -222,11 +217,6 @@ void threads_init(void)
 {
 #ifdef __WIN32__
   io_mutex = CreateMutex(NULL, FALSE, NULL);
-#endif
-
-#ifdef NUMA
-#ifndef __WIN32__
-#endif
 #endif
 
   Threads.num_threads = 1;
