@@ -612,6 +612,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
   // Probe each move.
   size_t num = *num_moves;
+  pos->st->endMoves = (pos->st-1)->endMoves;
   for (size_t i = 0; i < num; i++) {
     do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
     int v = 0;
@@ -725,6 +726,7 @@ int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
   // Probe each move.
   size_t num = *num_moves;
+  pos->st->endMoves=(pos->st-1)->endMoves;
   for (size_t i = 0; i < num; i++) {
     do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
     int v = -TB_probe_wdl(pos, &success);
