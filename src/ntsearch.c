@@ -397,39 +397,43 @@ moves_loop: // When in check search starts from here.
 
     // Step 13. Pruning at shallow depth
     if (   !rootNode
-        && !captureOrPromotion
         && !inCheck
-        && !givesCheck
-        &&  bestValue > VALUE_MATED_IN_MAX_PLY
-        && !advanced_pawn_push(pos, move))
+        &&  bestValue > VALUE_MATED_IN_MAX_PLY)
     {
-      // Move count based pruning
-      if (moveCountPruning)
-        continue;
-
-      predictedDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO);
-
-      // Countermoves based pruning
-      if (   predictedDepth < 3 * ONE_PLY
-          && (!cmh  || (*cmh )[moved_piece][to_sq(move)] < 0)
-          && (!fmh  || (*fmh )[moved_piece][to_sq(move)] < 0)
-          && (!fmh2 || (*fmh2)[moved_piece][to_sq(move)] < 0 || (cmh && fmh)))
-        continue;
-
-      // Futility pruning: parent node
-      if (   predictedDepth < 7 * ONE_PLY
-          && ss->staticEval + 256 + 200 * predictedDepth / ONE_PLY <= alpha)
-        continue;
-
-      // Prune moves with negative SEE at low depths and below a decreasing
-      // threshold at higher depths.
-      if (predictedDepth < 8 * ONE_PLY) {
-        Value see_v = predictedDepth < 4 * ONE_PLY ? 0
-                      : -PawnValueMg * 2
-                         * (int)(predictedDepth - 3 * ONE_PLY) / ONE_PLY;
-        if (!see_test(pos, move, see_v))
+      if (   !captureOrPromotion
+          && !givesCheck
+          && !advanced_pawn_push(pos, move))
+      {
+        // Move count based pruning
+        if (moveCountPruning)
           continue;
-      }
+
+        predictedDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO);
+
+        // Countermoves based pruning
+        if (   predictedDepth < 3 * ONE_PLY
+            && (!cmh  || (*cmh )[moved_piece][to_sq(move)] < 0)
+            && (!fmh  || (*fmh )[moved_piece][to_sq(move)] < 0)
+            && (!fmh2 || (*fmh2)[moved_piece][to_sq(move)] < 0 || (cmh && fmh)))
+          continue;
+
+        // Futility pruning: parent node
+        if (   predictedDepth < 7 * ONE_PLY
+            && ss->staticEval + 256 + 200 * predictedDepth / ONE_PLY <= alpha)
+          continue;
+
+        // Prune moves with negative SEE at low depths and below a decreasing
+        // threshold at higher depths.
+        if (predictedDepth < 8 * ONE_PLY) {
+          Value see_v = predictedDepth < 4 * ONE_PLY ? 0
+                        : -PawnValueMg * 2
+                           * (int)(predictedDepth - 3 * ONE_PLY) / ONE_PLY;
+          if (!see_test(pos, move, see_v))
+            continue;
+        }
+      } else if (   depth < 3 * ONE_PLY
+                 && !see_test(pos, move, 0))
+        continue;
     }
 
     // Speculative prefetch as early as possible
