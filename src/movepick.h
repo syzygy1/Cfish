@@ -66,6 +66,34 @@ INLINE Value ft_get(FromToStats ft, int c, Move m)
   return ft[c][m & 4095];
 }
 
+#define ST_MAIN_SEARCH            0
+#define ST_GOOD_CAPTURES          1
+#define ST_GOOD_CAPTURES_2        2
+#define ST_KILLERS                3
+#define ST_KILLERS_2              4
+#define ST_QUIET                  5
+#define ST_QUIET_2                6
+#define ST_BAD_CAPTURES           7
+
+#define ST_EVASIONS               8
+#define ST_EVASIONS_1             9
+
+#define ST_QSEARCH_WITH_CHECKS    10
+#define ST_QCAPTURES_CHECKS_1     11
+#define ST_QCAPTURES_CHECKS_2     12
+#define ST_CHECKS                 13
+
+#define ST_QSEARCH_WITHOUT_CHECKS 14
+#define ST_QCAPTURES_NO_CHECKS_1  15
+#define ST_REMAINING              16
+
+#define ST_RECAPTURES             17
+#define ST_RECAPTURES_2           18
+
+#define ST_PROBCUT                19
+#define ST_PROBCUT_1              20
+#define ST_PROBCUT_2              21
+
 void mp_init(Pos *pos, Move ttm, Depth depth);
 void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s);
 void mp_init_pc(Pos *pos, Move ttm, Value threshold);

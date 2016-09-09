@@ -432,7 +432,9 @@ moves_loop: // When in check search starts from here.
             continue;
         }
       } else if (   depth < 3 * ONE_PLY
-                 && !see_test(pos, move, 0))
+                 && (    ss->stage == ST_BAD_CAPTURES
+                     || (    ss->stage != ST_GOOD_CAPTURES_2
+                         && !see_test(pos, move, 0))))
         continue;
     }
 
