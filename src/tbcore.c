@@ -988,11 +988,11 @@ static struct PairsData *setup_pairs(unsigned char *data, uint64 tb_size, uint64
   int min_len = data[9];
   int h = max_len - min_len + 1;
   int num_syms = ReadUshort(&data[10 + 2 * h]);
-  d = (struct PairsData *)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(base_t) + num_syms);
+  d = (struct PairsData *)malloc(sizeof(struct PairsData) + h * sizeof(base_t) + num_syms);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
   d->offset = (ushort*)(&data[10]);
-  d->symlen = ((ubyte *)d) + sizeof(struct PairsData) + (h - 1) * sizeof(base_t);
+  d->symlen = ((ubyte *)d) + sizeof(struct PairsData) + h * sizeof(base_t);
   d->sympat = &data[12 + 2 * h];
   d->min_len = min_len;
   *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
