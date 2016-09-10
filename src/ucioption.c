@@ -24,40 +24,60 @@
 #include <strings.h>
 
 #include "misc.h"
+#include "numa.h"
 #include "search.h"
+#include "settings.h"
 #include "tbprobe.h"
 #include "thread.h"
 #include "tt.h"
 #include "uci.h"
 
 // 'On change' actions, triggered by an option's value change
-void on_clear_hash(Option *opt)
+static void on_clear_hash(Option *opt)
 {
   (void)opt;
 
-  search_clear();
+  if (settings.tt_size)
+    search_clear();
 }
 
-void on_hash_size(Option *opt)
+static void on_hash_size(Option *opt)
 {
-  tt_resize_delayed(opt->value);
+  delayed_settings.tt_size = opt->value;
 }
 
-void on_logger(Option *opt)
+static void on_logger(Option *opt)
 {
   start_logger(opt->val_string);
 }
 
-void on_threads(Option *opt)
+#ifdef NUMA
+static void on_numa(Option *opt)
 {
-  (void)opt;
+  read_numa_nodes(opt->val_string);
+}
+#endif
 
-  threads_read_uci_options();
+static void on_threads(Option *opt)
+{
+  delayed_settings.num_threads = opt->value;
 }
 
-void on_tb_path(Option *opt)
+static void on_tb_path(Option *opt)
 {
   TB_init(opt->val_string);
+}
+
+static void on_largepages(Option *opt)
+{
+#ifdef __WIN32__
+  if (opt->value) {
+    printf("info string Option LargePages not yet implemented on Windows.\n");
+    fflush(stdout);
+    opt->value = 0;
+  }
+#endif
+  delayed_settings.large_pages = opt->value;
 }
 
 #ifdef IS_64BIT
@@ -84,8 +104,9 @@ static Option options_map[] = {
   { "SyzygyProbeDepth", OPT_TYPE_SPIN, 1, 1, 100, NULL, NULL, 0, NULL },
   { "Syzygy50MoveRule", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
   { "SyzygyProbeLimit", OPT_TYPE_SPIN, 6, 0, 6, NULL, NULL, 0, NULL },
-#ifndef __WIN32__
-  { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
+  { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_largepages, 0, NULL },
+#ifdef NUMA
+  { "NUMA", OPT_TYPE_STRING, 0, 0, 0, "all", on_numa, 0, NULL },
 #endif
   { NULL }
 };
@@ -96,6 +117,14 @@ static Option options_map[] = {
 
 void options_init()
 {
+#ifdef NUMA
+  // On a non-NUMA machine, disable the NUMA option to diminish confusion.
+  if (!numa_avail)
+    options_map[OPT_NUMA].name = NULL;
+#endif
+#ifdef __WIN32__
+  options_map[OPT_LARGE_PAGES].def = 0;
+#endif
   for (Option *opt = options_map; opt->name != NULL; opt++) {
     switch (opt->type) {
     case OPT_TYPE_CHECK:

@@ -112,7 +112,6 @@ static_assert(CacheLineSize % sizeof(Cluster) == 0, "Cluster size incorrect");
 
 struct TranspositionTable {
   size_t clusterCount;
-  size_t newClusterCount;
   int largePages;
   Cluster *table;
   void *mem;
@@ -142,8 +141,7 @@ INLINE TTEntry *tt_first_entry(Key key)
 
 TTEntry *tt_probe(Key key, int *found);
 int tt_hashfull(void);
-void tt_resize_delayed(size_t mbSize);
-void tt_resize(void);
+void tt_allocate(size_t mbSize);
 void tt_clear(void);
 
 #endif

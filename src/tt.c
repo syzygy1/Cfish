@@ -27,10 +27,15 @@
 #endif
 
 #include "bitboard.h"
-#include "uci.h"
+#include "numa.h"
+#include "settings.h"
 #include "tt.h"
+#include "types.h"
+#include "uci.h"
 
 TranspositionTable TT; // Our global transposition table
+
+// tt_free() frees the allocated transposition table memory.
 
 void tt_free(void)
 {
@@ -43,37 +48,25 @@ void tt_free(void)
 }
 
 
-// tt_resize() sets the size of the transposition table, measured in
-// megabytes. Transposition table consists of a power of 2 number of
-// clusters and each cluster consists of ClusterSize number of TTEntry.
+// tt_allocate() allocates the transposition table, measured in 
+// megabytes.
 
-void tt_resize_delayed(size_t mbSize)
+void tt_allocate(size_t mbSize)
 {
-  TT.newClusterCount = ((size_t)1) << msb((mbSize * 1024 * 1024)
-                                                   / sizeof(Cluster));
-}
+  size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
 
-void tt_resize(void)
-{
-  if (!TT.newClusterCount || (TT.newClusterCount == TT.clusterCount
-          && TT.largePages == option_value(OPT_LARGE_PAGES)))
-    return;
-
-  tt_free();
-
-  TT.clusterCount = TT.newClusterCount;
-  TT.largePages = option_value(OPT_LARGE_PAGES);
+  TT.clusterCount = count;
 #ifdef __WIN32__
-  TT.mem = calloc(TT.clusterCount * sizeof(Cluster) + CacheLineSize - 1, 1);
+  TT.mem = calloc(count * sizeof(Cluster) + CacheLineSize - 1, 1);
 
 #else
-  TT.mem = mmap(NULL, TT.clusterCount * sizeof(Cluster),
+  TT.mem = mmap(NULL, count * sizeof(Cluster),
                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #endif
 
   if (!TT.mem) {
     fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for transposition table.\n",
-            TT.clusterCount * sizeof(Cluster));
+            mbSize);
     exit(EXIT_FAILURE);
   }
 
@@ -82,11 +75,17 @@ void tt_resize(void)
                                                & ~(CacheLineSize - 1));
 #else
   TT.table = (Cluster *)TT.mem;
-  if (TT.largePages)
-    madvise(TT.mem, TT.clusterCount * sizeof(Cluster), MADV_HUGEPAGE);
+#ifdef NUMA
+  // Interleave the shared transposition table across all nodes.
+  if (settings.numa_enabled)
+    numa_interleave_memory(TT.mem, count * sizeof(Cluster), settings.mask);
+  // FIXME: create an interleave mask of the nodes on which threads are
+  // actually running.
 #endif
-
-  TT.newClusterCount = 0;
+  // Advise the kernel to allocate large pages.
+  if (settings.large_pages)
+    madvise(TT.mem, count * sizeof(Cluster), MADV_HUGEPAGE);
+#endif
 }
 
 

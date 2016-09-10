@@ -23,8 +23,10 @@
 #include "material.h"
 #include "movegen.h"
 #include "movepick.h"
+#include "numa.h"
 #include "pawns.h"
 #include "search.h"
+#include "settings.h"
 #include "thread.h"
 #include "uci.h"
 #include "tbprobe.h"
@@ -33,28 +35,47 @@
 ThreadPool Threads;
 MainThread mainThread;
 
-// thread_create() launches the thread and then waits until it goes to sleep
-// in idle_loop().
+// thread_init() is where a search thread starts and initialises itself.
 
-Pos *thread_create(int idx)
+void thread_init(void *arg)
 {
-  Pos *pos = malloc(sizeof(Pos));
+  int idx = (intptr_t)arg;
+
+#ifdef NUMA
+  if (settings.numa_enabled)
+    bind_thread_to_numa_node(idx);
+#endif
+
+  Pos *pos;
+
+  if (settings.numa_enabled) {
+    pos = numa_alloc(sizeof(Pos));
+    pos->pawnTable = numa_alloc(16384 * sizeof(PawnEntry));
+    pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
+    pos->history = numa_alloc(sizeof(HistoryStats));
+    pos->counterMoves = numa_alloc(sizeof(MoveStats));
+    pos->fromTo = numa_alloc(sizeof(FromToStats));
+    pos->rootMoves = numa_alloc(sizeof(RootMoves));
+    pos->stack = numa_alloc((5 + MAX_PLY + 10) * sizeof(Stack));
+    pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
+  } else {
+    pos = calloc(sizeof(Pos), 1);
+    pos->pawnTable = calloc(16384 * sizeof(PawnEntry), 1);
+    pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
+    pos->history = calloc(sizeof(HistoryStats), 1);
+    pos->counterMoves = calloc(sizeof(MoveStats), 1);
+    pos->fromTo = calloc(sizeof(FromToStats), 1);
+    pos->rootMoves = calloc(sizeof(RootMoves), 1);
+    pos->stack = calloc((5 + MAX_PLY + 10) * sizeof(Stack), 1);
+    pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
+  }
   pos->thread_idx = idx;
-
-  pos->pawnTable = calloc(16384, sizeof(PawnEntry));
-  pos->materialTable = calloc(8192, sizeof(MaterialEntry));
-  pos->history = malloc(sizeof(HistoryStats));
-  pos->counterMoves = malloc(sizeof(MoveStats));
-  pos->fromTo = malloc(sizeof(FromToStats));
-
-  pos->rootMoves = malloc(sizeof(RootMoves));
-  pos->stack = malloc((5 + MAX_PLY + 10) * sizeof(Stack));
   pos->stack += 5;
-  pos->moveList = malloc(10000 * sizeof(ExtMove));
 
-  stats_clear(pos->history);
-  stats_clear(pos->counterMoves);
-  stats_clear(pos->fromTo);
+  // numa_alloc() clears the memory anyway.
+//  stats_clear(pos->history);
+//  stats_clear(pos->counterMoves);
+//  stats_clear(pos->fromTo);
 
   atomic_store(&pos->resetCalls, 0);
   pos->exit = 0;
@@ -63,20 +84,44 @@ Pos *thread_create(int idx)
 #ifndef __WIN32__
   pthread_mutex_init(&pos->mutex, NULL);
   pthread_cond_init(&pos->sleepCondition, NULL);
-
-  pthread_mutex_lock(&pos->mutex);
-  pos->searching = 1;
-  pthread_create(&pos->nativeThread, NULL, (void*(*)(void*))thread_idle_loop, pos);
-  while (pos->searching)
-    pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
-  pthread_mutex_unlock(&pos->mutex);
 #else
   pos->startEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
   pos->stopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-  pos->nativeThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_idle_loop, pos, 0, NULL);
 #endif
 
-  return pos;
+  Threads.pos[idx] = pos;
+
+#ifndef __WIN32__
+  pthread_mutex_lock(&Threads.mutex);
+  Threads.initializing = 0;
+  pthread_cond_signal(&Threads.sleepCondition);
+  pthread_mutex_unlock(&Threads.mutex);
+#else
+  SetEvent(Threads.event);
+#endif
+
+  thread_idle_loop(pos);
+}
+
+// thread_create() launches a new thread.
+
+void thread_create(int idx)
+{
+#ifndef __WIN32__
+  pthread_t thread;
+
+  Threads.initializing = 1;
+  pthread_mutex_lock(&Threads.mutex);
+  pthread_create(&thread, NULL, (void*(*)(void*))thread_init, (void *)(intptr_t)idx);
+  while (Threads.initializing)
+    pthread_cond_wait(&Threads.sleepCondition, &Threads.mutex);
+  pthread_mutex_unlock(&Threads.mutex);
+#else
+  HANDLE *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_init, (void *)(intptr_t)idx, 0 , NULL);
+  WaitForSingleObject(Threads.event, INFINITE);
+#endif
+
+  Threads.pos[idx]->nativeThread = thread;
 }
 
 
@@ -90,29 +135,37 @@ void thread_destroy(Pos *pos)
   pthread_cond_signal(&pos->sleepCondition);
   pthread_mutex_unlock(&pos->mutex);
   pthread_join(pos->nativeThread, NULL);
+  pthread_cond_destroy(&pos->sleepCondition);
+  pthread_mutex_destroy(&pos->mutex);
 #else
   pos->exit = 1;
   SetEvent(pos->startEvent);
   WaitForSingleObject(pos->nativeThread, INFINITE);
+  CloseHandle(pos->startEvent);
+  CloseHandle(pos->stopEvent);
 #endif
 
-  free(pos->pawnTable);
-  free(pos->materialTable);
-  free(pos->history);
-  free(pos->counterMoves);
-  free(pos->fromTo);
-
-  free(pos->rootMoves);
-  free(pos->stack - 5);
-  free(pos->moveList);
-
-#ifndef __WIN32__
-  pthread_cond_destroy(&pos->sleepCondition);
-  pthread_mutex_destroy(&pos->mutex);
-#else
-#endif
-  
-  free(pos);
+  if (settings.numa_enabled) {
+    numa_free(pos->pawnTable, 16384 * sizeof(PawnEntry));
+    numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
+    numa_free(pos->history, sizeof(HistoryStats));
+    numa_free(pos->counterMoves, sizeof(MoveStats));
+    numa_free(pos->fromTo, sizeof(FromToStats));
+    numa_free(pos->rootMoves, sizeof(RootMoves));
+    numa_free(pos->stack - 5, (5 + MAX_PLY + 10) * sizeof(Stack));
+    numa_free(pos->moveList, 10000 * sizeof(ExtMove));
+    numa_free(pos, sizeof(Pos));
+  } else {
+    free(pos->pawnTable);
+    free(pos->materialTable);
+    free(pos->history);
+    free(pos->counterMoves);
+    free(pos->fromTo);
+    free(pos->rootMoves);
+    free(pos->stack - 5);
+    free(pos->moveList);
+    free(pos);
+  }
 }
 
 
@@ -215,12 +268,20 @@ void thread_idle_loop(Pos *pos)
 
 void threads_init(void)
 {
-#ifdef __WIN32__
+#ifndef __WIN32__
+  pthread_mutex_init(&Threads.mutex, NULL);
+  pthread_cond_init(&Threads.sleepCondition, NULL);
+#else
   io_mutex = CreateMutex(NULL, FALSE, NULL);
+  Threads.event = CreateEvent(NULL, FALSE, FALSE, NULL);
+#endif
+
+#ifdef NUMA
+  numa_init();
 #endif
 
   Threads.num_threads = 1;
-  Threads.pos[0] = thread_create(0);
+  thread_create(0);
 }
 
 
@@ -230,31 +291,31 @@ void threads_init(void)
 
 void threads_exit(void)
 {
-  while (Threads.num_threads > 0)
-    thread_destroy(Threads.pos[--Threads.num_threads]);
+  threads_set_number(0);
 
-#ifdef __WIN32__
+#ifndef __WIN32__
+  pthread_cond_destroy(&Threads.sleepCondition);
+  pthread_mutex_destroy(&Threads.mutex);
+#else
   CloseHandle(io_mutex);
+  CloseHandle(Threads.event);
+#endif
+
+#ifdef NUMA
+  numa_exit();
 #endif
 }
 
 
-// threads_read_uci_options() updates internal threads parameters from
-// the corresponding UCI options and creates/destroys threads to match
-// requested number. Thread objects are dynamically allocated.
+// threads_set_number() creates/destroys threads to match the requested
+// number.
 
-void threads_read_uci_options(void)
+void threads_set_number(size_t num)
 {
-  size_t requested = option_value(OPT_THREADS);
+  while (Threads.num_threads < num)
+    thread_create(Threads.num_threads++);
 
-  assert(requested > 0);
-
-  while (Threads.num_threads < requested) {
-    Threads.pos[Threads.num_threads] = thread_create(Threads.num_threads);
-    Threads.num_threads++;
-  }
-
-  while (Threads.num_threads > requested)
+  while (Threads.num_threads > num)
     thread_destroy(Threads.pos[--Threads.num_threads]);
 }
 

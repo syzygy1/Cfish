@@ -46,7 +46,8 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
-Pos *thread_create(int idx);
+void thread_init(void *arg);
+void thread_create(int idx);
 void thread_search(Pos *pos);
 void thread_idle_loop(Pos *pos);
 void thread_start_searching(Pos *pos, int resume);
@@ -76,6 +77,13 @@ void mainthread_search();
 struct ThreadPool {
   Pos *pos[MAX_THREADS];
   size_t num_threads;
+#ifndef __WIN32__
+  pthread_mutex_t mutex;
+  pthread_cond_t sleepCondition;
+  int initializing;
+#else
+  HANDLE event;
+#endif
 };
 
 typedef struct ThreadPool ThreadPool;
@@ -83,7 +91,7 @@ typedef struct ThreadPool ThreadPool;
 void threads_init(void);
 void threads_exit(void);
 void threads_start_thinking(Pos *pos, LimitsType *);
-void threads_read_uci_options(void);
+void threads_set_number(size_t num);
 uint64_t threads_nodes_searched(void);
 uint64_t threads_tb_hits(void);
 

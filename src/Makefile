@@ -37,7 +37,8 @@ PGOBENCH = ./$(EXE) bench 16 1 1000 default time
 ### Object files
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 	material.o misc.o movegen.o movepick.o pawns.o position.o psqt.o \
-	search.o tbprobe.o thread.o timeman.o tt.o uci.o ucioption.o
+	search.o tbprobe.o thread.o timeman.o tt.o uci.o ucioption.o \
+        numa.o settings.o
 
 ### ==========================================================================
 ### Section 2. High-level Configuration
@@ -68,6 +69,7 @@ prefetch = yes
 popcnt = yes
 sse = yes
 pext = no
+numa = yes
 EXTRACFLAGS += -march=native
 
 ### 2.2 Architecture specific
@@ -313,6 +315,16 @@ ifeq ($(pext),yes)
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
 		CFLAGS += -mbmi2
 	endif
+endif
+
+### numa
+ifeq ($(numa),yes)
+	CFLAGS += -DNUMA
+        ifeq ($(UNAME),Linux)
+        ifneq ($(comp),mingw)
+		LDFLAGS += -lnuma
+        endif
+        endif
 endif
 
 ### 3.8 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.

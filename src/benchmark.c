@@ -27,6 +27,7 @@
 #include "misc.h"
 #include "position.h"
 #include "search.h"
+#include "settings.h"
 #include "thread.h"
 #include "tt.h"
 #include "uci.h"
@@ -118,9 +119,9 @@ void benchmark(Pos *current, char *str)
     }
   }
 
-  option_set_value(OPT_HASH, ttSize);
-  option_set_value(OPT_THREADS, threads);
-  tt_resize();
+  delayed_settings.tt_size = ttSize;
+  delayed_settings.num_threads = threads;
+  process_delayed_settings();
   search_clear();
 
   if (strcmp(limitType, "time") == 0)

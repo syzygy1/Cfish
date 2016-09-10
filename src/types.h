@@ -42,6 +42,9 @@
 //               | Works only in 64-bit mode and requires hardware with
 //               | pext support.
 
+#ifndef NDEBUG
+#include <assert.h>
+#endif
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
