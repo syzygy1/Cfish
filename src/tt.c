@@ -40,11 +40,13 @@ TranspositionTable TT; // Our global transposition table
 void tt_free(void)
 {
 #ifdef __WIN32__
-  free(TT.mem);
+  if (TT.mem)
+    VirtualFree(TT.mem, 0, MEM_RELEASE);
 #else
   if (TT.mem)
-    munmap(TT.mem, TT.clusterCount * sizeof(Cluster));
+    munmap(TT.mem, TT.alloc_size);
 #endif
+  TT.mem = NULL;
 }
 
 
@@ -56,36 +58,65 @@ void tt_allocate(size_t mbSize)
   size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
 
   TT.clusterCount = count;
+
+  size_t size = count * sizeof(Cluster);
+
 #ifdef __WIN32__
-  TT.mem = calloc(count * sizeof(Cluster) + CacheLineSize - 1, 1);
 
-#else
-  TT.mem = mmap(NULL, count * sizeof(Cluster),
-                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#endif
-
-  if (!TT.mem) {
-    fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for transposition table.\n",
-            mbSize);
-    exit(EXIT_FAILURE);
+  TT.mem = NULL;
+  if (settings.large_pages) {
+    size_t page_size = large_page_minimum;
+    size_t lp_size = (size + page_size - 1) & ~(page_size - 1);
+    TT.mem = VirtualAlloc(NULL, lp_size,
+                          MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES,
+                          PAGE_READWRITE);
+    if (!TT.mem) {
+      printf("info string Unable to allocate large pages for the "
+             "transposition table.\n");
+      fflush(stdout);
+    }
   }
 
-#ifdef __WIN32__
-  TT.table = (Cluster *)((((uintptr_t)TT.mem) + CacheLineSize - 1)
-                                               & ~(CacheLineSize - 1));
-#else
+  if (!TT.mem)
+    TT.mem = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  if (!TT.mem)
+    goto failed;
   TT.table = (Cluster *)TT.mem;
+
+#else
+
+  size_t alignment = settings.large_pages ? (1ULL << 21) : 1;
+  size_t alloc_size = size + alignment - 1;
+
+  TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
+                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  TT.alloc_size = alloc_size;
+  TT.table = (Cluster *)(  (((uintptr_t)TT.mem) + alignment - 1)
+                         & ~(alignment - 1));
+  if (!TT.mem)
+    goto failed;
+
 #ifdef NUMA
   // Interleave the shared transposition table across all nodes.
+  // Create an interleave mask of the nodes on which threads are
+  // actually running?
   if (settings.numa_enabled)
-    numa_interleave_memory(TT.mem, count * sizeof(Cluster), settings.mask);
-  // FIXME: create an interleave mask of the nodes on which threads are
-  // actually running.
+    numa_interleave_memory(TT.table, count * sizeof(Cluster), settings.mask);
 #endif
+
   // Advise the kernel to allocate large pages.
   if (settings.large_pages)
-    madvise(TT.mem, count * sizeof(Cluster), MADV_HUGEPAGE);
+    madvise(TT.table, count * sizeof(Cluster), MADV_HUGEPAGE);
+
 #endif
+
+  return;
+
+
+failed:
+  fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for "
+                  "transposition table.\n", mbSize);
+  exit(EXIT_FAILURE);
 }
 
 

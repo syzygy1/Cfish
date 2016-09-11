@@ -115,6 +115,7 @@ struct TranspositionTable {
   int largePages;
   Cluster *table;
   void *mem;
+  size_t alloc_size;
   uint8_t generation8; // Size must be not bigger than TTEntry::genBound8
 };
 

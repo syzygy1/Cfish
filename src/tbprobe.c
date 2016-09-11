@@ -157,6 +157,7 @@ static int probe_wdl_table(Pos *pos, int *success)
     for (; i < entry->num;) {
       bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
+        assume(i < TBPIECES); // Suppress a bogus warning.
         p[i++] = pop_lsb(&bb) ^ mirror;
       } while (bb);
     }
@@ -267,6 +268,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
     for (; i < entry->num;) {
       bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
+        assume(i < TBPIECES); // Suppress a bogus warning.
         p[i++] = pop_lsb(&bb) ^ mirror;
       } while (bb);
     }

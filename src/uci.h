@@ -31,10 +31,11 @@ typedef struct Option Option;
 typedef void (*OnChange)(Option *);
 
 // no options are of type combo
-#define OPT_TYPE_CHECK  0
-#define OPT_TYPE_SPIN   1
-#define OPT_TYPE_BUTTON 2
-#define OPT_TYPE_STRING 3
+#define OPT_TYPE_CHECK    0
+#define OPT_TYPE_SPIN     1
+#define OPT_TYPE_BUTTON   2
+#define OPT_TYPE_STRING   3
+#define OPT_TYPE_DISABLED 4
 
 #define OPT_DEBUG_LOG_FILE  0
 #define OPT_CONTEMPT        1

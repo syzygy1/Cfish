@@ -79,6 +79,8 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 extern HANDLE io_mutex;
 #define IO_LOCK WaitForSingleObject(io_mutex, INFINITE)
 #define IO_UNLOCK ReleaseMutex(io_mutex)
+int large_pages_supported(void);
+extern size_t large_page_minimum;
 #endif
 
 struct PRNG

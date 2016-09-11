@@ -308,7 +308,7 @@ void numa_init(void)
       ptr++;
     }
 
-    // then count cores in each node
+    // Then count cores in each node.
     ptr = buffer;
     offset = 0;
     while (offset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= len) {

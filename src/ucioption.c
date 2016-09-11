@@ -70,13 +70,6 @@ static void on_tb_path(Option *opt)
 
 static void on_largepages(Option *opt)
 {
-#ifdef __WIN32__
-  if (opt->value) {
-    printf("info string Option LargePages not yet implemented on Windows.\n");
-    fflush(stdout);
-    opt->value = 0;
-  }
-#endif
   delayed_settings.large_pages = opt->value;
 }
 
@@ -120,12 +113,16 @@ void options_init()
 #ifdef NUMA
   // On a non-NUMA machine, disable the NUMA option to diminish confusion.
   if (!numa_avail)
-    options_map[OPT_NUMA].name = NULL;
+    options_map[OPT_NUMA].type = OPT_TYPE_DISABLED;
 #endif
 #ifdef __WIN32__
-  options_map[OPT_LARGE_PAGES].def = 0;
+  // Disable the LargePages option if the machine does not support it.
+  if (!large_pages_supported())
+    options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
   for (Option *opt = options_map; opt->name != NULL; opt++) {
+    if (opt->type == OPT_TYPE_DISABLED)
+      continue;
     switch (opt->type) {
     case OPT_TYPE_CHECK:
     case OPT_TYPE_SPIN:
@@ -160,6 +157,8 @@ static char *opt_type_str[] =
 void print_options(void)
 {
   for (Option *opt = options_map; opt->name != NULL; opt++) {
+    if (opt->type == OPT_TYPE_DISABLED)
+      continue;
     printf("option name %s type %s", opt->name, opt_type_str[opt->type]);
     switch (opt->type) {
     case OPT_TYPE_CHECK:
@@ -199,7 +198,9 @@ void option_set_value(int opt_idx, int value)
 
 int option_set_by_name(char *name, char *value)
 {
-  for (Option *opt = options_map; opt->name != NULL; opt++)
+  for (Option *opt = options_map; opt->name != NULL; opt++) {
+    if (opt->type == OPT_TYPE_DISABLED)
+      continue;
     if (strcasecmp(opt->name, name) == 0) {
       int val;
       switch (opt->type) {
@@ -228,6 +229,7 @@ int option_set_by_name(char *name, char *value)
         opt->on_change(opt);
       return 1;
     }
+  }
 
   return 0;
 }

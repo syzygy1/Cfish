@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+#ifdef __WIN32__
+#include <windows.h>
+#endif
 
 #include "misc.h"
 #include "thread.h"
@@ -226,6 +229,40 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
   }
   (*lineptr)[i] = 0;
   return i;
+}
+#endif
+
+#ifdef __WIN32__
+typedef SIZE_T (WINAPI *GLPM)(void);
+size_t large_page_minimum;
+
+int large_pages_supported(void)
+{
+  GLPM imp_GetLargePageMinimum =
+             (GLPM)GetProcAddress(GetModuleHandle("kernel32.dll"),
+                                  "GetLargePageMinimum");
+  if (!imp_GetLargePageMinimum)
+    return 0;
+
+  if ((large_page_minimum = GetLargePageMinimum()) == 0)
+    return 0;
+
+  LUID priv_luid;
+  if (!LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &priv_luid))
+    return 0;
+
+  HANDLE token;
+  if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &token))
+    return 0;
+
+  TOKEN_PRIVILEGES token_privs;
+  token_privs.PrivilegeCount = 1;
+  token_privs.Privileges[0].Luid = priv_luid;
+  token_privs.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+  if (!AdjustTokenPrivileges(token, FALSE, &token_privs, 0, NULL, NULL))
+    return 0;
+
+  return 1;
 }
 #endif
 
