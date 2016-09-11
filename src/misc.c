@@ -244,7 +244,7 @@ int large_pages_supported(void)
   if (!imp_GetLargePageMinimum)
     return 0;
 
-  if ((large_page_minimum = GetLargePageMinimum()) == 0)
+  if ((large_page_minimum = imp_GetLargePageMinimum()) == 0)
     return 0;
 
   LUID priv_luid;
