@@ -70,11 +70,12 @@ void tt_allocate(size_t mbSize)
     TT.mem = VirtualAlloc(NULL, lp_size,
                           MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES,
                           PAGE_READWRITE);
-    if (!TT.mem) {
+    if (!TT.mem)
       printf("info string Unable to allocate large pages for the "
              "transposition table.\n");
-      fflush(stdout);
-    }
+    else
+      printf("info string Transposition table allocated using large pages.\n");
+    fflush(stdout);
   }
 
   if (!TT.mem)
