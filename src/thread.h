@@ -102,5 +102,8 @@ INLINE Pos *threads_main(void)
   return Threads.pos[0];
 }
 
+CounterMoveHistoryStats **cmh_tables;
+int num_cmh_tables;
+
 #endif
 

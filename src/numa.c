@@ -139,7 +139,7 @@ void read_numa_nodes(char *str)
     numa_bitmask_free(mask);
 }
 
-void bind_thread_to_numa_node(int thread_idx)
+int bind_thread_to_numa_node(int thread_idx)
 {
   int idx = thread_idx;
   int node, k;
@@ -168,6 +168,8 @@ void bind_thread_to_numa_node(int thread_idx)
   printf("info string Binding thread %d to node %d.\n", thread_idx, node);
   fflush(stdout);
   numa_bind(nodemask[node]);
+
+  return node;
 }
 
 #else /* NUMA on Windows */
@@ -375,7 +377,7 @@ void read_numa_nodes(char *str)
   fflush(stdout);
 }
 
-void bind_thread_to_numa_node(int thread_idx)
+int bind_thread_to_numa_node(int thread_idx)
 {
   int idx = thread_idx;
   int node;
@@ -398,6 +400,8 @@ void bind_thread_to_numa_node(int thread_idx)
                                NULL);
   else
     SetThreadAffinityMask(GetCurrentThread(), node_mask[node]);
+
+  return node;
 }
 
 void *numa_alloc(size_t size)

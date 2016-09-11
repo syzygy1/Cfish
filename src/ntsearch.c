@@ -263,7 +263,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     while ((move = next_move(pos)))
       if (is_legal(pos, move)) {
         ss->currentMove = move;
-        ss->counterMoves = &CounterMoveHistory[moved_piece(move)][to_sq(move)];
+        ss->counterMoves = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
         do_move(pos, move, gives_check(pos, ss, move));
         value = -search_NonPV(pos, ss+1, -rbeta, rdepth, !cutNode);
         undo_move(pos, move);
@@ -448,7 +448,7 @@ moves_loop: // When in check search starts from here.
     }
 
     ss->currentMove = move;
-    ss->counterMoves = &CounterMoveHistory[moved_piece][to_sq(move)];
+    ss->counterMoves = &(*pos->counterMoveHistory)[moved_piece][to_sq(move)];
 
     // Step 14. Make the move
     do_move(pos, move, givesCheck);

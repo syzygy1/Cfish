@@ -34,6 +34,8 @@
 // Global objects
 ThreadPool Threads;
 MainThread mainThread;
+CounterMoveHistoryStats **cmh_tables = NULL;
+int num_cmh_tables = 0;
 
 // thread_init() is where a search thread starts and initialises itself.
 
@@ -41,10 +43,25 @@ void thread_init(void *arg)
 {
   int idx = (intptr_t)arg;
 
-#ifdef NUMA
+  int node;
   if (settings.numa_enabled)
-    bind_thread_to_numa_node(idx);
-#endif
+    node = bind_thread_to_numa_node(idx);
+  else
+    node = 0;
+  if (node >= num_cmh_tables) {
+    int old = num_cmh_tables;
+    num_cmh_tables = node + 16;
+    cmh_tables = realloc(cmh_tables,
+                         num_cmh_tables * sizeof(CounterMoveHistoryStats *));
+    while (old < num_cmh_tables)
+      cmh_tables[old++] = NULL;
+  }
+  if (!cmh_tables[node]) {
+    if (settings.numa_enabled)
+      cmh_tables[node] = numa_alloc(sizeof(CounterMoveHistoryStats));
+    else
+      cmh_tables[node] = calloc(sizeof(CounterMoveHistoryStats), 1);
+  }
 
   Pos *pos;
 
@@ -71,11 +88,7 @@ void thread_init(void *arg)
   }
   pos->thread_idx = idx;
   pos->stack += 5;
-
-  // numa_alloc() clears the memory anyway.
-//  stats_clear(pos->history);
-//  stats_clear(pos->counterMoves);
-//  stats_clear(pos->fromTo);
+  pos->counterMoveHistory = cmh_tables[node];
 
   atomic_store(&pos->resetCalls, 0);
   pos->exit = 0;
@@ -317,6 +330,22 @@ void threads_set_number(size_t num)
 
   while (Threads.num_threads > num)
     thread_destroy(Threads.pos[--Threads.num_threads]);
+
+  if (num == 0 && num_cmh_tables > 0) {
+    for (int i = 0; i < num_cmh_tables; i++)
+      if (cmh_tables[i]) {
+        if (settings.numa_enabled)
+          numa_free(cmh_tables[i], sizeof(CounterMoveHistoryStats));
+        else
+          free(cmh_tables[i]);
+      }
+    free(cmh_tables);
+    cmh_tables = NULL;
+    num_cmh_tables = 0;
+  }
+
+  if (num == 0)
+    Signals.searching = 0;
 }
 
 

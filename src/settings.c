@@ -23,15 +23,14 @@ void process_delayed_settings(void)
 #ifndef __WIN32__
     if ((settings.numa_enabled = delayed_settings.numa_enabled))
       copy_bitmask_to_bitmask(delayed_settings.mask, settings.mask);
-#else
-    settings.numa_enabled = delayed_settings.numa_enabled;
 #endif
+    settings.numa_enabled = delayed_settings.numa_enabled;
   }
 #endif
 
   if (settings.num_threads != delayed_settings.num_threads) {
-    threads_set_number(delayed_settings.num_threads);
     settings.num_threads = delayed_settings.num_threads;
+    threads_set_number(settings.num_threads);
   }
 
   if (numa_change || tt_change || lp_change) {

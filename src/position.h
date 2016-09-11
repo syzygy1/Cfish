@@ -154,6 +154,7 @@ struct Pos {
   FromToStats *fromTo;
   PawnEntry *pawnTable;
   MaterialEntry *materialTable;
+  CounterMoveHistoryStats *counterMoveHistory;
 
   // Thread-control data.
   atomic_bool resetCalls;

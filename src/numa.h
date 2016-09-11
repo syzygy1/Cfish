@@ -14,7 +14,7 @@ void numa_init(void);
 void numa_exit(void);
 void read_numa_nodes(char *str);
 struct bitmask *numa_thread_to_node(int idx);
-void bind_thread_to_numa_node(int idx);
+int bind_thread_to_numa_node(int idx);
 
 #ifndef __WIN32__
 typedef struct bitmask *NodeMask;

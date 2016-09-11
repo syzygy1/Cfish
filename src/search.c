@@ -157,7 +157,7 @@ static const int HalfDensityRowSize[HalfDensitySize] = {
 };
 
 static Value DrawValue[2];
-static CounterMoveHistoryStats CounterMoveHistory;
+//static CounterMoveHistoryStats CounterMoveHistory;
 
 static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
 static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode);
@@ -212,7 +212,11 @@ void search_init(void)
 void search_clear()
 {
   tt_clear();
-  stats_clear(&CounterMoveHistory);
+
+  for (int i = 0; i < num_cmh_tables; i++)
+    if (cmh_tables[i])
+      stats_clear(*cmh_tables[i]);
+  printf("sizeof = %ld\n", sizeof(*cmh_tables[0]));
 
   for (size_t idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
