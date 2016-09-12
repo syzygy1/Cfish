@@ -183,10 +183,10 @@ void uci_loop(int argc, char **argv)
   // Signals.searching is only read and set by the UI thread.
   Signals.searching = 0;
 
-  pos.stack = malloc(1000 * sizeof(Stack));
-  pos.stack++;
-  pos.moveList = malloc(1000 * sizeof(ExtMove));
-  pos.stack[-1].endMoves = pos.moveList;
+//  pos.stack = malloc(1000 * sizeof(Stack));
+//  pos.stack++;
+//  pos.moveList = malloc(1000 * sizeof(ExtMove));
+//  pos.stack[-1].endMoves = pos.moveList;
 
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
@@ -204,6 +204,7 @@ void uci_loop(int argc, char **argv)
 
   strcpy(fen, StartFEN);
   pos_set(&pos, fen, 0);
+  pos.st[-1].endMoves = pos.moveList;
 
   do {
     if (argc == 1 && !getline(&cmd, &buf_size, stdin))
@@ -287,8 +288,8 @@ void uci_loop(int argc, char **argv)
     thread_wait_for_search_finished(threads_main());
 
   free(cmd);
-  free(pos.stack - 1);
-  free(pos.moveList);
+//  free(pos.stack - 1);
+//  free(pos.moveList);
 
   LOCK_DESTROY(Signals.lock);
 }

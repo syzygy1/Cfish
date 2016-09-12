@@ -25,28 +25,6 @@
 #include "position.h"
 #include "types.h"
 
-// PawnEntry contains various information about a pawn structure. A lookup
-// to the pawn hash table (performed by calling the probe function) returns
-// a pointer to an Entry object.
-
-struct PawnEntry {
-  Key key;
-  Bitboard passedPawns[2];
-  Bitboard pawnAttacks[2];
-  Bitboard pawnAttacksSpan[2];
-  Score kingSafety[2];
-  Score score;
-  uint8_t kingSquares[2];
-  uint8_t castlingRights[2];
-  uint8_t semiopenFiles[2];
-  uint8_t pawnsOnSquares[2][2]; // [color][light/dark squares]
-  uint8_t asymmetry;
-  uint8_t openFiles;
-};
-
-typedef struct PawnEntry PawnEntry;
-typedef PawnEntry PawnTable[16384];
-
 Score do_king_safety_white(PawnEntry *pe, Pos *pos, Square ksq);
 Score do_king_safety_black(PawnEntry *pe, Pos *pos, Square ksq);
 

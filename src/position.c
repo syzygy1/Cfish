@@ -181,7 +181,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   Square sq = SQ_A8;
 
   memset(pos, 0, offsetof(Pos, st));
-  Stack *st = pos->st = pos->stack;
+  Stack *st = pos->st = pos->stack + 5;
   memset(st, 0, StateSize);
 #ifdef PEDANTIC
   for (int i = 0; i < 256; i++)
@@ -985,7 +985,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // Update material hash key and prefetch access to materialTable
     key ^= zob.psq[captured][capsq];
     st->materialKey -= mat_key[captured];
-    prefetch(&pos->materialTable[st->materialKey >> (64 - 13)]);
+    prefetch(&(&pos->materialTable)[st->materialKey >> (64 - 13)]);
 
     // Update incremental scores
     st->psq -= psqt.psq[captured][capsq];
@@ -1046,7 +1046,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
     // Update pawn hash key and prefetch access to pawnsTable
     st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
-    prefetch(&pos->pawnTable[st->pawnKey & 16383]);
+    prefetch(&(&pos->pawnTable)[st->pawnKey & 16383]);
 
     // Reset rule 50 draw counter
     st->rule50 = 0;
@@ -1376,7 +1376,7 @@ int is_draw(Pos *pos)
 void pos_copy(Pos *dest, Pos *src)
 {
   memcpy(dest, src, offsetof(Pos, st));
-  dest->st = dest->stack;
+  dest->st = dest->stack + 5;
   memcpy(dest->st, src->st, StateSize);
   set_check_info(dest);
 }

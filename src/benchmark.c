@@ -167,21 +167,23 @@ void benchmark(Pos *current, char *str)
   }
 
   uint64_t nodes = 0;
-  Pos pos;
+  Pos *pos = malloc(sizeof(Pos));
+#if 0
   pos.stack = malloc(101 * sizeof(Stack)); // max perft 100
   pos.moveList = malloc(10000 * sizeof(ExtMove));
+#endif
   TimePoint elapsed = now();
 
   for (size_t i = 0; i < num_fens; i++) {
-    pos_set(&pos, fens[i], option_value(OPT_CHESS960));
+    pos_set(pos, fens[i], option_value(OPT_CHESS960));
 
     fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", i + 1, num_fens);
 
     if (strcmp(limitType, "perft") == 0)
-      nodes += perft(&pos, limits.depth * ONE_PLY);
+      nodes += perft(pos, limits.depth * ONE_PLY);
     else {
       limits.startTime = now();
-      threads_start_thinking(&pos, &limits);
+      threads_start_thinking(pos, &limits);
       thread_wait_for_search_finished(threads_main());
       nodes += threads_nodes_searched();
     }
@@ -202,7 +204,11 @@ void benchmark(Pos *current, char *str)
       free(fens[i]);
     free(fens);
   }
+#if 0
   free(pos.stack);
   free(pos.moveList);
+#else
+  free(pos);
+#endif
 }
 

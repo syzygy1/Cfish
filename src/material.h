@@ -25,31 +25,6 @@
 #include "misc.h"
 #include "types.h"
 
-typedef struct Pos Pos;
-
-// MaterialEntry contains various information about a material
-// configuration. It contains a material imbalance evaluation, a function
-// pointer to a special endgame evaluation function (which in most cases
-// is NULL, meaning that the standard evaluation function will be used),
-// and scale factors.
-//
-// The scale factors are used to scale the evaluation score up or down.
-// For instance, in KRB vs KR endgames, the score is scaled down by a
-// factor of 4, which will result in scores of absolute value less than
-// one pawn.
-
-struct MaterialEntry {
-  Key key;
-  Value (*eval_func)(Pos *, int);
-  Value (*scal_func[2])(Pos *, int);
-  int gamePhase;
-  int16_t value;
-  uint8_t factor[2];
-  uint8_t eval_func_side;
-};
-
-typedef struct MaterialEntry MaterialEntry;
-
 INLINE Score material_imbalance(MaterialEntry *me)
 {
   return make_score((unsigned)me->value, me->value);
@@ -77,8 +52,6 @@ INLINE int material_scale_factor(MaterialEntry *me, Pos *pos, int c)
     sf = me->scal_func[c](pos, c);
   return sf != SCALE_FACTOR_NONE ? sf : me->factor[c];
 }
-
-typedef MaterialEntry MaterialTable[8192];
 
 MaterialEntry *material_probe(Pos *pos);
 

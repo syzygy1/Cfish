@@ -67,27 +67,13 @@ void thread_init(void *arg)
 
   if (settings.numa_enabled) {
     pos = numa_alloc(sizeof(Pos));
-    pos->pawnTable = numa_alloc(16384 * sizeof(PawnEntry));
-    pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
-    pos->history = numa_alloc(sizeof(HistoryStats));
-    pos->counterMoves = numa_alloc(sizeof(MoveStats));
-    pos->fromTo = numa_alloc(sizeof(FromToStats));
     pos->rootMoves = numa_alloc(sizeof(RootMoves));
-    pos->stack = numa_alloc((5 + MAX_PLY + 10) * sizeof(Stack));
-    pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
   } else {
     pos = calloc(sizeof(Pos), 1);
-    pos->pawnTable = calloc(16384 * sizeof(PawnEntry), 1);
-    pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
-    pos->history = calloc(sizeof(HistoryStats), 1);
-    pos->counterMoves = calloc(sizeof(MoveStats), 1);
-    pos->fromTo = calloc(sizeof(FromToStats), 1);
+//printf("pos[%d] = %llx\n", idx, pos);
     pos->rootMoves = calloc(sizeof(RootMoves), 1);
-    pos->stack = calloc((5 + MAX_PLY + 10) * sizeof(Stack), 1);
-    pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
   }
   pos->thread_idx = idx;
-  pos->stack += 5;
   pos->counterMoveHistory = cmh_tables[node];
 
   atomic_store(&pos->resetCalls, 0);
@@ -159,24 +145,10 @@ void thread_destroy(Pos *pos)
 #endif
 
   if (settings.numa_enabled) {
-    numa_free(pos->pawnTable, 16384 * sizeof(PawnEntry));
-    numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
-    numa_free(pos->history, sizeof(HistoryStats));
-    numa_free(pos->counterMoves, sizeof(MoveStats));
-    numa_free(pos->fromTo, sizeof(FromToStats));
     numa_free(pos->rootMoves, sizeof(RootMoves));
-    numa_free(pos->stack - 5, (5 + MAX_PLY + 10) * sizeof(Stack));
-    numa_free(pos->moveList, 10000 * sizeof(ExtMove));
     numa_free(pos, sizeof(Pos));
   } else {
-    free(pos->pawnTable);
-    free(pos->materialTable);
-    free(pos->history);
-    free(pos->counterMoves);
-    free(pos->fromTo);
     free(pos->rootMoves);
-    free(pos->stack - 5);
-    free(pos->moveList);
     free(pos);
   }
 }

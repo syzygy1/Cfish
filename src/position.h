@@ -136,11 +136,9 @@ struct Pos {
   uint16_t gamePly;
 
   Stack *st;
-  ExtMove *moveList;
 
   // Relevant mainly to the search of the root position.
   RootMoves *rootMoves;
-  Stack *stack;
   uint64_t nodes;
   uint64_t tb_hits;
   int PVIdx;
@@ -148,13 +146,17 @@ struct Pos {
   Depth rootDepth;
   Depth completedDepth;
 
-  // Pointers to thread-specific tables.
-  HistoryStats *history;
-  MoveStats *counterMoves;
-  FromToStats *fromTo;
-  PawnEntry *pawnTable;
-  MaterialEntry *materialTable;
+  // Pointer to node-specific table.
   CounterMoveHistoryStats *counterMoveHistory;
+
+  // Thread-specific arrays and tables.
+  Stack stack[5 + MAX_PLY + 10];
+  ExtMove moveList[10000];
+  HistoryStats history;
+  MoveStats counterMoves;
+  FromToStats fromTo;
+  PawnTable pawnTable;
+  MaterialTable materialTable;
 
   // Thread-control data.
   atomic_bool resetCalls;

@@ -97,7 +97,7 @@ void mp_init(Pos *pos, Move ttm, Depth depth)
   st->depth = depth;
 
   Square prevSq = to_sq((st-1)->currentMove);
-  st->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
+  st->countermove = pos->counterMoves[piece_on(prevSq)][prevSq];
 
   st->stage = pos_checkers() ? ST_EVASIONS : ST_MAIN_SEARCH;
   st->ttMove = ttm;
@@ -171,8 +171,8 @@ void score_captures(Pos *pos)
 void score_quiets(Pos *pos)
 {
   Stack *st = pos->st;
-  HistoryStats *history = pos->history;
-  FromToStats *fromTo = pos->fromTo;
+  HistoryStats *history = &pos->history;
+  FromToStats *fromTo = &pos->fromTo;
 
   CounterMoveStats *cm = (st-1)->counterMoves;
   CounterMoveStats *fm = (st-2)->counterMoves;
@@ -195,8 +195,8 @@ void score_evasions(Pos *pos)
   // ordered by history value, then bad captures and quiet moves with a
   // negative SEE ordered by SEE value.
 
-  HistoryStats *history = pos->history;
-  FromToStats *fromTo = pos->fromTo;
+  HistoryStats *history = &pos->history;
+  FromToStats *fromTo = &pos->fromTo;
   int c = pos_stm();
   Value see;
 

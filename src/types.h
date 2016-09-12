@@ -392,10 +392,55 @@ INLINE int opposite_colors(Square s1, Square s2)
 }
 
 typedef struct Pos Pos;
+
+// MaterialEntry contains various information about a material
+// configuration. It contains a material imbalance evaluation, a function
+// pointer to a special endgame evaluation function (which in most cases
+// is NULL, meaning that the standard evaluation function will be used),
+// and scale factors.
+//
+// The scale factors are used to scale the evaluation score up or down.
+// For instance, in KRB vs KR endgames, the score is scaled down by a
+// factor of 4, which will result in scores of absolute value less than
+// one pawn.
+
+struct MaterialEntry {
+  Key key;
+  Value (*eval_func)(Pos *, int);
+  Value (*scal_func[2])(Pos *, int);
+  int gamePhase;
+  int16_t value;
+  uint8_t factor[2];
+  uint8_t eval_func_side;
+};
+
+typedef struct MaterialEntry MaterialEntry;
+typedef MaterialEntry MaterialTable[8192];
+
+// PawnEntry contains various information about a pawn structure. A lookup
+// to the pawn hash table (performed by calling the probe function) returns
+// a pointer to an Entry object.
+
+struct PawnEntry {
+  Key key;
+  Bitboard passedPawns[2];
+  Bitboard pawnAttacks[2];
+  Bitboard pawnAttacksSpan[2];
+  Score kingSafety[2];
+  Score score;
+  uint8_t kingSquares[2];
+  uint8_t castlingRights[2];
+  uint8_t semiopenFiles[2];
+  uint8_t pawnsOnSquares[2][2]; // [color][light/dark squares]
+  uint8_t asymmetry;
+  uint8_t openFiles;
+};
+
+typedef struct PawnEntry PawnEntry;
+typedef PawnEntry PawnTable[16384];
+
 typedef struct LimitsType LimitsType;
 typedef struct RootMoves RootMoves;
-typedef struct PawnEntry PawnEntry;
-typedef struct MaterialEntry MaterialEntry;
 
 typedef Move MoveStats[16][64];
 typedef Value HistoryStats[16][64];

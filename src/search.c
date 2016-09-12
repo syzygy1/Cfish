@@ -171,7 +171,7 @@ static Value value_to_tt(Value v, int ply);
 static Value value_from_tt(Value v, int ply);
 static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus);
-static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, Value bonus);
+static void update_stats(Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, Value bonus);
 static void check_time(void);
 static void stable_sort(RootMove *rm, size_t num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
@@ -693,7 +693,7 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus)
 // update_stats() updates killers, history, countermove and countermove
 // plus follow-up move history when a new quiet best move is found.
 
-void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
+void update_stats(Pos *pos, Stack *ss, Move move, Move *quiets,
                   int quietsCnt, Value bonus)
 {
   if (ss->killers[0] != move) {
@@ -702,19 +702,19 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
   }
 
   int c = pos_stm();
-  ft_update(*pos->fromTo, c, move, bonus);
-  hs_update(*pos->history, moved_piece(move), to_sq(move), bonus);
+  ft_update(pos->fromTo, c, move, bonus);
+  hs_update(pos->history, moved_piece(move), to_sq(move), bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 
   if ((ss-1)->counterMoves) {
     Square prevSq = to_sq((ss-1)->currentMove);
-    (*pos->counterMoves)[piece_on(prevSq)][prevSq] = move;
+    (pos->counterMoves)[piece_on(prevSq)][prevSq] = move;
   }
 
   // Decrease all the other played quiet moves
   for (int i = 0; i < quietsCnt; i++) {
-    ft_update(*pos->fromTo, c, quiets[i], -bonus);
-    hs_update(*pos->history, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
+    ft_update(pos->fromTo, c, quiets[i], -bonus);
+    hs_update(pos->history, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
     update_cm_stats(ss, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
   }
 }

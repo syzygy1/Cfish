@@ -477,11 +477,11 @@ moves_loop: // When in check search starts from here.
           r -= 2 * ONE_PLY;
 
         // Decrease/increase reduction for moves with a good/bad history
-        Value val =  (*pos->history)[moved_piece][to_sq(move)]
+        Value val =     pos->history[moved_piece][to_sq(move)]
                    + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
                    + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
                    + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
-                   + ft_get(*pos->fromTo, pos_stm() ^ 1, move);
+                   + ft_get(pos->fromTo, pos_stm() ^ 1, move);
         int rHist = (val - 8000) / 20000;
         r = max(DEPTH_ZERO, (r / ONE_PLY - rHist) * ONE_PLY);
       }
