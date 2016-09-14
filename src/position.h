@@ -96,10 +96,11 @@ struct Stack {
   union {
     struct {
       Bitboard blockersForKing[2];
+      Bitboard pinnersForKing[2];
     };
     struct {
-      Bitboard dummy; // blockersForKing[WHITE]
-      Bitboard checkSquares[7]; // element 0 is blockersForKing[BLACK]
+      Bitboard dummy[3]; // blockersForKing[2], pinnersForKing[WHITE]
+      Bitboard checkSquares[7]; // element 0 is pinnersForKing[BLACK]
     };
   };
   Square ksq;
@@ -177,7 +178,8 @@ void pos_fen(Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
 PURE Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
-PURE Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
+PURE Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
+                              Bitboard *pinners);
 //Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 
 PURE int is_legal(Pos *pos, Move m);

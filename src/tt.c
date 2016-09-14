@@ -84,13 +84,33 @@ void tt_allocate(size_t mbSize)
     goto failed;
   TT.table = (Cluster *)TT.mem;
 
-#else
+#else /* Unix */
 
   size_t alignment = settings.large_pages ? (1ULL << 21) : 1;
   size_t alloc_size = size + alignment - 1;
 
+#ifdef __APPLE__
+
+  if (settings.large_pages) {
+    TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
+                  MAP_PRIVATE | MAP_ANONYMOUS, VM_SUPERPAGE_SIZE_2MB, 0);
+    if (!TT.mem)
+      printf("info string Unable to allocate large pages for the "
+             "transposition table.\n");
+    else
+      printf("info string Transposition table allocated using large pages.\n");
+    fflush(stdout);
+  }
+  if (!TT.mem)
+    TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
+                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#else
+
   TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+#endif
+
   TT.alloc_size = alloc_size;
   TT.table = (Cluster *)(  (((uintptr_t)TT.mem) + alignment - 1)
                          & ~(alignment - 1));
@@ -105,9 +125,13 @@ void tt_allocate(size_t mbSize)
     numa_interleave_memory(TT.table, count * sizeof(Cluster), settings.mask);
 #endif
 
+#ifdef __linux__
+
   // Advise the kernel to allocate large pages.
   if (settings.large_pages)
     madvise(TT.table, count * sizeof(Cluster), MADV_HUGEPAGE);
+
+#endif
 
 #endif
 

@@ -359,7 +359,8 @@ INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
 
     if (Pt == QUEEN) {
       // Penalty if any relative pin or discovered attack against the queen
-      if (slider_blockers(pos, pieces_cpp(Them, ROOK, BISHOP), s))
+      Bitboard pinners;
+      if (slider_blockers(pos, pieces_cpp(Them, ROOK, BISHOP), s, &pinners))
           score -= WeakQueen;
     }
   }
@@ -790,22 +791,22 @@ Value evaluate(Pos *pos)
 {
   assert(!pos_checkers());
 
+  Score mobility[2] = { SCORE_ZERO, SCORE_ZERO };
   EvalInfo ei;
-  Score score, mobility[2] = { SCORE_ZERO, SCORE_ZERO };
-
-  // Initialize score by reading the incrementally updated scores included in
-  // the position object (material + piece square tables). Score is computed
-  // internally from the white point of view.
-  score = pos_psq_score();
 
   // Probe the material hash table
   ei.me = material_probe(pos);
-  score += material_imbalance(ei.me);
 
   // If we have a specialized evaluation function for the current material
   // configuration, call it and return.
   if (material_specialized_eval_exists(ei.me))
     return material_evaluate(ei.me, pos);
+
+  // Initialize score by reading the incrementally updated scores included
+  // in the position struct (material + piece square tables) and the
+  // material imbalance. Score is computed internally from the white point
+  // of view.
+  Score score = pos_psq_score() + material_imbalance(ei.me);
 
   // Probe the pawn hash table
   ei.pi = pawn_probe(pos);

@@ -93,8 +93,8 @@ INLINE void set_check_info(Pos *pos)
 {
   Stack *st = pos->st;
 
-  st->blockersForKing[WHITE] = slider_blockers(pos, pieces_c(BLACK), square_of(WHITE, KING));
-  st->blockersForKing[BLACK] = slider_blockers(pos, pieces_c(WHITE), square_of(BLACK, KING));
+  st->blockersForKing[WHITE] = slider_blockers(pos, pieces_c(BLACK), square_of(WHITE, KING), &st->pinnersForKing[WHITE]);
+  st->blockersForKing[BLACK] = slider_blockers(pos, pieces_c(WHITE), square_of(BLACK, KING), &st->pinnersForKing[BLACK]);
 
   int them = pos_stm() ^ 1;
   st->ksq = square_of(them, KING);
@@ -439,18 +439,19 @@ int game_phase(Pos *pos)
 // removing that piece from the board would result in a position where
 // square 's' is attacked. Both pinned pieces and discovered check
 // candidates are slider blockers and are calculated by calling this
-// function.
+// function. The pinners bitboard gets filled with real and potential
+// pinners.
 
-Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s)
+Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s, Bitboard *pinners)
 {
-  Bitboard b, pinners, result = 0;
+  Bitboard b, p, result = 0;
 
   // Pinners are sliders that attack 's' when a pinned piece is removed
-  pinners = (  (PseudoAttacks[ROOK  ][s] & pieces_pp(QUEEN, ROOK))
+  *pinners = p = (  (PseudoAttacks[ROOK  ][s] & pieces_pp(QUEEN, ROOK))
              | (PseudoAttacks[BISHOP][s] & pieces_pp(QUEEN, BISHOP))) & sliders;
 
-  while (pinners) {
-    b = between_bb(s, pop_lsb(&pinners)) & pieces();
+  while (p) {
+    b = between_bb(s, pop_lsb(&p)) & pieces();
 
     if (!more_than_one(b))
       result |= b;
@@ -1249,9 +1250,17 @@ Value see(Pos *pos, Move m)
   // removed, but possibly an X-ray attacker added behind it.
   attackers = attackers_to_occ(to, occ) & occ;
 
-  // If the opponent has no attackers we are finished
   stm ^= 1;
   stmAttackers = attackers & pieces_c(stm);
+  occ ^= sq_bb(to);
+
+  // Remove pinned pieces from the attackers provided that move m neither
+  // moves nor captures a pinner.
+  if (   (stmAttackers & pinned_pieces(pos, stm))
+      && ((pos->st->pinnersForKing[stm] & occ) == pos->st->pinnersForKing[stm]))
+    stmAttackers &= ~pinned_pieces(pos, stm);
+
+  // If the opponent has no attackers we are finished
   if (!stmAttackers)
     return swapList[0];
 
@@ -1282,6 +1291,10 @@ Value see(Pos *pos, Move m)
     attackers &= occ;
     stm ^= 1;
     stmAttackers = attackers & pieces_c(stm);
+    if (   (stmAttackers & pinned_pieces(pos, stm))
+        && (pos->st->pinnersForKing[stm] & occ) == pos->st->pinnersForKing[stm])
+      stmAttackers &= ~pinned_pieces(pos, stm);
+
     slIndex++;
 
   } while (stmAttackers && (captured != KING || (--slIndex, 0))); // Stop before a king capture
@@ -1316,24 +1329,36 @@ int see_test(Pos *pos, Move m, int value)
   if (swap <= 0)
     return 1;
 
-  occ ^= sq_bb(from);
+  occ ^= sq_bb(from) ^ sq_bb(to);
   Bitboard attackers = attackers_to_occ(to, occ) & occ;
   int stm = color_of(piece_on(from)) ^ 1;
   int res = 1;
   Bitboard stmAttackers;
 
-  while ((stmAttackers = attackers & pieces_c(stm))) {
+  while (1) {
+    stmAttackers = attackers & pieces_c(stm);
+    if (   (stmAttackers & pinned_pieces(pos, stm))
+        && (pos->st->pinnersForKing[stm] & occ) == pos->st->pinnersForKing[stm])
+      stmAttackers &= ~pinned_pieces(pos, stm);
+    if (!stmAttackers) break;
     Bitboard bb;
     int captured;
     for (captured = PAWN; captured < KING; captured++)
       if ((bb = stmAttackers & pieces_p(captured)))
         break;
-    if (captured == KING)
-      return stmAttackers == attackers ? res ^ 1 : res;
+    if (captured == KING) {
+      stm ^= 1;
+      stmAttackers = attackers & pieces_c(stm);
+      // Introduce error also present in official Stockfish.
+      if (   (stmAttackers & pinned_pieces(pos, stm))
+          && (pos->st->pinnersForKing[stm] & occ) == pos->st->pinnersForKing[stm])
+        stmAttackers &= ~pinned_pieces(pos, stm);
+      return stmAttackers ? res : res ^ 1;
+    }
     swap = PieceValue[MG][captured] - swap;
-    res = res ^ 1;
+    res ^= 1;
     // Next line tests alternately for swap < 0 and swap <= 0.
-    if (swap < res) return res;
+    if (swap < res && captured != KING) return res;
     occ ^= (bb & -bb);
     if (captured & 1) // PAWN, BISHOP, QUEEN
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
@@ -1346,6 +1371,21 @@ int see_test(Pos *pos, Move m, int value)
   return res;
 }
 
+#if 0
+int see_test(Pos *pos, Move m, int value)
+{
+  int s1 = see(pos, m) >= value;
+  int s2 = see_test1(pos, m, value);
+  if (s1 != s2) {
+    printf("s1 = %d, s2 = %d\n", s1, s2);
+    print_pos(pos);
+    printf("from = %d, to = %d, value = %d\n", from_sq(m), to_sq(m), value);
+    s1 = see_test1(pos, m, value);
+  }
+  return s1;
+//  return see(pos, m) >= value;
+}
+#endif
 
 // is_draw() tests whether the position is drawn by 50-move rule or by
 // repetition. It does not detect stalemates.
