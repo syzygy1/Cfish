@@ -215,8 +215,7 @@ void search_clear()
 
   for (int i = 0; i < num_cmh_tables; i++)
     if (cmh_tables[i])
-      stats_clear(*cmh_tables[i]);
-  printf("sizeof = %ld\n", sizeof(*cmh_tables[0]));
+      stats_clear(cmh_tables[i]);
 
   for (size_t idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
