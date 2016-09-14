@@ -90,11 +90,18 @@ INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
 //  return b;
 }
 
+#if __x86_64__
 INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
 {
   __asm__("btcq %1, %0" : "+r" (b) : "r" ((uint64_t)s) : "cc");
   return b;
 }
+#else
+INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
+{
+  return b ^ sq_bb(s);
+}
+#endif
 
 INLINE uint64_t more_than_one(Bitboard b)
 {
