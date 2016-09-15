@@ -1063,8 +1063,18 @@ void do_move(Pos *pos, Move m, int givesCheck)
   st->key = key;
 
   // Calculate checkers bitboard (if move gives check)
+#if 1
   st->checkersBB =  givesCheck
                   ? attackers_to(square_of(them, KING)) & pieces_c(us) : 0;
+#else
+  st->checkersBB = 0;
+  if (givesCheck) {
+    if (type_of_m(m) != NORMAL || ((st-1)->blockersForKing[them] & sq_bb(from)))
+      st->checkersBB = attackers_to(square_of(them, KING)) & pieces_c(us);
+    else
+      st->checkersBB = (st-1)->checkSquares[piece & 7] & sq_bb(to);
+  }
+#endif
 
   pos->sideToMove ^= 1;
 
