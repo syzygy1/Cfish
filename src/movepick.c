@@ -118,7 +118,7 @@ void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
   else if (depth > DEPTH_QS_RECAPTURES)
     st->stage = ST_QSEARCH_WITHOUT_CHECKS;
   else {
-    st->stage = ST_RECAPTURES;
+    st->stage = ST_RECAPTURES_GEN;
     st->recaptureSquare = s;
     return;
   }
@@ -156,7 +156,7 @@ void mp_init_pc(Pos *pos, Move ttm, Value threshold)
 // score() assigns a numerical value to each move in a move list. The moves with
 // highest values will be picked first.
 
-void score_captures(Pos *pos)
+static void score_captures(Pos *pos)
 {
   Stack *st = pos->st;
 
@@ -168,7 +168,7 @@ void score_captures(Pos *pos)
               - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
 }
 
-void score_quiets(Pos *pos)
+static void score_quiets(Pos *pos)
 {
   Stack *st = pos->st;
   HistoryStats *history = pos->history;
@@ -177,7 +177,7 @@ void score_quiets(Pos *pos)
   CounterMoveStats *cm = (st-1)->counterMoves;
   CounterMoveStats *fm = (st-2)->counterMoves;
   CounterMoveStats *f2 = (st-4)->counterMoves;
-
+//if(!cm || !fm || !f2)printf("st->ply = %d (%d,%d,%d)\n", st->ply, !!cm, !!fm, !!f2);
   int c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
@@ -188,7 +188,7 @@ void score_quiets(Pos *pos)
               + ft_get(*fromTo, c, m->move);
 }
 
-void score_evasions(Pos *pos)
+static void score_evasions(Pos *pos)
 {
   Stack *st = pos->st;
   // Try winning and equal captures ordered by MVV/LVA, then non-captures
@@ -227,13 +227,13 @@ Move next_move(Pos *pos)
     st->stage++;
     return st->ttMove;
 
-  case ST_GOOD_CAPTURES:
+  case ST_CAPTURES_GEN:
     st->endBadCaptures = st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
     st->stage++;
 
-  case ST_GOOD_CAPTURES_2:
+  case ST_GOOD_CAPTURES:
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
       if (move != st->ttMove) {
@@ -267,7 +267,7 @@ Move next_move(Pos *pos)
              && !is_capture(pos, move))
       return move;
 
-  case ST_QUIET:
+  case ST_QUIET_GEN:
     st->cur = st->endBadCaptures;
     st->endMoves = generate_quiets(pos, st->cur);
     score_quiets(pos);
@@ -278,7 +278,7 @@ Move next_move(Pos *pos)
       insertion_sort(st->cur, st->endMoves);
     st->stage++;
 
-  case ST_QUIET_2:
+  case ST_QUIET:
     while (st->cur < st->endMoves) {
       move = (st->cur++)->move;
       if (   move != st->ttMove && move != st->killers[0]
@@ -291,33 +291,31 @@ Move next_move(Pos *pos)
   case ST_BAD_CAPTURES:
     if (st->cur < st->endBadCaptures)
       return (st->cur++)->move;
-    return 0;
+    break;
 
-  case ST_EVASIONS_1:
+  case ST_ALL_EVASIONS:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_evasions(pos, st->cur);
     if (st->endMoves - st->cur > 1)
       score_evasions(pos);
     st->stage = ST_REMAINING;
-    goto remaining;
 
-  case ST_QCAPTURES_CHECKS_1:
-  case ST_QCAPTURES_NO_CHECKS_1:
-    st->cur = (st-1)->endMoves;
-    st->endMoves = generate_captures(pos, st->cur);
-    score_captures(pos);
-    st->stage++;
+    if (st->stage != ST_REMAINING) {
+  case ST_QCAPTURES_CHECKS_GEN: case ST_QCAPTURES_NO_CHECKS_GEN:
+      st->cur = (st-1)->endMoves;
+      st->endMoves = generate_captures(pos, st->cur);
+      score_captures(pos);
+      st->stage++;
+    }
 
-remaining:
-  case ST_QCAPTURES_CHECKS_2:
-  case ST_REMAINING:
+  case ST_QCAPTURES_CHECKS: case ST_REMAINING:
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
       if (move != st->ttMove)
         return move;
     }
-    if (st->stage != ST_QCAPTURES_CHECKS_2)
-      return 0;
+    if (st->stage != ST_QCAPTURES_CHECKS)
+      break;
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_quiet_checks(pos, st->cur);
     st->stage++;
@@ -328,23 +326,23 @@ remaining:
       if (move != st->ttMove)
         return move;
     }
-    return 0;
+    break;
 
-  case ST_RECAPTURES:
+  case ST_RECAPTURES_GEN:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
     st->stage++;
 
-  case ST_RECAPTURES_2:
+  case ST_RECAPTURES:
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
       if (to_sq(move) == st->recaptureSquare)
         return move;
     }
-    return 0;
+    break;
 
-  case ST_PROBCUT_1:
+  case ST_PROBCUT_GEN:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
@@ -356,12 +354,13 @@ remaining:
       if (move != st->ttMove && see_test(pos, move, st->threshold + 1))
         return move;
     }
-    return 0;
+    break;
 
   default:
     assume(0);
-    return 0;
 
   }
+
+  return 0;
 }
 

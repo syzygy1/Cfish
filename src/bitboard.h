@@ -32,7 +32,7 @@ void bitboards_init();
 void print_pretty(Bitboard b);
 
 #define DarkSquares  0xAA55AA55AA55AA55ULL
-#define LightSquares 0x55AA55AA55AA55AAULL
+#define LightSquares (~DarkSquares)
 
 #define FileABB 0x0101010101010101ULL
 #define FileBBB (FileABB << 1)

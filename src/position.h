@@ -278,6 +278,11 @@ INLINE Bitboard discovered_check_candidates(Pos *pos)
   return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
 }
 
+INLINE Bitboard blockers_for_king(Pos *pos, int c)
+{
+  return pos->st->blockersForKing[c];
+}
+
 INLINE Bitboard pinned_pieces(Pos *pos, int c)
 {
   return pos->st->blockersForKing[c] & pieces_c(c);
@@ -296,9 +301,15 @@ INLINE int advanced_pawn_push(Pos *pos, Move m)
 
 INLINE int opposite_bishops(Pos *pos)
 {
+#if 1
   return   piece_count(WHITE, BISHOP) == 1
         && piece_count(BLACK, BISHOP) == 1
         && opposite_colors(square_of(WHITE, BISHOP), square_of(BLACK, BISHOP));
+#else
+  return   (pos_material_key() & 0xf0000f0000) == 0x1000010000
+        && (pieces_p(BISHOP) & DarkSquares)
+        && (pieces_p(BISHOP) & DarkSquares) != pieces_p(BISHOP);
+#endif
 }
 
 INLINE int is_capture_or_promotion(const Pos *pos, Move m)

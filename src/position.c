@@ -708,7 +708,7 @@ int gives_check_special(Pos *pos, Stack *st, Move m)
   Square from = from_sq(m);
   Square to = to_sq(m);
 
-  if ((discovered_check_candidates(pos) & sq_bb(from)) && !aligned(m, st->ksq))
+  if ((blockers_for_king(pos, pos_stm() ^ 1) & sq_bb(from)) && !aligned(m, st->ksq))
     return 1;
 
   switch (type_of_m(m)) {
@@ -1368,7 +1368,7 @@ int see_test(Pos *pos, Move m, int value)
     swap = PieceValue[MG][captured] - swap;
     res ^= 1;
     // Next line tests alternately for swap < 0 and swap <= 0.
-    if (swap < res && captured != KING) return res;
+    if (swap < res) return res;
     occ ^= (bb & -bb);
     if (captured & 1) // PAWN, BISHOP, QUEEN
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
