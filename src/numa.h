@@ -34,6 +34,7 @@ typedef int NodeMask;
 #define numa_alloc(size) calloc(size, 1)
 #define numa_interleave_memory(a, b, c) do {} while (0)
 #define numa_free(ptr, size) free(ptr)
+#define bind_thread_to_numa_node(a) 0
 
 #endif
 

@@ -332,21 +332,21 @@ typedef uint32_t Score;
 
 #define SCORE_ZERO 0
 
-#define make_score(mg,eg) ((Score)(((mg)<<16) + (eg)))
+#define make_score(mg,eg) ((Score)(((eg)<<16) + (mg)))
 
 // Extracting the signed lower and upper 16 bits is not so trivial because
 // according to the standard a simple cast to short is implementation
 // defined and so is a right shift of a signed integer.
-INLINE Value mg_value(Score s)
-{
-  union { uint16_t u; int16_t s; } mg = { (uint16_t)((unsigned)(s + 0x8000) >> 16) };
-  return mg.s;
-}
-
 INLINE Value eg_value(Score s)
 {
-  union { uint16_t u; int16_t s; } eg = { (uint16_t)((unsigned)s) };
+  union { uint16_t u; int16_t s; } eg = { (uint16_t)((unsigned)(s + 0x8000) >> 16) };
   return eg.s;
+}
+
+INLINE Value mg_value(Score s)
+{
+  union { uint16_t u; int16_t s; } mg = { (uint16_t)((unsigned)s) };
+  return mg.s;
 }
 
 /// Division of a Score must be handled separately for each tEerm

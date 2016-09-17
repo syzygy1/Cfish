@@ -804,8 +804,8 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_PLY;
     v = tb ? TB_Score : v;
 
-    printf("info depth %d seldepth %d multipv %"PRIu64" score %s",
-           d / ONE_PLY, pos->maxPly, i + 1, uci_value(buf, v));
+    printf("info depth %d seldepth %d multipv %d score %s",
+           d / ONE_PLY, pos->maxPly, (int)i + 1, uci_value(buf, v));
 
     if (!tb && i == PVIdx)
       printf("%s", v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
