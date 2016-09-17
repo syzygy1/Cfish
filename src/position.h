@@ -89,7 +89,7 @@ struct Stack {
   Move ttMove;
   uint8_t recaptureSquare;
   Value threshold;
-  int stage;
+  uint8_t stage;
   ExtMove *cur, *endMoves, *endBadCaptures;
 
   // CheckInfo data

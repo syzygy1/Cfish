@@ -66,6 +66,7 @@ INLINE Value ft_get(FromToStats ft, int c, Move m)
   return ft[c][m & 4095];
 }
 
+#if 1
 #define ST_MAIN_SEARCH             0
 #define ST_CAPTURES_GEN            1
 #define ST_GOOD_CAPTURES           2
@@ -76,7 +77,7 @@ INLINE Value ft_get(FromToStats ft, int c, Move m)
 #define ST_BAD_CAPTURES            7
 
 #define ST_EVASIONS                8
-#define ST_ALL_EVASIONS            9
+#define ST_EVASIONS_GEN            9
 
 #define ST_QSEARCH_WITH_CHECKS     10
 #define ST_QCAPTURES_CHECKS_GEN    11
@@ -93,6 +94,40 @@ INLINE Value ft_get(FromToStats ft, int c, Move m)
 #define ST_PROBCUT                 19
 #define ST_PROBCUT_GEN             20
 #define ST_PROBCUT_2               21
+#define next_move_q next_move
+#define next_move_pc next_move
+#else
+#define ST_MAIN_SEARCH             0
+#define ST_CAPTURES_GEN            1
+#define ST_GOOD_CAPTURES           2
+#define ST_KILLERS                 3
+#define ST_KILLERS_2               4
+#define ST_QUIET_GEN               5
+#define ST_QUIET                   6
+#define ST_BAD_CAPTURES            7
+
+#define ST_EVASIONS                8
+#define ST_EVASIONS_GEN            9
+#define ST_EVASIONS_2              10
+
+#define ST_QSEARCH_WITH_CHECKS     11
+#define ST_QCAPTURES_CHECKS_GEN    12
+#define ST_QCAPTURES_CHECKS        13
+#define ST_CHECKS                  14
+
+#define ST_QSEARCH_WITHOUT_CHECKS  15
+#define ST_QCAPTURES_NO_CHECKS_GEN 16
+#define ST_REMAINING               17
+
+#define ST_RECAPTURES_GEN          18
+#define ST_RECAPTURES              19
+
+#define ST_PROBCUT                 20
+#define ST_PROBCUT_GEN             21
+#define ST_PROBCUT_2               22
+Move next_move_q(Pos *pos);
+Move next_move_pc(Pos *pos);
+#endif
 
 void mp_init(Pos *pos, Move ttm, Depth depth);
 void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s);

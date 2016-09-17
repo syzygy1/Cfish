@@ -70,7 +70,7 @@ popcnt = yes
 sse = yes
 pext = no
 numa = yes
-EXTRACFLAGS += -march=native
+EXTRACFLAGS += -march=native #-mno-vzeroupper
 
 ### 2.2 Architecture specific
 
@@ -149,7 +149,7 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow -m$(bits)
+	CFLAGS += -Wextra -Wshadow -m$(bits)
 	ifneq ($(UNAME),Darwin)
 	   LDFLAGS += -Wl,--no-as-needed
 	endif
@@ -189,7 +189,7 @@ endif
 ifeq ($(COMP),clang)
 	comp=clang
 	CC=clang
-	CFLAGS += -pedantic -Wextra -Wshadow -m$(bits)
+	CFLAGS += -Wextra -Wshadow -m$(bits)
 	LDFLAGS += -m$(bits)
 	ifeq ($(UNAME),Darwin)
 		CFLAGS += 
@@ -305,7 +305,7 @@ ifeq ($(popcnt),yes)
 	ifeq ($(comp),icc)
 		CFLAGS += -msse3 -DUSE_POPCNT
 	else
-		CFLAGS += -msse3 -mpopcnt -DUSE_POPCNT
+		CFLAGS += -msse3 -mpopcnt -DUSE_POPCNT #-mno-vzeroupper
 	endif
 endif
 

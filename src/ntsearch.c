@@ -260,7 +260,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
-    while ((move = next_move(pos)))
+    while ((move = next_move_pc(pos)))
       if (is_legal(pos, move)) {
         ss->currentMove = move;
         ss->counterMoves = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];

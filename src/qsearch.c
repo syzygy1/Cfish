@@ -115,7 +115,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   mp_init_q(pos, ttMove, depth, to_sq((ss-1)->currentMove));
 
   // Loop through the moves until no moves remain or a beta cutoff occurs
-  while ((move = next_move(pos))) {
+  while ((move = next_move_q(pos))) {
     assert(move_is_ok(move));
 
     givesCheck = gives_check(pos, ss, move);

@@ -214,6 +214,9 @@ static void score_evasions(Pos *pos)
 
 // next_move() returns the next pseudo-legal move to be searched.
 
+#if 1
+
+#if 0
 Move next_move(Pos *pos)
 {
   Stack *st = pos->st;
@@ -293,7 +296,7 @@ Move next_move(Pos *pos)
       return (st->cur++)->move;
     break;
 
-  case ST_ALL_EVASIONS:
+  case ST_EVASIONS_GEN:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_evasions(pos, st->cur);
     if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
@@ -363,4 +366,557 @@ Move next_move(Pos *pos)
 
   return 0;
 }
+#else
+Move next_move(Pos *pos)
+{
+  Stack *st = pos->st;
+  Move move;
+
+  static void *jump_table[] = {
+    &&tt_move, &&captures_gen, &&good_captures, &&killers,
+    &&killers_2, &&quiet_gen, &&quiet, &&bad_captures,
+    &&tt_move, &&evasions_gen,
+    &&tt_move, &&qcaptures_gen, &&remaining, &&checks,
+    &&tt_move, &&qcaptures_gen, &&remaining,
+    &&recaptures_gen, &&recaptures,
+    &&tt_move, &&probcut_gen, &&probcut
+  };
+
+  goto *jump_table[st->stage];
+
+  while (1) {
+
+  tt_move:
+    st->endMoves = (st-1)->endMoves;
+    st->stage++;
+    return st->ttMove;
+
+  captures_gen:
+    st->endBadCaptures = st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  good_captures:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove) {
+        if (see_test(pos, move, 0))
+          return move;
+
+        // Losing capture, move it to the beginning of the array.
+        (st->endBadCaptures++)->move = move;
+      }
+    }
+    st->stage++;
+
+    // First killer move.
+    move = st->killers[0];
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  killers:
+    st->stage++;
+    move = st->killers[1]; // Second killer move.
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  killers_2:
+    st->stage++;
+    move = st->countermove;
+    if (move && move != st->ttMove && move != st->killers[0]
+             && move != st->killers[1] && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  quiet_gen:
+    st->cur = st->endBadCaptures;
+    st->endMoves = generate_quiets(pos, st->cur);
+    score_quiets(pos);
+    if (st->depth < 3 * ONE_PLY) {
+      ExtMove *goodQuiet = partition(st->cur, st->endMoves);
+      insertion_sort(st->cur, goodQuiet);
+    } else
+      insertion_sort(st->cur, st->endMoves);
+    st->stage++;
+
+  quiet:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (   move != st->ttMove && move != st->killers[0]
+          && move != st->killers[1] && move != st->countermove)
+        return move;
+    }
+    st->stage++;
+    st->cur = (st-1)->endMoves; // Return to bad captures.
+
+  bad_captures:
+    if (st->cur < st->endBadCaptures)
+      return (st->cur++)->move;
+    break;
+
+  evasions_gen:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_evasions(pos, st->cur);
+    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
+      score_evasions(pos);
+    st->stage = ST_REMAINING;
+
+    if (st->stage != ST_REMAINING) {
+  qcaptures_gen:
+      st->cur = (st-1)->endMoves;
+      st->endMoves = generate_captures(pos, st->cur);
+      score_captures(pos);
+      st->stage++;
+    }
+
+  remaining:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove)
+        return move;
+    }
+    if (st->stage != ST_QCAPTURES_CHECKS)
+      break;
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_quiet_checks(pos, st->cur);
+    st->stage++;
+
+  checks:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (move != st->ttMove)
+        return move;
+    }
+    break;
+
+  recaptures_gen:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  recaptures:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (to_sq(move) == st->recaptureSquare)
+        return move;
+    }
+    break;
+
+  probcut_gen:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  probcut:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove && see_test(pos, move, st->threshold + 1))
+        return move;
+    }
+    break;
+
+  }
+
+  return 0;
+}
+#endif
+#else
+
+#if 0
+Move next_move(Pos *pos)
+{
+  Stack *st = pos->st;
+  Move move;
+
+  switch (st->stage) {
+
+  case ST_MAIN_SEARCH: case ST_EVASIONS:
+    st->endMoves = (st-1)->endMoves;
+    st->stage++;
+    return st->ttMove;
+
+  case ST_CAPTURES_GEN:
+    st->endBadCaptures = st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  case ST_GOOD_CAPTURES:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove) {
+        if (see_test(pos, move, 0))
+          return move;
+
+        // Losing capture, move it to the beginning of the array.
+        (st->endBadCaptures++)->move = move;
+      }
+    }
+    st->stage++;
+
+    // First killer move.
+    move = st->killers[0];
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  case ST_KILLERS:
+    st->stage++;
+    move = st->killers[1]; // Second killer move.
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  case ST_KILLERS_2:
+    st->stage++;
+    move = st->countermove;
+    if (move && move != st->ttMove && move != st->killers[0]
+             && move != st->killers[1] && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  case ST_QUIET_GEN:
+    st->cur = st->endBadCaptures;
+    st->endMoves = generate_quiets(pos, st->cur);
+    score_quiets(pos);
+    if (st->depth < 3 * ONE_PLY) {
+      ExtMove *goodQuiet = partition(st->cur, st->endMoves);
+      insertion_sort(st->cur, goodQuiet);
+    } else
+      insertion_sort(st->cur, st->endMoves);
+    st->stage++;
+
+  case ST_QUIET:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (   move != st->ttMove && move != st->killers[0]
+          && move != st->killers[1] && move != st->countermove)
+        return move;
+    }
+    st->stage++;
+    st->cur = (st-1)->endMoves; // Return to bad captures.
+
+  case ST_BAD_CAPTURES:
+    if (st->cur < st->endBadCaptures)
+      return (st->cur++)->move;
+    break;
+
+  case ST_EVASIONS_GEN:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_evasions(pos, st->cur);
+    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
+      score_evasions(pos);
+    st->stage++;
+
+  case ST_EVASIONS_2:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove)
+        return move;
+    }
+    break;
+
+  default:
+    assume(0);
+
+  }
+
+  return 0;
+}
+#else
+Move next_move(Pos *pos)
+{
+  Stack *st = pos->st;
+  Move move;
+
+  static void *jump_table[] = {
+    &&tt_move, &&captures_gen, &&good_captures, &&killers,
+    &&killers_2, &&quiet_gen, &&quiet, &&bad_captures,
+    &&tt_move, &&evasions_gen, &&evasions_2
+  };
+
+  goto *jump_table[st->stage];
+
+  while (1) {
+
+  tt_move:
+    st->endMoves = (st-1)->endMoves;
+    st->stage++;
+    return st->ttMove;
+
+  captures_gen:
+    st->endBadCaptures = st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  good_captures:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove) {
+        if (see_test(pos, move, 0))
+          return move;
+
+        // Losing capture, move it to the beginning of the array.
+        (st->endBadCaptures++)->move = move;
+      }
+    }
+    st->stage++;
+
+    // First killer move.
+    move = st->killers[0];
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  killers:
+    st->stage++;
+    move = st->killers[1]; // Second killer move.
+    if (move && move != st->ttMove && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  killers_2:
+    st->stage++;
+    move = st->countermove;
+    if (move && move != st->ttMove && move != st->killers[0]
+             && move != st->killers[1] && is_pseudo_legal(pos, move)
+             && !is_capture(pos, move))
+      return move;
+
+  quiet_gen:
+    st->cur = st->endBadCaptures;
+    st->endMoves = generate_quiets(pos, st->cur);
+    score_quiets(pos);
+    if (st->depth < 3 * ONE_PLY) {
+      ExtMove *goodQuiet = partition(st->cur, st->endMoves);
+      insertion_sort(st->cur, goodQuiet);
+    } else
+      insertion_sort(st->cur, st->endMoves);
+    st->stage++;
+
+  quiet:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (   move != st->ttMove && move != st->killers[0]
+          && move != st->killers[1] && move != st->countermove)
+        return move;
+    }
+    st->stage++;
+    st->cur = (st-1)->endMoves; // Return to bad captures.
+
+  bad_captures:
+    if (st->cur < st->endBadCaptures)
+      return (st->cur++)->move;
+    break;
+
+  evasions_gen:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_evasions(pos, st->cur);
+    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
+      score_evasions(pos);
+    st->stage++;
+
+  evasions_2:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove)
+        return move;
+    }
+    break;
+
+  }
+
+  return 0;
+}
+#endif
+
+#if 0
+Move next_move_q(Pos *pos)
+{
+  Stack *st = pos->st;
+  Move move;
+
+  switch (st->stage) {
+
+  case ST_EVASIONS: case ST_QSEARCH_WITH_CHECKS:
+  case ST_QSEARCH_WITHOUT_CHECKS:
+    st->endMoves = (st-1)->endMoves;
+    st->stage++;
+    return st->ttMove;
+
+  case ST_EVASIONS_GEN:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_evasions(pos, st->cur);
+    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
+      score_evasions(pos);
+    st->stage = ST_REMAINING;
+
+    if (st->stage != ST_REMAINING) {
+  case ST_QCAPTURES_CHECKS_GEN: case ST_QCAPTURES_NO_CHECKS_GEN:
+      st->cur = (st-1)->endMoves;
+      st->endMoves = generate_captures(pos, st->cur);
+      score_captures(pos);
+      st->stage++;
+    }
+
+  case ST_QCAPTURES_CHECKS: case ST_REMAINING:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove)
+        return move;
+    }
+    if (st->stage != ST_QCAPTURES_CHECKS)
+      break;
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_quiet_checks(pos, st->cur);
+    st->stage++;
+
+  case ST_CHECKS:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (move != st->ttMove)
+        return move;
+    }
+    break;
+
+  case ST_RECAPTURES_GEN:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  case ST_RECAPTURES:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (to_sq(move) == st->recaptureSquare)
+        return move;
+    }
+    break;
+
+  default:
+    assume(0);
+
+  }
+
+  return 0;
+}
+#else
+Move next_move_q(Pos *pos)
+{
+  Stack *st = pos->st;
+  Move move;
+
+  static void *jump_table[] = {
+    &&tt_move, &&evasions_gen, NULL,
+    &&tt_move, &&qcaptures_gen, &&remaining, &&checks,
+    &&tt_move, &&qcaptures_gen, &&remaining,
+    &&recaptures_gen, &&recaptures
+  };
+
+  goto *jump_table[(unsigned)(st->stage - ST_EVASIONS)];
+
+  while (1) {
+
+  tt_move:
+    st->endMoves = (st-1)->endMoves;
+    st->stage++;
+    return st->ttMove;
+
+  evasions_gen:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_evasions(pos, st->cur);
+    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
+      score_evasions(pos);
+    st->stage = ST_REMAINING;
+
+    if (st->stage != ST_REMAINING) {
+
+  qcaptures_gen:
+      st->cur = (st-1)->endMoves;
+      st->endMoves = generate_captures(pos, st->cur);
+      score_captures(pos);
+      st->stage++;
+    }
+
+  remaining:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove)
+        return move;
+    }
+    if (st->stage != ST_QCAPTURES_CHECKS)
+      break;
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_quiet_checks(pos, st->cur);
+    st->stage++;
+
+  checks:
+    while (st->cur < st->endMoves) {
+      move = (st->cur++)->move;
+      if (move != st->ttMove)
+        return move;
+    }
+    break;
+
+  recaptures_gen:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  recaptures:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (to_sq(move) == st->recaptureSquare)
+        return move;
+    }
+    break;
+
+  }
+
+  return 0;
+}
+#endif
+
+Move next_move_pc(Pos *pos)
+{
+  Stack *st = pos->st;
+  Move move;
+
+  switch (st->stage) {
+
+  case ST_PROBCUT:
+    st->endMoves = (st-1)->endMoves;
+    st->stage++;
+    return st->ttMove;
+
+  case ST_PROBCUT_GEN:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  case ST_PROBCUT_2:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove && see_test(pos, move, st->threshold + 1))
+        return move;
+    }
+    break;
+
+  default:
+    assume(0);
+
+  }
+
+  return 0;
+}
+
+#endif
 
