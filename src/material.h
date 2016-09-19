@@ -40,12 +40,12 @@ typedef struct Pos Pos;
 
 struct MaterialEntry {
   Key key;
-  Value (*eval_func)(Pos *, int);
-  Value (*scal_func[2])(Pos *, int);
   int gamePhase;
   int16_t value;
-  uint8_t factor[2];
+  uint8_t eval_func;
   uint8_t eval_func_side;
+  uint8_t scal_func[2];
+  uint8_t factor[2];
 };
 
 typedef struct MaterialEntry MaterialEntry;
@@ -57,12 +57,12 @@ INLINE Score material_imbalance(MaterialEntry *me)
 
 INLINE int material_specialized_eval_exists(MaterialEntry *me)
 {
-  return me->eval_func != NULL;
+  return me->eval_func != 0;
 }
 
 INLINE Value material_evaluate(MaterialEntry *me, Pos *pos)
 {
-  return me->eval_func(pos, me->eval_func_side);
+  return endgame_funcs[me->eval_func](pos, me->eval_func_side);
 }
 
 // scale_factor takes a position and a color as input and returns a scale factor
@@ -74,7 +74,7 @@ INLINE int material_scale_factor(MaterialEntry *me, Pos *pos, int c)
 {
   int sf = SCALE_FACTOR_NONE;
   if (me->scal_func[c])
-    sf = me->scal_func[c](pos, c);
+    sf = endgame_funcs[me->scal_func[c]](pos, c);
   return sf != SCALE_FACTOR_NONE ? sf : me->factor[c];
 }
 
