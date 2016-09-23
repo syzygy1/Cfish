@@ -94,23 +94,27 @@ void thread_init(void *arg)
   pos->exit = 0;
   pos->maxPly = pos->callsCnt = 0;
 
-#ifndef __WIN32__
+#ifndef __WIN32__  // linux
+
   pthread_mutex_init(&pos->mutex, NULL);
   pthread_cond_init(&pos->sleepCondition, NULL);
-#else
-  pos->startEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-  pos->stopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-#endif
 
   Threads.pos[idx] = pos;
 
-#ifndef __WIN32__
   pthread_mutex_lock(&Threads.mutex);
   Threads.initializing = 0;
   pthread_cond_signal(&Threads.sleepCondition);
   pthread_mutex_unlock(&Threads.mutex);
-#else
+
+#else // Windows
+
+  pos->startEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+  pos->stopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+  Threads.pos[idx] = pos;
+
   SetEvent(Threads.event);
+
 #endif
 
   thread_idle_loop(pos);
@@ -121,17 +125,22 @@ void thread_init(void *arg)
 void thread_create(int idx)
 {
 #ifndef __WIN32__
+
   pthread_t thread;
 
   Threads.initializing = 1;
   pthread_mutex_lock(&Threads.mutex);
-  pthread_create(&thread, NULL, (void*(*)(void*))thread_init, (void *)(intptr_t)idx);
+  pthread_create(&thread, NULL, (void*(*)(void*))thread_init,
+                 (void *)(intptr_t)idx);
   while (Threads.initializing)
     pthread_cond_wait(&Threads.sleepCondition, &Threads.mutex);
   pthread_mutex_unlock(&Threads.mutex);
+
 #else
+
   HANDLE *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_init, (void *)(intptr_t)idx, 0 , NULL);
   WaitForSingleObject(Threads.event, INFINITE);
+
 #endif
 
   Threads.pos[idx]->nativeThread = thread;
@@ -240,11 +249,10 @@ void thread_start_searching(Pos *pos, int resume)
 
 void thread_idle_loop(Pos *pos)
 {
-  while (!pos->exit) {
 #ifndef __WIN32__
-    pthread_mutex_lock(&pos->mutex);
 
-    pos->searching = 0;
+  pthread_mutex_lock(&pos->mutex);
+  while (1) {
 
     while (!pos->searching && !pos->exit) {
       pthread_cond_signal(&pos->sleepCondition); // Wake up any waiting thread
@@ -253,24 +261,35 @@ void thread_idle_loop(Pos *pos)
 
     pthread_mutex_unlock(&pos->mutex);
 
-    if (!pos->exit) {
-      if (pos->thread_idx == 0)
-        mainthread_search();
-      else
-        thread_search(pos);
-    }
-#else
-//    pos->searching = 0;
-    WaitForSingleObject(pos->startEvent, INFINITE);
-    if (!pos->exit) {
-      if (pos->thread_idx == 0)
-        mainthread_search();
-      else
-        thread_search(pos);
-    }
-    SetEvent(pos->stopEvent);
-#endif
+    if (pos->exit)
+      break;
+
+    if (pos->thread_idx == 0)
+      mainthread_search();
+    else
+      thread_search(pos);
+
+    pthread_mutex_lock(&pos->mutex);
+    pos->searching = 0;
   }
+
+#else
+
+  while (1) {
+    WaitForSingleObject(pos->startEvent, INFINITE);
+
+    if (pos->exit)
+      break;
+
+    if (pos->thread_idx == 0)
+      mainthread_search();
+    else
+      thread_search(pos);
+
+    SetEvent(pos->stopEvent);
+  }
+
+#endif
 }
 
 
