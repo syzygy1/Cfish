@@ -49,7 +49,7 @@ static unsigned index(int us, Square bksq, Square wksq, Square psq)
 #define RES_DRAW    2
 #define RES_WIN     4
 
-int bitbases_probe(Square wksq, Square wpsq, Square bksq, int us)
+FAST int bitbases_probe(Square wksq, Square wpsq, Square bksq, int us)
 {
   assert(file_of(wpsq) <= FILE_D);
 
@@ -57,7 +57,7 @@ int bitbases_probe(Square wksq, Square wpsq, Square bksq, int us)
   return KPKBitbase[idx / 32] & (1 << (idx & 0x1F));
 }
 
-static uint8_t initial(unsigned idx)
+FAST static uint8_t initial(unsigned idx)
 {
   int ksq[2] = { (idx >> 0) & 0x3f, (idx >> 6) & 0x3f };
   int us     = (idx >> 12) & 0x01;
@@ -88,7 +88,7 @@ static uint8_t initial(unsigned idx)
   return RES_UNKNOWN;
 }
 
-static uint8_t classify(uint8_t *db, unsigned idx)
+FAST static uint8_t classify(uint8_t *db, unsigned idx)
 {
   int ksq[2] = { (idx >> 0) & 0x3f, (idx >> 6) & 0x3f };
   int us     = (idx >> 12) & 0x01;

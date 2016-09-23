@@ -52,12 +52,12 @@ static struct TBHashEntry TB_hash[1 << TBHASHBITS][HSHMAX];
 
 static struct DTZTableEntry DTZ_table[DTZ_ENTRIES];
 
-static void init_indices(void);
-static Key calc_key_from_pcs(int *pcs, int mirror);
-static void free_wdl_entry(struct TBEntry *entry);
-static void free_dtz_entry(struct TBEntry *entry);
+FAST static void init_indices(void);
+FAST static Key calc_key_from_pcs(int *pcs, int mirror);
+FAST static void free_wdl_entry(struct TBEntry *entry);
+FAST static void free_dtz_entry(struct TBEntry *entry);
 
-static FD open_tb(const char *str, const char *suffix)
+FAST static FD open_tb(const char *str, const char *suffix)
 {
   int i;
   FD fd;
@@ -79,7 +79,7 @@ static FD open_tb(const char *str, const char *suffix)
   return FD_ERR;
 }
 
-static void close_tb(FD fd)
+FAST static void close_tb(FD fd)
 {
 #ifndef _WIN32
   close(fd);
@@ -88,7 +88,7 @@ static void close_tb(FD fd)
 #endif
 }
 
-static char *map_file(const char *name, const char *suffix, uint64 *mapping)
+FAST static char *map_file(const char *name, const char *suffix, uint64 *mapping)
 {
   FD fd = open_tb(name, suffix);
   if (fd == FD_ERR)
@@ -125,7 +125,7 @@ static char *map_file(const char *name, const char *suffix, uint64 *mapping)
 }
 
 #ifndef _WIN32
-static void unmap_file(char *data, uint64 size)
+FAST static void unmap_file(char *data, uint64 size)
 {
   if (!data) return;
   munmap(data, size);
@@ -139,7 +139,7 @@ static void unmap_file(char *data, uint64 mapping)
 }
 #endif
 
-static void add_to_hash(struct TBEntry *ptr, Key key)
+FAST static void add_to_hash(struct TBEntry *ptr, Key key)
 {
   int i, hshidx;
 
@@ -158,7 +158,7 @@ static void add_to_hash(struct TBEntry *ptr, Key key)
 
 static char pchr[] = {'K', 'Q', 'R', 'B', 'N', 'P'};
 
-static void init_tb(char *str)
+FAST static void init_tb(char *str)
 {
   FD fd;
   struct TBEntry *entry;
@@ -574,7 +574,7 @@ static int binomial[5][64];
 static int pawnidx[5][24];
 static int pfactor[5][4];
 
-static void init_indices(void)
+FAST static void init_indices(void)
 {
   int i, j, k;
 
@@ -618,7 +618,7 @@ static void init_indices(void)
   }
 }
 
-static uint64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor)
+FAST static uint64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int *factor)
 {
   uint64 idx;
   int i, j, k, m, l, p;
@@ -697,7 +697,7 @@ static uint64 encode_piece(struct TBEntry_piece *ptr, ubyte *norm, int *pos, int
 }
 
 // determine file of leftmost pawn and sort pawns
-static int pawn_file(struct TBEntry_pawn *ptr, int *pos)
+FAST static int pawn_file(struct TBEntry_pawn *ptr, int *pos)
 {
   int i;
 
@@ -708,7 +708,7 @@ static int pawn_file(struct TBEntry_pawn *ptr, int *pos)
   return file_to_file[pos[0] & 0x07];
 }
 
-static uint64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor)
+FAST static uint64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *factor)
 {
   uint64 idx;
   int i, j, k, m, s, t;
@@ -767,7 +767,7 @@ static uint64 encode_pawn(struct TBEntry_pawn *ptr, ubyte *norm, int *pos, int *
 }
 
 // place k like pieces on n squares
-static int subfactor(int k, int n)
+FAST static int subfactor(int k, int n)
 {
   int i, f, l;
 
@@ -781,7 +781,7 @@ static int subfactor(int k, int n)
   return f / l;
 }
 
-static uint64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte enc_type)
+FAST static uint64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, ubyte enc_type)
 {
   int i, k, n;
   uint64 f;
@@ -805,7 +805,7 @@ static uint64 calc_factors_piece(int *factor, int num, int order, ubyte *norm, u
   return f;
 }
 
-static uint64 calc_factors_pawn(int *factor, int num, int order, int order2, ubyte *norm, int file)
+FAST static uint64 calc_factors_pawn(int *factor, int num, int order, int order2, ubyte *norm, int file)
 {
   int i, k, n;
   uint64 f;
@@ -833,7 +833,7 @@ static uint64 calc_factors_pawn(int *factor, int num, int order, int order2, uby
   return f;
 }
 
-static void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces)
+FAST static void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces)
 {
   int i, j;
 
@@ -857,7 +857,7 @@ static void set_norm_piece(struct TBEntry_piece *ptr, ubyte *norm, ubyte *pieces
       norm[i]++;
 }
 
-static void set_norm_pawn(struct TBEntry_pawn *ptr, ubyte *norm, ubyte *pieces)
+FAST static void set_norm_pawn(struct TBEntry_pawn *ptr, ubyte *norm, ubyte *pieces)
 {
   int i, j;
 
@@ -872,7 +872,7 @@ static void set_norm_pawn(struct TBEntry_pawn *ptr, ubyte *norm, ubyte *pieces)
       norm[i]++;
 }
 
-static void setup_pieces_piece(struct TBEntry_piece *ptr, unsigned char *data, uint64 *tb_size)
+FAST static void setup_pieces_piece(struct TBEntry_piece *ptr, unsigned char *data, uint64 *tb_size)
 {
   int i;
   int order;
@@ -890,7 +890,7 @@ static void setup_pieces_piece(struct TBEntry_piece *ptr, unsigned char *data, u
   tb_size[1] = calc_factors_piece(ptr->factor[1], ptr->num, order, ptr->norm[1], ptr->enc_type);
 }
 
-static void setup_pieces_piece_dtz(struct DTZEntry_piece *ptr, unsigned char *data, uint64 *tb_size)
+FAST static void setup_pieces_piece_dtz(struct DTZEntry_piece *ptr, unsigned char *data, uint64 *tb_size)
 {
   int i;
   int order;
@@ -902,7 +902,7 @@ static void setup_pieces_piece_dtz(struct DTZEntry_piece *ptr, unsigned char *da
   tb_size[0] = calc_factors_piece(ptr->factor, ptr->num, order, ptr->norm, ptr->enc_type);
 }
 
-static void setup_pieces_pawn(struct TBEntry_pawn *ptr, unsigned char *data, uint64 *tb_size, int f)
+FAST static void setup_pieces_pawn(struct TBEntry_pawn *ptr, unsigned char *data, uint64 *tb_size, int f)
 {
   int i, j;
   int order, order2;
@@ -923,7 +923,7 @@ static void setup_pieces_pawn(struct TBEntry_pawn *ptr, unsigned char *data, uin
   tb_size[1] = calc_factors_pawn(ptr->file[f].factor[1], ptr->num, order, order2, ptr->file[f].norm[1], f);
 }
 
-static void setup_pieces_pawn_dtz(struct DTZEntry_pawn *ptr, unsigned char *data, uint64 *tb_size, int f)
+FAST static void setup_pieces_pawn_dtz(struct DTZEntry_pawn *ptr, unsigned char *data, uint64 *tb_size, int f)
 {
   int i, j;
   int order, order2;
@@ -937,7 +937,7 @@ static void setup_pieces_pawn_dtz(struct DTZEntry_pawn *ptr, unsigned char *data
   tb_size[0] = calc_factors_pawn(ptr->file[f].factor, ptr->num, order, order2, ptr->file[f].norm, f);
 }
 
-static void calc_symlen(struct PairsData *d, int s, char *tmp)
+FAST static void calc_symlen(struct PairsData *d, int s, char *tmp)
 {
   int s1, s2;
 
@@ -962,7 +962,7 @@ INLINE uint32 ReadUint32(ubyte *d) {
   return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24);
 }
 
-static struct PairsData *setup_pairs(unsigned char *data, uint64 tb_size, uint64 *size, unsigned char **next, ubyte *flags, int wdl)
+FAST static struct PairsData *setup_pairs(unsigned char *data, uint64 tb_size, uint64 *size, unsigned char **next, ubyte *flags, int wdl)
 {
   struct PairsData *d;
   int i;
@@ -1021,7 +1021,7 @@ static struct PairsData *setup_pairs(unsigned char *data, uint64 tb_size, uint64
   return d;
 }
 
-static int init_table_wdl(struct TBEntry *entry, char *str)
+FAST static int init_table_wdl(struct TBEntry *entry, char *str)
 {
   ubyte *next;
   int f, s;
@@ -1140,7 +1140,7 @@ static int init_table_wdl(struct TBEntry *entry, char *str)
   return 1;
 }
 
-static int init_table_dtz(struct TBEntry *entry)
+FAST static int init_table_dtz(struct TBEntry *entry)
 {
   ubyte *data = (ubyte *)entry->data;
   ubyte *next;
@@ -1246,7 +1246,7 @@ INLINE int is_little_endian() {
   return x.c[0] == 1;
 }
 
-static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
+FAST static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
 {
   int LittleEndian = is_little_endian();
 
@@ -1322,7 +1322,7 @@ static ubyte decompress_pairs(struct PairsData *d, uint64 idx)
   return sympat[3 * sym];
 }
 
-void load_dtz_table(char *str, uint64 key1, uint64 key2)
+FAST void load_dtz_table(char *str, uint64 key1, uint64 key2)
 {
   int i;
   struct TBEntry *ptr, *ptr3;
@@ -1362,7 +1362,7 @@ void load_dtz_table(char *str, uint64 key1, uint64 key2)
     DTZ_table[0].entry = ptr3;
 }
 
-static void free_wdl_entry(struct TBEntry *entry)
+FAST static void free_wdl_entry(struct TBEntry *entry)
 {
   unmap_file(entry->data, entry->mapping);
   if (!entry->has_pawns) {
@@ -1381,7 +1381,7 @@ static void free_wdl_entry(struct TBEntry *entry)
   }
 }
 
-static void free_dtz_entry(struct TBEntry *entry)
+FAST static void free_dtz_entry(struct TBEntry *entry)
 {
   unmap_file(entry->data, entry->mapping);
   if (!entry->has_pawns) {

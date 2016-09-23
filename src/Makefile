@@ -70,7 +70,7 @@ popcnt = yes
 sse = yes
 pext = no
 numa = yes
-EXTRACFLAGS += -march=native
+EXTRACFLAGS += -march=native -mno-red-zone -g
 
 ### 2.2 Architecture specific
 

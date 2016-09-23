@@ -72,7 +72,7 @@ INLINE ExtMove *partition(ExtMove *first, ExtMove *last)
 // it to the front. It's faster than sorting all the moves in advance
 // when there are few moves, e.g., the possible captures.
 
-static Move pick_best(ExtMove *begin, ExtMove *end)
+FAST static Move pick_best(ExtMove *begin, ExtMove *end)
 {
   ExtMove *p, *q, tmp;
 
@@ -88,7 +88,7 @@ static Move pick_best(ExtMove *begin, ExtMove *end)
 
 // Initialisation of move picker data.
 
-void mp_init(Pos *pos, Move ttm, Depth depth)
+FAST void mp_init(Pos *pos, Move ttm, Depth depth)
 {
   assert(depth > DEPTH_ZERO);
 
@@ -105,7 +105,7 @@ void mp_init(Pos *pos, Move ttm, Depth depth)
     st->stage++;
 }
 
-void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
+FAST void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
 {
   assert (depth <= DEPTH_ZERO);
 
@@ -128,7 +128,7 @@ void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
     st->stage++;
 }
 
-void mp_init_pc(Pos *pos, Move ttm, Value threshold)
+FAST void mp_init_pc(Pos *pos, Move ttm, Value threshold)
 {
   assert(!pos_checkers());
 
@@ -156,7 +156,7 @@ void mp_init_pc(Pos *pos, Move ttm, Value threshold)
 // score() assigns a numerical value to each move in a move list. The moves with
 // highest values will be picked first.
 
-static void score_captures(Pos *pos)
+FAST static void score_captures(Pos *pos)
 {
   Stack *st = pos->st;
 
@@ -168,7 +168,7 @@ static void score_captures(Pos *pos)
               - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
 }
 
-static void score_quiets(Pos *pos)
+FAST static void score_quiets(Pos *pos)
 {
   Stack *st = pos->st;
   HistoryStats *history = pos->history;
@@ -188,7 +188,7 @@ static void score_quiets(Pos *pos)
               + ft_get(*fromTo, c, m->move);
 }
 
-static void score_evasions(Pos *pos)
+FAST static void score_evasions(Pos *pos)
 {
   Stack *st = pos->st;
   // Try winning and equal captures ordered by MVV/LVA, then non-captures
@@ -214,7 +214,7 @@ static void score_evasions(Pos *pos)
 
 // next_move() returns the next pseudo-legal move to be searched.
 
-Move next_move(Pos *pos)
+FAST Move next_move(Pos *pos)
 {
   Stack *st = pos->st;
   Move move;

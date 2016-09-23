@@ -310,17 +310,17 @@ INLINE ExtMove *generate(Pos *pos, ExtMove *list, const int Type)
 
 // "template" instantiations
 
-ExtMove *generate_captures(Pos *pos, ExtMove *list)
+FAST ExtMove *generate_captures(Pos *pos, ExtMove *list)
 {
   return generate(pos, list, CAPTURES);
 }
 
-ExtMove *generate_quiets(Pos *pos, ExtMove *list)
+FAST ExtMove *generate_quiets(Pos *pos, ExtMove *list)
 {
   return generate(pos, list, QUIETS);
 }
 
-ExtMove *generate_non_evasions(Pos *pos, ExtMove *list)
+FAST ExtMove *generate_non_evasions(Pos *pos, ExtMove *list)
 {
   return generate(pos, list, NON_EVASIONS);
 }
@@ -328,7 +328,7 @@ ExtMove *generate_non_evasions(Pos *pos, ExtMove *list)
 
 // generate_quiet_checks() generates all pseudo-legal non-captures and
 // knight underpromotions that give check.
-ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list)
+FAST ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list)
 {
   assert(!pos_checkers());
 
@@ -358,7 +358,7 @@ ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list)
 
 // generate_evasions() generates all pseudo-legal check evasions when the
 // side to move is in check.
-ExtMove *generate_evasions(Pos *pos, ExtMove *list)
+FAST ExtMove *generate_evasions(Pos *pos, ExtMove *list)
 {
   assert(pos_checkers());
 
@@ -393,7 +393,7 @@ ExtMove *generate_evasions(Pos *pos, ExtMove *list)
 
 
 // generate_legal() generates all the legal moves in the given position
-ExtMove *generate_legal(Pos *pos, ExtMove *list)
+FAST ExtMove *generate_legal(Pos *pos, ExtMove *list)
 {
   Bitboard pinned = pinned_pieces(pos, pos_stm());
   Square ksq = square_of(pos_stm(), KING);

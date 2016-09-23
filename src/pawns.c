@@ -191,7 +191,7 @@ void pawn_init(void)
 // pawns_probe() looks up the current position's pawns configuration in
 // the pawns hash table.
 
-PawnEntry *pawn_probe(Pos *pos)
+FAST PawnEntry *pawn_probe(Pos *pos)
 {
   Key key = pos_pawn_key();
   PawnEntry* e = &pos->pawnTable[key & 16383];

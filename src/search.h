@@ -99,7 +99,7 @@ extern int TB_RootInTB;
 
 void search_init();
 void search_clear();
-uint64_t perft(Pos *pos, Depth depth);
+FAST uint64_t perft(Pos *pos, Depth depth);
 
 #endif
 

@@ -188,12 +188,12 @@ void start_logger(const char *fname)
 // For further analysis see
 //   <http://vigna.di.unimi.it/ftp/papers/xorshift.pdf>
 
-void prng_init(PRNG *rng, uint64_t seed)
+FAST void prng_init(PRNG *rng, uint64_t seed)
 {
   rng->s = seed;
 }
 
-uint64_t prng_rand(PRNG *rng)
+FAST uint64_t prng_rand(PRNG *rng)
 {
   uint64_t s = rng->s;
 
@@ -205,7 +205,7 @@ uint64_t prng_rand(PRNG *rng)
   return s * 2685821657736338717LL;
 }
 
-uint64_t prng_sparse_rand(PRNG *rng)
+FAST uint64_t prng_sparse_rand(PRNG *rng)
 {
   uint64_t r1 = prng_rand(rng);
   uint64_t r2 = prng_rand(rng);

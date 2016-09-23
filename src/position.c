@@ -421,7 +421,7 @@ void pos_fen(Pos *pos, char *str)
 // game_phase() calculates the game phase interpolating total non-pawn
 // material between endgame and midgame limits.
 
-int game_phase(Pos *pos)
+FAST int game_phase(Pos *pos)
 {
   Value npm = pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK);
 
@@ -442,7 +442,7 @@ int game_phase(Pos *pos)
 // candidates are slider blockers and are calculated by calling this
 // function.
 
-Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
+FAST Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
                          Bitboard *pinners)
 {
   Bitboard result = 0, snipers;
@@ -469,7 +469,7 @@ Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
 // attackers_to() computes a bitboard of all pieces which attack a given
 // square. Slider attacks use the occupied bitboard to indicate occupancy.
 
-Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied)
+FAST Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied)
 {
   return  (attacks_from_pawn(s, BLACK)    & pieces_cp(WHITE, PAWN))
         | (attacks_from_pawn(s, WHITE)    & pieces_cp(BLACK, PAWN))
@@ -482,7 +482,7 @@ Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied)
 
 // is_legal() tests whether a pseudo-legal move is legal
 
-int is_legal(Pos *pos, Move m)
+FAST int is_legal(Pos *pos, Move m)
 {
   assert(move_is_ok(m));
 
@@ -600,7 +600,7 @@ int is_pseudo_legal_old(Pos *pos, Move m)
 }
 #endif
 
-int is_pseudo_legal(Pos *pos, Move m)
+FAST int is_pseudo_legal(Pos *pos, Move m)
 {
   uint64_t us = pos_stm();
   Square from = from_sq(m);
@@ -706,7 +706,7 @@ exit(1);
 // gives_check_special() is invoked by gives_check() if there are
 // discovered check candidates or the move is of a special type.
 
-int gives_check_special(Pos *pos, Stack *st, Move m)
+FAST int gives_check_special(Pos *pos, Stack *st, Move m)
 {
   assert(move_is_ok(m));
   assert(color_of(moved_piece(m)) == pos_stm());
@@ -755,7 +755,7 @@ int gives_check_special(Pos *pos, Stack *st, Move m)
 
 // do_move() makes a move. The move is assumed to be legal.
 #ifndef PEDANTIC
-void do_move(Pos *pos, Move m, int givesCheck)
+FAST void do_move(Pos *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
 
@@ -867,7 +867,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   check_pos(pos);
 }
 
-void undo_move(Pos *pos, Move m)
+FAST void undo_move(Pos *pos, Move m)
 {
   int from = from_sq(m);
   int to = to_sq(m);
@@ -908,7 +908,7 @@ void undo_move(Pos *pos, Move m)
   check_pos(pos);
 }
 #else
-void do_move(Pos *pos, Move m, int givesCheck)
+FAST void do_move(Pos *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
 
@@ -1093,7 +1093,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 // undo_move() unmakes a move. When it returns, the position should
 // be restored to exactly the same state as before the move was made.
 
-void undo_move(Pos *pos, Move m)
+FAST void undo_move(Pos *pos, Move m)
 {
   assert(move_is_ok(m));
 
@@ -1162,7 +1162,7 @@ void undo_move(Pos *pos, Move m)
 
 // do_null_move() is used to do a null move.
 
-void do_null_move(Pos *pos)
+FAST void do_null_move(Pos *pos)
 {
   assert(!pos_checkers());
 
@@ -1190,7 +1190,7 @@ void do_null_move(Pos *pos)
 
 // undo_null_move() is used to undo a null move.
 
-void undo_null_move(Pos *pos)
+FAST void undo_null_move(Pos *pos)
 {
   assert(!pos_checkers());
 
@@ -1203,7 +1203,7 @@ void undo_null_move(Pos *pos)
 // for speculative prefetch. It does not recognize special moves like
 // castling, en-passant and promotions.
 
-Key key_after(Pos *pos, Move m)
+FAST Key key_after(Pos *pos, Move m)
 {
   Square from = from_sq(m);
   Square to = to_sq(m);
@@ -1221,7 +1221,7 @@ Key key_after(Pos *pos, Move m)
 // see() is a static exchange evaluator: It tries to estimate the
 // material gain or loss resulting from a move.
 
-Value see_sign(Pos *pos, Move m) 
+FAST Value see_sign(Pos *pos, Move m) 
 {
   assert(move_is_ok(m));
 
@@ -1234,7 +1234,7 @@ Value see_sign(Pos *pos, Move m)
   return see(pos, m);
 }
 
-Value see(Pos *pos, Move m)
+FAST Value see(Pos *pos, Move m)
 {
   Square from, to;
   Bitboard occ, attackers, stmAttackers;
@@ -1327,7 +1327,7 @@ Value see(Pos *pos, Move m)
 #if 1
 #if 0
 // Test whether see(m) >= value.
-int see_test(Pos *pos, Move m, int value)
+FAST int see_test(Pos *pos, Move m, int value)
 {
   if (type_of_m(m) == CASTLING)
     return 0 >= value;
@@ -1401,7 +1401,7 @@ int see_test(Pos *pos, Move m, int value)
   return res;
 }
 #else
-int see_test(Pos *pos, Move m, int value)
+FAST int see_test(Pos *pos, Move m, int value)
 {
   if (type_of_m(m) == CASTLING)
     return 0 >= value;
@@ -1478,7 +1478,7 @@ int see_test(Pos *pos, Move m, int value)
 #endif
 #else
 // Test whether see(m) >= value.
-int see_test(Pos *pos, Move m, int value)
+FAST int see_test(Pos *pos, Move m, int value)
 {
   if (type_of_m(m) == CASTLING)
     return 0 >= value;
@@ -1538,7 +1538,7 @@ int see_test(Pos *pos, Move m, int value)
 #endif
 
 #if 0
-int see_ab(Pos *pos, Move m, int alpha, int beta)
+FAST int see_ab(Pos *pos, Move m, int alpha, int beta)
 {
   if (type_of_m(m) == CASTLING)
     return 0;
@@ -1600,7 +1600,7 @@ int see_ab(Pos *pos, Move m, int alpha, int beta)
 #endif
 
 #if 0
-int see_test(Pos *pos, Move m, int value)
+FAST int see_test(Pos *pos, Move m, int value)
 {
 //  int s1 = see_test_old(pos, m, value);
   int s1 = see(pos, m) >= value;
@@ -1619,7 +1619,7 @@ int see_test(Pos *pos, Move m, int value)
 // is_draw() tests whether the position is drawn by 50-move rule or by
 // repetition. It does not detect stalemates.
 
-int is_draw(Pos *pos)
+FAST int is_draw(Pos *pos)
 {
   Stack *st = pos->st;
 

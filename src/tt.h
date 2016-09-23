@@ -122,7 +122,7 @@ typedef struct TranspositionTable TranspositionTable;
 
 extern TranspositionTable TT;
 
-void tt_free(void);
+FAST void tt_free(void);
 
 INLINE void tt_new_search(void)
 {
@@ -139,10 +139,10 @@ INLINE TTEntry *tt_first_entry(Key key)
   return &TT.table[(size_t)key & (TT.clusterCount - 1)].entry[0];
 }
 
-TTEntry *tt_probe(Key key, int *found);
-int tt_hashfull(void);
-void tt_allocate(size_t mbSize);
-void tt_clear(void);
+FAST TTEntry *tt_probe(Key key, int *found);
+FAST int tt_hashfull(void);
+FAST void tt_allocate(size_t mbSize);
+FAST void tt_clear(void);
 
 #endif
 

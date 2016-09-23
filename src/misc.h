@@ -90,9 +90,9 @@ struct PRNG
 
 typedef struct PRNG PRNG;
 
-void prng_init(PRNG *rng, uint64_t seed);
-uint64_t prng_rand(PRNG *rng);
-uint64_t prng_sparse_rand(PRNG *rng);
+FAST void prng_init(PRNG *rng, uint64_t seed);
+FAST uint64_t prng_rand(PRNG *rng);
+FAST uint64_t prng_sparse_rand(PRNG *rng);
 
 #endif
 

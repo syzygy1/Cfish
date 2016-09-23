@@ -30,12 +30,12 @@
 #define GEN_NON_EVASIONS 4
 #define GEN_LEGAL        5
 
-ExtMove *generate_captures(Pos *pos, ExtMove *list);
-ExtMove *generate_quiets(Pos *pos, ExtMove *list);
-ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list);
-ExtMove *generate_evasions(Pos *pos, ExtMove *list);
-ExtMove *generate_non_evasions(Pos *pos, ExtMove *list);
-ExtMove *generate_legal(Pos *pos, ExtMove *list);
+FAST ExtMove *generate_captures(Pos *pos, ExtMove *list);
+FAST ExtMove *generate_quiets(Pos *pos, ExtMove *list);
+FAST ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list);
+FAST ExtMove *generate_evasions(Pos *pos, ExtMove *list);
+FAST ExtMove *generate_non_evasions(Pos *pos, ExtMove *list);
+FAST ExtMove *generate_legal(Pos *pos, ExtMove *list);
 
 #endif
 

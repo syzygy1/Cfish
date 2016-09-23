@@ -94,10 +94,10 @@ INLINE Value ft_get(FromToStats ft, int c, Move m)
 #define ST_PROBCUT_GEN             20
 #define ST_PROBCUT_2               21
 
-void mp_init(Pos *pos, Move ttm, Depth depth);
-void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s);
-void mp_init_pc(Pos *pos, Move ttm, Value threshold);
-Move next_move(Pos *pos);
+FAST void mp_init(Pos *pos, Move ttm, Depth depth);
+FAST void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s);
+FAST void mp_init_pc(Pos *pos, Move ttm, Value threshold);
+FAST Move next_move(Pos *pos);
 
 #endif
 

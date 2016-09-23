@@ -80,7 +80,7 @@ INLINE int material_scale_factor(MaterialEntry *me, Pos *pos, int c)
 
 typedef MaterialEntry MaterialTable[8192];
 
-MaterialEntry *material_probe(Pos *pos);
+FAST MaterialEntry *material_probe(Pos *pos);
 
 #endif
 

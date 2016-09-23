@@ -90,19 +90,19 @@ struct {
   Move pv[3];
 } EM;
 
-static void easy_move_clear(void)
+FAST static void easy_move_clear(void)
 {
   EM.stableCnt = 0;
   EM.expectedPosKey = 0;
   EM.pv[0] = EM.pv[1] = EM.pv[2] = 0;
 }
 
-static Move easy_move_get(Key key)
+FAST static Move easy_move_get(Key key)
 {
   return EM.expectedPosKey == key ? EM.pv[2] : 0;
 }
 
-static void easy_move_update(Pos *pos, Move *newPv)
+FAST static void easy_move_update(Pos *pos, Move *newPv)
 {
 //  assert(newPv.size() >= 3);
 
@@ -159,23 +159,23 @@ static const int HalfDensityRowSize[HalfDensitySize] = {
 static Value DrawValue[2];
 //static CounterMoveHistoryStats CounterMoveHistory;
 
-static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
-static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode);
+FAST static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
+FAST static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode);
 
-static Value qsearch_PV_true(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_PV_false(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha, Depth depth);
-static Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha, Depth depth);
+FAST static Value qsearch_PV_true(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
+FAST static Value qsearch_PV_false(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
+FAST static Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha, Depth depth);
+FAST static Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha, Depth depth);
 
-static Value value_to_tt(Value v, int ply);
-static Value value_from_tt(Value v, int ply);
-static void update_pv(Move *pv, Move move, Move *childPv);
-static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus);
-static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, Value bonus);
-static void check_time(void);
-static void stable_sort(RootMove *rm, size_t num);
-static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
-static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
+FAST static Value value_to_tt(Value v, int ply);
+FAST static Value value_from_tt(Value v, int ply);
+FAST static void update_pv(Move *pv, Move move, Move *childPv);
+FAST static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus);
+FAST static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, Value bonus);
+FAST static void check_time(void);
+FAST static void stable_sort(RootMove *rm, size_t num);
+FAST static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
+FAST static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 
 static TimePoint lastInfoTime;
 
@@ -231,7 +231,7 @@ void search_clear()
 // perft() is our utility to verify move generation. All the leaf nodes
 // up to the given depth are generated and counted, and the sum is returned.
 
-static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
+FAST static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
 {
   ExtMove *m = (pos->st-1)->endMoves;
   ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
@@ -246,7 +246,7 @@ static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
   return nodes;
 }
 
-uint64_t perft(Pos *pos, Depth depth)
+FAST uint64_t perft(Pos *pos, Depth depth)
 {
   uint64_t cnt, nodes = 0;
   char buf[16];
@@ -275,7 +275,7 @@ uint64_t perft(Pos *pos, Depth depth)
 // receives the UCI 'go' command. It searches from the root position and
 // outputs the "bestmove".
 
-void mainthread_search(void)
+FAST void mainthread_search(void)
 {
   Pos *pos = Threads.pos[0];
   int us = pos_stm();
@@ -366,7 +366,7 @@ void mainthread_search(void)
 // been consumed, the user stops the search, or the maximum search depth is
 // reached.
 
-void thread_search(Pos *pos)
+FAST void thread_search(Pos *pos)
 {
   Value bestValue, alpha, beta, delta;
   Move easyMove = 0;
@@ -620,7 +620,7 @@ void thread_search(Pos *pos)
 
 // stable_sort() sorts RootMoves from highest-scoring move to lowest-scoring
 // move while preserving order of equal elements.
-static void stable_sort(RootMove *rm, size_t num)
+FAST static void stable_sort(RootMove *rm, size_t num)
 {
   size_t i, j;
 
@@ -638,7 +638,7 @@ static void stable_sort(RootMove *rm, size_t num)
 // "plies to mate from the current position". Non-mate scores are unchanged.
 // The function is called before storing a value in the transposition table.
 
-static Value value_to_tt(Value v, int ply)
+FAST static Value value_to_tt(Value v, int ply)
 {
   assert(v != VALUE_NONE);
 
@@ -651,7 +651,7 @@ static Value value_to_tt(Value v, int ply)
 // from the transposition table (which refers to the plies to mate/be mated
 // from current position) to "plies to mate/be mated from the root".
 
-static Value value_from_tt(Value v, int ply)
+FAST static Value value_from_tt(Value v, int ply)
 {
   return  v == VALUE_NONE             ? VALUE_NONE
         : v >= VALUE_MATE_IN_MAX_PLY  ? v - ply
@@ -661,7 +661,7 @@ static Value value_from_tt(Value v, int ply)
 
 // update_pv() adds current move and appends child pv[]
 
-static void update_pv(Move *pv, Move move, Move *childPv)
+FAST static void update_pv(Move *pv, Move move, Move *childPv)
 {
   for (*pv++ = move; childPv && *childPv; )
     *pv++ = *childPv++;
@@ -671,7 +671,7 @@ static void update_pv(Move *pv, Move move, Move *childPv)
 
 // update_cm_stats() updates countermove and follow-up move history.
 
-static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus)
+FAST static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus)
 {
   CounterMoveStats *cmh  = (ss-1)->counterMoves;
   CounterMoveStats *fmh1 = (ss-2)->counterMoves;
@@ -690,7 +690,7 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus)
 // update_stats() updates killers, history, countermove and countermove
 // plus follow-up move history when a new quiet best move is found.
 
-void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
+FAST void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
                   int quietsCnt, Value bonus)
 {
   if (ss->killers[0] != move) {
@@ -755,7 +755,7 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
 // check_time() is used to print debug info and, more importantly, to detect
 // when we are out of available time and thus stop the search.
 
-static void check_time(void)
+FAST static void check_time(void)
 {
   int elapsed = time_elapsed();
   TimePoint tick = Limits.startTime + elapsed;
@@ -779,7 +779,7 @@ static void check_time(void)
 // UCI requires that all (if any) unsearched PV lines are sent with a
 // previous search score.
 
-static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
+FAST static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 {
   int elapsed = time_elapsed() + 1;
   RootMoves *rootMoves = pos->rootMoves;
@@ -830,7 +830,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 // return to the GUI, otherwise in case of 'ponder on' we have nothing
 // to think on.
 
-static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
+FAST static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
 {
   int ttHit;
 
@@ -854,7 +854,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
   return rm->pv_size > 1;
 }
 
-ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
+FAST ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
 {
   TB_RootInTB = 0;
   TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);

@@ -52,11 +52,17 @@
 #include <windows.h>
 #endif
 
-#define INLINE static inline __attribute__((always_inline))
-
 // Declaring pure functions as pure seems not to help. (Investigate later.)
 //#define PURE __attribute__((pure))
 #define PURE
+
+#ifdef __WIN32__
+#define FAST __attribute__((sysv_abi))
+#else
+#define FAST
+#endif
+
+#define INLINE static inline __attribute__((always_inline))
 
 // Predefined macros hell:
 //

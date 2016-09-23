@@ -46,13 +46,13 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
-void thread_init(void *arg);
-void thread_create(int idx);
-void thread_search(Pos *pos);
-void thread_idle_loop(Pos *pos);
-void thread_start_searching(Pos *pos, int resume);
-void thread_wait_for_search_finished(Pos *pos);
-void thread_wait(Pos *pos, atomic_bool *b);
+FAST void thread_init(void *arg);
+FAST void thread_create(int idx);
+FAST void thread_search(Pos *pos);
+FAST void thread_idle_loop(Pos *pos);
+FAST void thread_start_searching(Pos *pos, int resume);
+FAST void thread_wait_for_search_finished(Pos *pos);
+FAST void thread_wait(Pos *pos, atomic_bool *b);
 
 
 // MainThread struct seems to exist mostly for easy move.
@@ -67,7 +67,7 @@ typedef struct MainThread MainThread;
 
 extern MainThread mainThread;
 
-void mainthread_search();
+FAST void mainthread_search();
 
 
 // ThreadPool struct handles all the threads-related stuff like init,
@@ -88,12 +88,12 @@ struct ThreadPool {
 
 typedef struct ThreadPool ThreadPool;
 
-void threads_init(void);
-void threads_exit(void);
-void threads_start_thinking(Pos *pos, LimitsType *);
-void threads_set_number(size_t num);
-uint64_t threads_nodes_searched(void);
-uint64_t threads_tb_hits(void);
+FAST void threads_init(void);
+FAST void threads_exit(void);
+FAST void threads_start_thinking(Pos *pos, LimitsType *);
+FAST void threads_set_number(size_t num);
+FAST uint64_t threads_nodes_searched(void);
+FAST uint64_t threads_tb_hits(void);
 
 extern ThreadPool Threads;
 

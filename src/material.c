@@ -49,20 +49,20 @@ static const int QuadraticTheirs[][8] = {
 };
 
 // Helper used to detect a given material distribution.
-static int is_KXK(Pos *pos, int us)
+FAST static int is_KXK(Pos *pos, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
         && pos_non_pawn_material(us) >= RookValueMg;
 }
 
-static int is_KBPsKs(Pos *pos, int us)
+FAST static int is_KBPsKs(Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
         && pieces_cp(us, BISHOP)
         && pieces_cp(us, PAWN);
 }
 
-static int is_KQKRPs(Pos *pos, int us) {
+FAST static int is_KQKRPs(Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
         && pieces_cp(us, QUEEN)
@@ -72,7 +72,7 @@ static int is_KQKRPs(Pos *pos, int us) {
 
 // imbalance() calculates the imbalance by comparing the piece count of each
 // piece type for both colors.
-int imbalance(int us, int pieceCount[][8])
+FAST int imbalance(int us, int pieceCount[][8])
 {
   int *pc_us = pieceCount[us];
   int *pc_them = pieceCount[us ^ 1];
@@ -103,7 +103,7 @@ typedef int PieceCountType[2][8];
 // there, so we don't have to recompute all when the same material
 // configuration occurs again.
 
-MaterialEntry *material_probe(Pos *pos)
+FAST MaterialEntry *material_probe(Pos *pos)
 {
   Key key = pos_material_key();
 //  MaterialEntry *e = &pos->materialTable[(key * 0xb44cede0e4473d6dULL) >> (64 - 13)];

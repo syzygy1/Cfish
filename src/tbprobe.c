@@ -24,7 +24,7 @@ int TB_MaxCardinality = 0;
 // Given a position with 6 or fewer pieces, produce a text string
 // of the form KQPvKRP, where "KQP" represents the white pieces if
 // mirror == 0 and the black pieces if mirror == 1.
-static void prt_str(Pos *pos, char *str, int mirror)
+FAST static void prt_str(Pos *pos, char *str, int mirror)
 {
   int color = !mirror ? WHITE : BLACK;
 
@@ -41,7 +41,7 @@ static void prt_str(Pos *pos, char *str, int mirror)
 
 // Given a position, produce a 64-bit material signature key.
 // If the engine supports such a key, it should equal the engine's key.
-static Key calc_key(Pos *pos, int mirror)
+FAST static Key calc_key(Pos *pos, int mirror)
 {
   Key key = 0;
 
@@ -59,7 +59,7 @@ static Key calc_key(Pos *pos, int mirror)
 // defined by pcs[16], where pcs[1], ..., pcs[6] is the number of white
 // pawns, ..., kings and pcs[9], ..., pcs[14] is the number of black
 // pawns, ..., kings.
-Key calc_key_from_pcs(int *pcs, int mirror)
+FAST Key calc_key_from_pcs(int *pcs, int mirror)
 {
   Key key = 0;
 
@@ -71,7 +71,7 @@ Key calc_key_from_pcs(int *pcs, int mirror)
 }
 
 // probe_wdl_table and probe_dtz_table require similar adaptations.
-static int probe_wdl_table(Pos *pos, int *success)
+FAST static int probe_wdl_table(Pos *pos, int *success)
 {
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
@@ -170,7 +170,7 @@ static int probe_wdl_table(Pos *pos, int *success)
 
 // The value of wdl MUST correspond to the WDL value of the position without
 // en passant rights.
-static int probe_dtz_table(Pos *pos, int wdl, int *success)
+FAST static int probe_dtz_table(Pos *pos, int wdl, int *success)
 {
   struct TBEntry *ptr;
   uint64 idx;
@@ -286,7 +286,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
 }
 
 // Add underpromotion captures to list of captures.
-static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
+FAST static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
 {
   ExtMove *extra = end;
 
@@ -302,7 +302,7 @@ static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
   return extra;
 }
 
-static int probe_ab(Pos *pos, int alpha, int beta, int *success)
+FAST static int probe_ab(Pos *pos, int alpha, int beta, int *success)
 {
   int v;
   ExtMove *m = (pos->st-1)->endMoves;
@@ -353,7 +353,7 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
 //  0 : draw
 //  1 : win, but draw under 50-move rule
 //  2 : win
-int TB_probe_wdl(Pos *pos, int *success)
+FAST int TB_probe_wdl(Pos *pos, int *success)
 {
   *success = 1;
 
@@ -481,7 +481,7 @@ static int wdl_to_dtz[] = {
 // In short, if a move is available resulting in dtz + 50-move-counter <= 99,
 // then do not accept moves leading to dtz + 50-move-counter == 100.
 //
-int TB_probe_dtz(Pos *pos, int *success)
+FAST int TB_probe_dtz(Pos *pos, int *success)
 {
   int wdl = TB_probe_wdl(pos, success);
   if (*success == 0) return 0;
@@ -573,7 +573,7 @@ int TB_probe_dtz(Pos *pos, int *success)
 
 // Check whether there has been at least one repetition of positions
 // since the last capture or pawn move.
-static int has_repeated(Pos *pos)
+FAST static int has_repeated(Pos *pos)
 {
   Stack *st = pos->st;
   while (1) {
@@ -605,7 +605,7 @@ static Value wdl_to_Value[5] = {
 //
 // A return value of 0 indicates that not all probes were successful and
 // that no moves were filtered out.
-int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
+FAST int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 {
   int success;
 
@@ -716,7 +716,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 //
 // A return value false indicates that not all probes were successful and that
 // no moves were filtered out.
-int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
+FAST int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 {
   int success;
 

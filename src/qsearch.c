@@ -19,7 +19,7 @@
 
 #define PvNode (NT == PV)
 
-Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
+FAST Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
                                Depth depth)
 {
   assert(InCheck == !!pos_checkers());

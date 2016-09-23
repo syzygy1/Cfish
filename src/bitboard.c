@@ -29,7 +29,7 @@ int SquareDistance[64][64];
 static Square RookDeltas[] = { DELTA_N,  DELTA_E,  DELTA_S,  DELTA_W  };
 static Square BishopDeltas[] = { DELTA_NE, DELTA_SE, DELTA_SW, DELTA_NW };
 
-static Bitboard sliding_attack(Square deltas[], Square sq, Bitboard occupied)
+FAST static Bitboard sliding_attack(Square deltas[], Square sq, Bitboard occupied)
 {
   Bitboard attack = 0;
 
@@ -117,13 +117,13 @@ INLINE unsigned popcount16(unsigned u)
 
 /// Software fall-back of lsb() and msb() for CPU lacking hardware support
 
-Square lsb(Bitboard b)
+FAST Square lsb(Bitboard b)
 {
   assert(b);
   return BSFTable[bsf_index(b)];
 }
 
-Square msb(Bitboard b)
+FAST Square msb(Bitboard b)
 {
   assert(b);
   unsigned b32;

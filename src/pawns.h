@@ -88,7 +88,7 @@ INLINE Score king_safety_black(PawnEntry *pe, Pos *pos, Square ksq)
 }
 
 void pawn_init();
-PawnEntry *pawn_probe(Pos *pos);
+FAST PawnEntry *pawn_probe(Pos *pos);
 
 #endif
 

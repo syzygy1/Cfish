@@ -39,7 +39,7 @@ int num_cmh_tables = 0;
 
 // thread_init() is where a search thread starts and initialises itself.
 
-void thread_init(void *arg)
+FAST void thread_init(void *arg)
 {
   int idx = (intptr_t)arg;
 
@@ -122,7 +122,7 @@ void thread_init(void *arg)
 
 // thread_create() launches a new thread.
 
-void thread_create(int idx)
+FAST void thread_create(int idx)
 {
 #ifndef __WIN32__
 
@@ -149,7 +149,7 @@ void thread_create(int idx)
 
 // thread_destroy() waits for thread termination before returning.
 
-void thread_destroy(Pos *pos)
+FAST void thread_destroy(Pos *pos)
 {
 #ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
@@ -194,7 +194,7 @@ void thread_destroy(Pos *pos)
 // thread_wait_for_search_finished() waits on sleep condition until
 // not searching.
 
-void thread_wait_for_search_finished(Pos *pos)
+FAST void thread_wait_for_search_finished(Pos *pos)
 {
 #ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
@@ -212,7 +212,7 @@ void thread_wait_for_search_finished(Pos *pos)
 
 // thread_wait() waits on sleep condition until condition is true.
 
-void thread_wait(Pos *pos, atomic_bool *condition)
+FAST void thread_wait(Pos *pos, atomic_bool *condition)
 {
 #ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
@@ -228,7 +228,7 @@ void thread_wait(Pos *pos, atomic_bool *condition)
 
 // thread_start_searching() wakes up the thread that will start the search.
 
-void thread_start_searching(Pos *pos, int resume)
+FAST void thread_start_searching(Pos *pos, int resume)
 {
 #ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
@@ -247,7 +247,7 @@ void thread_start_searching(Pos *pos, int resume)
 
 // thread_idle_loop() is where the thread is parked when it has no work to do.
 
-void thread_idle_loop(Pos *pos)
+FAST void thread_idle_loop(Pos *pos)
 {
 #ifndef __WIN32__
 
@@ -298,7 +298,7 @@ void thread_idle_loop(Pos *pos)
 // static object and we need a fully initialized engine at this point due to
 // allocation of Endgames in the Thread constructor.
 
-void threads_init(void)
+FAST void threads_init(void)
 {
 #ifndef __WIN32__
   pthread_mutex_init(&Threads.mutex, NULL);
@@ -321,7 +321,7 @@ void threads_init(void)
 // done in destructor because threads must be terminated before deleting
 // any static objects while still in main().
 
-void threads_exit(void)
+FAST void threads_exit(void)
 {
   threads_set_number(0);
 
@@ -342,7 +342,7 @@ void threads_exit(void)
 // threads_set_number() creates/destroys threads to match the requested
 // number.
 
-void threads_set_number(size_t num)
+FAST void threads_set_number(size_t num)
 {
   while (Threads.num_threads < num)
     thread_create(Threads.num_threads++);
@@ -370,7 +370,7 @@ void threads_set_number(size_t num)
 
 // threads_nodes_searched() returns the number of nodes searched.
 
-uint64_t threads_nodes_searched(void)
+FAST uint64_t threads_nodes_searched(void)
 {
   uint64_t nodes = 0;
   for (size_t idx = 0; idx < Threads.num_threads; idx++)
@@ -381,7 +381,7 @@ uint64_t threads_nodes_searched(void)
 
 // threads_tb_hits() returns the number of TB hits.
 
-uint64_t threads_tb_hits(void)
+FAST uint64_t threads_tb_hits(void)
 {
   uint64_t hits = 0;
   for (size_t idx = 0; idx < Threads.num_threads; idx++)
@@ -393,7 +393,7 @@ uint64_t threads_tb_hits(void)
 // threads_start_thinking() wakes up the main thread sleeping in
 // idle_loop() and starts a new search, then returns immediately.
 
-void threads_start_thinking(Pos *root, LimitsType *limits)
+FAST void threads_start_thinking(Pos *root, LimitsType *limits)
 {
   if (Signals.searching)
     thread_wait_for_search_finished(threads_main());

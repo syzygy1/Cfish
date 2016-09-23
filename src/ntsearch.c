@@ -9,9 +9,9 @@
 #endif
 
 #if PvNode
-Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth)
+FAST Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth)
 #else
-Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
+FAST Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 #endif
 {
   int rootNode = PvNode && (ss-1)->ply == 0;

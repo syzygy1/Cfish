@@ -177,29 +177,29 @@ void pos_set(Pos *pos, char *fen, int isChess960);
 void pos_fen(Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
-PURE Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
-PURE Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
+FAST PURE Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
+FAST PURE Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
                               Bitboard *pinners);
 //Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 
-PURE int is_legal(Pos *pos, Move m);
-PURE int is_pseudo_legal(Pos *pos, Move m);
-PURE int gives_check_special(Pos *pos, Stack *st, Move m);
+FAST PURE int is_legal(Pos *pos, Move m);
+FAST PURE int is_pseudo_legal(Pos *pos, Move m);
+FAST PURE int gives_check_special(Pos *pos, Stack *st, Move m);
 
 // Doing and undoing moves
-void do_move(Pos *pos, Move m, int givesCheck);
-void undo_move(Pos *pos, Move m);
-void do_null_move(Pos *pos);
-void undo_null_move(Pos *pos);
+FAST void do_move(Pos *pos, Move m, int givesCheck);
+FAST void undo_move(Pos *pos, Move m);
+FAST void do_null_move(Pos *pos);
+FAST void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
-PURE Value see(Pos *pos, Move m);
-PURE Value see_sign(Pos *pos, Move m);
-PURE Value see_test(Pos *pos, Move m, int value);
+FAST PURE Value see(Pos *pos, Move m);
+FAST PURE Value see_sign(Pos *pos, Move m);
+FAST PURE Value see_test(Pos *pos, Move m, int value);
 
-PURE Key key_after(Pos *pos, Move m);
-PURE int game_phase(Pos *pos);
-PURE int is_draw(Pos *pos);
+FAST PURE Key key_after(Pos *pos, Move m);
+FAST PURE int game_phase(Pos *pos);
+FAST PURE int is_draw(Pos *pos);
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])

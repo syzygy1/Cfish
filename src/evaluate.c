@@ -782,7 +782,7 @@ INLINE int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
 // of the position from the point of view of the side to move.
 
 //template<bool DoTrace>
-Value evaluate(Pos *pos)
+FAST Value evaluate(Pos *pos)
 {
   assert(!pos_checkers());
 

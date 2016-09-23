@@ -37,7 +37,7 @@ TranspositionTable TT; // Our global transposition table
 
 // tt_free() frees the allocated transposition table memory.
 
-void tt_free(void)
+FAST void tt_free(void)
 {
 #ifdef __WIN32__
   if (TT.mem)
@@ -53,7 +53,7 @@ void tt_free(void)
 // tt_allocate() allocates the transposition table, measured in 
 // megabytes.
 
-void tt_allocate(size_t mbSize)
+FAST void tt_allocate(size_t mbSize)
 {
   size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
 
@@ -149,7 +149,7 @@ failed:
 // is called whenever the table is resized, or when the user asks the
 // program to clear the table (from the UCI interface).
 
-void tt_clear(void)
+FAST void tt_clear(void)
 {
   memset(TT.table, 0, TT.clusterCount * sizeof(Cluster));
 }
@@ -163,7 +163,7 @@ void tt_clear(void)
 // considered more valuable than TTEntry t2 if its replace value is greater
 // than that of t2.
 
-TTEntry *tt_probe(Key key, int *found)
+FAST TTEntry *tt_probe(Key key, int *found)
 {
   TTEntry *tte = tt_first_entry(key);
   uint16_t key16 = key >> 48; // Use the high 16 bits as key inside the cluster
@@ -195,7 +195,7 @@ TTEntry *tt_probe(Key key, int *found)
 // Returns an approximation of the hashtable occupation during a search. The
 // hash is x permill full, as per UCI protocol.
 
-int tt_hashfull(void)
+FAST int tt_hashfull(void)
 {
   int cnt = 0;
   for (int i = 0; i < 1000 / ClusterSize; i++) {

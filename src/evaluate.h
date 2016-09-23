@@ -10,7 +10,7 @@ typedef struct Pos Pos;
 void trace(Pos *pos);
 
 //template<bool DoTrace = false>
-Value evaluate(Pos *pos);
+FAST Value evaluate(Pos *pos);
 
 #endif
 
