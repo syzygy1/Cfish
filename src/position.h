@@ -201,9 +201,6 @@ PURE Key key_after(Pos *pos, Move m);
 PURE int game_phase(Pos *pos);
 PURE int is_draw(Pos *pos);
 
-// Position consistency check, for debugging
-int pos_is_ok(Pos *pos, int* failedStep);
-
 // Position representation
 #define pieces() (pos->byTypeBB[0])
 #define pieces_p(p) (pos->byTypeBB[p])

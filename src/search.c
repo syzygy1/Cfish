@@ -311,15 +311,13 @@ void mainthread_search(void)
   // move before the GUI sends a "stop" or "ponderhit" command. We
   // therefore simply wait here until the GUI sends one of those commands
   // (which also raises Signals.stop).
-  int wait = 0;
   LOCK(Signals.lock);
   if (!Signals.stop && (Limits.ponder || Limits.infinite)) {
-    Signals.stopOnPonderhit = 1;
-    wait = 1;
-  }
-  UNLOCK(Signals.lock);
-  if (wait)
+    Signals.sleeping = 1;
+    UNLOCK(Signals.lock);
     thread_wait(pos, &Signals.stop);
+  } else
+    UNLOCK(Signals.lock);
 
   // Stop the threads if not already stopped
   Signals.stop = 1;

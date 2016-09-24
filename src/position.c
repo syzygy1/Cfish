@@ -17,7 +17,8 @@ static void set_castling_right(Pos *pos, int c, Square rfrom);
 static void set_state(Pos *pos, Stack *st);
 
 #ifndef NDEBUG
-int check_pos(Pos *pos);
+static int pos_is_ok(Pos *pos, int *failedStep);
+static int check_pos(Pos *pos);
 #else
 #define check_pos(p) do {} while (0)
 #endif
@@ -439,22 +440,27 @@ int game_phase(Pos *pos)
 // removing that piece from the board would result in a position where
 // square 's' is attacked. Both pinned pieces and discovered check
 // candidates are slider blockers and are calculated by calling this
-// function. The pinners bitboard gets filled with real and potential
-// pinners.
+// function.
 
-Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s, Bitboard *pinners)
+Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
+                         Bitboard *pinners)
 {
-  Bitboard b, p, result = 0;
+  Bitboard result = 0, snipers;
+  *pinners = 0;
 
-  // Pinners are sliders that attack 's' when a pinned piece is removed
-  *pinners = p = (  (PseudoAttacks[ROOK  ][s] & pieces_pp(QUEEN, ROOK))
+  // Snipers are sliders that attack square 's'when a piece removed.
+  snipers = (  (PseudoAttacks[ROOK  ][s] & pieces_pp(QUEEN, ROOK))
              | (PseudoAttacks[BISHOP][s] & pieces_pp(QUEEN, BISHOP))) & sliders;
 
-  while (p) {
-    b = between_bb(s, pop_lsb(&p)) & pieces();
+  while (snipers) {
+    Square sniperSq = pop_lsb(&snipers);
+    Bitboard b = between_bb(s, sniperSq) & pieces();
 
-    if (!more_than_one(b))
+    if (!more_than_one(b)) {
       result |= b;
+      if (b & pieces_c(color_of(piece_on(s))))
+        *pinners |= sq_bb(sniperSq);
+    }
   }
   return result;
 }
@@ -1234,7 +1240,7 @@ Value see(Pos *pos, Move m)
   Bitboard occ, attackers, stmAttackers;
   Value swapList[32];
   int slIndex = 1;
-  int captured;
+  int nextVictim;
   int stm;
 
   assert(move_is_ok(m));
@@ -1280,34 +1286,35 @@ Value see(Pos *pos, Move m)
   // alternately capture, and always capture with the least valuable
   // piece. After each capture, we look for new X-ray attacks from
   // behind the capturing piece.
-  captured = type_of_p(piece_on(from));
+  nextVictim = type_of_p(piece_on(from));
 
   do {
     assert(slIndex < 32);
 
     // Add the new entry to the swap list
-    swapList[slIndex] = -swapList[slIndex - 1] + PieceValue[MG][captured];
+    swapList[slIndex] = -swapList[slIndex - 1] + PieceValue[MG][nextVictim];
 
     // Locate and remove the next least valuable attacker
     Bitboard bb;
-    for (captured = PAWN; captured <= KING; captured++)
-      if ((bb = stmAttackers & pieces_p(captured)))
+    for (nextVictim = PAWN; nextVictim <= KING; nextVictim++)
+      if ((bb = stmAttackers & pieces_p(nextVictim)))
         break;
     occ ^= (bb & -bb);
-    if (captured & 1) // PAWN, BISHOP, QUEEN
+    if (nextVictim & 1) // PAWN, BISHOP, QUEEN
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
-    if ((captured & 4) && captured != KING) // ROOK, QUEEN
+    if ((nextVictim & 4) && nextVictim != KING) // ROOK, QUEEN
       attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
     attackers &= occ;
     stm ^= 1;
     stmAttackers = attackers & pieces_c(stm);
-    if (   (stmAttackers & pinned_pieces(pos, stm))
+    if (    nextVictim != KING
+        && (stmAttackers & pinned_pieces(pos, stm))
         && (pos->st->pinnersForKing[stm] & occ) == pos->st->pinnersForKing[stm])
       stmAttackers &= ~pinned_pieces(pos, stm);
 
     slIndex++;
 
-  } while (stmAttackers && (captured != KING || (--slIndex, 0))); // Stop before a king capture
+  } while (stmAttackers && (nextVictim != KING || (--slIndex, 0))); // Stop before a king capture
 
   // Having built the swap list, we negamax through it to find the best
   // achievable score from the point of view of the side to move.
@@ -1317,6 +1324,159 @@ Value see(Pos *pos, Move m)
   return swapList[0];
 }
 
+#if 1
+#if 0
+// Test whether see(m) >= value.
+int see_test(Pos *pos, Move m, int value)
+{
+  if (type_of_m(m) == CASTLING)
+    return 0 >= value;
+
+  Square from = from_sq(m), to = to_sq(m);
+  Bitboard occ = pieces();
+
+  int swap = PieceValue[MG][piece_on(to)] - value;
+  if (type_of_m(m) == ENPASSANT) {
+    assert(pos_stm() == color_of(piece_on(from)));
+    occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn
+    swap += PawnValueMg;
+  }
+  if (swap < 0)
+    return 0;
+
+  swap = PieceValue[MG][piece_on(from)] - swap;
+  if (swap <= 0)
+    return 1;
+
+  occ ^= sq_bb(from) ^ sq_bb(to);
+  int stm = color_of(piece_on(from));
+  Bitboard attackers = attackers_to_occ(to, occ);
+  int res = 1;
+
+  while (1) {
+    stm ^= 1;
+    swap = -swap;
+    attackers &= occ;
+    Bitboard stmAttackers = attackers & pieces_c(stm);
+    if (!stmAttackers) break;
+    if (!(pos->st->pinnersForKing[stm] & ~occ))
+      stmAttackers &= ~blockers_for_king(pos, stm);
+    if (!stmAttackers) break;
+    res ^= 1;
+    Bitboard bb;
+    if ((bb = stmAttackers & pieces_p(PAWN))) goto pawn;
+    if ((bb = stmAttackers & pieces_p(KNIGHT))) goto knight;
+    if ((bb = stmAttackers & pieces_p(BISHOP))) goto bishop;
+    if ((bb = stmAttackers & pieces_p(ROOK))) goto rook;
+    if ((bb = stmAttackers & pieces_p(QUEEN))) goto queen;
+    stmAttackers = attackers & ~pieces_c(stm);
+    return stmAttackers ? res ^ 1 : res;
+
+  bishop:
+    swap += BishopValueMg - PawnValueMg;
+  pawn:
+    if ((swap += PawnValueMg) < res) break;
+    occ ^= bb & -bb;
+    attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
+    continue;
+
+  knight:
+    if ((swap += KnightValueMg) < res) break;
+    occ ^= bb & -bb;
+    continue;
+
+  rook:
+    if ((swap += RookValueMg) < res) break;
+    occ ^= bb & -bb;
+    attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
+    continue;
+
+  queen:
+    if ((swap += QueenValueMg) < res) break;
+    occ ^= bb & -bb;
+    attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
+    attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
+  }
+
+  return res;
+}
+#else
+int see_test(Pos *pos, Move m, int value)
+{
+  if (type_of_m(m) == CASTLING)
+    return 0 >= value;
+
+  Square from = from_sq(m), to = to_sq(m);
+  Bitboard occ = pieces();
+
+  int swap = PieceValue[MG][piece_on(to)] - value;
+  if (type_of_m(m) == ENPASSANT) {
+    assert(pos_stm() == color_of(piece_on(from)));
+    occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn
+    swap += PawnValueMg;
+  }
+  if (swap < 0)
+    return 0;
+
+  swap = PieceValue[MG][piece_on(from)] - swap;
+  if (swap <= 0)
+    return 1;
+
+  occ ^= sq_bb(from) ^ sq_bb(to);
+  int stm = color_of(piece_on(from));
+  Bitboard attackers = attackers_to_occ(to, occ), stmAttackers;
+  int res = 1;
+
+  while (1) {
+    stm ^= 1;
+    attackers &= occ;
+#if 1
+    if (!(stmAttackers = attackers & pieces_c(stm))) break;
+    if (stmAttackers & blockers_for_king(pos, stm)
+        && !(pos->st->pinnersForKing[stm] & ~occ))
+      stmAttackers &= ~blockers_for_king(pos, stm);
+    if (!stmAttackers) break;
+#else
+    if (   !(stmAttackers = attackers & pieces_c(stm))
+        ||  (   !(pos->st->pinnersForKing[stm] & ~occ)
+             && !(stmAttackers &= ~blockers_for_king(pos, stm))))
+      break;
+#endif
+    res ^= 1;
+    Bitboard bb;
+    if ((bb = stmAttackers & pieces_p(PAWN))) {
+      if ((swap = PawnValueMg - swap) < res) break;
+      occ ^= bb & -bb;
+      attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
+    }
+    else if ((bb = stmAttackers & pieces_p(KNIGHT))) {
+      if ((swap = KnightValueMg - swap) < res) break;
+      occ ^= bb & -bb;
+    }
+    else if ((bb = stmAttackers & pieces_p(BISHOP))) {
+      if ((swap = BishopValueMg - swap) < res) break;
+      occ ^= bb & -bb;
+      attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
+    }
+    else if ((bb = stmAttackers & pieces_p(ROOK))) {
+      if ((swap = RookValueMg - swap) < res) break;
+      occ ^= bb & -bb;
+      attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
+    }
+    else if ((bb = stmAttackers & pieces_p(QUEEN))) {
+      if ((swap = QueenValueMg - swap) < res) break;
+      occ ^= bb & -bb;
+      attackers |=  (attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN))
+                  | (attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN));
+    }
+    else // KING
+      return (attackers & ~pieces_c(stm)) ? res ^ 1 : res;
+  }
+
+  return res;
+}
+#endif
+#else
 // Test whether see(m) >= value.
 int see_test(Pos *pos, Move m, int value)
 {
@@ -1340,39 +1500,96 @@ int see_test(Pos *pos, Move m, int value)
     return 1;
 
   occ ^= sq_bb(from) ^ sq_bb(to);
-  Bitboard attackers = attackers_to_occ(to, occ) & occ;
-  int stm = color_of(piece_on(from)) ^ 1;
+  Bitboard attackers = attackers_to_occ(to, occ);
+  int stm = color_of(piece_on(from));
   int res = 1;
   Bitboard stmAttackers;
 
   while (1) {
-    stmAttackers = attackers & pieces_c(stm);
-    if (   (stmAttackers & pinned_pieces(pos, stm))
-        && (pos->st->pinnersForKing[stm] & occ) == pos->st->pinnersForKing[stm])
-      stmAttackers &= ~pinned_pieces(pos, stm);
+    attackers &= occ;
+    stm ^= 1;
+    if (!(stmAttackers = attackers & pieces_c(stm)))
+      break;
+    if (!(pos->st->pinnersForKing[stm] & ~occ))
+      stmAttackers &= ~blockers_for_king(pos, stm);
     if (!stmAttackers) break;
     Bitboard bb;
-    int captured;
-    for (captured = PAWN; captured < KING; captured++)
-      if ((bb = stmAttackers & pieces_p(captured)))
+    int nextVictim;
+    for (nextVictim = PAWN; nextVictim < KING; nextVictim++)
+      if ((bb = stmAttackers & pieces_p(nextVictim)))
         break;
-    if (captured == KING) {
-      stm ^= 1;
-      stmAttackers = attackers & pieces_c(stm);
-      // Introduce error also present in official Stockfish.
-      if (   (stmAttackers & pinned_pieces(pos, stm))
-          && (pos->st->pinnersForKing[stm] & occ) == pos->st->pinnersForKing[stm])
-        stmAttackers &= ~pinned_pieces(pos, stm);
+    if (nextVictim == KING) {
+      stmAttackers = attackers & ~pieces_c(stm);
       return stmAttackers ? res : res ^ 1;
     }
-    swap = PieceValue[MG][captured] - swap;
+    swap = PieceValue[MG][nextVictim] - swap;
     res ^= 1;
     // Next line tests alternately for swap < 0 and swap <= 0.
     if (swap < res) return res;
     occ ^= (bb & -bb);
-    if (captured & 1) // PAWN, BISHOP, QUEEN
+    if (nextVictim & 1) // PAWN, BISHOP, QUEEN
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
-    if (captured & 4) // ROOK, QUEEN
+    if (nextVictim & 4) // ROOK, QUEEN
+      attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
+  }
+
+  return res;
+}
+#endif
+
+#if 0
+int see_ab(Pos *pos, Move m, int alpha, int beta)
+{
+  if (type_of_m(m) == CASTLING)
+    return 0;
+
+  Square from = from_sq(m), to = to_sq(m);
+  Bitboard occ = pieces();
+
+  int swap = PieceValue[MG][piece_on(to)]; // - value;
+  if (type_of_m(m) == ENPASSANT) {
+    assert(pos_stm() == color_of(piece_on(from)));
+    occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn
+    swap += PieceValue[MG][PAWN];
+  }
+// at this point see() <= swap, so test whether swap <= alpha
+  if (swap <= alpha)
+    return alpha; // or swap
+
+  swap = PieceValue[MG][piece_on(from)] - swap;
+// at this point see() >= -swap. so test whether -swap >= beta
+  if (swap <= -beta)
+    return beta; // or -swap
+
+  occ ^= sq_bb(from) ^ sq_bb(to);
+  Bitboard attackers = attackers_to_occ(to, occ) & occ;
+  int stm = color_of(piece_on(from)) ^ 1;
+  int res = alpha;
+  Bitboard stmAttackers;
+
+  while (1) {
+    stmAttackers = attackers & pieces_c(stm);
+    if (   (stmAttackers & blockers_for_king(pos, stm))
+        && !(pos->st->pinnersForKing[stm] & ~occ))
+      stmAttackers &= ~blockers_for_king(pos, stm);
+    if (!stmAttackers) break;
+    Bitboard bb;
+    int nextVictim;
+    for (nextVictim = PAWN; nextVictim < KING; nextVictim++)
+      if ((bb = stmAttackers & pieces_p(nextVictim)))
+        break;
+    if (nextVictim == KING) {
+      stm ^= 1;
+      stmAttackers = attackers & pieces_c(stm);
+      return stmAttackers ? res : res ^ 1;
+    }
+    swap = PieceValue[MG][nextVictim] - swap;
+    res = (alpha - beta) - res;
+    if (swap <= res) return res;
+    occ ^= (bb & -bb);
+    if (nextVictim & 1) // PAWN, BISHOP, QUEEN
+      attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
+    if (nextVictim & 4) // ROOK, QUEEN
       attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
     attackers &= occ;
     stm ^= 1;
@@ -1380,17 +1597,19 @@ int see_test(Pos *pos, Move m, int value)
 
   return res;
 }
+#endif
 
 #if 0
 int see_test(Pos *pos, Move m, int value)
 {
+//  int s1 = see_test_old(pos, m, value);
   int s1 = see(pos, m) >= value;
-  int s2 = see_test1(pos, m, value);
+  int s2 = see_test2(pos, m, value);
   if (s1 != s2) {
     printf("s1 = %d, s2 = %d\n", s1, s2);
     print_pos(pos);
     printf("from = %d, to = %d, value = %d\n", from_sq(m), to_sq(m), value);
-    s1 = see_test1(pos, m, value);
+    s1 = see_test2(pos, m, value);
   }
   return s1;
 //  return see(pos, m) >= value;
@@ -1436,7 +1655,8 @@ void pos_copy(Pos *dest, Pos *src)
 // This is meant to be helpful when debugging.
 
 #ifdef PEDANTIC
-int pos_is_ok(Pos *pos, int *failedStep)
+#ifndef NDEBUG
+static int pos_is_ok(Pos *pos, int *failedStep)
 {
   int Fast = 1; // Quick (default) or full check?
 
@@ -1507,8 +1727,9 @@ int pos_is_ok(Pos *pos, int *failedStep)
 
   return 1;
 }
+#endif
 #else
-int pos_is_ok(Pos *pos, int *failedStep)
+static int pos_is_ok(Pos *pos, int *failedStep)
 {
 (void)pos;
 (void)failedStep;
@@ -1516,7 +1737,7 @@ int pos_is_ok(Pos *pos, int *failedStep)
 }
 
 #ifndef NDEBUG
-int check_pos(Pos *pos)
+static int check_pos(Pos *pos)
 {
   Bitboard color_bb[2];
   Bitboard piece_bb[8];

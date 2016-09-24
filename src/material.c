@@ -118,42 +118,38 @@ MaterialEntry *material_probe(Pos *pos)
   e->gamePhase = game_phase(pos);
 
   // Look for a specialized evaluation function.
-  for (int i = 0; i < NUM_EVAL; i++) {
-    struct EndgameFunc *ef = &endgame_funcs[i];
+  for (int i = 0; i < NUM_EVAL; i++)
     for (int c = 0; c < 2; c++)
-      if (ef->key[c] == key) {
-	e->eval_func = ef->eg_func;
+      if (endgame_keys[i][c] == key) {
+	e->eval_func = 1 + i;
 	e->eval_func_side = c;
 	return e;
       }
-  }
 
   for (int c = 0; c < 2; c++)
     if (is_KXK(pos, c)) {
-      e->eval_func = &EvaluateKXK;
+      e->eval_func = 9; // EvaluateKXK
       e->eval_func_side = c;
       return e;
     }
 
   // Look for a specialized scaling function.
-  for (int i = 0; i < NUM_SCALING; i++) {
-    struct EndgameFunc *ef = &endgame_funcs[NUM_EVAL + i];
+  for (int i = 0; i < NUM_SCALING; i++)
     for (int c = 0; c < 2; c++)
-      if (ef->key[c] == key) {
-        e->scal_func[c] = ef->eg_func;
+      if (endgame_keys[NUM_EVAL + i][c] == key) {
+        e->scal_func[c] = 10 + i;
         return e;
       }
-  }
 
   // We did not find any specialized scaling function, so fall back on
   // generic ones that refer to more than one material distribution. Note
   // that in this case we do not return after setting the function.
   for (int c = 0; c < 2; c++) {
     if (is_KBPsKs(pos, c))
-      e->scal_func[c] = &ScaleKBPsK;
+      e->scal_func[c] = 18; // ScaleKBPsK
 
     else if (is_KQKRPs(pos, c))
-      e->scal_func[c] = &ScaleKQKRPs;
+      e->scal_func[c] = 19; // ScaleKQKRPs
   }
 
   Value npm_w = pos_non_pawn_material(WHITE);
@@ -163,18 +159,18 @@ MaterialEntry *material_probe(Pos *pos)
     if (!pieces_cp(BLACK, PAWN)) {
       assert(piece_count(WHITE, PAWN) >= 2);
 
-      e->scal_func[WHITE] = &ScaleKPsK;
+      e->scal_func[WHITE] = 20; // ScaleKPsK
     }
     else if (!pieces_cp(WHITE, PAWN)) {
       assert(piece_count(BLACK, PAWN) >= 2);
 
-      e->scal_func[BLACK] = &ScaleKPsK;
+      e->scal_func[BLACK] = 20; // ScaleKPsK
     }
     else if (popcount(pieces_p(PAWN)) == 2) { // Each side has one pawn.
       // This is a special case because we set scaling functions
       // for both colors instead of only one.
-      e->scal_func[WHITE] = &ScaleKPKP;
-      e->scal_func[BLACK] = &ScaleKPKP;
+      e->scal_func[WHITE] = 21; // ScaleKPKP
+      e->scal_func[BLACK] = 21; // ScaleKPKP
     }
   }
 
