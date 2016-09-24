@@ -216,7 +216,7 @@ static void score_evasions(Pos *pos)
 
 #if 1
 
-#if 0
+#if 1
 Move next_move(Pos *pos)
 {
   Stack *st = pos->st;
@@ -527,7 +527,7 @@ Move next_move(Pos *pos)
 #endif
 #else
 
-#if 0
+#if 1
 Move next_move(Pos *pos)
 {
   Stack *st = pos->st;
@@ -736,7 +736,7 @@ Move next_move(Pos *pos)
 }
 #endif
 
-#if 0
+#if 1
 Move next_move_q(Pos *pos)
 {
   Stack *st = pos->st;
