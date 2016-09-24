@@ -215,8 +215,7 @@ void search_clear()
 
   for (int i = 0; i < num_cmh_tables; i++)
     if (cmh_tables[i])
-      stats_clear(*cmh_tables[i]);
-  printf("sizeof = %ld\n", sizeof(*cmh_tables[0]));
+      stats_clear(cmh_tables[i]);
 
   for (size_t idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
@@ -312,15 +311,13 @@ void mainthread_search(void)
   // move before the GUI sends a "stop" or "ponderhit" command. We
   // therefore simply wait here until the GUI sends one of those commands
   // (which also raises Signals.stop).
-  int wait = 0;
   LOCK(Signals.lock);
   if (!Signals.stop && (Limits.ponder || Limits.infinite)) {
-    Signals.stopOnPonderhit = 1;
-    wait = 1;
-  }
-  UNLOCK(Signals.lock);
-  if (wait)
+    Signals.sleeping = 1;
+    UNLOCK(Signals.lock);
     thread_wait(pos, &Signals.stop);
+  } else
+    UNLOCK(Signals.lock);
 
   // Stop the threads if not already stopped
   Signals.stop = 1;
@@ -805,8 +802,8 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_PLY;
     v = tb ? TB_Score : v;
 
-    printf("info depth %d seldepth %d multipv %"PRIu64" score %s",
-           d / ONE_PLY, pos->maxPly, i + 1, uci_value(buf, v));
+    printf("info depth %d seldepth %d multipv %d score %s",
+           d / ONE_PLY, pos->maxPly, (int)i + 1, uci_value(buf, v));
 
     if (!tb && i == PVIdx)
       printf("%s", v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");

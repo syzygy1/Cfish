@@ -181,12 +181,10 @@ void uci_loop(int argc, char **argv)
   LOCK_INIT(Signals.lock);
 
   // Signals.searching is only read and set by the UI thread.
+  // The UI thread uses it to know whether it must still call
+  // thread_wait_for_search_finished() on the main search thread.
+  // (This is important for our native Windows threading implementation.)
   Signals.searching = 0;
-
-//  pos.stack = malloc(1000 * sizeof(Stack));
-//  pos.stack++;
-//  pos.moveList = malloc(1000 * sizeof(ExtMove));
-//  pos.stack[-1].endMoves = pos.moveList;
 
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
@@ -233,20 +231,28 @@ void uci_loop(int argc, char **argv)
     // already ran out of time), otherwise we should continue searching but
     // switching from pondering to normal search.
     if (   strcmp(token, "quit") == 0
-        || strcmp(token, "stop") == 0
-        || strcmp(token, "ponderhit") == 0) {
+        || strcmp(token, "stop") == 0) {
       if (Signals.searching) {
         Signals.stop = 1;
         LOCK(Signals.lock);
-        if (Signals.stopOnPonderhit)
+        if (Signals.sleeping)
           thread_start_searching(threads_main(), 1); // Wake up main thread.
-        else if (strcmp(token, "ponderhit") == 0)
-          Limits.ponder = 0; // Switch to normal search.
+        Signals.sleeping = 0;
         UNLOCK(Signals.lock);
       }
     }
-    else if (strcmp(token, "ponderhit") == 0)
+    else if (strcmp(token, "ponderhit") == 0) {
       Limits.ponder = 0; // Switch to normal search
+      if (Signals.stopOnPonderhit)
+        Signals.stop = 1;
+      LOCK(Signals.lock);
+      if (Signals.sleeping) {
+        Signals.stop = 1;
+        thread_start_searching(threads_main(), 1); // Wake up main thread.
+        Signals.sleeping = 0;
+      }
+      UNLOCK(Signals.lock);
+    }
     else if (strcmp(token, "uci") == 0) {
       printf("id name ");
       print_engine_info(1);

@@ -32,7 +32,7 @@ void bitboards_init();
 void print_pretty(Bitboard b);
 
 #define DarkSquares  0xAA55AA55AA55AA55ULL
-#define LightSquares 0x55AA55AA55AA55AAULL
+#define LightSquares (~DarkSquares)
 
 #define FileABB 0x0101010101010101ULL
 #define FileBBB (FileABB << 1)
@@ -90,11 +90,18 @@ INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
 //  return b;
 }
 
+#if __x86_64__
 INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
 {
   __asm__("btcq %1, %0" : "+r" (b) : "r" ((uint64_t)s) : "cc");
   return b;
 }
+#else
+INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
+{
+  return b ^ sq_bb(s);
+}
+#endif
 
 INLINE uint64_t more_than_one(Bitboard b)
 {

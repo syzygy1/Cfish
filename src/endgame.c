@@ -88,7 +88,7 @@ extern char *PieceToChar;
 
 extern Key mat_key[16];
 
-static Key calc_key(char *code, int c)
+static Key calc_key(const char *code, int c)
 {
   Key key = 0;
   int color = c << 3;
@@ -103,33 +103,47 @@ static Key calc_key(char *code, int c)
   return key;
 }
 
-struct EndgameFunc endgame_funcs[16] = {
-// Entries 0-7 are evaluation functions.
-  { &EvaluateKPK, "KPk", {0, 0} },
-  { &EvaluateKNNK, "KNNk", {0, 0} },
-  { &EvaluateKBNK, "KBNk", {0, 0} },
-  { &EvaluateKRKP, "KRkp", {0, 0} },
-  { &EvaluateKRKB, "KRkb", {0, 0} },
-  { &EvaluateKRKN, "KRkn", {0, 0} },
-  { &EvaluateKQKP, "KQkp", {0, 0} },
-  { &EvaluateKQKR, "KQkr", {0, 0} },
-// Entries 8-15 are scaling functions.
-  { &ScaleKNPK, "KNPk", {0, 0} },
-  { &ScaleKNPKB, "KNPkb", {0, 0} },
-  { &ScaleKRPKR, "KRPkr", {0, 0} },
-  { &ScaleKRPKB, "KRPkb", {0, 0} },
-  { &ScaleKBPKB, "KBPkb", {0, 0} },
-  { &ScaleKBPKN, "KBPkn", {0, 0} },
-  { &ScaleKBPPKB, "KBPPkb", {0, 0} },
-  { &ScaleKRPPKRP, "KRPPkrp", {0, 0} }
+EgFunc *endgame_funcs[22] = {
+  NULL,
+// Entries 1-9 are evaluation functions.
+ &EvaluateKPK,    // 1
+ &EvaluateKNNK,   // 2
+ &EvaluateKBNK,   // 3
+ &EvaluateKRKP,   // 4
+ &EvaluateKRKB,   // 5
+ &EvaluateKRKN,   // 6
+ &EvaluateKQKP,   // 7
+ &EvaluateKQKR,   // 8
+ &EvaluateKXK,    // 9
+// Entries 10-21 are scaling functions.
+ &ScaleKNPK,      // 10
+ &ScaleKNPKB,     // 11
+ &ScaleKRPKR,     // 12
+ &ScaleKRPKB,     // 13
+ &ScaleKBPKB,     // 14
+ &ScaleKBPKN,     // 15
+ &ScaleKBPPKB,    // 16
+ &ScaleKRPPKRP,   // 17
+ &ScaleKBPsK,     // 18
+ &ScaleKQKRPs,    // 19
+ &ScaleKPsK,      // 20
+ &ScaleKPKP       // 21
+};
+
+Key endgame_keys[16][2];
+
+static const char *endgame_codes[16] = {
+  // Codes for evaluation functions 1-8.
+  "KPk", "KNNk", "KBNk", "KRkp", "KRkb", "KRkn", "KQkp", "KQkr",
+  // Codes for scaling functions 10-17.
+  "KNPk", "KNPkb", "KRPkr", "KRPkb", "KBPkb", "KBPkn", "KBPPkb", "KRPPkrp"
 };
 
 void endgames_init(void)
 {
   for (int i = 0; i < NUM_EVAL + NUM_SCALING; i++) {
-    struct EndgameFunc *ef = &endgame_funcs[i];
-    ef->key[WHITE] = calc_key(ef->code, WHITE);
-    ef->key[BLACK] = calc_key(ef->code, BLACK);
+    endgame_keys[i][WHITE] = calc_key(endgame_codes[i], WHITE);
+    endgame_keys[i][BLACK] = calc_key(endgame_codes[i], BLACK);
   }
 }
 

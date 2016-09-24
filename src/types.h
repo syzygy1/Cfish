@@ -406,12 +406,12 @@ typedef struct Pos Pos;
 
 struct MaterialEntry {
   Key key;
-  Value (*eval_func)(Pos *, int);
-  Value (*scal_func[2])(Pos *, int);
   int gamePhase;
   int16_t value;
-  uint8_t factor[2];
+  uint8_t eval_func;
   uint8_t eval_func_side;
+  uint8_t scal_func[2];
+  uint8_t factor[2];
 };
 
 typedef struct MaterialEntry MaterialEntry;

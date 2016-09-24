@@ -25,7 +25,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   TTEntry *tte;
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
-  Depth extension, newDepth, predictedDepth;
+  Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, nullValue;
   int ttHit, inCheck, givesCheck, singularExtensionNode, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
@@ -408,33 +408,29 @@ moves_loop: // When in check search starts from here.
         if (moveCountPruning)
           continue;
 
-        predictedDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO);
+        // Reduced depth of the next LMR search
+        int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
 
         // Countermoves based pruning
-        if (   predictedDepth < 3 * ONE_PLY
+        if (   lmrDepth < 3
             && (!cmh  || (*cmh )[moved_piece][to_sq(move)] < 0)
             && (!fmh  || (*fmh )[moved_piece][to_sq(move)] < 0)
             && (!fmh2 || (*fmh2)[moved_piece][to_sq(move)] < 0 || (cmh && fmh)))
           continue;
 
         // Futility pruning: parent node
-        if (   predictedDepth < 7 * ONE_PLY
-            && ss->staticEval + 256 + 200 * predictedDepth / ONE_PLY <= alpha)
+        if (   lmrDepth < 7
+            && ss->staticEval + 256 + 200 * lmrDepth <= alpha)
           continue;
 
         // Prune moves with negative SEE at low depths and below a decreasing
         // threshold at higher depths.
-        if (predictedDepth < 8 * ONE_PLY) {
-          Value see_v = predictedDepth < 4 * ONE_PLY ? 0
-                        : -PawnValueMg * 2
-                           * (int)(predictedDepth - 3 * ONE_PLY) / ONE_PLY;
-          if (!see_test(pos, move, see_v))
-            continue;
-        }
-      } else if (   depth < 3 * ONE_PLY
-                 && (    ss->stage == ST_BAD_CAPTURES
-                     || (    ss->stage != ST_GOOD_CAPTURES_2
-                         && !see_test(pos, move, 0))))
+        if (   lmrDepth < 8
+            && !see_test(pos, move, -35 * lmrDepth * lmrDepth))
+          continue;
+      }
+      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
+               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
         continue;
     }
 

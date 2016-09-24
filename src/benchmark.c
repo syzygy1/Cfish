@@ -170,12 +170,14 @@ void benchmark(Pos *current, char *str)
   Pos *pos = malloc(sizeof(Pos));
 #if 0
   pos.stack = malloc(101 * sizeof(Stack)); // max perft 100
+  pos.stack++;
   pos.moveList = malloc(10000 * sizeof(ExtMove));
 #endif
   TimePoint elapsed = now();
 
   for (size_t i = 0; i < num_fens; i++) {
     pos_set(pos, fens[i], option_value(OPT_CHESS960));
+    (pos->st-1)->endMoves = pos->moveList;
 
     fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", i + 1, num_fens);
 
@@ -204,11 +206,6 @@ void benchmark(Pos *current, char *str)
       free(fens[i]);
     free(fens);
   }
-#if 0
-  free(pos.stack);
-  free(pos.moveList);
-#else
   free(pos);
-#endif
 }
 

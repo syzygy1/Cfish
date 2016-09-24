@@ -35,16 +35,11 @@ EgFunc ScaleKNPK, ScaleKNPKB, ScaleKRPKR, ScaleKRPKB,
        ScaleKBPKB, ScaleKBPKN, ScaleKBPPKB, ScaleKRPPKRP,
        ScaleKBPsK, ScaleKQKRPs, ScaleKPKP, ScaleKPsK;
 
-struct EndgameFunc {
-  EgFunc *eg_func;
-  char *code;
-  Key key[2];
-};
-
 #define NUM_EVAL 8
 #define NUM_SCALING 8
 
-struct EndgameFunc endgame_funcs[NUM_EVAL + NUM_SCALING];
+extern EgFunc *endgame_funcs[22];
+extern Key endgame_keys[16][2];
 
 void endgames_init(void);
 

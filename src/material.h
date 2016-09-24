@@ -32,12 +32,12 @@ INLINE Score material_imbalance(MaterialEntry *me)
 
 INLINE int material_specialized_eval_exists(MaterialEntry *me)
 {
-  return me->eval_func != NULL;
+  return me->eval_func != 0;
 }
 
 INLINE Value material_evaluate(MaterialEntry *me, Pos *pos)
 {
-  return me->eval_func(pos, me->eval_func_side);
+  return endgame_funcs[me->eval_func](pos, me->eval_func_side);
 }
 
 // scale_factor takes a position and a color as input and returns a scale factor
@@ -49,7 +49,7 @@ INLINE int material_scale_factor(MaterialEntry *me, Pos *pos, int c)
 {
   int sf = SCALE_FACTOR_NONE;
   if (me->scal_func[c])
-    sf = me->scal_func[c](pos, c);
+    sf = endgame_funcs[me->scal_func[c]](pos, c);
   return sf != SCALE_FACTOR_NONE ? sf : me->factor[c];
 }
 

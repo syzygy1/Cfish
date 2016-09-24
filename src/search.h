@@ -83,9 +83,11 @@ INLINE int use_time_management(LimitsType *l)
 // typically in an async fashion e.g. to stop the search by the GUI.
 
 struct SignalsType {
-  atomic_bool stop;
-  atomic_bool stopOnPonderhit;
-  int searching;
+  atomic_bool stop; // Search threads should stop searching.
+  atomic_bool stopOnPonderhit; // Main search thread is willing to stop.
+  int searching; // UI thread has started the main thread and has not yet
+                 // called thread_wait_for_search_finished().
+  int sleeping; // Main search thread is sleeping and must be woken up.
   LOCK_T lock;
 };
 

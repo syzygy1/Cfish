@@ -22,7 +22,6 @@
 
 #include "bitboard.h"
 #include "endgame.h"
-#include "evaluate.h"
 #include "pawns.h"
 #include "position.h"
 #include "search.h"
@@ -40,7 +39,6 @@ int main(int argc, char **argv)
   bitboards_init();
   bitbases_init();
   search_init();
-  eval_init();
   pawn_init();
   endgames_init();
   threads_init();
