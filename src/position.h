@@ -87,19 +87,19 @@ struct Stack {
   Move countermove;
   Depth depth;
   Move ttMove;
-  uint8_t recaptureSquare;
   Value threshold;
-  int stage;
+  uint8_t stage;
+  uint8_t recaptureSquare;
   ExtMove *cur, *endMoves, *endBadCaptures;
 
   // CheckInfo data
+  Bitboard blockersForKing[2];
   union {
     struct {
-      Bitboard blockersForKing[2];
       Bitboard pinnersForKing[2];
     };
     struct {
-      Bitboard dummy[3]; // blockersForKing[2], pinnersForKing[WHITE]
+      Bitboard dummy;           // pinnersForKing[WHITE]
       Bitboard checkSquares[7]; // element 0 is pinnersForKing[BLACK]
     };
   };
@@ -193,7 +193,6 @@ void do_null_move(Pos *pos);
 void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
-PURE Value see(Pos *pos, Move m);
 PURE Value see_sign(Pos *pos, Move m);
 PURE Value see_test(Pos *pos, Move m, int value);
 

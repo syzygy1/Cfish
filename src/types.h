@@ -320,7 +320,7 @@ INLINE int make_castling_right(int c, int s)
 typedef uint32_t Move;
 typedef int32_t Phase;
 typedef int32_t Value;
-typedef int32_t Piece;
+typedef uint32_t Piece;
 typedef int32_t Depth;
 typedef uint32_t Square;
 
