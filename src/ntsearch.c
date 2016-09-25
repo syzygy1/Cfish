@@ -305,8 +305,6 @@ moves_loop: // When in check search starts from here.
   singularExtensionNode =   !rootNode
                          &&  depth >= 8 * ONE_PLY
                          &&  ttMove
-                     /*  &&  ttValue != VALUE_NONE Already implicit in the next condition */
-                         &&  abs(ttValue) < VALUE_KNOWN_WIN
                          && !excludedMove // Recursive singular search is not allowed
                          && (tte_bound(tte) & BOUND_LOWER)
                          &&  tte_depth(tte) >= depth - 3 * ONE_PLY;
@@ -373,7 +371,7 @@ moves_loop: // When in check search starts from here.
         && !extension
         &&  is_legal(pos, move))
     {
-      Value rBeta = ttValue - 2 * depth / ONE_PLY;
+      Value rBeta = max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
       Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
       ss->excludedMove = move;
       ss->skipEarlyPruning = 1;

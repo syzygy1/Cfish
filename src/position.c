@@ -1341,7 +1341,7 @@ INLINE int see_ab(Pos *pos, Move m, int alpha, int beta)
       bound = alpha;
     } else {
       if (swap > beta)
-        beta = swap;  // Opponent is sure to lose at most (original) beta.
+        beta = swap;  // Opponent is sure to lose at most (minus) beta.
       bound = beta;
     }
     Bitboard bb;
