@@ -22,6 +22,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#ifndef __WIN32__
+#include <sys/mman.h>
+#endif
 
 #include "misc.h"
 #include "numa.h"
@@ -98,9 +101,7 @@ static Option options_map[] = {
   { "Syzygy50MoveRule", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
   { "SyzygyProbeLimit", OPT_TYPE_SPIN, 6, 0, 6, NULL, NULL, 0, NULL },
   { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_largepages, 0, NULL },
-#ifdef NUMA
   { "NUMA", OPT_TYPE_STRING, 0, 0, 0, "all", on_numa, 0, NULL },
-#endif
   { NULL }
 };
 
@@ -114,11 +115,18 @@ void options_init()
   // On a non-NUMA machine, disable the NUMA option to diminish confusion.
   if (!numa_avail)
     options_map[OPT_NUMA].type = OPT_TYPE_DISABLED;
+#else
+  options_map[OPT_NUMA].type = OPT_TYPE_DISABLED;
 #endif
 #ifdef __WIN32__
   // Disable the LargePages option if the machine does not support it.
   if (!large_pages_supported())
     options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
+#endif
+#ifdef __linux
+#ifndef MADV_HUGEPAGE
+  options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
+#endif
 #endif
   for (Option *opt = options_map; opt->name != NULL; opt++) {
     if (opt->type == OPT_TYPE_DISABLED)

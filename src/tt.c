@@ -126,11 +126,13 @@ void tt_allocate(size_t mbSize)
 #endif
 
 #ifdef __linux__
+#ifdef MADV_HUGEPAGE
 
   // Advise the kernel to allocate large pages.
   if (settings.large_pages)
     madvise(TT.table, count * sizeof(Cluster), MADV_HUGEPAGE);
 
+#endif
 #endif
 
 #endif

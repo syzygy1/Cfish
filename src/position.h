@@ -62,8 +62,13 @@ struct Stack {
     uint64_t psqnpm;
   };
   uint8_t castlingRights;
-  uint8_t pliesFromNull;
-  uint8_t rule50;
+  union {
+    struct {
+      uint8_t pliesFromNull;
+      uint8_t rule50;
+    };
+    uint16_t plyCounters;
+  };
 
   // Not copied when making a move
   uint8_t capturedPiece;

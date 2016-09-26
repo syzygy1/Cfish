@@ -912,7 +912,6 @@ void do_move(Pos *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
 
-  pos->nodes++;
   Key key = pos_key() ^ zob.side;
 
   // Copy some fields of the old state to our new Stack object except the
@@ -920,21 +919,20 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // switch our state pointer to point to the new (ready to be updated)
   // state.
   Stack *st = ++pos->st;
-  memcpy(st, st - 1, StateCopySize);
+  memcpy(st, st - 1, (StateCopySize + 7) & ~7);
   st->previous = st - 1;
 
   // Increment ply counters. In particular, rule50 will be reset to zero
   // later on in case of a capture or a pawn move.
-  st->rule50 = (st-1)->rule50 + 1;
-  st->pliesFromNull++;
+  st->plyCounters += 0x101; // Increment both rule50 and pliesFromNull.
 
-  int us = pos_stm();
-  int them = us ^ 1;
+  uint32_t us = pos_stm();
+  uint32_t them = us ^ 1;
   Square from = from_sq(m);
   Square to = to_sq(m);
-  uint32_t piece = piece_on(from);
-  uint32_t captured =  type_of_m(m) == ENPASSANT
-                     ? make_piece(them, PAWN) : piece_on(to);
+  Piece piece = piece_on(from);
+  Piece captured = type_of_m(m) == ENPASSANT
+                   ? make_piece(them, PAWN) : piece_on(to);
 
   assert(color_of(piece) == us);
   assert(   is_empty(to)
@@ -1083,6 +1081,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 #endif
 
   pos->sideToMove ^= 1;
+  pos->nodes++;
 
   set_check_info(pos);
 
@@ -1167,7 +1166,7 @@ void do_null_move(Pos *pos)
   assert(!pos_checkers());
 
   Stack *st = ++pos->st;
-  memcpy(st, st - 1, StateSize);
+  memcpy(st, st - 1, (StateSize + 7) & ~7);
   st->previous = st - 1;
 
   if (st->epSquare) {
