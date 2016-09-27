@@ -195,7 +195,7 @@ PURE int gives_check_special(Pos *pos, Stack *st, Move m);
 void do_move(Pos *pos, Move m, int givesCheck);
 void undo_move(Pos *pos, Move m);
 void do_null_move(Pos *pos);
-void undo_null_move(Pos *pos);
+INLINE void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
 PURE Value see_sign(Pos *pos, Move m);
@@ -334,6 +334,16 @@ INLINE int gives_check(Pos *pos, Stack *st, Move m)
 }
 
 void pos_copy(Pos *dest, Pos *src);
+
+// undo_null_move is used to undo a null move.
+
+INLINE void undo_null_move(Pos *pos)
+{
+  assert(!pos_checkers());
+
+  pos->st--;
+  pos->sideToMove ^= 1;
+}
 
 #endif
 

@@ -1187,15 +1187,7 @@ void do_null_move(Pos *pos)
   assert(pos_is_ok(pos, &failed_step));
 }
 
-// undo_null_move() is used to undo a null move.
-
-void undo_null_move(Pos *pos)
-{
-  assert(!pos_checkers());
-
-  pos->st--;
-  pos->sideToMove ^= 1;
-}
+// See position.h for undo_null_move().
 
 
 // key_after() computes the new hash key after the given move. Needed

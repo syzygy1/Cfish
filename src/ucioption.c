@@ -18,6 +18,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -123,7 +125,7 @@ void options_init()
   if (!large_pages_supported())
     options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
-#ifdef __linux
+#ifdef __linux__
 #ifndef MADV_HUGEPAGE
   options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
