@@ -108,8 +108,6 @@ struct Cluster {
 
 typedef struct Cluster Cluster;
 
-static_assert(CacheLineSize % sizeof(Cluster) == 0, "Cluster size incorrect");
-
 struct TranspositionTable {
   size_t clusterCount;
   Cluster *table;
