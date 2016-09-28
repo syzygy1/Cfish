@@ -191,19 +191,12 @@ void pawn_init(void)
 // pawns_probe() looks up the current position's pawns configuration in
 // the pawns hash table.
 
-PawnEntry *pawn_probe(Pos *pos)
+void pawn_entry_fill(Pos *pos, PawnEntry *e, Key key)
 {
-  Key key = pos_pawn_key();
-  PawnEntry* e = &pos->pawnTable[key & 16383];
-
-  if (e->key == key)
-    return e;
-
   e->key = key;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
   e->asymmetry = popcount(e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]);
   e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
-  return e;
 }
 
 

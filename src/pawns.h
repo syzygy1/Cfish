@@ -53,6 +53,18 @@ Score do_king_safety_black(PawnEntry *pe, Pos *pos, Square ksq);
 Value shelter_storm_white(Pos *pos, Square ksq);
 Value shelter_storm_black(Pos *pos, Square ksq);
 
+void pawn_entry_fill(Pos *pos, PawnEntry *e, Key k);
+
+INLINE PawnEntry *pawn_probe(Pos *pos)
+{
+  Key key = pos_pawn_key();
+  PawnEntry *e = &pos->pawnTable[key & 16383];
+
+  if (unlikely(e->key != key))
+    pawn_entry_fill(pos, e, key);
+
+  return e;
+}
 
 INLINE int semiopen_file(PawnEntry *pe, int c, int f)
 {
@@ -88,7 +100,6 @@ INLINE Score king_safety_black(PawnEntry *pe, Pos *pos, Square ksq)
 }
 
 void pawn_init();
-PawnEntry *pawn_probe(Pos *pos);
 
 #endif
 

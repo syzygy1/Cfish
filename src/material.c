@@ -103,15 +103,8 @@ typedef int PieceCountType[2][8];
 // there, so we don't have to recompute all when the same material
 // configuration occurs again.
 
-MaterialEntry *material_probe(Pos *pos)
+void material_entry_init(Pos *pos, MaterialEntry *e, Key key)
 {
-  Key key = pos_material_key();
-//  MaterialEntry *e = &pos->materialTable[(key * 0xb44cede0e4473d6dULL) >> (64 - 13)];
-  MaterialEntry *e = &pos->materialTable[key >> (64 - 13)];
-
-  if (e->key == key)
-      return e;
-
   memset(e, 0, sizeof(MaterialEntry));
   e->key = key;
   e->factor[WHITE] = e->factor[BLACK] = (uint8_t)SCALE_FACTOR_NORMAL;
@@ -123,14 +116,14 @@ MaterialEntry *material_probe(Pos *pos)
       if (endgame_keys[i][c] == key) {
 	e->eval_func = 1 + i;
 	e->eval_func_side = c;
-	return e;
+	return;
       }
 
   for (int c = 0; c < 2; c++)
     if (is_KXK(pos, c)) {
       e->eval_func = 9; // EvaluateKXK
       e->eval_func_side = c;
-      return e;
+      return;
     }
 
   // Look for a specialized scaling function.
@@ -138,7 +131,7 @@ MaterialEntry *material_probe(Pos *pos)
     for (int c = 0; c < 2; c++)
       if (endgame_keys[NUM_EVAL + i][c] == key) {
         e->scal_func[c] = 10 + i;
-        return e;
+        return;
       }
 
   // We did not find any specialized scaling function, so fall back on
@@ -204,7 +197,5 @@ MaterialEntry *material_probe(Pos *pos)
   };
 #undef pc
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
-
-  return e;
 }
 

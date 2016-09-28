@@ -495,7 +495,7 @@ int is_legal(Pos *pos, Move m)
   // En passant captures are a tricky special case. Because they are rather
   // uncommon, we do it simply by testing whether the king is attacked after
   // the move is made.
-  if (type_of_m(m) == ENPASSANT) {
+  if (unlikely(type_of_m(m) == ENPASSANT)) {
     Square ksq = square_of(us, KING);
     Square to = to_sq(m);
     Square capsq = to - pawn_push(us);
@@ -519,7 +519,7 @@ int is_legal(Pos *pos, Move m)
 
   // A non-king move is legal if and only if it is not pinned or it
   // is moving along the ray towards or away from the king.
-  return   !(pinned_pieces(pos, us) & sq_bb(from))
+  return   !(blockers_for_king(pos, us) & sq_bb(from))
         ||  aligned(m, square_of(us, KING));
 }
 
@@ -608,7 +608,7 @@ int is_pseudo_legal(Pos *pos, Move m)
   if (!(pieces_c(us) & sq_bb(from)))
     return 0;
 
-  if (type_of_m(m) == CASTLING) {
+  if (unlikely(type_of_m(m) == CASTLING)) {
     if (pos_checkers()) return 0;
     ExtMove list[MAX_MOVES];
     ExtMove *end = generate_quiets(pos, list);
@@ -657,7 +657,7 @@ int is_pseudo_legal(Pos *pos, Move m)
       break;
     }
   } else {
-    if (type_of_m(m) == NORMAL) {
+    if (likely(type_of_m(m) == NORMAL)) {
       if (rank_of(to) == relative_rank(us, RANK_8))
         return 0;
       if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
@@ -667,7 +667,7 @@ int is_pseudo_legal(Pos *pos, Move m)
             && is_empty(to) && is_empty(to - pawn_push(us))))
         return 0;
     }
-    else if (type_of_m(m) == PROMOTION) {
+    else if (likely(type_of_m(m) == PROMOTION)) {
       // No need to test for pawn to 8th rank.
       if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
           && !((from + pawn_push(us) == to) && is_empty(to)))
@@ -780,7 +780,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   // Clear en passant.
   st->epSquare = 0;
-  if ((st-1)->epSquare) {
+  if (unlikely((st-1)->epSquare)) {
     key ^= zob.enpassant[(st-1)->epSquare & 7];
     if (type_of_m(m) == ENPASSANT)
       capt_piece = B_PAWN ^ (us << 3);
@@ -790,7 +790,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   int prom_piece;
 
   // Move the piece or carry out a promotion.
-  if (type_of_m(m) != PROMOTION) {
+  if (likely(type_of_m(m) != PROMOTION)) {
     // In Chess960, the king might seem to capture the friendly rook.
     if (type_of_m(m) == CASTLING)
       capt_piece = 0;
@@ -876,7 +876,7 @@ void undo_move(Pos *pos, Move m)
   pos->sideToMove ^= 1;
   int us = pos->sideToMove;
  
-  if (type_of_m(m) != PROMOTION) {
+  if (likely(type_of_m(m) != PROMOTION)) {
     pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
   } else {
     pos->byTypeBB[piece & 7] ^= sq_bb(to);
@@ -939,7 +939,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
          || color_of(piece_on(to)) == (type_of_m(m) != CASTLING ? them : us));
   assert(type_of_p(captured) != KING);
 
-  if (type_of_m(m) == CASTLING) {
+  if (unlikely(type_of_m(m) == CASTLING)) {
     assert(piece == make_piece(us, KING));
     assert(captured == make_piece(us, ROOK));
 
@@ -968,7 +968,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // If the captured piece is a pawn, update pawn hash key, otherwise
     // update non-pawn material.
     if (type_of_p(captured) == PAWN) {
-      if (type_of_m(m) == ENPASSANT) {
+      if (unlikely(type_of_m(m) == ENPASSANT)) {
         capsq -= pawn_push(us);
 
         assert(piece == make_piece(us, PAWN));
@@ -1003,7 +1003,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   key ^= zob.psq[piece][from] ^ zob.psq[piece][to];
 
   // Reset en passant square
-  if ((st-1)->epSquare != 0)
+  if (unlikely((st-1)->epSquare != 0))
     key ^= zob.enpassant[file_of((st-1)->epSquare)];
   st->epSquare = 0;
 
@@ -1016,7 +1016,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   }
 
   // Move the piece. The tricky Chess960 castling is handled earlier
-  if (type_of_m(m) != CASTLING)
+  if (likely(type_of_m(m) != CASTLING))
     move_piece(pos, us, piece, from, to);
 
   // If the moving piece is a pawn do some special extra work
@@ -1106,7 +1106,7 @@ void undo_move(Pos *pos, Move m)
   assert(is_empty(from) || type_of_m(m) == CASTLING);
   assert(type_of_p(pos->st->capturedPiece) != KING);
 
-  if (type_of_m(m) == PROMOTION) {
+  if (unlikely(type_of_m(m) == PROMOTION)) {
     assert(relative_rank_s(us, to) == RANK_8);
     assert(type_of_p(piece) == promotion_type(m));
     assert(type_of_p(piece) >= KNIGHT && type_of_p(piece) <= QUEEN);
@@ -1116,7 +1116,7 @@ void undo_move(Pos *pos, Move m)
     put_piece(pos, us, piece, to);
   }
 
-  if (type_of_m(m) == CASTLING) {
+  if (unlikely(type_of_m(m) == CASTLING)) {
     Square rfrom, rto;
     int kingSide = to > from;
     rfrom = to; // Castling is encoded as "king captures friendly rook"
@@ -1137,7 +1137,7 @@ void undo_move(Pos *pos, Move m)
     if (pos->st->capturedPiece) {
       Square capsq = to;
 
-      if (type_of_m(m) == ENPASSANT) {
+      if (unlikely(type_of_m(m) == ENPASSANT)) {
         capsq -= pawn_push(us);
 
         assert(type_of_p(piece) == PAWN);
@@ -1169,7 +1169,7 @@ void do_null_move(Pos *pos)
   memcpy(st, st - 1, (StateSize + 7) & ~7);
   st->previous = st - 1;
 
-  if (st->epSquare) {
+  if (unlikely(st->epSquare)) {
     st->key ^= zob.enpassant[file_of(st->epSquare)];
     st->epSquare = 0;
   }
@@ -1212,14 +1212,14 @@ Key key_after(Pos *pos, Move m)
 // Test whether SEE >= value.
 int see_test(Pos *pos, Move m, int value)
 {
-  if (type_of_m(m) == CASTLING)
+  if (unlikely(type_of_m(m) == CASTLING))
     return 0 >= value;
 
   Square from = from_sq(m), to = to_sq(m);
   Bitboard occ = pieces();
 
   int swap = PieceValue[MG][piece_on(to)] - value;
-  if (type_of_m(m) == ENPASSANT) {
+  if (unlikely(type_of_m(m) == ENPASSANT)) {
     assert(pos_stm() == color_of(piece_on(from)));
     occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn
     swap += PawnValueMg;
@@ -1283,19 +1283,20 @@ int see_test(Pos *pos, Move m, int value)
 // Currently used only by see_sign(), so we force it to be inlined.
 INLINE int see_ab(Pos *pos, Move m, int alpha, int beta)
 {
-  if (type_of_m(m) == CASTLING)
+  if (unlikely(type_of_m(m) == CASTLING))
     return 0;
 
   Square from = from_sq(m), to = to_sq(m);
   Bitboard occ = pieces();
 
   int swap = PieceValue[MG][piece_on(to)];
-  if (type_of_m(m) == ENPASSANT) {
+  if (unlikely(type_of_m(m) == ENPASSANT)) {
     assert(pos_stm() == color_of(piece_on(from)));
     occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn.
     swap += PieceValue[MG][PAWN];
   }
 
+  assume(swap >= 0);
   // We know that SEE <= swap. Can the opponent stand pat?
   if (swap <= alpha)
     return alpha;
@@ -1406,7 +1407,7 @@ int is_draw(Pos *pos)
 {
   Stack *st = pos->st;
 
-  if (st->rule50 > 99) {
+  if (unlikely(st->rule50 > 99)) {
     if (!pos_checkers())
       return 1;
     return generate_legal(pos, (pos->st-1)->endMoves) != (pos->st-1)->endMoves;

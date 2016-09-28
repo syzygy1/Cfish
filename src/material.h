@@ -23,6 +23,7 @@
 
 #include "endgame.h"
 #include "misc.h"
+#include "position.h"
 #include "types.h"
 
 typedef struct Pos Pos;
@@ -49,6 +50,21 @@ struct MaterialEntry {
 };
 
 typedef struct MaterialEntry MaterialEntry;
+
+typedef MaterialEntry MaterialTable[8192];
+
+void material_entry_init(Pos *pos, MaterialEntry *e, Key key);
+
+INLINE MaterialEntry *material_probe(Pos *pos)
+{
+  Key key = pos_material_key();
+  MaterialEntry *e = &pos->materialTable[key >> (64-13)];
+
+  if (unlikely(e->key != key))
+    material_entry_init(pos, e, key);
+
+  return e;
+}
 
 INLINE Score material_imbalance(MaterialEntry *me)
 {
@@ -77,10 +93,6 @@ INLINE int material_scale_factor(MaterialEntry *me, Pos *pos, int c)
     sf = endgame_funcs[me->scal_func[c]](pos, c);
   return sf != SCALE_FACTOR_NONE ? sf : me->factor[c];
 }
-
-typedef MaterialEntry MaterialTable[8192];
-
-MaterialEntry *material_probe(Pos *pos);
 
 #endif
 
