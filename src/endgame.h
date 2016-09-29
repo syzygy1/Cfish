@@ -25,7 +25,7 @@
 
 typedef struct Pos Pos;
 
-typedef Value (EgFunc)(Pos *, int);
+typedef Value (EgFunc)(const Pos *, int);
 
 EgFunc EvaluateKPK, EvaluateKNNK, EvaluateKBNK, EvaluateKRKP,
        EvaluateKRKB, EvaluateKRKN, EvaluateKQKP, EvaluateKQKR,

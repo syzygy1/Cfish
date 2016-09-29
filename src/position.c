@@ -376,7 +376,7 @@ static void set_state(Pos *pos, Stack *st)
 // Chess960 the Shredder-FEN notation is used. This is used for copying
 // the root position to search threads.
 
-void pos_fen(Pos *pos, char *str)
+void pos_fen(const Pos *pos, char *str)
 {
   int cnt;
 
@@ -421,7 +421,7 @@ void pos_fen(Pos *pos, char *str)
 // game_phase() calculates the game phase interpolating total non-pawn
 // material between endgame and midgame limits.
 
-int game_phase(Pos *pos)
+int game_phase(const Pos *pos)
 {
   Value npm = pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK);
 
@@ -442,7 +442,7 @@ int game_phase(Pos *pos)
 // candidates are slider blockers and are calculated by calling this
 // function.
 
-Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
+Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
                          Bitboard *pinners)
 {
   Bitboard result = 0, snipers;
@@ -469,7 +469,7 @@ Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
 // attackers_to() computes a bitboard of all pieces which attack a given
 // square. Slider attacks use the occupied bitboard to indicate occupancy.
 
-Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied)
+Bitboard pos_attackers_to_occ(const Pos *pos, Square s, Bitboard occupied)
 {
   return  (attacks_from_pawn(s, BLACK)    & pieces_cp(WHITE, PAWN))
         | (attacks_from_pawn(s, WHITE)    & pieces_cp(BLACK, PAWN))
@@ -482,7 +482,7 @@ Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied)
 
 // is_legal() tests whether a pseudo-legal move is legal
 
-int is_legal(Pos *pos, Move m)
+int is_legal(const Pos *pos, Move m)
 {
   assert(move_is_ok(m));
 
@@ -600,7 +600,7 @@ int is_pseudo_legal_old(Pos *pos, Move m)
 }
 #endif
 
-int is_pseudo_legal(Pos *pos, Move m)
+int is_pseudo_legal(const Pos *pos, Move m)
 {
   uint64_t us = pos_stm();
   Square from = from_sq(m);
@@ -706,7 +706,7 @@ exit(1);
 // gives_check_special() is invoked by gives_check() if there are
 // discovered check candidates or the move is of a special type.
 
-int gives_check_special(Pos *pos, Stack *st, Move m)
+int gives_check_special(const Pos *pos, Stack *st, Move m)
 {
   assert(move_is_ok(m));
   assert(color_of(moved_piece(m)) == pos_stm());
@@ -1194,7 +1194,7 @@ void do_null_move(Pos *pos)
 // for speculative prefetch. It does not recognize special moves like
 // castling, en-passant and promotions.
 
-Key key_after(Pos *pos, Move m)
+Key key_after(const Pos *pos, Move m)
 {
   Square from = from_sq(m);
   Square to = to_sq(m);
@@ -1210,7 +1210,7 @@ Key key_after(Pos *pos, Move m)
 
 
 // Test whether SEE >= value.
-int see_test(Pos *pos, Move m, int value)
+int see_test(const Pos *pos, Move m, int value)
 {
   if (unlikely(type_of_m(m) == CASTLING))
     return 0 >= value;
@@ -1281,7 +1281,7 @@ int see_test(Pos *pos, Move m, int value)
 
 // see_ab() performs an exact SEE calculation within bounds alpha and beta.
 // Currently used only by see_sign(), so we force it to be inlined.
-INLINE int see_ab(Pos *pos, Move m, int alpha, int beta)
+INLINE int see_ab(const Pos *pos, Move m, int alpha, int beta)
 {
   if (unlikely(type_of_m(m) == CASTLING))
     return 0;
@@ -1375,7 +1375,7 @@ INLINE int see_ab(Pos *pos, Move m, int alpha, int beta)
   return bound == alpha ? alpha : -beta;
 }
 
-int see_sign(Pos *pos, Move m)
+int see_sign(const Pos *pos, Move m)
 {
   assert(move_is_ok(m));
 
@@ -1403,7 +1403,7 @@ int see_test(Pos *pos, Move m, int value)
 // is_draw() tests whether the position is drawn by 50-move rule or by
 // repetition. It does not detect stalemates.
 
-int is_draw(Pos *pos)
+int is_draw(const Pos *pos)
 {
   Stack *st = pos->st;
 

@@ -230,7 +230,7 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
 
-INLINE void evalinfo_init(Pos *pos, EvalInfo *ei, const int Us)
+INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Down = (Us == WHITE ? DELTA_S : DELTA_N);
@@ -255,9 +255,8 @@ INLINE void evalinfo_init(Pos *pos, EvalInfo *ei, const int Us)
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
 // color and type.
 
-INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
-                                   Bitboard *mobilityArea,
-                                   const int Us, const int Pt)
+INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
+                            Bitboard *mobilityArea, const int Us, const int Pt)
 {
   Bitboard b, bb;
   Square s;
@@ -369,8 +368,8 @@ INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
 // come last). We rely on the inlining compiler to expand all calls to
 // evaluate_piece(). No need for C++ templates!
 
-INLINE Score evaluate_pieces(Pos *pos, EvalInfo *ei, Score *mobility,
-                                    Bitboard *mobilityArea)
+INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
+                             Bitboard *mobilityArea)
 {
   return  evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, KNIGHT)
         - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, KNIGHT)
@@ -398,7 +397,7 @@ static const Bitboard KingFlank[2][8] = {
     CenterFiles & BlackCamp, KingSide  & BlackCamp, KingSide  & BlackCamp, KingSide    & BlackCamp },
 };
 
-INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
+INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Up = (Us == WHITE ? DELTA_N : DELTA_S);
@@ -523,7 +522,7 @@ INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 // evaluate_threats() assigns bonuses according to the types of the
 // attacking and the attacked pieces.
 
-INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
+INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them  = (Us == WHITE ? BLACK    : WHITE);
   const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
@@ -606,8 +605,7 @@ INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
 
 // evaluate_passed_pawns() evaluates the passed pawns of the given color.
 
-INLINE Score evaluate_passed_pawns(Pos *pos, EvalInfo *ei,
-                                          const int Us)
+INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
 
@@ -689,7 +687,7 @@ INLINE Score evaluate_passed_pawns(Pos *pos, EvalInfo *ei,
 // twice. Finally, the space bonus is multiplied by a weight. The aim is to
 // improve play on game opening.
 
-INLINE Score evaluate_space(Pos *pos, EvalInfo *ei, const int Us)
+INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const Bitboard SpaceMask =
@@ -725,7 +723,7 @@ INLINE Score evaluate_space(Pos *pos, EvalInfo *ei, const int Us)
 // position, i.e., second order bonus/malus based on the known
 // attacking/defending status of the players.
 
-INLINE Score evaluate_initiative(Pos *pos, int asymmetry, Value eg)
+INLINE Score evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
 {
   int kingDistance =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                     - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
@@ -744,7 +742,7 @@ INLINE Score evaluate_initiative(Pos *pos, int asymmetry, Value eg)
 
 // evaluate_scale_factor() computes the scale factor for the winning side
 
-INLINE int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
+INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 {
   int strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
   int sf = material_scale_factor(ei->me, pos, strongSide);
@@ -782,7 +780,7 @@ INLINE int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
 // of the position from the point of view of the side to move.
 
 //template<bool DoTrace>
-Value evaluate(Pos *pos)
+Value evaluate(const Pos *pos)
 {
   assert(!pos_checkers());
 
@@ -845,7 +843,7 @@ Value evaluate(Pos *pos)
           - evaluate_passed_pawns(pos, &ei, BLACK);
 
   // If both sides have only pawns, score for potential unstoppable pawns
-  if (!pos_non_pawn_material(WHITE) && !pos_non_pawn_material(BLACK)) {
+  if (pos_pawns_only()) {
     Bitboard b;
     if ((b = ei.pi->passedPawns[WHITE]) != 0)
       score += Unstoppable * relative_rank_s(WHITE, frontmost_sq(WHITE, b));

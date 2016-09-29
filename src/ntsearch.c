@@ -185,8 +185,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       &&  !ttMove
       &&  eval + razor_margin[depth / ONE_PLY] <= alpha) {
 
-    if (   depth <= ONE_PLY
-        && eval + razor_margin[3 * ONE_PLY] <= alpha)
+    if (depth <= ONE_PLY)
       return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
 
     Value ralpha = alpha - razor_margin[depth / ONE_PLY];

@@ -179,17 +179,17 @@ struct Pos {
 
 // FEN string input/output
 void pos_set(Pos *pos, char *fen, int isChess960);
-void pos_fen(Pos *pos, char *fen);
+void pos_fen(const Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
-PURE Bitboard pos_attackers_to_occ(Pos *pos, Square s, Bitboard occupied);
-PURE Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s,
+PURE Bitboard pos_attackers_to_occ(const Pos *pos, Square s, Bitboard occupied);
+PURE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
                               Bitboard *pinners);
 //Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 
-PURE int is_legal(Pos *pos, Move m);
-PURE int is_pseudo_legal(Pos *pos, Move m);
-PURE int gives_check_special(Pos *pos, Stack *st, Move m);
+PURE int is_legal(const Pos *pos, Move m);
+PURE int is_pseudo_legal(const Pos *pos, Move m);
+PURE int gives_check_special(const Pos *pos, Stack *st, Move m);
 
 // Doing and undoing moves
 void do_move(Pos *pos, Move m, int givesCheck);
@@ -198,12 +198,12 @@ void do_null_move(Pos *pos);
 INLINE void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
-PURE Value see_sign(Pos *pos, Move m);
-PURE Value see_test(Pos *pos, Move m, int value);
+PURE Value see_sign(const Pos *pos, Move m);
+PURE Value see_test(const Pos *pos, Move m, int value);
 
-PURE Key key_after(Pos *pos, Move m);
-PURE int game_phase(Pos *pos);
-PURE int is_draw(Pos *pos);
+PURE Key key_after(const Pos *pos, Move m);
+PURE int game_phase(const Pos *pos);
+PURE int is_draw(const Pos *pos);
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])
@@ -220,7 +220,7 @@ PURE int is_draw(Pos *pos);
 #define piece_list(c,p) (&pos->pieceList[16 * (8 * (c) + (p))])
 #define square_of(c,p) (pos->pieceList[16 * (8 * (c) + (p))])
 #define loop_through_pieces(c,p,s) \
-  uint8_t *pl = piece_list(c,p); \
+  const uint8_t *pl = piece_list(c,p); \
   while ((s = *pl++) != SQ_NONE)
 #else
 #define piece_count(c,p) (popcount(pieces_cp(c, p)))
@@ -273,34 +273,35 @@ PURE int is_draw(Pos *pos);
 #define pos_rule50_count() (pos->st->rule50)
 #define pos_psq_score() (pos->st->psq)
 #define pos_non_pawn_material(c) (pos->st->nonPawnMaterial[c])
+#define pos_pawns_only() (!pos->st->nonPawn)
 
-INLINE Bitboard discovered_check_candidates(Pos *pos)
+INLINE Bitboard discovered_check_candidates(const Pos *pos)
 {
   return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
 }
 
-INLINE Bitboard blockers_for_king(Pos *pos, int c)
+INLINE Bitboard blockers_for_king(const Pos *pos, int c)
 {
   return pos->st->blockersForKing[c];
 }
 
-INLINE Bitboard pinned_pieces(Pos *pos, int c)
+INLINE Bitboard pinned_pieces(const Pos *pos, int c)
 {
   return pos->st->blockersForKing[c] & pieces_c(c);
 }
 
-INLINE int pawn_passed(Pos *pos, int c, Square s)
+INLINE int pawn_passed(const Pos *pos, int c, Square s)
 {
   return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_mask(c, s));
 }
 
-INLINE int advanced_pawn_push(Pos *pos, Move m)
+INLINE int advanced_pawn_push(const Pos *pos, Move m)
 {
   return   type_of_p(moved_piece(m)) == PAWN
         && relative_rank_s(pos_stm(), from_sq(m)) > RANK_4;
 }
 
-INLINE int opposite_bishops(Pos *pos)
+INLINE int opposite_bishops(const Pos *pos)
 {
 #if 1
   return   piece_count(WHITE, BISHOP) == 1
@@ -319,14 +320,14 @@ INLINE int is_capture_or_promotion(const Pos *pos, Move m)
   return type_of_m(m) != NORMAL ? type_of_m(m) != CASTLING : !is_empty(to_sq(m));
 }
 
-INLINE int is_capture(Pos *pos, Move m)
+INLINE int is_capture(const Pos *pos, Move m)
 {
   // Castling is encoded as "king captures the rook"
   assert(move_is_ok(m));
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
 }
 
-INLINE int gives_check(Pos *pos, Stack *st, Move m)
+INLINE int gives_check(const Pos *pos, Stack *st, Move m)
 {
   return  type_of_m(m) == NORMAL && !discovered_check_candidates(pos)
         ? !!(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))

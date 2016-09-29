@@ -49,20 +49,20 @@ static const int QuadraticTheirs[][8] = {
 };
 
 // Helper used to detect a given material distribution.
-static int is_KXK(Pos *pos, int us)
+static int is_KXK(const Pos *pos, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
         && pos_non_pawn_material(us) >= RookValueMg;
 }
 
-static int is_KBPsKs(Pos *pos, int us)
+static int is_KBPsKs(const Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
         && pieces_cp(us, BISHOP)
         && pieces_cp(us, PAWN);
 }
 
-static int is_KQKRPs(Pos *pos, int us) {
+static int is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
         && pieces_cp(us, QUEEN)
@@ -103,7 +103,7 @@ typedef int PieceCountType[2][8];
 // there, so we don't have to recompute all when the same material
 // configuration occurs again.
 
-void material_entry_init(Pos *pos, MaterialEntry *e, Key key)
+void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
 {
   memset(e, 0, sizeof(MaterialEntry));
   e->key = key;

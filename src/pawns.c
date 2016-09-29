@@ -85,7 +85,7 @@ static const Value MaxSafetyBonus = V(258);
 #undef S
 #undef V
 
-INLINE Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
+INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 {
   const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
   const int Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
@@ -191,7 +191,7 @@ void pawn_init(void)
 // pawns_probe() looks up the current position's pawns configuration in
 // the pawns hash table.
 
-void pawn_entry_fill(Pos *pos, PawnEntry *e, Key key)
+void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 {
   e->key = key;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
@@ -203,7 +203,7 @@ void pawn_entry_fill(Pos *pos, PawnEntry *e, Key key)
 // shelter_storm() calculates shelter and storm penalties for the file
 // the king is on, as well as the two adjacent files.
 
-INLINE Value shelter_storm(Pos *pos, Square ksq, const int Us)
+INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   
@@ -237,7 +237,7 @@ INLINE Value shelter_storm(Pos *pos, Square ksq, const int Us)
 // do_king_safety() calculates a bonus for king safety. It is called only
 // when king square changes, which is about 20% of total king_safety() calls.
 
-INLINE Score do_king_safety(PawnEntry *pe, Pos *pos, Square ksq,
+INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
                                    const int Us)
 {
   pe->kingSquares[Us] = ksq;
@@ -261,12 +261,12 @@ INLINE Score do_king_safety(PawnEntry *pe, Pos *pos, Square ksq,
 }
 
 // "template" instantiation:
-Score do_king_safety_white(PawnEntry *pe, Pos *pos, Square ksq)
+Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   return do_king_safety(pe, pos, ksq, WHITE);
 }
 
-Score do_king_safety_black(PawnEntry *pe, Pos *pos, Square ksq)
+Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   return do_king_safety(pe, pos, ksq, BLACK);
 }

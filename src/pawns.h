@@ -47,15 +47,15 @@ struct PawnEntry {
 typedef struct PawnEntry PawnEntry;
 typedef PawnEntry PawnTable[16384];
 
-Score do_king_safety_white(PawnEntry *pe, Pos *pos, Square ksq);
-Score do_king_safety_black(PawnEntry *pe, Pos *pos, Square ksq);
+Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq);
+Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq);
 
-Value shelter_storm_white(Pos *pos, Square ksq);
-Value shelter_storm_black(Pos *pos, Square ksq);
+Value shelter_storm_white(const Pos *pos, Square ksq);
+Value shelter_storm_black(const Pos *pos, Square ksq);
 
-void pawn_entry_fill(Pos *pos, PawnEntry *e, Key k);
+void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key k);
 
-INLINE PawnEntry *pawn_probe(Pos *pos)
+INLINE PawnEntry *pawn_probe(const Pos *pos)
 {
   Key key = pos_pawn_key();
   PawnEntry *e = &pos->pawnTable[key & 16383];
@@ -81,7 +81,7 @@ INLINE int pawns_on_same_color_squares(PawnEntry *pe, int c, Square s)
   return pe->pawnsOnSquares[c][!!(DarkSquares & sq_bb(s))];
 }
 
-INLINE Score king_safety_white(PawnEntry *pe, Pos *pos, Square ksq)
+INLINE Score king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   if (  pe->kingSquares[WHITE] == ksq
       && pe->castlingRights[WHITE] == can_castle_cr(WHITE_OO | WHITE_OOO))
@@ -90,7 +90,7 @@ INLINE Score king_safety_white(PawnEntry *pe, Pos *pos, Square ksq)
     return pe->kingSafety[WHITE] = do_king_safety_white(pe, pos, ksq);
 }
 
-INLINE Score king_safety_black(PawnEntry *pe, Pos *pos, Square ksq)
+INLINE Score king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   if (  pe->kingSquares[BLACK] == ksq
       && pe->castlingRights[BLACK] == can_castle_cr(BLACK_OO | BLACK_OOO))
