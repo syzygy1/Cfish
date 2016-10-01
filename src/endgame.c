@@ -68,7 +68,7 @@ static int verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
 
 // Map the square as if strongSide is white and strongSide's only pawn
 // is on the left half of the board.
-static Square normalize(const Pos *pos, int strongSide, Square sq)
+static Square normalize(const Pos *pos, unsigned strongSide, Square sq)
 {
   assert(piece_count(strongSide, PAWN) == 1);
 
@@ -152,9 +152,9 @@ void endgames_init(void)
 // king and plenty of material vs a lone king. It simply gives the
 // attacking side a bonus for driving the defending king towards the edge
 // of the board, and for keeping the distance between the two kings small.
-Value EvaluateKXK(const Pos *pos, int strongSide)
+Value EvaluateKXK(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
   assert(!pos_checkers()); // Eval is never called when in check
@@ -187,9 +187,9 @@ Value EvaluateKXK(const Pos *pos, int strongSide)
 
 // Mate with KBN vs K. This is similar to KX vs K, but we have to drive the
 // defending king towards a corner square of the right color.
-Value EvaluateKBNK(const Pos *pos, int strongSide)
+Value EvaluateKBNK(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, KnightValueMg + BishopValueMg, 0));
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
@@ -215,9 +215,9 @@ Value EvaluateKBNK(const Pos *pos, int strongSide)
 
 
 // KP vs K. This endgame is evaluated with the help of a bitbase.
-Value EvaluateKPK(const Pos *pos, int strongSide)
+Value EvaluateKPK(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, VALUE_ZERO, 1));
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
@@ -227,7 +227,7 @@ Value EvaluateKPK(const Pos *pos, int strongSide)
   Square bksq = normalize(pos, strongSide, square_of(weakSide, KING));
   Square psq  = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
 
-  int us = strongSide == pos_stm() ? WHITE : BLACK;
+  unsigned us = strongSide == pos_stm() ? WHITE : BLACK;
 
   if (!bitbases_probe(wksq, psq, bksq, us))
     return VALUE_DRAW;
@@ -242,9 +242,9 @@ Value EvaluateKPK(const Pos *pos, int strongSide)
 // a bitbase. The function below returns drawish scores when the pawn is
 // far advanced with support of the king, while the attacking king is far
 // away.
-Value EvaluateKRKP(const Pos *pos, int strongSide)
+Value EvaluateKRKP(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, RookValueMg, 0));
   assert(verify_material(pos, weakSide, VALUE_ZERO, 1));
@@ -286,9 +286,9 @@ Value EvaluateKRKP(const Pos *pos, int strongSide)
 
 // KR vs KB. This is very simple, and always returns drawish scores.  The
 // score is slightly bigger when the defending king is close to the edge.
-Value EvaluateKRKB(const Pos *pos, int strongSide)
+Value EvaluateKRKB(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, RookValueMg, 0));
   assert(verify_material(pos, weakSide, BishopValueMg, 0));
@@ -300,9 +300,9 @@ Value EvaluateKRKB(const Pos *pos, int strongSide)
 
 // KR vs KN. The attacking side has slightly better winning chances than
 // in KR vs KB, particularly if the king and the knight are far apart.
-Value EvaluateKRKN(const Pos *pos, int strongSide)
+Value EvaluateKRKN(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, RookValueMg, 0));
   assert(verify_material(pos, weakSide, KnightValueMg, 0));
@@ -318,9 +318,9 @@ Value EvaluateKRKN(const Pos *pos, int strongSide)
 // few important exceptions. A pawn on 7th rank and on the A,C,F or H files
 // with a king positioned next to it can be a draw, so in that case, we only
 // use the distance between the kings.
-Value EvaluateKQKP(const Pos *pos, int strongSide)
+Value EvaluateKQKP(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, QueenValueMg, 0));
   assert(verify_material(pos, weakSide, VALUE_ZERO, 1));
@@ -345,9 +345,9 @@ Value EvaluateKQKP(const Pos *pos, int strongSide)
 // defending king towards the edge. If we also take care to avoid null
 // move for the defending side in the search, this is usually sufficient
 // to win KQ vs KR.
-Value EvaluateKQKR(const Pos *pos, int strongSide)
+Value EvaluateKQKR(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, QueenValueMg, 0));
   assert(verify_material(pos, weakSide, RookValueMg, 0));
@@ -365,7 +365,7 @@ Value EvaluateKQKR(const Pos *pos, int strongSide)
 
 
 // Some cases of trivial draws.
-Value EvaluateKNNK(const Pos *pos, int strongSide)
+Value EvaluateKNNK(const Pos *pos, unsigned strongSide)
 {
   // Avoid compiler warnings about unused variables.
   (void)pos, (void)strongSide;
@@ -378,9 +378,9 @@ Value EvaluateKNNK(const Pos *pos, int strongSide)
 // and a bishop of the wrong color. If such a draw is detected,
 // SCALE_FACTOR_DRAW is returned. If not, the return value is
 // SCALE_FACTOR_NONE, i.e. no scaling will be used.
-int ScaleKBPsK(const Pos *pos, int strongSide)
+int ScaleKBPsK(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(pos_non_pawn_material(strongSide) == BishopValueMg);
   assert(pieces_cp(strongSide, PAWN));
@@ -389,7 +389,7 @@ int ScaleKBPsK(const Pos *pos, int strongSide)
   // be detected even when the weaker side has some pawns.
 
   Bitboard pawns = pieces_cp(strongSide, PAWN);
-  int pawnsFile = file_of(lsb(pawns));
+  unsigned pawnsFile = file_of(lsb(pawns));
 
   // All pawns are on a single rook file?
   if (    (pawnsFile == FILE_A || pawnsFile == FILE_H)
@@ -423,8 +423,8 @@ int ScaleKBPsK(const Pos *pos, int strongSide)
         && (pieces_cp(strongSide, PAWN) & sq_bb(weakPawnSq + pawn_push(weakSide)))
         && (opposite_colors(bishopSq, weakPawnSq) || piece_count(strongSide, PAWN) == 1)) {
 
-      int strongKingDist = distance(weakPawnSq, strongKingSq);
-      int weakKingDist = distance(weakPawnSq, weakKingSq);
+      unsigned strongKingDist = distance(weakPawnSq, strongKingSq);
+      unsigned weakKingDist = distance(weakPawnSq, weakKingSq);
 
       // It is a draw if the weak king is on its back two ranks, within 2
       // squares of the blocking pawn and the strong king is not closer.
@@ -445,9 +445,9 @@ int ScaleKBPsK(const Pos *pos, int strongSide)
 
 // KQ vs KR and one or more pawns. It tests for fortress draws with a rook
 // on the third rank defended by a pawn.
-int ScaleKQKRPs(const Pos *pos, int strongSide)
+int ScaleKQKRPs(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, QueenValueMg, 0));
   assert(piece_count(weakSide, ROOK) == 1);
@@ -474,9 +474,9 @@ int ScaleKQKRPs(const Pos *pos, int strongSide)
 //
 // It would also be nice to rewrite the actual code for this function,
 // which is mostly copied from Glaurung 1.x, and is not very pretty.
-int ScaleKRPKR(const Pos *pos, int strongSide)
+int ScaleKRPKR(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, RookValueMg, 1));
   assert(verify_material(pos, weakSide,   RookValueMg, 0));
@@ -488,10 +488,10 @@ int ScaleKRPKR(const Pos *pos, int strongSide)
   Square wpsq = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
   Square brsq = normalize(pos, strongSide, square_of(weakSide, ROOK));
 
-  uint32_t f = file_of(wpsq);
-  uint32_t r = rank_of(wpsq);
+  unsigned f = file_of(wpsq);
+  unsigned r = rank_of(wpsq);
   Square queeningSq = make_square(f, RANK_8);
-  int tempo = (pos_stm() == strongSide);
+  signed tempo = (pos_stm() == strongSide);
 
   // If the pawn is not too far advanced and the defending king defends
   // the queening square, use the third-rank defence.
@@ -569,9 +569,9 @@ int ScaleKRPKR(const Pos *pos, int strongSide)
   return SCALE_FACTOR_NONE;
 }
 
-int ScaleKRPKB(const Pos *pos, int strongSide)
+int ScaleKRPKB(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, RookValueMg, 1));
   assert(verify_material(pos, weakSide, BishopValueMg, 0));
@@ -581,7 +581,7 @@ int ScaleKRPKB(const Pos *pos, int strongSide)
     Square ksq = square_of(weakSide, KING);
     Square bsq = lsb(pieces_p(BISHOP));
     Square psq = lsb(pieces_p(PAWN));
-    int rk = relative_rank_s(strongSide, psq);
+    unsigned rk = relative_rank_s(strongSide, psq);
     Square push = pawn_push(strongSide);
 
     // If the pawn is on the 5th rank and the pawn (currently) is on
@@ -615,9 +615,9 @@ int ScaleKRPKB(const Pos *pos, int strongSide)
 // KRPP vs KRP. There is just a single rule: if the stronger side has no
 // passed pawns and the defending king is actively placed, the position
 // is drawish.
-int ScaleKRPPKRP(const Pos *pos, int strongSide)
+int ScaleKRPPKRP(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, RookValueMg, 2));
   assert(verify_material(pos, weakSide,   RookValueMg, 1));
@@ -635,7 +635,7 @@ int ScaleKRPPKRP(const Pos *pos, int strongSide)
   if (pawn_passed(pos, strongSide, wpsq1) || pawn_passed(pos, strongSide, wpsq2))
     return SCALE_FACTOR_NONE;
 
-  uint32_t r = max(relative_rank_s(strongSide, wpsq1), relative_rank_s(strongSide, wpsq2));
+  unsigned r = max(relative_rank_s(strongSide, wpsq1), relative_rank_s(strongSide, wpsq2));
 
   if (   distance_f(bksq, wpsq1) <= 1
       && distance_f(bksq, wpsq2) <= 1
@@ -650,9 +650,9 @@ int ScaleKRPPKRP(const Pos *pos, int strongSide)
 // K and two or more pawns vs K. There is just a single rule here: If all
 // pawns are on the same rook file and are blocked by the defending king,
 // it is a draw.
-int ScaleKPsK(const Pos *pos, int strongSide)
+int ScaleKPsK(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(pos_non_pawn_material(strongSide) == 0);
   assert(piece_count(strongSide, PAWN) >= 2);
@@ -676,9 +676,9 @@ int ScaleKPsK(const Pos *pos, int strongSide)
 // along the path of the pawn, and the square of the king is not of the
 // same color as the stronger side's bishop, it is a draw. If the two
 // bishops have opposite color, it's almost always a draw.
-int ScaleKBPKB(const Pos *pos, int strongSide)
+int ScaleKBPKB(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, BishopValueMg, 1));
   assert(verify_material(pos, weakSide,   BishopValueMg, 0));
@@ -725,9 +725,9 @@ int ScaleKBPKB(const Pos *pos, int strongSide)
 
 
 // KBPP vs KB. It detects a few basic draws with opposite-colored bishops.
-int ScaleKBPPKB(const Pos *pos, int strongSide)
+int ScaleKBPPKB(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, BishopValueMg, 2));
   assert(verify_material(pos, weakSide,   BishopValueMg, 0));
@@ -799,9 +799,9 @@ int ScaleKBPPKB(const Pos *pos, int strongSide)
 // KBP vs KN. There is a single rule: If the defending king is somewhere
 // along the path of the pawn, and the square of the king is not of the
 // same color as the stronger side's bishop, it is a draw.
-int ScaleKBPKN(const Pos *pos, int strongSide)
+int ScaleKBPKN(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, BishopValueMg, 1));
   assert(verify_material(pos, weakSide, KnightValueMg, 0));
@@ -823,9 +823,9 @@ int ScaleKBPKN(const Pos *pos, int strongSide)
 // KNP vs K. There is a single rule: if the pawn is a rook pawn on the
 // 7th rank and the defending king prevents the pawn from advancing, the
 // position is drawn.
-int ScaleKNPK(const Pos *pos, int strongSide)
+int ScaleKNPK(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, KnightValueMg, 1));
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
@@ -843,9 +843,9 @@ int ScaleKNPK(const Pos *pos, int strongSide)
 
 // KNP vs KB. If knight can block bishop from taking pawn, it is a win.
 // Otherwise the position is drawn.
-int ScaleKNPKB(const Pos *pos, int strongSide)
+int ScaleKNPKB(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   Square pawnSq = lsb(pieces_p(PAWN));
   Square bishopSq = lsb(pieces_p(BISHOP));
@@ -866,9 +866,9 @@ int ScaleKNPKB(const Pos *pos, int strongSide)
 // is when the stronger side's pawn is far advanced and not on a rook
 // file; in this case it is often possible to win
 // (e.g. 8/4k3/3p4/3P4/6K1/8/8/8 w - - 0 1).
-int ScaleKPKP(const Pos *pos, int strongSide)
+int ScaleKPKP(const Pos *pos, unsigned strongSide)
 {
-  int weakSide = strongSide ^ 1;
+  unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, strongSide, VALUE_ZERO, 1));
   assert(verify_material(pos, weakSide,   VALUE_ZERO, 1));
@@ -878,7 +878,7 @@ int ScaleKPKP(const Pos *pos, int strongSide)
   Square bksq = normalize(pos, strongSide, square_of(weakSide, KING));
   Square psq  = normalize(pos, strongSide, square_of(strongSide, PAWN));
 
-  int us = strongSide == pos_stm() ? WHITE : BLACK;
+  unsigned us = strongSide == pos_stm() ? WHITE : BLACK;
 
   // If the pawn has advanced to the fifth rank or further, and is not a
   // rook pawn, it is too dangerous to assume that it is at least a draw.

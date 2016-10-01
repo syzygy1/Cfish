@@ -125,10 +125,13 @@ typedef struct Stack Stack;
 // the search tree.
 
 struct Pos {
+  Stack *st;
   // Board / game representation.
-  uint8_t board[64];
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
+  uint32_t sideToMove;
+  uint8_t chess960;
+  uint8_t board[64];
 #ifdef PEDANTIC
   uint8_t pieceCount[16];
   uint8_t pieceList[256];
@@ -137,11 +140,8 @@ struct Pos {
   uint8_t castlingRookSquare[16];
   Bitboard castlingPath[16];
 #endif
-  uint8_t sideToMove;
-  uint8_t chess960;
   uint16_t gamePly;
 
-  Stack *st;
   ExtMove *moveList;
 
   // Relevant mainly to the search of the root position.
@@ -182,10 +182,9 @@ void pos_set(Pos *pos, char *fen, int isChess960);
 void pos_fen(const Pos *pos, char *fen);
 void print_pos(Pos *pos);
 
-PURE Bitboard pos_attackers_to_occ(const Pos *pos, Square s, Bitboard occupied);
+//PURE Bitboard pos_attackers_to_occ(const Pos *pos, Square s, Bitboard occupied);
 PURE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
                               Bitboard *pinners);
-//Bitboard slider_blockers(Pos *pos, Bitboard sliders, Square s);
 
 PURE int is_legal(const Pos *pos, Move m);
 PURE int is_pseudo_legal(const Pos *pos, Move m);
@@ -344,6 +343,53 @@ INLINE void undo_null_move(Pos *pos)
 
   pos->st--;
   pos->sideToMove ^= 1;
+}
+
+// Inlining this seems to slow down.
+#if 0
+// slider_blockers() returns a bitboard of all pieces that are blocking
+// attacks on the square 's' from 'sliders'. A piece blocks a slider if
+// removing that piece from the board would result in a position where
+// square 's' is attacked. Both pinned pieces and discovered check
+// candidates are slider blockers and are calculated by calling this
+// function.
+
+INLINE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
+                                Bitboard *pinners)
+{
+  Bitboard result = 0, snipers;
+  *pinners = 0;
+
+  // Snipers are sliders that attack square 's'when a piece removed.
+  snipers = (  (PseudoAttacks[ROOK  ][s] & pieces_pp(QUEEN, ROOK))
+             | (PseudoAttacks[BISHOP][s] & pieces_pp(QUEEN, BISHOP))) & sliders;
+
+  while (snipers) {
+    Square sniperSq = pop_lsb(&snipers);
+    Bitboard b = between_bb(s, sniperSq) & pieces();
+
+    if (!more_than_one(b)) {
+      result |= b;
+      if (b & pieces_c(color_of(piece_on(s))))
+        *pinners |= sq_bb(sniperSq);
+    }
+  }
+  return result;
+}
+#endif
+
+// attackers_to() computes a bitboard of all pieces which attack a given
+// square. Slider attacks use the occupied bitboard to indicate occupancy.
+
+INLINE Bitboard pos_attackers_to_occ(const Pos *pos, Square s,
+                                     Bitboard occupied)
+{
+  return  (attacks_from_pawn(s, BLACK)    & pieces_cp(WHITE, PAWN))
+        | (attacks_from_pawn(s, WHITE)    & pieces_cp(BLACK, PAWN))
+        | (attacks_from_knight(s)         & pieces_p(KNIGHT))
+        | (attacks_bb_rook(s, occupied)   & pieces_pp(ROOK,   QUEEN))
+        | (attacks_bb_bishop(s, occupied) & pieces_pp(BISHOP, QUEEN))
+        | (attacks_from_king(s)           & pieces_p(KING));
 }
 
 #endif

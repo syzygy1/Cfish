@@ -58,6 +58,8 @@
 //#define PURE __attribute__((pure))
 #define PURE
 
+#define SMALL __attribute__((optimize("Os")))
+
 // Predefined macros hell:
 //
 // __GNUC__           Compiler is gcc, Clang or Intel on Linux

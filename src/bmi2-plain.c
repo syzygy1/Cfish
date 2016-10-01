@@ -10,7 +10,7 @@ Bitboard RookTable[102400];
 typedef unsigned (Fn)(Square, Bitboard);
 
 static void init_bmi2(Bitboard table[], Bitboard *attacks[], Bitboard masks[],
-                      Square deltas[], Fn index)
+                      int deltas[], Fn index)
 {
   Bitboard edges, b;
 

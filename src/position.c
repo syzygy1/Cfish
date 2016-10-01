@@ -181,7 +181,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   unsigned char col, row, token;
   Square sq = SQ_A8;
 
-  memset(pos, 0, offsetof(Pos, st));
+  memset(pos, 0, offsetof(Pos, moveList));
   Stack *st = pos->st = pos->stack;
   memset(st, 0, StateSize);
 #ifdef PEDANTIC
@@ -237,13 +237,10 @@ void pos_set(Pos *pos, char *fen, int isChess960)
 
     if (token == 'K')
       for (rsq = relative_square(c, SQ_H1); piece_on(rsq) != rook; --rsq);
-
     else if (token == 'Q')
       for (rsq = relative_square(c, SQ_A1); piece_on(rsq) != rook; ++rsq);
-
     else if (token >= 'A' && token <= 'H')
       rsq = make_square(token - 'A', relative_rank(c, RANK_1));
-
     else
       continue;
 
@@ -395,13 +392,18 @@ void pos_fen(const Pos *pos, char *str)
   *str++ = ' ';
 
   int cr = pos->st->castlingRights;
-//  int ch960 = is_chess960();
 
-// FIXME: Chess960
-  if (cr & WHITE_OO) *str++ = 'K';
-  if (cr & WHITE_OOO) *str++ = 'Q';
-  if (cr & BLACK_OO) *str++ = 'k';
-  if (cr & BLACK_OOO) *str++ = 'q';
+  if (!is_chess960()) {
+    if (cr & WHITE_OO) *str++ = 'K';
+    if (cr & WHITE_OOO) *str++ = 'Q';
+    if (cr & BLACK_OO) *str++ = 'k';
+    if (cr & BLACK_OOO) *str++ = 'q';
+  } else {
+    if (cr & WHITE_OO) *str++ = 'A' + file_of(castling_rook_square(WHITE | KING_SIDE));
+    if (cr & WHITE_OOO) *str++ = 'A' + file_of(castling_rook_square(WHITE | QUEEN_SIDE));
+    if (cr & BLACK_OO) *str++ = 'A' + file_of(castling_rook_square(BLACK | KING_SIDE));
+    if (cr & BLACK_OOO) *str++ = 'A' + file_of(castling_rook_square(BLACK | QUEEN_SIDE));
+  }
   if (!cr)
       *str++ = '-';
 
@@ -435,6 +437,9 @@ int game_phase(const Pos *pos)
 }
 
 
+// Turning slider_blockers() into an inline function was slower, even
+// though it should only add a single slightly optimised copy to evaluate().
+#if 1
 // slider_blockers() returns a bitboard of all pieces that are blocking
 // attacks on the square 's' from 'sliders'. A piece blocks a slider if
 // removing that piece from the board would result in a position where
@@ -464,8 +469,10 @@ Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
   }
   return result;
 }
+#endif
 
 
+#if 0
 // attackers_to() computes a bitboard of all pieces which attack a given
 // square. Slider attacks use the occupied bitboard to indicate occupancy.
 
@@ -478,6 +485,7 @@ Bitboard pos_attackers_to_occ(const Pos *pos, Square s, Bitboard occupied)
         | (attacks_bb_bishop(s, occupied) & pieces_pp(BISHOP, QUEEN))
         | (attacks_from_king(s)           & pieces_p(KING));
 }
+#endif
 
 
 // is_legal() tests whether a pseudo-legal move is legal
@@ -1315,11 +1323,12 @@ INLINE int see_ab(const Pos *pos, Move m, int alpha, int beta)
 
   occ ^= sq_bb(from) ^ sq_bb(to);
   int stm = color_of(piece_on(from));
-  Bitboard attackers = attackers_to_occ(to, occ) & occ, stmAttackers;
+  Bitboard attackers = attackers_to_occ(to, occ), stmAttackers;
   beta = -beta;
   int bound = beta;
 
   while (1) {
+    attackers &= occ;
     stm ^= 1;
     if (!(stmAttackers = attackers & pieces_c(stm))) break;
     if (    (stmAttackers & blockers_for_king(pos, stm))
@@ -1369,7 +1378,6 @@ INLINE int see_ab(const Pos *pos, Move m, int alpha, int beta)
         break;
     }
     swap = -swap;
-    attackers &= occ;
   }
 
   return bound == alpha ? alpha : -beta;
@@ -1403,6 +1411,7 @@ int see_test(Pos *pos, Move m, int value)
 // is_draw() tests whether the position is drawn by 50-move rule or by
 // repetition. It does not detect stalemates.
 
+__attribute__((optimize("Os")))
 int is_draw(const Pos *pos)
 {
   Stack *st = pos->st;
@@ -1428,7 +1437,7 @@ int is_draw(const Pos *pos)
 
 void pos_copy(Pos *dest, Pos *src)
 {
-  memcpy(dest, src, offsetof(Pos, st));
+  memcpy(dest, src, offsetof(Pos, moveList));
   dest->st = dest->stack;
   memcpy(dest->st, src->st, StateSize);
   set_check_info(dest);
