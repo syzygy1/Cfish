@@ -430,8 +430,8 @@ profile-build:
 	@rm -f *.o
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_use)
 	@echo ""
-	@echo "Step 4/4. Deleting profile data ..."
-	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_clean)
+	@echo "Step 4/4. NOT deleting profile data ..."
+#	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_clean)
 
 strip:
 	strip $(EXE)
