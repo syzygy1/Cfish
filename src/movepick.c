@@ -89,7 +89,7 @@ static Move pick_best(ExtMove *begin, ExtMove *end)
 // score() assigns a numerical value to each move in a move list. The moves with
 // highest values will be picked first.
 
-static void score_captures(Pos *pos)
+static void score_captures(const Pos *pos)
 {
   Stack *st = pos->st;
 
@@ -101,7 +101,7 @@ static void score_captures(Pos *pos)
               - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
 }
 
-static void score_quiets(Pos *pos)
+static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
   HistoryStats *history = pos->history;
@@ -110,18 +110,27 @@ static void score_quiets(Pos *pos)
   CounterMoveStats *cm = (st-1)->counterMoves;
   CounterMoveStats *fm = (st-2)->counterMoves;
   CounterMoveStats *f2 = (st-4)->counterMoves;
-//if(!cm || !fm || !f2)printf("st->ply = %d (%d,%d,%d)\n", st->ply, !!cm, !!fm, !!f2);
-  int c = pos_stm();
 
-  for (ExtMove *m = st->cur; m < st->endMoves; m++)
-    m->value =   (*history)[moved_piece(m->move)][to_sq(m->move)]
-              + (cm ? (*cm)[moved_piece(m->move)][to_sq(m->move)] : 0)
-              + (fm ? (*fm)[moved_piece(m->move)][to_sq(m->move)] : 0)
-              + (f2 ? (*f2)[moved_piece(m->move)][to_sq(m->move)] : 0)
+  CounterMoveStats *tmp = &(*pos->counterMoveHistory)[0][0];
+  if (!cm) cm = tmp;
+  if (!fm) fm = tmp;
+  if (!f2) f2 = tmp;
+
+  uint32_t c = pos_stm();
+
+  for (ExtMove *m = st->cur; m < st->endMoves; m++) {
+    uint32_t move = m->move & 4095;
+    uint32_t to = move & 63;
+    uint32_t from = move >> 6;
+    m->value =  (*history)[piece_on(from)][to]
+              + (*cm)[piece_on(from)][to]
+              + (*fm)[piece_on(from)][to]
+              + (*f2)[piece_on(from)][to]
               + ft_get(*fromTo, c, m->move);
+  }
 }
 
-static void score_evasions(Pos *pos)
+static void score_evasions(const Pos *pos)
 {
   Stack *st = pos->st;
   // Try winning and equal captures ordered by MVV/LVA, then non-captures
@@ -130,7 +139,7 @@ static void score_evasions(Pos *pos)
 
   HistoryStats *history = pos->history;
   FromToStats *fromTo = pos->fromTo;
-  int c = pos_stm();
+  uint32_t c = pos_stm();
   Value see;
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
@@ -147,7 +156,7 @@ static void score_evasions(Pos *pos)
 
 // next_move() returns the next pseudo-legal move to be searched.
 
-Move next_move(Pos *pos)
+Move next_move(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;

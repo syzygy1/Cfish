@@ -378,7 +378,7 @@ char *uci_move(char *str, Move m, int chess960)
 // uci_to_move() converts a string representing a move in coordinate
 // notation (g1f3, a7a8q) to the corresponding legal Move, if any.
 
-Move uci_to_move(Pos *pos, char *str)
+Move uci_to_move(const Pos *pos, char *str)
 {
   if (strlen(str) == 5) // Junior could send promotion piece in uppercase
     str[4] = tolower(str[4]);

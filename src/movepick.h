@@ -94,11 +94,11 @@ INLINE Value ft_get(FromToStats ft, int c, Move m)
 #define ST_PROBCUT_GEN             20
 #define ST_PROBCUT_2               21
 
-Move next_move(Pos *pos);
+Move next_move(const Pos *pos);
 
 // Initialisation of move picker data.
 
-INLINE void mp_init(Pos *pos, Move ttm, Depth depth)
+INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
 {
   assert(depth > DEPTH_ZERO);
 
@@ -117,7 +117,7 @@ INLINE void mp_init(Pos *pos, Move ttm, Depth depth)
   }
 }
 
-INLINE void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
+INLINE void mp_init_q(const Pos *pos, Move ttm, Depth depth, Square s)
 {
   assert (depth <= DEPTH_ZERO);
 
@@ -142,7 +142,7 @@ INLINE void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
   }
 }
 
-INLINE void mp_init_pc(Pos *pos, Move ttm, Value threshold)
+INLINE void mp_init_pc(const Pos *pos, Move ttm, Value threshold)
 {
   assert(!pos_checkers());
 
