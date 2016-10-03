@@ -68,21 +68,19 @@ INLINE ExtMove *partition(ExtMove *first, ExtMove *last)
   }
 }
 
-// pick_best() finds the best move in the range (begin, end) and moves
-// it to the front. It's faster than sorting all the moves in advance
-// when there are few moves, e.g., the possible captures.
+// pick_best() finds the best move in the range (begin, end).
 
 static Move pick_best(ExtMove *begin, ExtMove *end)
 {
-  ExtMove *p, *q, tmp;
+  ExtMove *p, *q;
 
   for (p = begin, q = begin + 1; q < end; q++)
     if (q->value > p->value)
       p = q;
-  tmp = *begin;
-  *begin = *p;
-  *p = tmp;
-  return begin->move;
+  Move m = p->move;
+  *p = *begin;
+
+  return m;
 }
 
 
@@ -101,6 +99,7 @@ static void score_captures(const Pos *pos)
               - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
 }
 
+SMALL
 static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
@@ -126,7 +125,7 @@ static void score_quiets(const Pos *pos)
               + (*cm)[piece_on(from)][to]
               + (*fm)[piece_on(from)][to]
               + (*f2)[piece_on(from)][to]
-              + ft_get(*fromTo, c, m->move);
+              + ft_get(*fromTo, c, move);
   }
 }
 
