@@ -299,7 +299,7 @@ INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
   assert(Type == CAPTURES || Type == QUIETS || Type == NON_EVASIONS);
   assert(!pos_checkers());
 
-  int us = pos_stm();
+  uint32_t us = pos_stm();
 
   Bitboard target =  Type == CAPTURES     ?  pieces_c(us ^ 1)
                    : Type == QUIETS       ? ~pieces()
@@ -333,7 +333,7 @@ ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 {
   assert(!pos_checkers());
 
-  int us = pos_stm();
+  uint32_t us = pos_stm();
   Bitboard dc = discovered_check_candidates(pos);
 
   while (dc) {
@@ -363,7 +363,7 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 {
   assert(pos_checkers());
 
-  int us = pos_stm();
+  uint32_t us = pos_stm();
   Square ksq = square_of(us, KING);
   Bitboard sliderAttacks = 0;
   Bitboard sliders = pos_checkers() & ~pieces_pp(KNIGHT, PAWN);
@@ -394,6 +394,7 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 
 
 // generate_legal() generates all the legal moves in the given position
+SMALL
 ExtMove *generate_legal(const Pos *pos, ExtMove *list)
 {
   Bitboard pinned = pinned_pieces(pos, pos_stm());

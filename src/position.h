@@ -279,17 +279,17 @@ INLINE Bitboard discovered_check_candidates(const Pos *pos)
   return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
 }
 
-INLINE Bitboard blockers_for_king(const Pos *pos, int c)
+INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
 {
   return pos->st->blockersForKing[c];
 }
 
-INLINE Bitboard pinned_pieces(const Pos *pos, int c)
+INLINE Bitboard pinned_pieces(const Pos *pos, uint32_t c)
 {
   return pos->st->blockersForKing[c] & pieces_c(c);
 }
 
-INLINE int pawn_passed(const Pos *pos, int c, Square s)
+INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
 {
   return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_mask(c, s));
 }

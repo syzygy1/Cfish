@@ -49,7 +49,7 @@ const char *PieceToChar = " PNBRQK  pnbrqk";
 int failed_step;
 
 #ifdef PEDANTIC
-INLINE void put_piece(Pos *pos, int c, int piece, Square s)
+INLINE void put_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
 {
   pos->board[s] = piece;
   pos->byTypeBB[0] |= sq_bb(s);
@@ -59,7 +59,7 @@ INLINE void put_piece(Pos *pos, int c, int piece, Square s)
   pos->pieceList[pos->index[s]] = s;
 }
 
-INLINE void remove_piece(Pos *pos, int c, int piece, Square s)
+INLINE void remove_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
 {
   // WARNING: This is not a reversible operation.
   pos->byTypeBB[0] ^= sq_bb(s);
@@ -72,7 +72,7 @@ INLINE void remove_piece(Pos *pos, int c, int piece, Square s)
   pos->pieceList[pos->pieceCount[piece]] = SQ_NONE;
 }
 
-INLINE void move_piece(Pos *pos, int c, int piece, Square from, Square to)
+INLINE void move_piece(Pos *pos, uint32_t c, uint32_t piece, Square from, Square to)
 {
   // index[from] is not updated and becomes stale. This works as long as
   // index[] is accessed just by known occupied squares.
@@ -97,7 +97,7 @@ INLINE void set_check_info(Pos *pos)
   st->blockersForKing[WHITE] = slider_blockers(pos, pieces_c(BLACK), square_of(WHITE, KING), &st->pinnersForKing[WHITE]);
   st->blockersForKing[BLACK] = slider_blockers(pos, pieces_c(WHITE), square_of(BLACK, KING), &st->pinnersForKing[BLACK]);
 
-  int them = pos_stm() ^ 1;
+  uint32_t them = pos_stm() ^ 1;
   st->ksq = square_of(them, KING);
 
   st->checkSquares[PAWN]   = attacks_from_pawn(st->ksq, them);
