@@ -27,44 +27,51 @@
 
 // Our insertion sort, which is guaranteed to be stable, as it should be.
 
-INLINE void insertion_sort(ExtMove *begin, ExtMove *end)
+INLINE void insertion_sort(Move *m, int *s, int num)
 {
-  ExtMove tmp, *p, *q;
+  int i, j;
 
-  for (p = begin + 1; p < end; p++) {
-    tmp = *p;
-    for (q = p; q != begin && (q-1)->value < tmp.value; --q)
-      *q = *(q-1);
-    *q = tmp;
+  for (i = 1; i < num; i++) {
+    Move tmp = m[i];
+    int tmpVal = s[i];
+    for (j = i; j != 0 && s[j - 1] < tmpVal; --j) {
+      m[j] = m[j-1];
+      s[j] = s[j-1];
+    }
+    m[j] = tmp;
+    s[j] = tmpVal;
   }
 }
 
 // Our non-stable partition function, the one that Stockfish uses.
 
-INLINE ExtMove *partition(ExtMove *first, ExtMove *last)
+INLINE int partition(Move *m, int *s, int num)
 {
-  ExtMove tmp;
+  int i = 0;
 
   while (1) {
     while (1)
-      if (first == last)
-        return first;
-      else if (first->value > 0)
-        first++;
+      if (i == num)
+        return i;
+      else if (s[i] > 0)
+        i++;
       else
         break;
-    last--;
+    num--;
     while (1)
-      if (first == last)
-        return first;
-      else if (!(last->value > 0))
-        last--;
+      if (i == num)
+        return i;
+      else if (!(s[num] > 0))
+        num--;
       else
         break;
-    tmp = *first;
-    *first = *last;
-    *last = tmp;
-    first++;
+    Move tmp = m[i];
+    m[i] = m[num];
+    m[num] = tmp;
+    int tmpVal = s[i];
+    s[i] = s[num];
+    s[num] = tmpVal;
+    i++;
   }
 }
 
@@ -72,17 +79,24 @@ INLINE ExtMove *partition(ExtMove *first, ExtMove *last)
 // it to the front. It's faster than sorting all the moves in advance
 // when there are few moves, e.g., the possible captures.
 
-static Move pick_best(ExtMove *begin, ExtMove *end)
+static Move pick_best(Move *begin, Move *end, int *s)
 {
-  ExtMove *p, *q, tmp;
+  Move *p, *q;
 
-  for (p = begin, q = begin + 1; q < end; q++)
-    if (q->value > p->value)
+  int best = *s;
+  int tmp = best;
+  int *r = s++;
+  for (p = begin, q = begin + 1; q < end; q++, s++)
+    if (*s > best) {
+      best = *s;
       p = q;
-  tmp = *begin;
-  *begin = *p;
-  *p = tmp;
-  return begin->move;
+      r = s;
+    }
+  Move move = *p;
+  *p = *begin;
+  *r = tmp;
+
+  return move;
 }
 
 
@@ -96,9 +110,11 @@ static void score_captures(const Pos *pos)
   // Winning and equal captures in the main search are ordered by MVV,
   // preferring captures near our home rank.
 
-  for (ExtMove *m = st->cur; m < st->endMoves; m++)
-    m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-              - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
+  int *s = st->curScore = (st-1)->endScore;
+  for (Move *m = st->cur; m < st->endMoves; m++)
+    *s++ =  PieceValue[MG][piece_on(to_sq(*m))]
+          - (Value)(200 * relative_rank_s(pos_stm(), to_sq(*m)));
+  st->endScore = s;
 }
 
 static void score_quiets(const Pos *pos)
@@ -118,15 +134,16 @@ static void score_quiets(const Pos *pos)
 
   uint32_t c = pos_stm();
 
-  for (ExtMove *m = st->cur; m < st->endMoves; m++) {
-    uint32_t move = m->move & 4095;
+  int *s = st->endScore = (st-1)->endScore;
+  for (Move *m = st->cur; m < st->endMoves; m++) {
+    uint32_t move = *m & 4095;
     uint32_t to = move & 63;
     uint32_t from = move >> 6;
-    m->value =  (*history)[piece_on(from)][to]
-              + (*cm)[piece_on(from)][to]
-              + (*fm)[piece_on(from)][to]
-              + (*f2)[piece_on(from)][to]
-              + ft_get(*fromTo, c, m->move);
+    *s++ =  (*history)[piece_on(from)][to]
+          + (*cm)[piece_on(from)][to]
+          + (*fm)[piece_on(from)][to]
+          + (*f2)[piece_on(from)][to]
+          + ft_get(*fromTo, c, move);
   }
 }
 
@@ -142,15 +159,17 @@ static void score_evasions(const Pos *pos)
   uint32_t c = pos_stm();
   Value see;
 
-  for (ExtMove *m = st->cur; m < st->endMoves; m++)
-    if ((see = see_sign(pos, m->move)) < VALUE_ZERO)
-      m->value = see - HistoryStats_Max; // At the bottom
-    else if (is_capture(pos, m->move))
-      m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - (Value)type_of_p(moved_piece(m->move)) + HistoryStats_Max;
+  int *s = st->endScore;
+  for (Move *m = st->cur; m < st->endMoves; m++, s++)
+    if ((see = see_sign(pos, *m)) < VALUE_ZERO)
+      *s = see - HistoryStats_Max; // At the bottom
+    else if (is_capture(pos, *m))
+      *s =  PieceValue[MG][piece_on(to_sq(*m))]
+          - (Value)type_of_p(moved_piece(*m)) + HistoryStats_Max;
     else
-      m->value =  (*history)[moved_piece(m->move)][to_sq(m->move)]
-                + ft_get(*fromTo, c, m->move);
+      *s =  (*history)[moved_piece(*m)][to_sq(*m)]
+          + ft_get(*fromTo, c, *m);
+  st->endScore = s;
 }
 
 
@@ -166,6 +185,7 @@ Move next_move(const Pos *pos)
   case ST_MAIN_SEARCH: case ST_EVASIONS: case ST_QSEARCH_WITH_CHECKS:
   case ST_QSEARCH_WITHOUT_CHECKS: case ST_PROBCUT:
     st->endMoves = (st-1)->endMoves;
+    st->endScore = (st-1)->endScore;
     st->stage++;
     return st->ttMove;
 
@@ -177,13 +197,13 @@ Move next_move(const Pos *pos)
 
   case ST_GOOD_CAPTURES:
     while (st->cur < st->endMoves) {
-      move = pick_best(st->cur++, st->endMoves);
+      move = pick_best(st->cur++, st->endMoves, st->curScore++);
       if (move != st->ttMove) {
         if (see_test(pos, move, 0))
           return move;
 
         // Losing capture, move it to the beginning of the array.
-        (st->endBadCaptures++)->move = move;
+        *st->endBadCaptures++ = move;
       }
     }
     st->stage++;
@@ -214,15 +234,15 @@ Move next_move(const Pos *pos)
     st->endMoves = generate_quiets(pos, st->cur);
     score_quiets(pos);
     if (st->depth < 3 * ONE_PLY) {
-      ExtMove *goodQuiet = partition(st->cur, st->endMoves);
-      insertion_sort(st->cur, goodQuiet);
+      int goodQuiet = partition(st->cur, st->endScore, st->endMoves - st->cur);
+      insertion_sort(st->cur, st->endScore, goodQuiet);
     } else
-      insertion_sort(st->cur, st->endMoves);
+      insertion_sort(st->cur, st->endScore, st->endMoves - st->cur);
     st->stage++;
 
   case ST_QUIET:
     while (st->cur < st->endMoves) {
-      move = (st->cur++)->move;
+      move = *st->cur++;
       if (   move != st->ttMove && move != st->killers[0]
           && move != st->killers[1] && move != st->countermove)
         return move;
@@ -232,11 +252,12 @@ Move next_move(const Pos *pos)
 
   case ST_BAD_CAPTURES:
     if (st->cur < st->endBadCaptures)
-      return (st->cur++)->move;
+      return *st->cur++;
     break;
 
   case ST_ALL_EVASIONS:
     st->cur = (st-1)->endMoves;
+    st->endScore = st->curScore = (st-1)->endScore;
     st->endMoves = generate_evasions(pos, st->cur);
     if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
       score_evasions(pos);
@@ -252,7 +273,7 @@ Move next_move(const Pos *pos)
 
   case ST_QCAPTURES_CHECKS: case ST_REMAINING:
     while (st->cur < st->endMoves) {
-      move = pick_best(st->cur++, st->endMoves);
+      move = pick_best(st->cur++, st->endMoves, st->curScore++);
       if (move != st->ttMove)
         return move;
     }
@@ -264,7 +285,7 @@ Move next_move(const Pos *pos)
 
   case ST_CHECKS:
     while (st->cur < st->endMoves) {
-      move = (st->cur++)->move;
+      move = *st->cur++;
       if (move != st->ttMove)
         return move;
     }
@@ -278,7 +299,7 @@ Move next_move(const Pos *pos)
 
   case ST_RECAPTURES:
     while (st->cur < st->endMoves) {
-      move = pick_best(st->cur++, st->endMoves);
+      move = pick_best(st->cur++, st->endMoves, st->curScore++);
       if (to_sq(move) == st->recaptureSquare)
         return move;
     }
@@ -292,7 +313,7 @@ Move next_move(const Pos *pos)
 
   case ST_PROBCUT_2:
     while (st->cur < st->endMoves) {
-      move = pick_best(st->cur++, st->endMoves);
+      move = pick_best(st->cur++, st->endMoves, st->curScore++);
       if (move != st->ttMove && see_test(pos, move, st->threshold + 1))
         return move;
     }

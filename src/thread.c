@@ -74,7 +74,8 @@ void thread_init(void *arg)
     pos->fromTo = numa_alloc(sizeof(FromToStats));
     pos->rootMoves = numa_alloc(sizeof(RootMoves));
     pos->stack = numa_alloc((5 + MAX_PLY + 10) * sizeof(Stack));
-    pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
+    pos->moveList = numa_alloc(10000 * sizeof(Move));
+    pos->scoreList = numa_alloc(10000 * sizeof(int));
   } else {
     pos = calloc(sizeof(Pos), 1);
     pos->pawnTable = calloc(16384 * sizeof(PawnEntry), 1);
@@ -84,7 +85,8 @@ void thread_init(void *arg)
     pos->fromTo = calloc(sizeof(FromToStats), 1);
     pos->rootMoves = calloc(sizeof(RootMoves), 1);
     pos->stack = calloc((5 + MAX_PLY + 10) * sizeof(Stack), 1);
-    pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
+    pos->moveList = calloc(10000 * sizeof(Move), 1);
+    pos->scoreList = calloc(10000 * sizeof(int), 1);
   }
   pos->thread_idx = idx;
   pos->stack += 5;
@@ -175,7 +177,8 @@ void thread_destroy(Pos *pos)
     numa_free(pos->fromTo, sizeof(FromToStats));
     numa_free(pos->rootMoves, sizeof(RootMoves));
     numa_free(pos->stack - 5, (5 + MAX_PLY + 10) * sizeof(Stack));
-    numa_free(pos->moveList, 10000 * sizeof(ExtMove));
+    numa_free(pos->moveList, 10000 * sizeof(Move));
+    numa_free(pos->scoreList, 10000 * sizeof(int));
     numa_free(pos, sizeof(Pos));
   } else {
     free(pos->pawnTable);
@@ -186,6 +189,7 @@ void thread_destroy(Pos *pos)
     free(pos->rootMoves);
     free(pos->stack - 5);
     free(pos->moveList);
+    free(pos->scoreList);
     free(pos);
   }
 }
@@ -401,16 +405,16 @@ void threads_start_thinking(Pos *root, LimitsType *limits)
   Signals.stopOnPonderhit = Signals.stop = 0;
   Limits = *limits;
 
-  ExtMove list[MAX_MOVES];
-  ExtMove *end = generate_legal(root, list);
+  Move list[MAX_MOVES];
+  Move *end = generate_legal(root, list);
 
   end = TB_filter_root_moves(root, list, end);
 
-  ExtMove *p = list;
-  for (ExtMove *m = p; m < end; m++) {
+  Move *p = list;
+  for (Move *m = p; m < end; m++) {
     int i;
     for (i = 0; i < limits->num_searchmoves; i++)
-      if (m->move == limits->searchmoves[i])
+      if (*m == limits->searchmoves[i])
         break;
     if (i == limits->num_searchmoves)
       *p++ = *m;
@@ -425,7 +429,7 @@ void threads_start_thinking(Pos *root, LimitsType *limits)
     RootMoves *rm = pos->rootMoves;
     rm->size = end - list;
     for (size_t i = 0; i < rm->size; i++) {
-      rm->move[i].pv[0] = list[i].move;
+      rm->move[i].pv[0] = list[i];
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
     }

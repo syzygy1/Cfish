@@ -233,15 +233,15 @@ void search_clear()
 
 static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
 {
-  ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
+  Move *m = (pos->st-1)->endMoves;
+  Move *last = pos->st->endMoves = generate_legal(pos, m);
   for (; m < last; m++) {
-    do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+    do_move(pos, *m, gives_check(pos, pos->st, *m));
     if (depth == 0) {
       nodes += generate_legal(pos, last) - last;
     } else
       nodes = perft_helper(pos, depth - ONE_PLY, nodes);
-    undo_move(pos, m->move);
+    undo_move(pos, *m);
   }
   return nodes;
 }
@@ -251,22 +251,22 @@ uint64_t perft(Pos *pos, Depth depth)
   uint64_t cnt, nodes = 0;
   char buf[16];
 
-  ExtMove *m = pos->moveList;
-  ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
+  Move *m = pos->moveList;
+  Move *last = pos->st->endMoves = generate_legal(pos, m);
   for (; m < last; m++) {
     if (depth <= ONE_PLY) {
       cnt = 1;
       nodes++;
     } else {
-      do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+      do_move(pos, *m, gives_check(pos, pos->st, *m));
       if (depth == 2 * ONE_PLY)
         cnt = generate_legal(pos, last) - last;
       else
         cnt = perft_helper(pos, depth - 3 * ONE_PLY, 0);
       nodes += cnt;
-      undo_move(pos, m->move);
+      undo_move(pos, *m);
     }
-    printf("%s: %"PRIu64"\n", uci_move(buf, m->move, is_chess960()), cnt);
+    printf("%s: %"PRIu64"\n", uci_move(buf, *m, is_chess960()), cnt);
   }
   return nodes;
 }
@@ -375,6 +375,7 @@ void thread_search(Pos *pos)
   for (int i = -5; i < 3; i++)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;
+  (ss-1)->endScore = pos->scoreList;
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
@@ -841,10 +842,10 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
 
   if (ttHit) {
     Move m = tte_move(tte); // Local copy to be SMP safe
-    ExtMove list[MAX_MOVES];
-    ExtMove *last = generate_legal(pos, list);
-    for (ExtMove *p = list; p < last; p++)
-      if (p->move == m) {
+    Move list[MAX_MOVES];
+    Move *last = generate_legal(pos, list);
+    for (Move *p = list; p < last; p++)
+      if (*p == m) {
         rm->pv[rm->pv_size++] = m;
         break;
       }
@@ -854,7 +855,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
   return rm->pv_size > 1;
 }
 
-ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
+Move *TB_filter_root_moves(Pos *pos, Move *begin, Move *last)
 {
   TB_RootInTB = 0;
   TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);

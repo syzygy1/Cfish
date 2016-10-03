@@ -405,13 +405,6 @@ typedef Value CounterMoveStats[16][64];
 typedef CounterMoveStats CounterMoveHistoryStats[16][64];
 typedef Value FromToStats[2][4096];
 
-struct ExtMove {
-  Move move;
-  Value value;
-};
-
-typedef struct ExtMove ExtMove;
-
 struct PSQT {
   Score psq[16][64];
 };

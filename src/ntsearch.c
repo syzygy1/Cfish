@@ -218,6 +218,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
+    ss->endScore = (ss-1)->endScore;
     (ss+1)->skipEarlyPruning = 1;
     nullValue = depth-R < ONE_PLY ? -qsearch_NonPV_false(pos, ss+1, -beta, DEPTH_ZERO)
                                   : - search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);

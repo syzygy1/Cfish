@@ -95,7 +95,8 @@ struct Stack {
   Value threshold;
   uint8_t stage;
   uint8_t recaptureSquare;
-  ExtMove *cur, *endMoves, *endBadCaptures;
+  Move *cur, *endMoves, *endBadCaptures;
+  int *curScore, *endScore;
 
   // CheckInfo data
   Bitboard blockersForKing[2];
@@ -142,7 +143,8 @@ struct Pos {
 #endif
   uint16_t gamePly;
 
-  ExtMove *moveList;
+  Move *moveList;
+  int *scoreList;
 
   // Relevant mainly to the search of the root position.
   RootMoves *rootMoves;

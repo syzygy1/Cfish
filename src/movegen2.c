@@ -32,9 +32,9 @@
 #define LEGAL        5
 
 
-INLINE ExtMove *generate_castling(const Pos *pos, ExtMove *list, int us,
-                                  const int Cr, const int Checks,
-                                  const int Chess960)
+INLINE Move *generate_castling(const Pos *pos, Move *list, int us,
+                               const int Cr, const int Checks,
+                               const int Chess960)
 {
   const int KingSide = (Cr == WHITE_OO || Cr == BLACK_OO);
 
@@ -73,36 +73,35 @@ INLINE ExtMove *generate_castling(const Pos *pos, ExtMove *list, int us,
   if (Checks && !gives_check(pos, pos->st, m))
     return list;
 
-  (list++)->move = m;
+  *list++ = m;
   return list;
 }
 
 
-INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
-                                const int Type, const int Delta)
+INLINE Move *make_promotions(Move *list, Square to, Square ksq, const int Type,
+                             const int Delta)
 {
   if (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS)
-    (list++)->move = make_promotion(to - Delta, to, QUEEN);
+    *list++ = make_promotion(to - Delta, to, QUEEN);
 
   if (Type == QUIETS || Type == EVASIONS || Type == NON_EVASIONS) {
-    (list++)->move = make_promotion(to - Delta, to, ROOK);
-    (list++)->move = make_promotion(to - Delta, to, BISHOP);
-    (list++)->move = make_promotion(to - Delta, to, KNIGHT);
+    *list++ = make_promotion(to - Delta, to, ROOK);
+    *list++ = make_promotion(to - Delta, to, BISHOP);
+    *list++ = make_promotion(to - Delta, to, KNIGHT);
   }
 
   // Knight promotion is the only promotion that can give a direct check
   // that's not already included in the queen promotion.
   if (   Type == QUIET_CHECKS
       && (StepAttacksBB[W_KNIGHT][to] & sq_bb(ksq)))
-    (list++)->move = make_promotion(to - Delta, to, KNIGHT);
+    *list++ = make_promotion(to - Delta, to, KNIGHT);
 
   return list;
 }
 
 
-INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
-                                    Bitboard target, const int Us,
-                                    const int Type)
+INLINE Move *generate_pawn_moves(const Pos *pos, Move *list, Bitboard target,
+                                 const int Us, const int Type)
 {
   // Compute our parametrized parameters at compile time, named according to
   // the point of view of white side.
@@ -155,12 +154,12 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 
     while (b1) {
       Square to = pop_lsb(&b1);
-      (list++)->move = make_move(to - Up, to);
+      *list++ = make_move(to - Up, to);
     }
 
     while (b2) {
       Square to = pop_lsb(&b2);
-      (list++)->move = make_move(to - Up - Up, to);
+      *list++ = make_move(to - Up - Up, to);
     }
   }
 
@@ -193,12 +192,12 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 
     while (b1) {
       Square to = pop_lsb(&b1);
-      (list++)->move = make_move(to - Right, to);
+      *list++ = make_move(to - Right, to);
     }
 
     while (b2) {
       Square to = pop_lsb(&b2);
-      (list++)->move = make_move(to - Left, to);
+      *list++ = make_move(to - Left, to);
     }
 
     if (ep_square() != 0) {
@@ -215,7 +214,7 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
       assert(b1);
 
       while (b1)
-        (list++)->move = make_enpassant(pop_lsb(&b1), ep_square());
+        *list++ = make_enpassant(pop_lsb(&b1), ep_square());
     }
   }
 
@@ -223,8 +222,8 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 }
 
 
-INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
-                               Bitboard target, const int Pt, const int Checks)
+INLINE Move *generate_moves(const Pos *pos, Move *list, int us,
+                            Bitboard target, const int Pt, const int Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
@@ -246,15 +245,15 @@ INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
       b &= pos->st->checkSquares[Pt];
 
     while (b)
-      (list++)->move = make_move(from, pop_lsb(&b));
+      *list++ = make_move(from, pop_lsb(&b));
   }
 
   return list;
 }
 
 
-INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
-                             const int Us, const int Type)
+INLINE Move *generate_all(const Pos *pos, Move *list, Bitboard target,
+                          const int Us, const int Type)
 {
   const int Checks = Type == QUIET_CHECKS;
 
@@ -268,7 +267,7 @@ INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
     Square ksq = square_of(Us, KING);
     Bitboard b = attacks_from_king(ksq) & target;
     while (b)
-      (list++)->move = make_move(ksq, pop_lsb(&b));
+      *list++ = make_move(ksq, pop_lsb(&b));
   }
 
   if (Type != CAPTURES && Type != EVASIONS && can_castle_c(Us)) {
@@ -294,7 +293,7 @@ INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
 // generate_non_evasions() generates all pseudo-legal captures and
 // non-captures.
 
-INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
+INLINE Move *generate(const Pos *pos, Move *list, const int Type)
 {
   assert(Type == CAPTURES || Type == QUIETS || Type == NON_EVASIONS);
   assert(!pos_checkers());
@@ -311,17 +310,17 @@ INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
 
 // "template" instantiations
 
-ExtMove *generate_captures(const Pos *pos, ExtMove *list)
+Move *generate_captures(const Pos *pos, Move *list)
 {
   return generate(pos, list, CAPTURES);
 }
 
-ExtMove *generate_quiets(const Pos *pos, ExtMove *list)
+Move *generate_quiets(const Pos *pos, Move *list)
 {
   return generate(pos, list, QUIETS);
 }
 
-ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
+Move *generate_non_evasions(const Pos *pos, Move *list)
 {
   return generate(pos, list, NON_EVASIONS);
 }
@@ -329,7 +328,7 @@ ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
 
 // generate_quiet_checks() generates all pseudo-legal non-captures and
 // knight underpromotions that give check.
-ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
+Move *generate_quiet_checks(const Pos *pos, Move *list)
 {
   assert(!pos_checkers());
 
@@ -349,7 +348,7 @@ ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
       b &= ~PseudoAttacks[QUEEN][pos->st->ksq];
 
     while (b)
-      (list++)->move = make_move(from, pop_lsb(&b));
+      *list++ = make_move(from, pop_lsb(&b));
   }
 
   return us == WHITE ? generate_all(pos, list, ~pieces(), WHITE, QUIET_CHECKS)
@@ -359,7 +358,7 @@ ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 
 // generate_evasions() generates all pseudo-legal check evasions when the
 // side to move is in check.
-ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
+Move *generate_evasions(const Pos *pos, Move *list)
 {
   assert(pos_checkers());
 
@@ -379,7 +378,7 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
   // Generate evasions for king, capture and non capture moves
   Bitboard b = attacks_from_king(ksq) & ~pieces_c(us) & ~sliderAttacks;
   while (b)
-      (list++)->move = make_move(ksq, pop_lsb(&b));
+      *list++ = make_move(ksq, pop_lsb(&b));
 
   if (more_than_one(pos_checkers()))
       return list; // Double check, only a king move can save the day
@@ -394,19 +393,19 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 
 
 // generate_legal() generates all the legal moves in the given position
-ExtMove *generate_legal(const Pos *pos, ExtMove *list)
+Move *generate_legal(const Pos *pos, Move *list)
 {
   Bitboard pinned = pinned_pieces(pos, pos_stm());
   Square ksq = square_of(pos_stm(), KING);
-  ExtMove *cur = list;
+  Move *cur = list;
 
   list = pos_checkers() ? generate_evasions(pos, list)
                         : generate_non_evasions(pos, list);
   while (cur != list)
-    if (   (pinned || from_sq(cur->move) == ksq
-                   || type_of_m(cur->move) == ENPASSANT)
-        && !is_legal(pos, cur->move))
-      cur->move = (--list)->move;
+    if (   (pinned || from_sq(*cur) == ksq
+                   || type_of_m(*cur) == ENPASSANT)
+        && !is_legal(pos, *cur))
+      *cur = *--list;
     else
       ++cur;
 

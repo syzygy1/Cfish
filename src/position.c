@@ -618,10 +618,10 @@ int is_pseudo_legal(const Pos *pos, Move m)
 
   if (unlikely(type_of_m(m) == CASTLING)) {
     if (pos_checkers()) return 0;
-    ExtMove list[MAX_MOVES];
-    ExtMove *end = generate_quiets(pos, list);
-    for (ExtMove *p = list; p < end; p++)
-      if (p->move == m) return 1;
+    Move list[MAX_MOVES];
+    Move *end = generate_quiets(pos, list);
+    for (Move *p = list; p < end; p++)
+      if (*p == m) return 1;
     return 0;
   }
 

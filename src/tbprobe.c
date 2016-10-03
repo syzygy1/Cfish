@@ -286,16 +286,16 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
 }
 
 // Add underpromotion captures to list of captures.
-static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
+static Move *add_underprom_caps(Pos *pos, Move *m, Move *end)
 {
-  ExtMove *extra = end;
+  Move *extra = end;
 
   for (; m < end; m++) {
-    Move move = m->move;
+    Move move = *m;
     if (type_of_m(move) == PROMOTION && piece_on(to_sq(move))) {
-      (*extra++).move = (Move)(move - (1 << 12));
-      (*extra++).move = (Move)(move - (2 << 12));
-      (*extra++).move = (Move)(move - (3 << 12));
+      *extra++ = (Move)(move - (1 << 12));
+      *extra++ = (Move)(move - (2 << 12));
+      *extra++ = (Move)(move - (3 << 12));
     }
   }
 
@@ -305,8 +305,8 @@ static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
 static int probe_ab(Pos *pos, int alpha, int beta, int *success)
 {
   int v;
-  ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *end;
+  Move *m = (pos->st-1)->endMoves;
+  Move *end;
 
   // Generate (at least) all legal captures including (under)promotions.
   // It is OK to generate more, as long as they are filtered out below.
@@ -319,7 +319,7 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
   pos->st->endMoves = end;
 
   for (; m < end; m++) {
-    Move move = m->move;
+    Move move = *m;
     if (!is_capture(pos, move) || !is_legal(pos, move))
       continue;
     do_move(pos, move, gives_check(pos, pos->st, move));
@@ -358,8 +358,8 @@ int TB_probe_wdl(Pos *pos, int *success)
   *success = 1;
 
   // Generate (at least) all legal en passant captures.
-  ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *end;
+  Move *m = (pos->st-1)->endMoves;
+  Move *end;
 
   // Generate (at least) all legal captures including (under)promotions.
   if (!pos_checkers()) {
@@ -376,7 +376,7 @@ int TB_probe_wdl(Pos *pos, int *success)
   // better ep captures if they exist.
 
   for (; m < end; m++) {
-    Move move = m->move;
+    Move move = *m;
     if (!is_capture(pos, move) || !is_legal(pos, move))
       continue;
     do_move(pos, move, gives_check(pos, pos->st, move));
@@ -426,14 +426,14 @@ int TB_probe_wdl(Pos *pos, int *success)
   if (best_ep > -3 && v == 0) {
     // Check for stalemate in the position with ep captures.
     for (m = (pos->st-1)->endMoves; m < end; m++) {
-      Move move = m->move;
+      Move move = *m;
       if (type_of_m(move) == ENPASSANT) continue;
       if (is_legal(pos, move)) break;
     }
     if (m == end && !pos_checkers()) {
       end = generate_quiets(pos, end);
       for (; m < end; m++) {
-        Move move = m->move;
+        Move move = *m;
         if (is_legal(pos, move))
           break;
       }
@@ -493,7 +493,7 @@ int TB_probe_dtz(Pos *pos, int *success)
   if (*success == 2)
     return wdl_to_dtz[wdl + 2];
 
-  ExtMove *end, *m = (pos->st-1)->endMoves;
+  Move *end, *m = (pos->st-1)->endMoves;
 
   // If winning, check for a winning pawn move.
   if (wdl > 0) {
@@ -507,7 +507,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     pos->st->endMoves = end;
 
     for (; m < end; m++) {
-      Move move = m->move;
+      Move move = *m;
       if (type_of_p(moved_piece(move)) != PAWN || is_capture(pos, move)
                 || !is_legal(pos, move))
         continue;
@@ -549,7 +549,7 @@ int TB_probe_dtz(Pos *pos, int *success)
   }
 
   for (; m < end; m++) {
-    Move move = m->move;
+    Move move = *m;
     // We can skip pawn moves and captures.
     // If wdl > 0, we already caught them. If wdl < 0, the initial value
     // of best already takes account of them.
@@ -605,18 +605,20 @@ static Value wdl_to_Value[5] = {
 //
 // A return value of 0 indicates that not all probes were successful and
 // that no moves were filtered out.
-int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
+int TB_root_probe(Pos *pos, Move *rm, size_t *num_moves, Value *score)
 {
   int success;
 
   int dtz = TB_probe_dtz(pos, &success);
   if (!success) return 0;
 
-  // Probe each move.
   size_t num = *num_moves;
+  int vals[num];
+
+  // Probe each move.
   pos->st->endMoves = (pos->st-1)->endMoves;
   for (size_t i = 0; i < num; i++) {
-    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
+    do_move(pos, rm[i], gives_check(pos, pos->st, rm[i]));
     int v = 0;
     // Testing for mate should only be necessary if dtz == 1.
     if (pos_checkers() && dtz > 0) {
@@ -633,9 +635,9 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
         v = wdl_to_dtz[v + 2];
       }
     }
-    undo_move(pos, rm[i].move);
+    undo_move(pos, rm[i]);
     if (!success) return 0;
-    rm[i].value = v;
+    vals[i] = v;
   }
 
   // Obtain 50-move counter for the root position.
@@ -665,7 +667,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
   if (dtz > 0) { // winning (or 50-move rule draw)
     int best = 0xffff;
     for (size_t i = 0; i < num; i++) {
-      int v = rm[i].value;
+      int v = vals[i];
       if (v > 0 && v < best)
         best = v;
     }
@@ -682,15 +684,15 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
     // Now keep all winning moves with dtz <= max_allowed.
     for (size_t i = 0; i < num; i++) {
-      int v = rm[i].value;
+      int v = vals[i];
       if (v > 0 && v <= max_dtz_allowed)
-        rm[j++].move = rm[i].move;
+        rm[j++] = rm[i];
     }
   } else if (dtz < 0) { // losing (or 50-move rule draw)
     int best = 0;
     for (size_t i = 0; i < num; i++)
-      if (best < rm[i].value)
-        best = rm[i].value;
+      if (best < vals[i])
+        best = vals[i];
 
     // Try all moves, unless we approach or have a 50-move rule draw.
     if (-best * 2 + cnt50 < 100)
@@ -698,13 +700,13 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
     // Since we approach or have a 50-move rule draw, we play DTZ-optimal.
     for (size_t i = 0; i < num; i++)
-      if (rm[i].value == best)
-        rm[j++].move = rm[i].move;
+      if (vals[i] == best)
+        rm[j++] = rm[i];
   } else { // drawing
     // Try all moves that preserve the draw.
     for (size_t i = 0; i < num; i++)
-      if (rm[i].value == 0)
-        rm[j++].move = rm[i].move;
+      if (vals[i] == 0)
+        rm[j++] = rm[i];
   }
   *num_moves = j;
 
@@ -716,7 +718,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 //
 // A return value false indicates that not all probes were successful and that
 // no moves were filtered out.
-int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
+int TB_root_probe_wdl(Pos *pos, Move *rm, size_t *num_moves, Value *score)
 {
   int success;
 
@@ -726,23 +728,25 @@ int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
 
   int best = -2;
 
-  // Probe each move.
   size_t num = *num_moves;
+  int vals[num];
+
+  // Probe each move.
   pos->st->endMoves=(pos->st-1)->endMoves;
   for (size_t i = 0; i < num; i++) {
-    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
+    do_move(pos, rm[i], gives_check(pos, pos->st, rm[i]));
     int v = -TB_probe_wdl(pos, &success);
-    undo_move(pos, rm[i].move);
+    undo_move(pos, rm[i]);
     if (!success) return 0;
-    rm[i].value = v;
+    vals[i] = v;
     if (v > best)
       best = v;
   }
 
   size_t j = 0;
   for (size_t i = 0; i < num; i++)
-    if (rm[i].value == best)
-      rm[j++].move = rm[i].move;
+    if (vals[i] == best)
+      rm[j++] = rm[i];
   *num_moves = j;
 
   return 1;

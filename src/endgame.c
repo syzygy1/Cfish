@@ -161,7 +161,7 @@ Value EvaluateKXK(const Pos *pos, unsigned strongSide)
 
   // Stalemate detection with lone king
   if (pos_stm() == weakSide) {
-    ExtMove list[MAX_MOVES];
+    Move list[MAX_MOVES];
     if (generate_legal(pos, list) == list)
       return VALUE_DRAW;
   }

@@ -195,7 +195,7 @@ void uci_loop(int argc, char **argv)
 
   pos.stack = malloc(1000 * sizeof(Stack));
   pos.stack++;
-  pos.moveList = malloc(1000 * sizeof(ExtMove));
+  pos.moveList = malloc(1000 * sizeof(Move));
   pos.stack[-1].endMoves = pos.moveList;
 
   size_t buf_size = 1;
@@ -383,14 +383,14 @@ Move uci_to_move(const Pos *pos, char *str)
   if (strlen(str) == 5) // Junior could send promotion piece in uppercase
     str[4] = tolower(str[4]);
 
-  ExtMove list[MAX_MOVES];
-  ExtMove *last = generate_legal(pos, list);
+  Move list[MAX_MOVES];
+  Move *last = generate_legal(pos, list);
 
   char buf[16];
 
-  for (ExtMove *m = list; m < last; m++)
-    if (strcmp(str, uci_move(buf, m->move, pos->chess960)) == 0)
-      return m->move;
+  for (Move *m = list; m < last; m++)
+    if (strcmp(str, uci_move(buf, *m, pos->chess960)) == 0)
+      return *m;
 
   return 0;
 }

@@ -170,7 +170,7 @@ void benchmark(Pos *current, char *str)
   Pos pos;
   pos.stack = malloc(101 * sizeof(Stack)); // max perft 100
   pos.stack++;
-  pos.moveList = malloc(10000 * sizeof(ExtMove));
+  pos.moveList = malloc(10000 * sizeof(Move));
   TimePoint elapsed = now();
 
   for (size_t i = 0; i < num_fens; i++) {
