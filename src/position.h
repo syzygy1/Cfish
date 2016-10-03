@@ -127,7 +127,7 @@ typedef struct Stack Stack;
 struct Pos {
   Stack *st;
   // Board / game representation.
-  Bitboard byTypeBB[7]; // no reason to allocate 8 here
+  Bitboard byPieceBB[15]; // no reason to allocate 16 here
   Bitboard byColorBB[2];
   uint32_t sideToMove;
   uint8_t chess960;
@@ -205,12 +205,12 @@ PURE int game_phase(const Pos *pos);
 PURE int is_draw(const Pos *pos);
 
 // Position representation
-#define pieces() (pos->byTypeBB[0])
-#define pieces_p(p) (pos->byTypeBB[p])
-#define pieces_pp(p1,p2) (pos->byTypeBB[p1] | pos->byTypeBB[p2])
+#define pieces() (pos->byPieceBB[0])
+#define pieces_p(p) (pos->byPieceBB[p] | pos->byPieceBB[p + 8])
+#define pieces_pp(p1,p2) (pieces_p(p1) | pieces_p(p2))
 #define pieces_c(c) (pos->byColorBB[c])
-#define pieces_cp(c,p) (pieces_p(p) & pieces_c(c))
-#define pieces_cpp(c,p1,p2) (pieces_pp(p1,p2) & pieces_c(c))
+#define pieces_cp(c,p) (pos->byPieceBB[make_piece(c,p)])
+#define pieces_cpp(c,p1,p2) (pieces_cp(c,p1) | pieces_cp(c,p2))
 #define piece_on(s) (pos->board[s])
 #define ep_square() (pos->st->epSquare)
 #define is_empty(s) (!piece_on(s))

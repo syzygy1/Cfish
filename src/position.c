@@ -52,8 +52,8 @@ int failed_step;
 INLINE void put_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
 {
   pos->board[s] = piece;
-  pos->byTypeBB[0] |= sq_bb(s);
-  pos->byTypeBB[type_of_p(piece)] |= sq_bb(s);
+  pos->byPieceBB[0] |= sq_bb(s);
+  pos->byPieceBB[piece] |= sq_bb(s);
   pos->byColorBB[c] |= sq_bb(s);
   pos->index[s] = pos->pieceCount[piece]++;
   pos->pieceList[pos->index[s]] = s;
@@ -62,8 +62,8 @@ INLINE void put_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
 INLINE void remove_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
 {
   // WARNING: This is not a reversible operation.
-  pos->byTypeBB[0] ^= sq_bb(s);
-  pos->byTypeBB[type_of_p(piece)] ^= sq_bb(s);
+  pos->byPieceBB[0] ^= sq_bb(s);
+  pos->byPieceBB[piece] ^= sq_bb(s);
   pos->byColorBB[c] ^= sq_bb(s);
   /* board[s] = 0;  Not needed, overwritten by the capturing one */
   Square lastSquare = pos->pieceList[--pos->pieceCount[piece]];
@@ -77,8 +77,8 @@ INLINE void move_piece(Pos *pos, uint32_t c, uint32_t piece, Square from, Square
   // index[from] is not updated and becomes stale. This works as long as
   // index[] is accessed just by known occupied squares.
   Bitboard from_to_bb = sq_bb(from) ^ sq_bb(to);
-  pos->byTypeBB[0] ^= from_to_bb;
-  pos->byTypeBB[type_of_p(piece)] ^= from_to_bb;
+  pos->byPieceBB[0] ^= from_to_bb;
+  pos->byPieceBB[piece] ^= from_to_bb;
   pos->byColorBB[c] ^= from_to_bb;
   pos->board[from] = 0;
   pos->board[to] = piece;
@@ -207,8 +207,8 @@ void pos_set(Pos *pos, char *fen, int isChess960)
           put_piece(pos, color_of(piece), piece, sq++);
 #else
           pos->board[sq] = piece;
-          pos->byTypeBB[0] |= sq_bb(sq);
-          pos->byTypeBB[type_of_p(piece)] |= sq_bb(sq);
+          pos->byPieceBB[0] |= sq_bb(sq);
+          pos->byPieceBB[piece] |= sq_bb(sq);
           pos->byColorBB[color_of(piece)] |= sq_bb(sq);
           sq++;
 #endif
@@ -802,7 +802,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // In Chess960, the king might seem to capture the friendly rook.
     if (type_of_m(m) == CASTLING)
       capt_piece = 0;
-    pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from) ^ sq_bb(to);
+    pos->byPieceBB[piece] ^= sq_bb(from) ^ sq_bb(to);
     st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
     key ^= zob.psq[piece][from] ^ zob.psq[piece][to];
     if (type_of_p(piece) == PAWN)
@@ -810,9 +810,9 @@ void do_move(Pos *pos, Move m, int givesCheck)
     prom_piece = piece;
   } else {
     prom_piece = promotion_type(m);
-    pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from);
-    pos->byTypeBB[prom_piece] ^= sq_bb(to);
+    pos->byPieceBB[piece] ^= sq_bb(from);
     prom_piece |= piece & 8;
+    pos->byPieceBB[prom_piece] ^= sq_bb(to);
     st->psq += psqt.psq[prom_piece][to] - psqt.psq[piece][to];
     st->nonPawn += NonPawnPieceValue[prom_piece];
     st->materialKey += mat_key[prom_piece] - mat_key[piece];
@@ -836,7 +836,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     st->psq -= psqt.psq[capt_piece][to];
     st->nonPawn -= NonPawnPieceValue[capt_piece];
     st->materialKey -= mat_key[capt_piece];
-    pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
+    pos->byPieceBB[capt_piece] ^= sq_bb(to);
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
     key ^= zob.psq[capt_piece][to];
   } else { // Not a capture.
@@ -845,14 +845,14 @@ void do_move(Pos *pos, Move m, int givesCheck)
     if ((piece & 7) == PAWN) {
       st->rule50 = 0;
       if ((from ^ to) == 16) {
-        if (EPMask[to - SQ_A4] & pos->byTypeBB[PAWN] & pos->byColorBB[us^1]) {
+        if (EPMask[to - SQ_A4] & pos->byPieceBB[piece ^ 8]) {
           st->epSquare = to + (us == WHITE ? -8 : 8);
           key ^= zob.enpassant[to & 7];
         }
       }
     } else if (type_of_m(m) == CASTLING) {
       key ^= CastlingHash[to & 0x0f];
-      pos->byTypeBB[ROOK] ^= CastlingBits[to & 0x0f];
+      pos->byPieceBB[ROOK | (to & 0x08)] ^= CastlingBits[to & 0x0f];
       pos->byColorBB[us] ^= CastlingBits[to & 0x0f];
       pos->board[CastlingRookFrom[to & 0x0f]] = 0;
       pos->board[CastlingRookTo[to & 0x0f]] = ROOK | (to & 0x08);
@@ -860,7 +860,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     }
   }
   st->key = key;
-  pos->byTypeBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
+  pos->byPieceBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
 
   st->checkersBB =  givesCheck
                   ? attackers_to(square_of(us ^ 1, KING)) & pieces_c(us) : 0;
@@ -885,11 +885,11 @@ void undo_move(Pos *pos, Move m)
   int us = pos->sideToMove;
  
   if (likely(type_of_m(m) != PROMOTION)) {
-    pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
+    pos->byPieceBB[piece] ^= sq_bb(from) ^ sq_bb(to);
   } else {
-    pos->byTypeBB[piece & 7] ^= sq_bb(to);
-    pos->byTypeBB[PAWN] ^= sq_bb(from);
+    pos->byPieceBB[piece] ^= sq_bb(to);
     piece = PAWN | (piece & 8);
+    pos->byPieceBB[piece] ^= sq_bb(from);
   }
   pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
   pos->board[from] = piece;
@@ -902,16 +902,16 @@ void undo_move(Pos *pos, Move m)
       to = (st-1)->epSquare + (us == WHITE ? -8 : 8);
       pos->board[to] = capt_piece;
     }
-    pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
+    pos->byPieceBB[capt_piece] ^= sq_bb(to);
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
   }
   else if (type_of_m(m) == CASTLING) {
-    pos->byTypeBB[ROOK] ^= CastlingBits[to & 0x0f];
+    pos->byPieceBB[ROOK | (to & 0x08)] ^= CastlingBits[to & 0x0f];
     pos->byColorBB[us] ^= CastlingBits[to & 0x0f];
     pos->board[CastlingRookTo[to & 0x0f]] = 0;
     pos->board[CastlingRookFrom[to & 0x0f]] = ROOK | (to & 0x08);
   }
-  pos->byTypeBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
+  pos->byPieceBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
 
   check_pos(pos);
 }
@@ -1533,24 +1533,24 @@ static int pos_is_ok(Pos *pos, int *failedStep)
 static int check_pos(Pos *pos)
 {
   Bitboard color_bb[2];
-  Bitboard piece_bb[8];
+  Bitboard piece_bb[16];
 
   color_bb[0] = color_bb[1] = 0;
-  for (int i = 0; i < 8; i++)
+  for (int i = 0; i < 16; i++)
     piece_bb[i] = 0;
 
   for (int sq = 0; sq < 64; sq++)
     if (pos->board[sq]) {
       color_bb[pos->board[sq] >> 3] |= sq_bb(sq);
-      piece_bb[pos->board[sq] & 7] |= sq_bb(sq);
+      piece_bb[pos->board[sq]] |= sq_bb(sq);
     }
 
   for (int i = PAWN; i <= KING; i++)
-    assert(pos->byTypeBB[i] == piece_bb[i]);
+    assert(pos->byPieceBB[i] == piece_bb[i]);
 
   assert(pos->byColorBB[0] == color_bb[0]);
   assert(pos->byColorBB[1] == color_bb[1]);
-  assert(pos->byTypeBB[0] == (color_bb[0] | color_bb[1]));
+  assert(pos->byPieceBB[0] == (color_bb[0] | color_bb[1]));
 
   Key key = 0, pawnKey = 0, matKey = 0;
 
