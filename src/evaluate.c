@@ -537,12 +537,12 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   Score score = SCORE_ZERO;
 
   // Small bonus if the opponent has loose pawns or pieces
-  if (  pieces_c(Them) & ~pieces_pp(QUEEN, KING)
+  if (  (pieces_c(Them) ^ pieces_cpp(Them, QUEEN, KING))
       & ~(ei->attackedBy[Us][0] | ei->attackedBy[Them][0]))
     score += LooseEnemies;
 
   // Non-pawn enemies attacked by a pawn
-  weak = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Us][PAWN];
+  weak = (pieces_c(Them) ^ pieces_cp(Them, PAWN)) & ei->attackedBy[Us][PAWN];
 
   if (weak) {
     b = pieces_cp(Us, PAWN) & ( ~ei->attackedBy[Them][0]
@@ -558,7 +558,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   }
 
   // Non-pawn enemies defended by a pawn
-  defended = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Them][PAWN];
+  defended = (pieces_c(Them) ^ pieces_cp(Them, PAWN)) & ei->attackedBy[Them][PAWN];
 
   // Enemies not defended by a pawn and under our attack
   weak =   pieces_c(Them)
@@ -643,12 +643,12 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         // in the pawn's path attacked or occupied by the enemy.
         defendedSquares = unsafeSquares = squaresToQueen = forward_bb(Us, s);
 
-        Bitboard bb = forward_bb(Them, s) & pieces_pp(ROOK, QUEEN) & attacks_from_rook(s);
+        Bitboard bb = forward_bb(Them, s) & attacks_from_rook(s);
 
-        if (!(pieces_c(Us) & bb))
+        if (!(bb & pieces_cpp(Us, ROOK, QUEEN)))
           defendedSquares &= ei->attackedBy[Us][0];
 
-        if (!(pieces_c(Them) & bb))
+        if (!(bb & pieces_cpp(Them, ROOK, QUEEN)))
           unsafeSquares &= ei->attackedBy[Them][0] | pieces_c(Them);
 
         // If there aren't any enemy attacks, assign a big bonus. Otherwise

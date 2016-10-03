@@ -521,7 +521,7 @@ int is_legal(const Pos *pos, Move m)
   // If the moving piece is a king, check whether the destination
   // square is attacked by the opponent. Castling moves are checked
   // for legality during move generation.
-  if (pieces_p(KING) & sq_bb(from))
+  if (pieces_cp(us, KING) & sq_bb(from))
     return   type_of_m(m) == CASTLING
           || !(attackers_to(to_sq(m)) & pieces_c(us ^ 1));
 
@@ -1254,26 +1254,26 @@ int see_test(const Pos *pos, Move m, int value)
     if (!stmAttackers) break;
     res ^= 1;
     Bitboard bb;
-    if ((bb = stmAttackers & pieces_p(PAWN))) {
+    if ((bb = stmAttackers & pieces_cp(stm, PAWN))) {
       if ((swap = PawnValueMg - swap) < res) break;
       occ ^= bb & -bb;
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
     }
-    else if ((bb = stmAttackers & pieces_p(KNIGHT))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, KNIGHT))) {
       if ((swap = KnightValueMg - swap) < res) break;
       occ ^= bb & -bb;
     }
-    else if ((bb = stmAttackers & pieces_p(BISHOP))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, BISHOP))) {
       if ((swap = BishopValueMg - swap) < res) break;
       occ ^= bb & -bb;
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
     }
-    else if ((bb = stmAttackers & pieces_p(ROOK))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, ROOK))) {
       if ((swap = RookValueMg - swap) < res) break;
       occ ^= bb & -bb;
       attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
     }
-    else if ((bb = stmAttackers & pieces_p(QUEEN))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, QUEEN))) {
       if ((swap = QueenValueMg - swap) < res) break;
       occ ^= bb & -bb;
       attackers |=  (attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN))
@@ -1346,26 +1346,26 @@ INLINE int see_ab(const Pos *pos, Move m, int alpha, int beta)
       bound = beta;
     }
     Bitboard bb;
-    if ((bb = stmAttackers & pieces_p(PAWN))) {
+    if ((bb = stmAttackers & pieces_cp(stm, PAWN))) {
       if ((swap += PawnValueMg) <= bound) break;
       occ ^= bb & -bb;
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
     }
-    else if ((bb = stmAttackers & pieces_p(KNIGHT))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, KNIGHT))) {
       if ((swap += KnightValueMg) <= bound) break;
       occ ^= bb & -bb;
     }
-    else if ((bb = stmAttackers & pieces_p(BISHOP))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, BISHOP))) {
       if ((swap += BishopValueMg) <= bound) break;
       occ ^= bb & -bb;
       attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
     }
-    else if ((bb = stmAttackers & pieces_p(ROOK))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, ROOK))) {
       if ((swap += RookValueMg) <= bound) break;
       occ ^= bb & -bb;
       attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
     }
-    else if ((bb = stmAttackers & pieces_p(QUEEN))) {
+    else if ((bb = stmAttackers & pieces_cp(stm, QUEEN))) {
       if ((swap += QueenValueMg) <= bound) break;
       occ ^= bb & -bb;
       attackers |=  (attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN))

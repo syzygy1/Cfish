@@ -174,11 +174,10 @@ Value EvaluateKXK(const Pos *pos, unsigned strongSide)
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
 
-  Bitboard bb = pieces_c(strongSide);
-  if (   (pieces_pp(QUEEN, ROOK) & bb)
-      || ((pieces_p(BISHOP) & bb) && (pieces_p(KNIGHT) & bb))
-      || ((pieces_p(BISHOP) & bb & DarkSquares)
-                   && (pieces_p(BISHOP) & bb & LightSquares)))
+  if (   pieces_cpp(strongSide, QUEEN, ROOK)
+      || (pieces_cp(strongSide, BISHOP) && pieces_cp(strongSide, KNIGHT))
+      || ((pieces_cp(strongSide, BISHOP) & DarkSquares)
+                   && (pieces_cp(strongSide, BISHOP) & LightSquares)))
     result = min(result + VALUE_KNOWN_WIN, VALUE_MATE_IN_MAX_PLY - 1);
 
   return strongSide == pos_stm() ? result : -result;
@@ -196,7 +195,7 @@ Value EvaluateKBNK(const Pos *pos, unsigned strongSide)
 
   Square winnerKSq = square_of(strongSide, KING);
   Square loserKSq = square_of(weakSide, KING);
-  Square bishopSq = lsb(pieces_p(BISHOP));
+  Square bishopSq = square_of(strongSide, BISHOP);
 
   // kbnk_mate_table() tries to drive toward corners A1 or H8. If we have a
   // bishop that cannot reach the above squares, we flip the kings in order
@@ -225,7 +224,7 @@ Value EvaluateKPK(const Pos *pos, unsigned strongSide)
   // Assume strongSide is white and the pawn is on files A-D
   Square wksq = normalize(pos, strongSide, square_of(strongSide, KING));
   Square bksq = normalize(pos, strongSide, square_of(weakSide, KING));
-  Square psq  = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
+  Square psq  = normalize(pos, strongSide, square_of(strongSide, PAWN));
 
   unsigned us = strongSide == pos_stm() ? WHITE : BLACK;
 
@@ -251,8 +250,8 @@ Value EvaluateKRKP(const Pos *pos, unsigned strongSide)
 
   Square wksq = relative_square(strongSide, square_of(strongSide, KING));
   Square bksq = relative_square(strongSide, square_of(weakSide, KING));
-  Square rsq  = relative_square(strongSide, lsb(pieces_p(ROOK)));
-  Square psq  = relative_square(strongSide, lsb(pieces_p(PAWN)));
+  Square rsq  = relative_square(strongSide, square_of(strongSide, ROOK));
+  Square psq  = relative_square(strongSide, square_of(weakSide, PAWN));
 
   Square queeningSq = make_square(file_of(psq), RANK_1);
   Value result;
@@ -308,7 +307,7 @@ Value EvaluateKRKN(const Pos *pos, unsigned strongSide)
   assert(verify_material(pos, weakSide, KnightValueMg, 0));
 
   Square bksq = square_of(weakSide, KING);
-  Square bnsq = lsb(pieces_p(KNIGHT));
+  Square bnsq = square_of(weakSide, KNIGHT);
   Value result = (Value)PushToEdges[bksq] + PushAway[distance(bksq, bnsq)];
   return strongSide == pos_stm() ? result : -result;
 }
@@ -327,7 +326,7 @@ Value EvaluateKQKP(const Pos *pos, unsigned strongSide)
 
   Square winnerKSq = square_of(strongSide, KING);
   Square loserKSq = square_of(weakSide, KING);
-  Square pawnSq = lsb(pieces_p(PAWN));
+  Square pawnSq = square_of(weakSide, PAWN);
 
   Value result = (Value)PushClose[distance(winnerKSq, loserKSq)];
 
@@ -454,12 +453,12 @@ int ScaleKQKRPs(const Pos *pos, unsigned strongSide)
   assert(pieces_cp(weakSide, PAWN));
 
   Square kingSq = square_of(weakSide, KING);
-  Square rsq = lsb(pieces_p(ROOK));
+  Square rsq = square_of(weakSide, ROOK);
 
   if (    relative_rank_s(weakSide, kingSq) <= RANK_2
       &&  relative_rank_s(weakSide, square_of(strongSide, KING)) >= RANK_4
       &&  relative_rank_s(weakSide, rsq) == RANK_3
-      && (  pieces_p(PAWN)
+      && (  pieces_cp(weakSide, PAWN)
           & attacks_from_king(kingSq)
           & attacks_from_pawn(rsq, strongSide)))
     return SCALE_FACTOR_DRAW;
@@ -485,7 +484,7 @@ int ScaleKRPKR(const Pos *pos, unsigned strongSide)
   Square wksq = normalize(pos, strongSide, square_of(strongSide, KING));
   Square bksq = normalize(pos, strongSide, square_of(weakSide, KING));
   Square wrsq = normalize(pos, strongSide, square_of(strongSide, ROOK));
-  Square wpsq = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
+  Square wpsq = normalize(pos, strongSide, square_of(strongSide, PAWN));
   Square brsq = normalize(pos, strongSide, square_of(weakSide, ROOK));
 
   unsigned f = file_of(wpsq);
@@ -579,8 +578,8 @@ int ScaleKRPKB(const Pos *pos, unsigned strongSide)
   // Test for a rook pawn
   if (pieces_p(PAWN) & (FileABB | FileHBB)) {
     Square ksq = square_of(weakSide, KING);
-    Square bsq = lsb(pieces_p(BISHOP));
-    Square psq = lsb(pieces_p(PAWN));
+    Square bsq = square_of(weakSide, BISHOP);
+    Square psq = square_of(strongSide, PAWN);
     unsigned rk = relative_rank_s(strongSide, psq);
     Square push = pawn_push(strongSide);
 
@@ -683,7 +682,7 @@ int ScaleKBPKB(const Pos *pos, unsigned strongSide)
   assert(verify_material(pos, strongSide, BishopValueMg, 1));
   assert(verify_material(pos, weakSide,   BishopValueMg, 0));
 
-  Square pawnSq = lsb(pieces_p(PAWN));
+  Square pawnSq = square_of(strongSide, PAWN);
   Square strongBishopSq = square_of(strongSide, BISHOP);
   Square weakBishopSq = square_of(weakSide, BISHOP);
   Square weakKingSq = square_of(weakSide, KING);
@@ -806,8 +805,8 @@ int ScaleKBPKN(const Pos *pos, unsigned strongSide)
   assert(verify_material(pos, strongSide, BishopValueMg, 1));
   assert(verify_material(pos, weakSide, KnightValueMg, 0));
 
-  Square pawnSq = lsb(pieces_p(PAWN));
-  Square strongBishopSq = lsb(pieces_p(BISHOP));
+  Square pawnSq = square_of(strongSide, PAWN);
+  Square strongBishopSq = square_of(strongSide, BISHOP);
   Square weakKingSq = square_of(weakSide, KING);
 
   if (   file_of(weakKingSq) == file_of(pawnSq)
@@ -831,7 +830,7 @@ int ScaleKNPK(const Pos *pos, unsigned strongSide)
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
 
   // Assume strongSide is white and the pawn is on files A-D
-  Square pawnSq     = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
+  Square pawnSq     = normalize(pos, strongSide, square_of(strongSide, PAWN));
   Square weakKingSq = normalize(pos, strongSide, square_of(weakSide, KING));
 
   if (pawnSq == SQ_A7 && distance(SQ_A8, weakKingSq) <= 1)
@@ -847,8 +846,8 @@ int ScaleKNPKB(const Pos *pos, unsigned strongSide)
 {
   unsigned weakSide = strongSide ^ 1;
 
-  Square pawnSq = lsb(pieces_p(PAWN));
-  Square bishopSq = lsb(pieces_p(BISHOP));
+  Square pawnSq = square_of(strongSide, PAWN);
+  Square bishopSq = square_of(weakSide, BISHOP);
   Square weakKingSq = square_of(weakSide, KING);
 
   // King needs to get close to promoting pawn to prevent knight from blocking.

@@ -98,7 +98,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   const Bitboard* pawnAttacksBB = StepAttacksBB[make_piece(Us, PAWN)];
 
   Bitboard ourPawns   = pieces_cp(Us, PAWN);
-  Bitboard theirPawns = pieces_p(PAWN) ^ ourPawns;
+  Bitboard theirPawns = pieces_cp(Us ^ 1, PAWN);
 
   e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
   e->kingSquares[Us] = SQ_NONE;

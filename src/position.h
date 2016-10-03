@@ -127,8 +127,20 @@ typedef struct Stack Stack;
 struct Pos {
   Stack *st;
   // Board / game representation.
+#if 1
+  union {
+    struct {
+      Bitboard byPieceBB[15]; // no reason to allocate 16 here
+    };
+    struct {
+      Bitboard dummy[7];     // byPieceBB[0], ..., byPieceBB[6]
+      Bitboard byColorBB[2]; // byPieceBB[7], byPieceBB[8]
+    };
+  };
+#else
   Bitboard byPieceBB[15]; // no reason to allocate 16 here
-  Bitboard byColorBB[2];
+  Bitboard byColorBB[2]; // byPieceBB[7], byPieceBB[8]
+#endif
   uint32_t sideToMove;
   uint8_t chess960;
   uint8_t board[64];

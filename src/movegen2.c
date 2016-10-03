@@ -366,7 +366,7 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
   uint32_t us = pos_stm();
   Square ksq = square_of(us, KING);
   Bitboard sliderAttacks = 0;
-  Bitboard sliders = pos_checkers() & ~pieces_pp(KNIGHT, PAWN);
+  Bitboard sliders = pos_checkers() & ~pieces_cpp(us ^ 1, KNIGHT, PAWN);
 
   // Find all the squares attacked by slider checkers. We will remove them
   // from the king evasions in order to skip known illegal moves, which
