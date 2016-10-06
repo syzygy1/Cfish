@@ -34,9 +34,8 @@ static const Score Isolated[2] = { S(45, 40), S(30, 27) };
 // Backward pawn penalty by opposed flag
 static const Score Backward[2] = { S(56, 33), S(41, 19) };
 
-// Unsupported pawn penalty for pawns which are neither isolated or backward,
-// by number of pawns it supports [less than 2 / exactly 2].
-static const Score Unsupported[2] = { S(17, 8), S(21, 12) };
+// Unsupported pawn penalty for pawns which are neither isolated nor backward.
+static const Score Unsupported = S(17, 8);
 
 // Connected pawn bonus by opposed, phalanx, twice supported and rank
 static Score Connected[2][2][2][8];
@@ -155,7 +154,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       score -= Backward[opposed];
 
     else if (!supported)
-      score -= Unsupported[!!more_than_one(neighbours & pawnAttacksBB[s])];
+      score -= Unsupported;
 
     if (connected)
       score += Connected[opposed][!!phalanx][!!more_than_one(supported)][relative_rank_s(Us, s)];

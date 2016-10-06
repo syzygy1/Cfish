@@ -1206,8 +1206,8 @@ Key key_after(const Pos *pos, Move m)
 {
   Square from = from_sq(m);
   Square to = to_sq(m);
-  int pt = piece_on(from);
-  int captured = piece_on(to);
+  uint32_t pt = piece_on(from);
+  uint32_t captured = piece_on(to);
   Key k = pos_key() ^ zob.side;
 
   if (captured)
@@ -1240,7 +1240,7 @@ int see_test(const Pos *pos, Move m, int value)
     return 1;
 
   occ ^= sq_bb(from) ^ sq_bb(to);
-  int stm = color_of(piece_on(from));
+  uint32_t stm = color_of(piece_on(from));
   Bitboard attackers = attackers_to_occ(to, occ), stmAttackers;
   int res = 1;
 
@@ -1286,7 +1286,7 @@ int see_test(const Pos *pos, Move m, int value)
   return res;
 }
 
-
+#if 0
 // see_ab() performs an exact SEE calculation within bounds alpha and beta.
 // Currently used only by see_sign(), so we force it to be inlined.
 INLINE int see_ab(const Pos *pos, Move m, int alpha, int beta)
@@ -1389,6 +1389,7 @@ int see_sign(const Pos *pos, Move m)
 
   return see_ab(pos, m, -VALUE_INFINITE, 0);
 }
+#endif
 
 #if 0
 // For debugging purposes.
