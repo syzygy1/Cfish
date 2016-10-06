@@ -132,19 +132,15 @@ static void score_quiets(const Pos *pos)
 static void score_evasions(const Pos *pos)
 {
   Stack *st = pos->st;
-  // Try winning and equal captures ordered by MVV/LVA, then non-captures
-  // ordered by history value, then bad captures and quiet moves with a
-  // negative SEE ordered by SEE value.
+  // Try captures ordered by MVV/LVA, then non-captures ordered by
+  // history value.
 
   HistoryStats *history = pos->history;
   FromToStats *fromTo = pos->fromTo;
   uint32_t c = pos_stm();
-  Value see;
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
-    if ((see = see_sign(pos, m->move)) < VALUE_ZERO)
-      m->value = see - HistoryStats_Max; // At the bottom
-    else if (is_capture(pos, m->move))
+    if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
                 - (Value)type_of_p(moved_piece(m->move)) + HistoryStats_Max;
     else

@@ -1287,6 +1287,7 @@ int see_test(const Pos *pos, Move m, int value)
 }
 
 
+#if 0
 // see_ab() performs an exact SEE calculation within bounds alpha and beta.
 // Currently used only by see_sign(), so we force it to be inlined.
 INLINE int see_ab(const Pos *pos, Move m, int alpha, int beta)
@@ -1389,6 +1390,7 @@ int see_sign(const Pos *pos, Move m)
 
   return see_ab(pos, m, -VALUE_INFINITE, 0);
 }
+#endif
 
 #if 0
 // For debugging purposes.
