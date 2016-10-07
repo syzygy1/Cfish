@@ -57,7 +57,7 @@ void tt_allocate(size_t mbSize)
 {
   size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
 
-  TT.clusterCount = count;
+  TT.mask = count - 1;
 
   size_t size = count * sizeof(Cluster);
 
@@ -153,7 +153,7 @@ failed:
 
 void tt_clear(void)
 {
-  memset(TT.table, 0, TT.clusterCount * sizeof(Cluster));
+  memset(TT.table, 0, (TT.mask + 1) * sizeof(Cluster));
 }
 
 

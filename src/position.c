@@ -13,7 +13,7 @@
 #include "uci.h"
 #include "tbprobe.h"
 
-static void set_castling_right(Pos *pos, int c, Square rfrom);
+static void set_castling_right(Pos *pos, uint32_t c, Square rfrom);
 static void set_state(Pos *pos, Stack *st);
 
 #ifndef NDEBUG
@@ -277,7 +277,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
 // set_castling_right() is a helper function used to set castling rights
 // given the corresponding color and the rook starting square.
 
-static void set_castling_right(Pos *pos, int c, Square rfrom)
+static void set_castling_right(Pos *pos, uint32_t c, Square rfrom)
 {
   Square kfrom = square_of(c, KING);
   int cs = kfrom < rfrom ? KING_SIDE : QUEEN_SIDE;
@@ -304,7 +304,7 @@ static void set_castling_right(Pos *pos, int c, Square rfrom)
   CastlingRightsMask[kfrom] &= ~cr;
   CastlingRightsMask[rfrom] &= ~cr;
 //  CastlingToSquare[rfrom & 0x0f] = kto;
-  int rook = make_piece(c, ROOK);
+  uint32_t rook = make_piece(c, ROOK);
   CastlingHash[kto & 0x0f] = zob.psq[rook][rto] ^ zob.psq[rook][rfrom];
   CastlingPSQ[kto & 0x0f] = psqt.psq[rook][rto] - psqt.psq[rook][rfrom];
   CastlingBits[kto & 0x0f] = sq_bb(rto) ^ sq_bb(rfrom);
@@ -359,12 +359,12 @@ static void set_state(Pos *pos, Stack *st)
     st->pawnKey ^= zob.psq[piece_on(s)][s];
   }
 
-  for (int c = 0; c < 2; c++)
-    for (int pt = PAWN; pt <= KING; pt++)
+  for (uint32_t c = 0; c < 2; c++)
+    for (uint32_t pt = PAWN; pt <= KING; pt++)
       st->materialKey += piece_count(c, pt) * mat_key[8 * c + pt];
 
-  for (int c = 0; c < 2; c++)
-    for (int pt = KNIGHT; pt <= QUEEN; pt++)
+  for (uint32_t c = 0; c < 2; c++)
+    for (uint32_t pt = KNIGHT; pt <= QUEEN; pt++)
       st->nonPawn += piece_count(c, pt) * NonPawnPieceValue[make_piece(c, pt)];
 }
 
@@ -629,7 +629,7 @@ int is_pseudo_legal(const Pos *pos, Move m)
   if (pieces_c(us) & sq_bb(to))
     return 0;
 
-  int pt = type_of_p(piece_on(from));
+  uint32_t pt = type_of_p(piece_on(from));
   if (pt != PAWN) {
     if (type_of_m(m) != NORMAL)
       return 0;
@@ -783,8 +783,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
                       & CastlingRightsMask[to];
   key ^= zob.castling[st->castlingRights ^ (st-1)->castlingRights];
 
-  int capt_piece = pos->board[to];
-  int us = pos->sideToMove;
+  uint32_t capt_piece = pos->board[to];
+  uint32_t us = pos->sideToMove;
 
   // Clear en passant.
   st->epSquare = 0;
@@ -794,8 +794,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
       capt_piece = B_PAWN ^ (us << 3);
   }
 
-  int piece = piece_on(from);
-  int prom_piece;
+  uint32_t piece = piece_on(from);
+  uint32_t prom_piece;
 
   // Move the piece or carry out a promotion.
   if (likely(type_of_m(m) != PROMOTION)) {
@@ -877,12 +877,12 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
 void undo_move(Pos *pos, Move m)
 {
-  int from = from_sq(m);
-  int to = to_sq(m);
-  int piece = pos->board[to];
+  uint32_t from = from_sq(m);
+  uint32_t to = to_sq(m);
+  uint32_t piece = pos->board[to];
   Stack *st = pos->st--;
   pos->sideToMove ^= 1;
-  int us = pos->sideToMove;
+  uint32_t us = pos->sideToMove;
  
   if (likely(type_of_m(m) != PROMOTION)) {
     pos->byPieceBB[piece] ^= sq_bb(from) ^ sq_bb(to);
@@ -894,7 +894,7 @@ void undo_move(Pos *pos, Move m)
   pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
   pos->board[from] = piece;
 
-  int capt_piece = st->capturedPiece;
+  uint32_t capt_piece = st->capturedPiece;
   pos->board[to] = capt_piece;
   if (capt_piece) {
     if (type_of_m(m) == ENPASSANT) {
@@ -1003,8 +1003,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // Update incremental scores
     st->psq -= psqt.psq[captured][capsq];
 
-    // Reset rule 50 counter
-    st->rule50 = 0;
+    // Reset ply counters.
+    st->plyCounters = 0;
   }
 
   // Update hash key
@@ -1018,7 +1018,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // Update castling rights if needed
   if (    st->castlingRights
       && (pos->castlingRightsMask[from] | pos->castlingRightsMask[to])) {
-    int cr = pos->castlingRightsMask[from] | pos->castlingRightsMask[to];
+    uint32_t cr = pos->castlingRightsMask[from] | pos->castlingRightsMask[to];
     key ^= zob.castling[st->castlingRights & cr];
     st->castlingRights &= ~cr;
   }
@@ -1035,7 +1035,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
       st->epSquare = (from + to) / 2;
       key ^= zob.enpassant[file_of(st->epSquare)];
     } else if (type_of_m(m) == PROMOTION) {
-      int promotion = promotion_type(m);
+      uint32_t promotion = promotion_type(m);
 
       assert(relative_rank_s(us, to) == RANK_8);
       assert(promotion >= KNIGHT && promotion <= QUEEN);
@@ -1061,8 +1061,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
     st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
     prefetch(&pos->pawnTable[st->pawnKey & 16383]);
 
-    // Reset rule 50 draw counter
-    st->rule50 = 0;
+    // Reset ply counters.
+    st->plyCounters = 0;
   }
 
   // Update incremental scores
@@ -1106,10 +1106,10 @@ void undo_move(Pos *pos, Move m)
 
   pos->sideToMove ^= 1;
 
-  int us = pos_stm();
+  uint32_t us = pos_stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
-  int piece = piece_on(to);
+  uint32_t piece = piece_on(to);
 
   assert(is_empty(from) || type_of_m(m) == CASTLING);
   assert(type_of_p(pos->st->capturedPiece) != KING);
@@ -1132,8 +1132,8 @@ void undo_move(Pos *pos, Move m)
     to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
 
     // Remove both pieces first since squares could overlap in Chess960
-    int king = make_piece(us, KING);
-    int rook = make_piece(us, ROOK);
+    uint32_t king = make_piece(us, KING);
+    uint32_t rook = make_piece(us, ROOK);
     remove_piece(pos, us, king, to);
     remove_piece(pos, us, rook, rto);
     pos->board[to] = pos->board[rto] = 0;
@@ -1420,16 +1420,18 @@ int is_draw(const Pos *pos)
   if (unlikely(st->rule50 > 99)) {
     if (!pos_checkers())
       return 1;
-    return generate_legal(pos, (pos->st-1)->endMoves) != (pos->st-1)->endMoves;
+    return generate_legal(pos, (st-1)->endMoves) != (st-1)->endMoves;
   }
 
-  Stack *stp = st;
-  for (int i = 2, e = min(st->rule50, st->pliesFromNull); i <= e; i += 2)
-  {
+  // st->pliesFromNull is reset both on null moves and on zeroing moves.
+  int e = st->pliesFromNull;
+  if (e >= 4) {
+    Stack *stp = st->previous->previous;
+    for (int i = 4; i <= e; i += 2) {
       stp = stp->previous->previous;
-
       if (stp->key == st->key)
-          return 1; // Draw at first repetition
+        return 1; // Draw at first repetition
+    }
   }
 
   return 0;
