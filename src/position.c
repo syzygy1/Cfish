@@ -1003,8 +1003,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // Update incremental scores
     st->psq -= psqt.psq[captured][capsq];
 
-    // Reset rule 50 counter
-    st->rule50 = 0;
+    // Reset ply counters.
+    st->plyCounters = 0;
   }
 
   // Update hash key
@@ -1061,8 +1061,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
     st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
     prefetch(&pos->pawnTable[st->pawnKey & 16383]);
 
-    // Reset rule 50 draw counter
-    st->rule50 = 0;
+    // Reset ply counters.
+    st->plyCounters = 0;
   }
 
   // Update incremental scores
@@ -1421,16 +1421,18 @@ int is_draw(const Pos *pos)
   if (unlikely(st->rule50 > 99)) {
     if (!pos_checkers())
       return 1;
-    return generate_legal(pos, (pos->st-1)->endMoves) != (pos->st-1)->endMoves;
+    return generate_legal(pos, (st-1)->endMoves) != (st-1)->endMoves;
   }
 
-  Stack *stp = st;
-  for (int i = 2, e = min(st->rule50, st->pliesFromNull); i <= e; i += 2)
-  {
+  // st->pliesFromNull is reset both on null moves and on zeroing moves.
+  int e = st->pliesFromNull;
+  if (e >= 4) {
+    Stack *stp = st->previous->previous;
+    for (int i = 4; i <= e; i += 2) {
       stp = stp->previous->previous;
-
       if (stp->key == st->key)
-          return 1; // Draw at first repetition
+        return 1; // Draw at first repetition
+    }
   }
 
   return 0;
