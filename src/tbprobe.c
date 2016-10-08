@@ -580,14 +580,14 @@ static int has_repeated(Pos *pos)
     int i = 4, e = st->pliesFromNull;
     if (e < i)
       return 0;
-    Stack *stp = st->previous->previous;
+    Stack *stp = st - 2;
     do {
-      stp = stp->previous->previous;
+      stp -= 2;
       if (stp->key == st->key)
         return 1;
       i += 2;
     } while (i <= e);
-    st = st->previous;
+    st--;
   }
 }
 

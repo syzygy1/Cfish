@@ -75,7 +75,6 @@ struct Stack {
   uint8_t epSquare;
   Key key;
   Bitboard checkersBB;
-  struct Stack *previous;
 
   // Original search stack data
   Move* pv;
@@ -333,7 +332,7 @@ INLINE int gives_check(const Pos *pos, Stack *st, Move m)
         : gives_check_special(pos, st, m);
 }
 
-void pos_copy(Pos *dest, Pos *src);
+void pos_set_check_info(Pos *pos);
 
 // undo_null_move is used to undo a null move.
 

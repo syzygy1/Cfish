@@ -47,6 +47,7 @@ void position(Pos *pos, char *str)
 {
   char fen[128];
   char *moves;
+  int ply = 0;
 
   moves = strstr(str, "moves");
   if (moves) {
@@ -54,7 +55,7 @@ void position(Pos *pos, char *str)
     moves += 5;
   }
 
-  if (strncmp(str, "fen ", 4) == 0) {
+  if (strncmp(str, "fen", 3) == 0) {
     strncpy(fen, str + 4, 127);
     fen[127] = 0;
   } else if (strncmp(str, "startpos", 8) == 0)
@@ -64,15 +65,30 @@ void position(Pos *pos, char *str)
 
   pos_set(pos, fen, option_value(OPT_CHESS960));
 
-  // Parse move list (if any)
-  if (moves)
+  // Parse move list (if any).
+  if (moves) {
     for (moves = strtok(moves, " \t"); moves; moves = strtok(NULL, " \t")) {
       Move m = uci_to_move(pos, moves);
       if (!m) break;
       pos->st->endMoves = (pos->st-1)->endMoves;
       do_move(pos, m, gives_check(pos, pos->st, m));
       pos->gamePly++;
+      // Roll over if we reach 100 plies.
+      if (++ply == 100) {
+        memcpy(pos->st - 100, pos->st, StateSize);
+        pos->st -= 100;
+        // Make sure rule50 and pliesFromNull do not overflow.
+        if (pos->st->rule50 > 100)
+          pos->st->rule50 = 100;
+        if (pos->st->pliesFromNull > 100)
+          pos->st->pliesFromNull = 100;
+      }
     }
+    // Make sure that is_draw() never tries to look back more than 99 ply.
+    // This is enough, since 100 ply history means draw by 50-move rule.
+    if (pos->st->pliesFromNull > 99)
+      pos->st->pliesFromNull = 99;
+  }
 }
 
 
@@ -84,24 +100,24 @@ void setoption(char *str)
 {
   char *name, *value;
 
-  name = strstr(str, "name ");
+  name = strstr(str, "name");
   if (!name) {
     name = "";
     goto error;
   }
 
-  name += 5;
-  while (isspace(*name))
+  name += 4;
+  while (isblank(*name))
     name++;
 
-  value = strstr(name, " value ");
+  value = strstr(name, "value");
   if (value) {
     char *p = value - 1;
-    while (isspace(*p))
+    while (isblank(*p))
       p--;
     p[1] = 0;
-    value += 7;
-    while (isspace(*value))
+    value += 5;
+    while (isblank(*value))
       value++;
   }
   if (!value || strlen(value) == 0)
@@ -193,7 +209,11 @@ void uci_loop(int argc, char **argv)
   // This variable must be accessed only after acquiring Signals.lock.
   Signals.sleeping = 0;
 
-  pos.stack = malloc(1000 * sizeof(Stack));
+  // Allocate 1 + 100 + 25 slots.
+  // 1 is for making available (pos->st-1)->endMoves.
+  // 100 is the circular buffer for game history moves.
+  // 25 may be used by perft.
+  pos.stack = malloc(126 * sizeof(Stack));
   pos.stack++;
   pos.moveList = malloc(1000 * sizeof(ExtMove));
   pos.stack[-1].endMoves = pos.moveList;
@@ -288,7 +308,6 @@ void uci_loop(int argc, char **argv)
     // Additional custom non-UCI commands, useful for debugging
     else if (strcmp(token, "bench") == 0)     benchmark(&pos, str);
     else if (strcmp(token, "d") == 0)         print_pos(&pos);
-//    else if (strcmp(token, "eval") == 0)      eval_trace(stdout, &pos);
     else if (strcmp(token, "perft") == 0) {
       char str2[64];
       sprintf(str2, "%d %d %d current perft", option_value(OPT_HASH),

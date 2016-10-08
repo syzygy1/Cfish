@@ -371,7 +371,7 @@ void thread_search(Pos *pos)
   Value bestValue, alpha, beta, delta;
   Move easyMove = 0;
 
-  Stack *ss = pos->st; // The fifth element of the allocated array.
+  Stack *ss = pos->st; // At least the fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;

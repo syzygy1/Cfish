@@ -26,56 +26,6 @@
 #include "material.h"
 #include "pawns.h"
 
-// Trace
-
-#define MATERIAL  8
-#define IMBALANCE 9
-#define MOBILITY  10
-#define THREAT    11
-#define PASSED    12
-#define SPACE     13
-#define TOTAL     14
-#define TERM_NB   15
-
-#if 0
-static double scores[TERM_NB][2][2];
-
-INLINE double to_cp(Value v)
-{
-  return ((double)v) / PawnValueEg;
-}
-
-static void add_c(int idx, int c, Score s) {
-  scores[idx][c][MG] = to_cp(mg_value(s));
-  scores[idx][c][EG] = to_cp(eg_value(s));
-}
-
-static void add(int idx, Score w, Score b) {
-  add(idx, WHITE, w);
-  add(idx, BLACK, b);
-}
-#endif
-
-#if 0
-static void print_term(Term t);
-
-std::ostream& operator<<(std::ostream& os, Term t) {
-
-  if (t == MATERIAL || t == IMBALANCE || t == Term(PAWN) || t == TOTAL)
-      os << "  ---   --- |   ---   --- | ";
-  else
-      os << std::setw(5) << scores[t][WHITE][MG] << " "
-         << std::setw(5) << scores[t][WHITE][EG] << " | "
-         << std::setw(5) << scores[t][BLACK][MG] << " "
-         << std::setw(5) << scores[t][BLACK][EG] << " | ";
-
-  os << std::setw(5) << scores[t][WHITE][MG] - scores[t][BLACK][MG] << " "
-     << std::setw(5) << scores[t][WHITE][EG] - scores[t][BLACK][EG] << " \n";
-
-  return os;
-}
-#endif
-
 // Struct EvalInfo contains various information computed and collected
 // by the evaluation functions.
 struct EvalInfo {
@@ -358,9 +308,6 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
     }
   }
 
-//  if (DoTrace)
-//    Trace::add(Pt, Us, score);
-
   return score;
 }
 
@@ -510,11 +457,6 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 
   score -= CloseEnemies * popcount(b);
 
-#if 0
-  if (DoTrace)
-    trace_add(KING, Us, score);
-#endif
-
   return score;
 }
 
@@ -596,9 +538,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
   score += ThreatByPawnPush * popcount(b);
 
-//  if (DoTrace)
-//    Trace::add(THREAT, Us, score);
-
   return score;
 }
 
@@ -671,9 +610,6 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 
     score += make_score(mbonus, ebonus) + PassedFile[file_of(s)];
   }
-
-//  if (DoTrace)
-//    Trace::add(PASSED, Us, score);
 
   // Add the scores to the middlegame and endgame eval
   return score;
@@ -779,7 +715,6 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 // evaluate() is the main evaluation function. It returns a static evaluation
 // of the position from the point of view of the side to move.
 
-//template<bool DoTrace>
 Value evaluate(const Pos *pos)
 {
   assert(!pos_checkers());
@@ -869,57 +804,6 @@ Value evaluate(const Pos *pos)
 
   v /= PHASE_MIDGAME;
 
-#if 0
-  // In case of tracing add all remaining individual evaluation terms
-  if (DoTrace)
-  {
-      Trace::add(MATERIAL, pos.psq_score());
-      Trace::add(IMBALANCE, ei.me->imbalance());
-      Trace::add(PAWN, ei.pi->pawns_score());
-      Trace::add(MOBILITY, mobility[WHITE], mobility[BLACK]);
-      Trace::add(SPACE, evaluate_space<WHITE>(pos, &ei)
-                      , evaluate_space<BLACK>(pos, &ei));
-      Trace::add(TOTAL, score);
-  }
-#endif
-
   return (pos_stm() == WHITE ? v : -v) + Tempo; // Side to move point of view
 }
-
-#if 0
-
-// eval_trace() is like evaluate(), but prints the detailed descriptions
-// and values of each evaluation term to stdout. Useful for debugging.
-
-void eval_trace(Pos *pos)
-{
-  memset(scores, 0, sizeof(scores));
-
-  Value v = evaluate<true>(pos);
-  v = pos->stm == WHITE ? v : -v; // White's point of view
-
-  printf("      Eval term |    White    |    Black    |    Total    \n"
-         "                |   MG    EG  |   MG    EG  |   MG    EG  \n"
-         "----------------+-------------+-------------+-------------\n"
-         "       Material | %s"
-         "      Imbalance | %s"
-         "          Pawns | %s"
-         "        Knights | %s"
-         "         Bishop | %s"
-         "          Rooks | %s"
-         "         Queens | %s"
-         "       Mobility | %s"
-         "    King safety | %s"
-         "        Threats | %s"
-         "   Passed pawns | %s"
-         "          Space | %s"
-         "----------------+-------------+-------------+-------------\n"
-         "          Total | %s"
-         Term(MATERIAL), Term(IMBALANCE), Term(PAWN), Term(KNIGHT),
-         Term(BISHOP), Term(ROOK), Term(QUEEN), Term(MOBILITY),
-         Term(KING), Term(THREAT), Term(PASSED), Term(SPACE), Term(TOTAL));
-
-  printf("\nTotal Evaluation: %d (white side)\n", to_cp(v));
-}
-#endif
 

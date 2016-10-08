@@ -768,7 +768,6 @@ void do_move(Pos *pos, Move m, int givesCheck)
   assert(move_is_ok(m));
 
   Stack *st = ++pos->st;
-  st->previous = st - 1;
   st->pawnKey = (st-1)->pawnKey;
   st->materialKey = (st-1)->materialKey;
   st->psqnpm = (st-1)->psqnpm; // psq and nonPawnMaterial
@@ -928,7 +927,6 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // state.
   Stack *st = ++pos->st;
   memcpy(st, st - 1, (StateCopySize + 7) & ~7);
-  st->previous = st - 1;
 
   // Increment ply counters. In particular, rule50 will be reset to zero
   // later on in case of a capture or a pawn move.
@@ -1149,7 +1147,7 @@ void undo_move(Pos *pos, Move m)
         capsq -= pawn_push(us);
 
         assert(type_of_p(piece) == PAWN);
-        assert(to == pos->st->previous->epSquare);
+        assert(to == (pos->st-1)->epSquare);
         assert(relative_rank_s(us, to) == RANK_6);
         assert(is_empty(capsq));
         assert(pos->st->capturedPiece == make_piece(us ^ 1, PAWN));
@@ -1175,7 +1173,6 @@ void do_null_move(Pos *pos)
 
   Stack *st = ++pos->st;
   memcpy(st, st - 1, (StateSize + 7) & ~7);
-  st->previous = st - 1;
 
   if (unlikely(st->epSquare)) {
     st->key ^= zob.enpassant[file_of(st->epSquare)];
@@ -1427,9 +1424,9 @@ int is_draw(const Pos *pos)
   // st->pliesFromNull is reset both on null moves and on zeroing moves.
   int e = st->pliesFromNull;
   if (e >= 4) {
-    Stack *stp = st->previous->previous;
+    Stack *stp = st - 2;
     for (int i = 4; i <= e; i += 2) {
-      stp = stp->previous->previous;
+      stp -= 2;
       if (stp->key == st->key)
         return 1; // Draw at first repetition
     }
@@ -1439,14 +1436,10 @@ int is_draw(const Pos *pos)
 }
 
 
-void pos_copy(Pos *dest, Pos *src)
+void pos_set_check_info(Pos *pos)
 {
-  memcpy(dest, src, offsetof(Pos, moveList));
-  dest->st = dest->stack;
-  memcpy(dest->st, src->st, StateSize);
-  set_check_info(dest);
+  set_check_info(pos);
 }
-
 
 // pos_is_ok() performs some consistency checks for the position object.
 // This is meant to be helpful when debugging.
