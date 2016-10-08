@@ -153,7 +153,8 @@ failed:
 
 void tt_clear(void)
 {
-  memset(TT.table, 0, (TT.mask + 1) * sizeof(Cluster));
+  if (TT.table)
+    memset(TT.table, 0, (TT.mask + 1) * sizeof(Cluster));
 }
 
 
