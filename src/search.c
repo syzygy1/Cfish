@@ -376,6 +376,11 @@ void thread_search(Pos *pos)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;
 
+  for (int i = 0; i < MAX_PLY; i++) {
+    ss[i].ply = i + 1;
+    ss[i].skipEarlyPruning = 0;
+  }
+
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
   pos->completedDepth = DEPTH_ZERO;

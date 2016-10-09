@@ -233,8 +233,7 @@ Move next_move(const Pos *pos)
   case ST_ALL_EVASIONS:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_evasions(pos, st->cur);
-    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
-      score_evasions(pos);
+    score_evasions(pos);
     st->stage = ST_REMAINING;
 
     if (st->stage != ST_REMAINING) {

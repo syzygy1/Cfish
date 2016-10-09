@@ -36,7 +36,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   inCheck = !!pos_checkers();
   moveCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
-  ss->ply = (ss-1)->ply + 1;
 
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
@@ -82,9 +81,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
-  ss->currentMove = (ss+1)->excludedMove = bestMove = 0;
+  (ss+1)->excludedMove = bestMove = 0;
   ss->counterMoves = NULL;
-  (ss+1)->skipEarlyPruning = 0;
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
 
   // Step 4. Transposition table lookup. We don't want the score of a
@@ -104,8 +102,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && ttValue != VALUE_NONE // Possible in case of TT access race.
       && (ttValue >= beta ? (tte_bound(tte) & BOUND_LOWER)
                           : (tte_bound(tte) & BOUND_UPPER))) {
-    ss->currentMove = ttMove; // Can be 0.
-
     // If ttMove is quiet, update killers, history, counter move on TT hit.
     if (ttValue >= beta && ttMove) {
       int d = depth / ONE_PLY;
@@ -255,7 +251,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     assert(rdepth >= ONE_PLY);
     assert((ss-1)->currentMove != 0);
-    assert((ss-1)->currentMove != 0);
+    assert((ss-1)->currentMove != MOVE_NULL);
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 

@@ -78,12 +78,12 @@ struct Stack {
 
   // Original search stack data
   Move* pv;
-  int ply;
+  uint8_t ply;
+  uint8_t skipEarlyPruning;
   Move currentMove;
   Move excludedMove;
   Move killers[2];
   Value staticEval;
-  int skipEarlyPruning;
   int moveCount;
   CounterMoveStats *counterMoves;
 

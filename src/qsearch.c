@@ -41,8 +41,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     ss->pv[0] = 0;
   }
 
-  ss->currentMove = bestMove = 0;
-  ss->ply = (ss-1)->ply + 1;
+  bestMove = 0;
 
   // Check for an instant draw or if the maximum ply has been reached
   if (is_draw(pos) || ss->ply >= MAX_PLY)
@@ -68,10 +67,8 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
       && tte_depth(tte) >= ttDepth
       && ttValue != VALUE_NONE // Only in case of TT access race
       && (ttValue >= beta ? (tte_bound(tte) &  BOUND_LOWER)
-                          : (tte_bound(tte) &  BOUND_UPPER))) {
-    ss->currentMove = ttMove; // Can be 0.
+                          : (tte_bound(tte) &  BOUND_UPPER)))
     return ttValue;
-  }
 
   // Evaluate the position statically
   if (InCheck) {
