@@ -301,7 +301,7 @@ INLINE int advanced_pawn_push(const Pos *pos, Move m)
 
 INLINE int opposite_bishops(const Pos *pos)
 {
-#if 1
+#if 0
   return   piece_count(WHITE, BISHOP) == 1
         && piece_count(BLACK, BISHOP) == 1
         && opposite_colors(square_of(WHITE, BISHOP), square_of(BLACK, BISHOP));
