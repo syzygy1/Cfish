@@ -34,9 +34,8 @@ static const Score Isolated[2] = { S(45, 40), S(30, 27) };
 // Backward pawn penalty by opposed flag
 static const Score Backward[2] = { S(56, 33), S(41, 19) };
 
-// Unsupported pawn penalty for pawns which are neither isolated or backward,
-// by number of pawns it supports [less than 2 / exactly 2].
-static const Score Unsupported[2] = { S(17, 8), S(21, 12) };
+// Unsupported pawn penalty for pawns which are neither isolated nor backward.
+static const Score Unsupported = S(17, 8);
 
 // Connected pawn bonus by opposed, phalanx, twice supported and rank
 static Score Connected[2][2][2][8];
@@ -85,7 +84,7 @@ static const Value MaxSafetyBonus = V(258);
 #undef S
 #undef V
 
-INLINE Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
+INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 {
   const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
   const int Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
@@ -155,7 +154,7 @@ INLINE Score pawn_evaluate(Pos *pos, PawnEntry *e, const int Us)
       score -= Backward[opposed];
 
     else if (!supported)
-      score -= Unsupported[!!more_than_one(neighbours & pawnAttacksBB[s])];
+      score -= Unsupported;
 
     if (connected)
       score += Connected[opposed][!!phalanx][!!more_than_one(supported)][relative_rank_s(Us, s)];
@@ -191,26 +190,19 @@ void pawn_init(void)
 // pawns_probe() looks up the current position's pawns configuration in
 // the pawns hash table.
 
-PawnEntry *pawn_probe(Pos *pos)
+void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 {
-  Key key = pos_pawn_key();
-  PawnEntry* e = &pos->pawnTable[key & 16383];
-
-  if (e->key == key)
-    return e;
-
   e->key = key;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
   e->asymmetry = popcount(e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]);
   e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
-  return e;
 }
 
 
 // shelter_storm() calculates shelter and storm penalties for the file
 // the king is on, as well as the two adjacent files.
 
-INLINE Value shelter_storm(Pos *pos, Square ksq, const int Us)
+INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   
@@ -244,7 +236,7 @@ INLINE Value shelter_storm(Pos *pos, Square ksq, const int Us)
 // do_king_safety() calculates a bonus for king safety. It is called only
 // when king square changes, which is about 20% of total king_safety() calls.
 
-INLINE Score do_king_safety(PawnEntry *pe, Pos *pos, Square ksq,
+INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
                                    const int Us)
 {
   pe->kingSquares[Us] = ksq;
@@ -268,12 +260,12 @@ INLINE Score do_king_safety(PawnEntry *pe, Pos *pos, Square ksq,
 }
 
 // "template" instantiation:
-Score do_king_safety_white(PawnEntry *pe, Pos *pos, Square ksq)
+Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   return do_king_safety(pe, pos, ksq, WHITE);
 }
 
-Score do_king_safety_black(PawnEntry *pe, Pos *pos, Square ksq)
+Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   return do_king_safety(pe, pos, ksq, BLACK);
 }

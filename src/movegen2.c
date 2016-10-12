@@ -32,7 +32,7 @@
 #define LEGAL        5
 
 
-INLINE ExtMove *generate_castling(Pos *pos, ExtMove *list, int us,
+INLINE ExtMove *generate_castling(const Pos *pos, ExtMove *list, int us,
                                   const int Cr, const int Checks,
                                   const int Chess960)
 {
@@ -100,8 +100,9 @@ INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
 }
 
 
-INLINE ExtMove *generate_pawn_moves(Pos *pos, ExtMove *list, Bitboard target,
-                                    const int Us, const int Type)
+INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
+                                    Bitboard target, const int Us,
+                                    const int Type)
 {
   // Compute our parametrized parameters at compile time, named according to
   // the point of view of white side.
@@ -222,7 +223,7 @@ INLINE ExtMove *generate_pawn_moves(Pos *pos, ExtMove *list, Bitboard target,
 }
 
 
-INLINE ExtMove *generate_moves(Pos *pos, ExtMove *list, int us,
+INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
                                Bitboard target, const int Pt, const int Checks)
 {
   assert(Pt != KING && Pt != PAWN);
@@ -252,7 +253,7 @@ INLINE ExtMove *generate_moves(Pos *pos, ExtMove *list, int us,
 }
 
 
-INLINE ExtMove *generate_all(Pos *pos, ExtMove *list, Bitboard target,
+INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
                              const int Us, const int Type)
 {
   const int Checks = Type == QUIET_CHECKS;
@@ -293,12 +294,12 @@ INLINE ExtMove *generate_all(Pos *pos, ExtMove *list, Bitboard target,
 // generate_non_evasions() generates all pseudo-legal captures and
 // non-captures.
 
-INLINE ExtMove *generate(Pos *pos, ExtMove *list, const int Type)
+INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
 {
   assert(Type == CAPTURES || Type == QUIETS || Type == NON_EVASIONS);
   assert(!pos_checkers());
 
-  int us = pos_stm();
+  uint32_t us = pos_stm();
 
   Bitboard target =  Type == CAPTURES     ?  pieces_c(us ^ 1)
                    : Type == QUIETS       ? ~pieces()
@@ -310,17 +311,17 @@ INLINE ExtMove *generate(Pos *pos, ExtMove *list, const int Type)
 
 // "template" instantiations
 
-ExtMove *generate_captures(Pos *pos, ExtMove *list)
+ExtMove *generate_captures(const Pos *pos, ExtMove *list)
 {
   return generate(pos, list, CAPTURES);
 }
 
-ExtMove *generate_quiets(Pos *pos, ExtMove *list)
+ExtMove *generate_quiets(const Pos *pos, ExtMove *list)
 {
   return generate(pos, list, QUIETS);
 }
 
-ExtMove *generate_non_evasions(Pos *pos, ExtMove *list)
+ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
 {
   return generate(pos, list, NON_EVASIONS);
 }
@@ -328,11 +329,11 @@ ExtMove *generate_non_evasions(Pos *pos, ExtMove *list)
 
 // generate_quiet_checks() generates all pseudo-legal non-captures and
 // knight underpromotions that give check.
-ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list)
+ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 {
   assert(!pos_checkers());
 
-  int us = pos_stm();
+  uint32_t us = pos_stm();
   Bitboard dc = discovered_check_candidates(pos);
 
   while (dc) {
@@ -358,11 +359,11 @@ ExtMove *generate_quiet_checks(Pos *pos, ExtMove *list)
 
 // generate_evasions() generates all pseudo-legal check evasions when the
 // side to move is in check.
-ExtMove *generate_evasions(Pos *pos, ExtMove *list)
+ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 {
   assert(pos_checkers());
 
-  int us = pos_stm();
+  uint32_t us = pos_stm();
   Square ksq = square_of(us, KING);
   Bitboard sliderAttacks = 0;
   Bitboard sliders = pos_checkers() & ~pieces_pp(KNIGHT, PAWN);
@@ -393,7 +394,8 @@ ExtMove *generate_evasions(Pos *pos, ExtMove *list)
 
 
 // generate_legal() generates all the legal moves in the given position
-ExtMove *generate_legal(Pos *pos, ExtMove *list)
+SMALL
+ExtMove *generate_legal(const Pos *pos, ExtMove *list)
 {
   Bitboard pinned = pinned_pieces(pos, pos_stm());
   Square ksq = square_of(pos_stm(), KING);

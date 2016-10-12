@@ -153,7 +153,7 @@ static struct MagicInit rook_init[64] = {
 typedef unsigned (Fn)(Square, Bitboard);
 
 static void init_magics(struct MagicInit *magic_init, Bitboard *attacks[],
-                        Bitboard magics[], Bitboard masks[], Square deltas[],
+                        Bitboard magics[], Bitboard masks[], int deltas[],
                         Fn index)
 {
   Bitboard edges, b;

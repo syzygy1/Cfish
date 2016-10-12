@@ -49,20 +49,20 @@ static const int QuadraticTheirs[][8] = {
 };
 
 // Helper used to detect a given material distribution.
-static int is_KXK(Pos *pos, int us)
+static int is_KXK(const Pos *pos, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
         && pos_non_pawn_material(us) >= RookValueMg;
 }
 
-static int is_KBPsKs(Pos *pos, int us)
+static int is_KBPsKs(const Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
         && pieces_cp(us, BISHOP)
         && pieces_cp(us, PAWN);
 }
 
-static int is_KQKRPs(Pos *pos, int us) {
+static int is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
         && pieces_cp(us, QUEEN)
@@ -103,15 +103,8 @@ typedef int PieceCountType[2][8];
 // there, so we don't have to recompute all when the same material
 // configuration occurs again.
 
-MaterialEntry *material_probe(Pos *pos)
+void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
 {
-  Key key = pos_material_key();
-//  MaterialEntry *e = &pos->materialTable[(key * 0xb44cede0e4473d6dULL) >> (64 - 13)];
-  MaterialEntry *e = &pos->materialTable[key >> (64 - 13)];
-
-  if (e->key == key)
-      return e;
-
   memset(e, 0, sizeof(MaterialEntry));
   e->key = key;
   e->factor[WHITE] = e->factor[BLACK] = (uint8_t)SCALE_FACTOR_NORMAL;
@@ -123,14 +116,14 @@ MaterialEntry *material_probe(Pos *pos)
       if (endgame_keys[i][c] == key) {
 	e->eval_func = 1 + i;
 	e->eval_func_side = c;
-	return e;
+	return;
       }
 
   for (int c = 0; c < 2; c++)
     if (is_KXK(pos, c)) {
       e->eval_func = 9; // EvaluateKXK
       e->eval_func_side = c;
-      return e;
+      return;
     }
 
   // Look for a specialized scaling function.
@@ -138,7 +131,7 @@ MaterialEntry *material_probe(Pos *pos)
     for (int c = 0; c < 2; c++)
       if (endgame_keys[NUM_EVAL + i][c] == key) {
         e->scal_func[c] = 10 + i;
-        return e;
+        return;
       }
 
   // We did not find any specialized scaling function, so fall back on
@@ -204,7 +197,5 @@ MaterialEntry *material_probe(Pos *pos)
   };
 #undef pc
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
-
-  return e;
 }
 

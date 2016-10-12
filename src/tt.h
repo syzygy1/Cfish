@@ -108,10 +108,8 @@ struct Cluster {
 
 typedef struct Cluster Cluster;
 
-static_assert(CacheLineSize % sizeof(Cluster) == 0, "Cluster size incorrect");
-
 struct TranspositionTable {
-  size_t clusterCount;
+  size_t mask;         // clusterCount - 1
   Cluster *table;
   void *mem;
   size_t alloc_size;
@@ -136,7 +134,7 @@ INLINE uint8_t tt_generation(void)
 
 INLINE TTEntry *tt_first_entry(Key key)
 {
-  return &TT.table[(size_t)key & (TT.clusterCount - 1)].entry[0];
+  return &TT.table[(size_t)key & TT.mask].entry[0];
 }
 
 TTEntry *tt_probe(Key key, int *found);

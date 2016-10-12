@@ -26,56 +26,6 @@
 #include "material.h"
 #include "pawns.h"
 
-// Trace
-
-#define MATERIAL  8
-#define IMBALANCE 9
-#define MOBILITY  10
-#define THREAT    11
-#define PASSED    12
-#define SPACE     13
-#define TOTAL     14
-#define TERM_NB   15
-
-#if 0
-static double scores[TERM_NB][2][2];
-
-INLINE double to_cp(Value v)
-{
-  return ((double)v) / PawnValueEg;
-}
-
-static void add_c(int idx, int c, Score s) {
-  scores[idx][c][MG] = to_cp(mg_value(s));
-  scores[idx][c][EG] = to_cp(eg_value(s));
-}
-
-static void add(int idx, Score w, Score b) {
-  add(idx, WHITE, w);
-  add(idx, BLACK, b);
-}
-#endif
-
-#if 0
-static void print_term(Term t);
-
-std::ostream& operator<<(std::ostream& os, Term t) {
-
-  if (t == MATERIAL || t == IMBALANCE || t == Term(PAWN) || t == TOTAL)
-      os << "  ---   --- |   ---   --- | ";
-  else
-      os << std::setw(5) << scores[t][WHITE][MG] << " "
-         << std::setw(5) << scores[t][WHITE][EG] << " | "
-         << std::setw(5) << scores[t][BLACK][MG] << " "
-         << std::setw(5) << scores[t][BLACK][EG] << " | ";
-
-  os << std::setw(5) << scores[t][WHITE][MG] - scores[t][BLACK][MG] << " "
-     << std::setw(5) << scores[t][WHITE][EG] - scores[t][BLACK][EG] << " \n";
-
-  return os;
-}
-#endif
-
 // Struct EvalInfo contains various information computed and collected
 // by the evaluation functions.
 struct EvalInfo {
@@ -230,7 +180,7 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
 
-INLINE void evalinfo_init(Pos *pos, EvalInfo *ei, const int Us)
+INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Down = (Us == WHITE ? DELTA_S : DELTA_N);
@@ -255,9 +205,8 @@ INLINE void evalinfo_init(Pos *pos, EvalInfo *ei, const int Us)
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
 // color and type.
 
-INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
-                                   Bitboard *mobilityArea,
-                                   const int Us, const int Pt)
+INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
+                            Bitboard *mobilityArea, const int Us, const int Pt)
 {
   Bitboard b, bb;
   Square s;
@@ -359,9 +308,6 @@ INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
     }
   }
 
-//  if (DoTrace)
-//    Trace::add(Pt, Us, score);
-
   return score;
 }
 
@@ -369,8 +315,8 @@ INLINE Score evaluate_piece(Pos *pos, EvalInfo *ei, Score *mobility,
 // come last). We rely on the inlining compiler to expand all calls to
 // evaluate_piece(). No need for C++ templates!
 
-INLINE Score evaluate_pieces(Pos *pos, EvalInfo *ei, Score *mobility,
-                                    Bitboard *mobilityArea)
+INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
+                             Bitboard *mobilityArea)
 {
   return  evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, KNIGHT)
         - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, KNIGHT)
@@ -398,7 +344,7 @@ static const Bitboard KingFlank[2][8] = {
     CenterFiles & BlackCamp, KingSide  & BlackCamp, KingSide  & BlackCamp, KingSide    & BlackCamp },
 };
 
-INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
+INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Up = (Us == WHITE ? DELTA_N : DELTA_S);
@@ -511,11 +457,6 @@ INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 
   score -= CloseEnemies * popcount(b);
 
-#if 0
-  if (DoTrace)
-    trace_add(KING, Us, score);
-#endif
-
   return score;
 }
 
@@ -523,7 +464,7 @@ INLINE Score evaluate_king(Pos *pos, EvalInfo *ei, int Us)
 // evaluate_threats() assigns bonuses according to the types of the
 // attacking and the attacked pieces.
 
-INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
+INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them  = (Us == WHITE ? BLACK    : WHITE);
   const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
@@ -597,17 +538,13 @@ INLINE Score evaluate_threats(Pos *pos, EvalInfo *ei, const int Us)
 
   score += ThreatByPawnPush * popcount(b);
 
-//  if (DoTrace)
-//    Trace::add(THREAT, Us, score);
-
   return score;
 }
 
 
 // evaluate_passed_pawns() evaluates the passed pawns of the given color.
 
-INLINE Score evaluate_passed_pawns(Pos *pos, EvalInfo *ei,
-                                          const int Us)
+INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
 
@@ -674,9 +611,6 @@ INLINE Score evaluate_passed_pawns(Pos *pos, EvalInfo *ei,
     score += make_score(mbonus, ebonus) + PassedFile[file_of(s)];
   }
 
-//  if (DoTrace)
-//    Trace::add(PASSED, Us, score);
-
   // Add the scores to the middlegame and endgame eval
   return score;
 }
@@ -689,7 +623,7 @@ INLINE Score evaluate_passed_pawns(Pos *pos, EvalInfo *ei,
 // twice. Finally, the space bonus is multiplied by a weight. The aim is to
 // improve play on game opening.
 
-INLINE Score evaluate_space(Pos *pos, EvalInfo *ei, const int Us)
+INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const Bitboard SpaceMask =
@@ -725,7 +659,7 @@ INLINE Score evaluate_space(Pos *pos, EvalInfo *ei, const int Us)
 // position, i.e., second order bonus/malus based on the known
 // attacking/defending status of the players.
 
-INLINE Score evaluate_initiative(Pos *pos, int asymmetry, Value eg)
+INLINE Score evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
 {
   int kingDistance =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                     - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
@@ -744,7 +678,7 @@ INLINE Score evaluate_initiative(Pos *pos, int asymmetry, Value eg)
 
 // evaluate_scale_factor() computes the scale factor for the winning side
 
-INLINE int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
+INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 {
   int strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
   int sf = material_scale_factor(ei->me, pos, strongSide);
@@ -781,8 +715,7 @@ INLINE int evaluate_scale_factor(Pos *pos, EvalInfo *ei, Value eg)
 // evaluate() is the main evaluation function. It returns a static evaluation
 // of the position from the point of view of the side to move.
 
-//template<bool DoTrace>
-Value evaluate(Pos *pos)
+Value evaluate(const Pos *pos)
 {
   assert(!pos_checkers());
 
@@ -845,7 +778,7 @@ Value evaluate(Pos *pos)
           - evaluate_passed_pawns(pos, &ei, BLACK);
 
   // If both sides have only pawns, score for potential unstoppable pawns
-  if (!pos_non_pawn_material(WHITE) && !pos_non_pawn_material(BLACK)) {
+  if (pos_pawns_only()) {
     Bitboard b;
     if ((b = ei.pi->passedPawns[WHITE]) != 0)
       score += Unstoppable * relative_rank_s(WHITE, frontmost_sq(WHITE, b));
@@ -871,57 +804,6 @@ Value evaluate(Pos *pos)
 
   v /= PHASE_MIDGAME;
 
-#if 0
-  // In case of tracing add all remaining individual evaluation terms
-  if (DoTrace)
-  {
-      Trace::add(MATERIAL, pos.psq_score());
-      Trace::add(IMBALANCE, ei.me->imbalance());
-      Trace::add(PAWN, ei.pi->pawns_score());
-      Trace::add(MOBILITY, mobility[WHITE], mobility[BLACK]);
-      Trace::add(SPACE, evaluate_space<WHITE>(pos, &ei)
-                      , evaluate_space<BLACK>(pos, &ei));
-      Trace::add(TOTAL, score);
-  }
-#endif
-
   return (pos_stm() == WHITE ? v : -v) + Tempo; // Side to move point of view
 }
-
-#if 0
-
-// eval_trace() is like evaluate(), but prints the detailed descriptions
-// and values of each evaluation term to stdout. Useful for debugging.
-
-void eval_trace(Pos *pos)
-{
-  memset(scores, 0, sizeof(scores));
-
-  Value v = evaluate<true>(pos);
-  v = pos->stm == WHITE ? v : -v; // White's point of view
-
-  printf("      Eval term |    White    |    Black    |    Total    \n"
-         "                |   MG    EG  |   MG    EG  |   MG    EG  \n"
-         "----------------+-------------+-------------+-------------\n"
-         "       Material | %s"
-         "      Imbalance | %s"
-         "          Pawns | %s"
-         "        Knights | %s"
-         "         Bishop | %s"
-         "          Rooks | %s"
-         "         Queens | %s"
-         "       Mobility | %s"
-         "    King safety | %s"
-         "        Threats | %s"
-         "   Passed pawns | %s"
-         "          Space | %s"
-         "----------------+-------------+-------------+-------------\n"
-         "          Total | %s"
-         Term(MATERIAL), Term(IMBALANCE), Term(PAWN), Term(KNIGHT),
-         Term(BISHOP), Term(ROOK), Term(QUEEN), Term(MOBILITY),
-         Term(KING), Term(THREAT), Term(PASSED), Term(SPACE), Term(TOTAL));
-
-  printf("\nTotal Evaluation: %d (white side)\n", to_cp(v));
-}
-#endif
 

@@ -17,7 +17,7 @@ typedef unsigned (Fn)(Square, Bitboard);
 
 static void init_magics(Bitboard table[], Bitboard *attacks[],
                         Bitboard magics[], Bitboard masks[], uint8_t shifts[],
-                        Square deltas[], Fn index)
+                        int deltas[], Fn index)
 {
   int seeds[][8] = { { 8977, 44560, 54343, 38998,  5731, 95205, 104912, 17020 },
                      {  728, 10316, 55013, 32803, 12281, 15100,  16645,   255 } };

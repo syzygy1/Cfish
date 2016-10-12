@@ -371,10 +371,15 @@ void thread_search(Pos *pos)
   Value bestValue, alpha, beta, delta;
   Move easyMove = 0;
 
-  Stack *ss = pos->st; // The fifth element of the allocated array.
+  Stack *ss = pos->st; // At least the fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;
+
+  for (int i = 0; i < MAX_PLY; i++) {
+    ss[i].ply = i + 1;
+    ss[i].skipEarlyPruning = 0;
+  }
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
@@ -867,7 +872,7 @@ ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
     TB_ProbeDepth = DEPTH_ZERO;
   }
 
-  if (TB_Cardinality < popcount(pieces()) || can_castle_cr(ANY_CASTLING))
+  if (TB_Cardinality < popcount(pieces()) || can_castle_any())
     return last;
 
   size_t num_moves = last - begin;

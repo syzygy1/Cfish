@@ -39,7 +39,7 @@ static uint32_t KPKBitbase[MAX_INDEX / 32];
 // bit 13-14: white pawn file (from FILE_A to FILE_D)
 // bit 15-17: white pawn RANK_7 - rank
 //            (from RANK_7 - RANK_7 to RANK_7 - RANK_2)
-static unsigned index(int us, Square bksq, Square wksq, Square psq)
+static unsigned index(unsigned us, Square bksq, Square wksq, Square psq)
 {
   return wksq | (bksq << 6) | (us << 12) | (file_of(psq) << 13) | ((RANK_7 - rank_of(psq)) << 15);
 }
@@ -49,7 +49,7 @@ static unsigned index(int us, Square bksq, Square wksq, Square psq)
 #define RES_DRAW    2
 #define RES_WIN     4
 
-int bitbases_probe(Square wksq, Square wpsq, Square bksq, int us)
+unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us)
 {
   assert(file_of(wpsq) <= FILE_D);
 

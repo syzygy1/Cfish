@@ -68,95 +68,26 @@ INLINE ExtMove *partition(ExtMove *first, ExtMove *last)
   }
 }
 
-// pick_best() finds the best move in the range (begin, end) and moves
-// it to the front. It's faster than sorting all the moves in advance
-// when there are few moves, e.g., the possible captures.
+// pick_best() finds the best move in the range (begin, end).
 
 static Move pick_best(ExtMove *begin, ExtMove *end)
 {
-  ExtMove *p, *q, tmp;
+  ExtMove *p, *q;
 
   for (p = begin, q = begin + 1; q < end; q++)
     if (q->value > p->value)
       p = q;
-  tmp = *begin;
-  *begin = *p;
-  *p = tmp;
-  return begin->move;
-}
+  Move m = p->move;
+  *p = *begin;
 
-
-// Initialisation of move picker data.
-
-void mp_init(Pos *pos, Move ttm, Depth depth)
-{
-  assert(depth > DEPTH_ZERO);
-
-  Stack *st = pos->st;
-
-  st->depth = depth;
-
-  Square prevSq = to_sq((st-1)->currentMove);
-  st->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
-
-  st->stage = pos_checkers() ? ST_EVASIONS : ST_MAIN_SEARCH;
-  st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm))
-    st->stage++;
-}
-
-void mp_init_q(Pos *pos, Move ttm, Depth depth, Square s)
-{
-  assert (depth <= DEPTH_ZERO);
-
-  Stack *st = pos->st;
-
-  if (pos_checkers())
-    st->stage = ST_EVASIONS;
-  else if (depth > DEPTH_QS_NO_CHECKS)
-    st->stage = ST_QSEARCH_WITH_CHECKS;
-  else if (depth > DEPTH_QS_RECAPTURES)
-    st->stage = ST_QSEARCH_WITHOUT_CHECKS;
-  else {
-    st->stage = ST_RECAPTURES_GEN;
-    st->recaptureSquare = s;
-    return;
-  }
-
-  st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm))
-    st->stage++;
-}
-
-void mp_init_pc(Pos *pos, Move ttm, Value threshold)
-{
-  assert(!pos_checkers());
-
-  Stack *st = pos->st;
-
-  st->threshold = threshold;
-
-  st->stage = ST_PROBCUT;
-
-  // In ProbCut we generate captures with SEE higher than the given
-  // threshold.
-#if 0
-  st->ttMove = ttm;
-  if (!(ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-            && see_test(pos, ttm, threshold + 1)))
-    st->stage++;
-#else
-  st->ttMove =   ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-              && see_test(pos, ttm, threshold + 1) ? ttm : 0;
-  if (st->ttMove == 0) st->stage++;
-#endif
+  return m;
 }
 
 
 // score() assigns a numerical value to each move in a move list. The moves with
 // highest values will be picked first.
 
-static void score_captures(Pos *pos)
+static void score_captures(const Pos *pos)
 {
   Stack *st = pos->st;
 
@@ -168,7 +99,8 @@ static void score_captures(Pos *pos)
               - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
 }
 
-static void score_quiets(Pos *pos)
+SMALL
+static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
   HistoryStats *history = pos->history;
@@ -177,33 +109,38 @@ static void score_quiets(Pos *pos)
   CounterMoveStats *cm = (st-1)->counterMoves;
   CounterMoveStats *fm = (st-2)->counterMoves;
   CounterMoveStats *f2 = (st-4)->counterMoves;
-//if(!cm || !fm || !f2)printf("st->ply = %d (%d,%d,%d)\n", st->ply, !!cm, !!fm, !!f2);
-  int c = pos_stm();
 
-  for (ExtMove *m = st->cur; m < st->endMoves; m++)
-    m->value =   (*history)[moved_piece(m->move)][to_sq(m->move)]
-              + (cm ? (*cm)[moved_piece(m->move)][to_sq(m->move)] : 0)
-              + (fm ? (*fm)[moved_piece(m->move)][to_sq(m->move)] : 0)
-              + (f2 ? (*f2)[moved_piece(m->move)][to_sq(m->move)] : 0)
-              + ft_get(*fromTo, c, m->move);
+  CounterMoveStats *tmp = &(*pos->counterMoveHistory)[0][0];
+  if (!cm) cm = tmp;
+  if (!fm) fm = tmp;
+  if (!f2) f2 = tmp;
+
+  uint32_t c = pos_stm();
+
+  for (ExtMove *m = st->cur; m < st->endMoves; m++) {
+    uint32_t move = m->move & 4095;
+    uint32_t to = move & 63;
+    uint32_t from = move >> 6;
+    m->value =  (*history)[piece_on(from)][to]
+              + (*cm)[piece_on(from)][to]
+              + (*fm)[piece_on(from)][to]
+              + (*f2)[piece_on(from)][to]
+              + ft_get(*fromTo, c, move);
+  }
 }
 
-static void score_evasions(Pos *pos)
+static void score_evasions(const Pos *pos)
 {
   Stack *st = pos->st;
-  // Try winning and equal captures ordered by MVV/LVA, then non-captures
-  // ordered by history value, then bad captures and quiet moves with a
-  // negative SEE ordered by SEE value.
+  // Try captures ordered by MVV/LVA, then non-captures ordered by
+  // history value.
 
   HistoryStats *history = pos->history;
   FromToStats *fromTo = pos->fromTo;
-  int c = pos_stm();
-  Value see;
+  uint32_t c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
-    if ((see = see_sign(pos, m->move)) < VALUE_ZERO)
-      m->value = see - HistoryStats_Max; // At the bottom
-    else if (is_capture(pos, m->move))
+    if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
                 - (Value)type_of_p(moved_piece(m->move)) + HistoryStats_Max;
     else
@@ -214,10 +151,10 @@ static void score_evasions(Pos *pos)
 
 // next_move() returns the next pseudo-legal move to be searched.
 
-#if 1
+#if 0
 
 #if 1
-Move next_move(Pos *pos)
+Move next_move(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;
@@ -367,7 +304,7 @@ Move next_move(Pos *pos)
   return 0;
 }
 #else
-Move next_move(Pos *pos)
+Move next_move(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;
@@ -528,7 +465,7 @@ Move next_move(Pos *pos)
 #else
 
 #if 1
-Move next_move(Pos *pos)
+Move next_move(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;
@@ -629,7 +566,7 @@ Move next_move(Pos *pos)
   return 0;
 }
 #else
-Move next_move(Pos *pos)
+Move next_move(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;
@@ -737,7 +674,7 @@ Move next_move(Pos *pos)
 #endif
 
 #if 1
-Move next_move_q(Pos *pos)
+Move next_move_q(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;
@@ -753,8 +690,7 @@ Move next_move_q(Pos *pos)
   case ST_EVASIONS_GEN:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_evasions(pos, st->cur);
-    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
-      score_evasions(pos);
+    score_evasions(pos);
     st->stage = ST_REMAINING;
 
     if (st->stage != ST_REMAINING) {
@@ -807,7 +743,7 @@ Move next_move_q(Pos *pos)
   return 0;
 }
 #else
-Move next_move_q(Pos *pos)
+Move next_move_q(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;
@@ -884,7 +820,7 @@ Move next_move_q(Pos *pos)
 }
 #endif
 
-Move next_move_pc(Pos *pos)
+Move next_move_pc(const Pos *pos)
 {
   Stack *st = pos->st;
   Move move;

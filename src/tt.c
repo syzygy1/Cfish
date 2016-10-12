@@ -57,7 +57,7 @@ void tt_allocate(size_t mbSize)
 {
   size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
 
-  TT.clusterCount = count;
+  TT.mask = count - 1;
 
   size_t size = count * sizeof(Cluster);
 
@@ -126,11 +126,13 @@ void tt_allocate(size_t mbSize)
 #endif
 
 #ifdef __linux__
+#ifdef MADV_HUGEPAGE
 
   // Advise the kernel to allocate large pages.
   if (settings.large_pages)
     madvise(TT.table, count * sizeof(Cluster), MADV_HUGEPAGE);
 
+#endif
 #endif
 
 #endif
@@ -151,7 +153,8 @@ failed:
 
 void tt_clear(void)
 {
-  memset(TT.table, 0, TT.clusterCount * sizeof(Cluster));
+  if (TT.table)
+    memset(TT.table, 0, (TT.mask + 1) * sizeof(Cluster));
 }
 
 
