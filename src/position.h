@@ -75,16 +75,15 @@ struct Stack {
   uint8_t epSquare;
   Key key;
   Bitboard checkersBB;
-  struct Stack *previous;
 
   // Original search stack data
   Move* pv;
-  int ply;
+  uint8_t ply;
+  uint8_t skipEarlyPruning;
   Move currentMove;
   Move excludedMove;
   Move killers[2];
   Value staticEval;
-  int skipEarlyPruning;
   int moveCount;
   CounterMoveStats *counterMoves;
 
@@ -235,6 +234,7 @@ PURE int is_draw(const Pos *pos);
 // Castling
 #define can_castle_cr(cr) (pos->st->castlingRights & (cr))
 #define can_castle_c(c) can_castle_cr((WHITE_OO | WHITE_OOO) << (2 * (c)))
+#define can_castle_any() (pos->st->castlingRights)
 #ifdef PEDANTIC
 #define castling_impeded(cr) (pieces() & pos->castlingPath[cr])
 #define castling_rook_square(cr) (pos->castlingRookSquare[cr])
@@ -281,17 +281,17 @@ INLINE Bitboard discovered_check_candidates(const Pos *pos)
   return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
 }
 
-INLINE Bitboard blockers_for_king(const Pos *pos, int c)
+INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
 {
   return pos->st->blockersForKing[c];
 }
 
-INLINE Bitboard pinned_pieces(const Pos *pos, int c)
+INLINE Bitboard pinned_pieces(const Pos *pos, uint32_t c)
 {
   return pos->st->blockersForKing[c] & pieces_c(c);
 }
 
-INLINE int pawn_passed(const Pos *pos, int c, Square s)
+INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
 {
   return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_mask(c, s));
 }
@@ -304,7 +304,7 @@ INLINE int advanced_pawn_push(const Pos *pos, Move m)
 
 INLINE int opposite_bishops(const Pos *pos)
 {
-#if 1
+#if 0
   return   piece_count(WHITE, BISHOP) == 1
         && piece_count(BLACK, BISHOP) == 1
         && opposite_colors(square_of(WHITE, BISHOP), square_of(BLACK, BISHOP));
@@ -335,7 +335,7 @@ INLINE int gives_check(const Pos *pos, Stack *st, Move m)
         : gives_check_special(pos, st, m);
 }
 
-void pos_copy(Pos *dest, Pos *src);
+void pos_set_check_info(Pos *pos);
 
 // undo_null_move is used to undo a null move.
 

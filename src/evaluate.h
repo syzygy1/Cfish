@@ -7,9 +7,6 @@ typedef struct Pos Pos;
 
 #define Tempo ((Value)20)
 
-void trace(Pos *pos);
-
-//template<bool DoTrace = false>
 Value evaluate(const Pos *pos);
 
 #endif

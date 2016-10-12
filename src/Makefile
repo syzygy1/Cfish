@@ -55,22 +55,24 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # popcnt = yes/no     --- -DUSE_POPCNT     --- Use popcnt asm-instruction
 # sse = yes/no        --- -msse            --- Use Intel Streaming SIMD Extensions
 # pext = yes/no       --- -DUSE_PEXT       --- Use pext x86_64 asm-instruction
+# native = yes/no     --- -march=native    --- Optimize for local CPU
+# numa = yes/no       --- -DNUMA           --- Enable NUMA support
 #
 # Note that Makefile is space sensitive, so when adding new architectures
 # or modifying existing flags, you have to make sure there are no extra spaces
 # at the end of the line for flag values.
 
 ### 2.1. General and architecture defaults
-arch = x86_64
-optimize = yes
 debug = no
+optimize = yes
+arch = x86_64
 bits = 64
 prefetch = yes
 popcnt = yes
 sse = yes
 pext = no
+native = yes
 numa = yes
-EXTRACFLAGS += -march=native
 
 ### 2.2 Architecture specific
 
@@ -315,6 +317,11 @@ ifeq ($(pext),yes)
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
 		CFLAGS += -mbmi2
 	endif
+endif
+
+### native
+ifeq ($(native),yes)
+	CFLAGS += -march=native
 endif
 
 ### numa

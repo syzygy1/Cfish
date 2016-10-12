@@ -73,7 +73,7 @@ void thread_init(void *arg)
     pos->counterMoves = numa_alloc(sizeof(MoveStats));
     pos->fromTo = numa_alloc(sizeof(FromToStats));
     pos->rootMoves = numa_alloc(sizeof(RootMoves));
-    pos->stack = numa_alloc((5 + MAX_PLY + 10) * sizeof(Stack));
+    pos->stack = numa_alloc((MAX_PLY + 110) * sizeof(Stack));
     pos->moveList = numa_alloc(10000 * sizeof(Move));
     pos->scoreList = numa_alloc(10000 * sizeof(int));
   } else {
@@ -84,12 +84,11 @@ void thread_init(void *arg)
     pos->counterMoves = calloc(sizeof(MoveStats), 1);
     pos->fromTo = calloc(sizeof(FromToStats), 1);
     pos->rootMoves = calloc(sizeof(RootMoves), 1);
-    pos->stack = calloc((5 + MAX_PLY + 10) * sizeof(Stack), 1);
+    pos->stack = calloc((MAX_PLY + 110) * sizeof(Stack), 1);
     pos->moveList = calloc(10000 * sizeof(Move), 1);
     pos->scoreList = calloc(10000 * sizeof(int), 1);
   }
   pos->thread_idx = idx;
-  pos->stack += 5;
   pos->counterMoveHistory = cmh_tables[node];
 
   atomic_store(&pos->resetCalls, 0);
@@ -176,7 +175,7 @@ void thread_destroy(Pos *pos)
     numa_free(pos->counterMoves, sizeof(MoveStats));
     numa_free(pos->fromTo, sizeof(FromToStats));
     numa_free(pos->rootMoves, sizeof(RootMoves));
-    numa_free(pos->stack - 5, (5 + MAX_PLY + 10) * sizeof(Stack));
+    numa_free(pos->stack, (MAX_PLY + 110) * sizeof(Stack));
     numa_free(pos->moveList, 10000 * sizeof(Move));
     numa_free(pos->scoreList, 10000 * sizeof(int));
     numa_free(pos, sizeof(Pos));
@@ -187,7 +186,7 @@ void thread_destroy(Pos *pos)
     free(pos->counterMoves);
     free(pos->fromTo);
     free(pos->rootMoves);
-    free(pos->stack - 5);
+    free(pos->stack);
     free(pos->moveList);
     free(pos->scoreList);
     free(pos);
@@ -433,7 +432,18 @@ void threads_start_thinking(Pos *root, LimitsType *limits)
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
     }
-    pos_copy(pos, root);
+    memcpy(pos, root, offsetof(Pos, moveList));
+    // Copy enough of the root State circular buffer.
+    int n = max(5, root->st->pliesFromNull);
+    int k = (root->st - root->stack) - n;
+    if (k < 0) k += 100;
+    for (int i = 0; i <= n; i++) {
+      memcpy(&pos->stack[i], &root->stack[k++], StateSize);
+      if (k == 100)
+        k = 0;
+    }
+    pos->st = pos->stack + n;
+    pos_set_check_info(pos);
   }
 
   if (TB_RootInTB)

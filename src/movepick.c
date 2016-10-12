@@ -75,9 +75,7 @@ INLINE int partition(Move *m, int *s, int num)
   }
 }
 
-// pick_best() finds the best move in the range (begin, end) and moves
-// it to the front. It's faster than sorting all the moves in advance
-// when there are few moves, e.g., the possible captures.
+// pick_best() finds the best move in the range (begin, end).
 
 static Move pick_best(Move *begin, Move *end, int *s)
 {
@@ -117,6 +115,7 @@ static void score_captures(const Pos *pos)
   st->endScore = s;
 }
 
+SMALL
 static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
@@ -150,20 +149,16 @@ static void score_quiets(const Pos *pos)
 static void score_evasions(const Pos *pos)
 {
   Stack *st = pos->st;
-  // Try winning and equal captures ordered by MVV/LVA, then non-captures
-  // ordered by history value, then bad captures and quiet moves with a
-  // negative SEE ordered by SEE value.
+  // Try captures ordered by MVV/LVA, then non-captures ordered by
+  // history value.
 
   HistoryStats *history = pos->history;
   FromToStats *fromTo = pos->fromTo;
   uint32_t c = pos_stm();
-  Value see;
 
   int *s = st->endScore;
   for (Move *m = st->cur; m < st->endMoves; m++, s++)
-    if ((see = see_sign(pos, *m)) < VALUE_ZERO)
-      *s = see - HistoryStats_Max; // At the bottom
-    else if (is_capture(pos, *m))
+    if (is_capture(pos, *m))
       *s =  PieceValue[MG][piece_on(to_sq(*m))]
           - (Value)type_of_p(moved_piece(*m)) + HistoryStats_Max;
     else
@@ -259,8 +254,7 @@ Move next_move(const Pos *pos)
     st->cur = (st-1)->endMoves;
     st->endScore = st->curScore = (st-1)->endScore;
     st->endMoves = generate_evasions(pos, st->cur);
-    if (st->endMoves - st->cur - (st->ttMove != 0) > 1)
-      score_evasions(pos);
+    score_evasions(pos);
     st->stage = ST_REMAINING;
 
     if (st->stage != ST_REMAINING) {

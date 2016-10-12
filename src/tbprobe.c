@@ -577,17 +577,17 @@ static int has_repeated(Pos *pos)
 {
   Stack *st = pos->st;
   while (1) {
-    int i = 4, e = min(st->rule50, st->pliesFromNull);
+    int i = 4, e = st->pliesFromNull;
     if (e < i)
       return 0;
-    Stack *stp = st->previous->previous;
+    Stack *stp = st - 2;
     do {
-      stp = stp->previous->previous;
+      stp -= 2;
       if (stp->key == st->key)
         return 1;
       i += 2;
     } while (i <= e);
-    st = st->previous;
+    st--;
   }
 }
 
