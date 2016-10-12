@@ -306,10 +306,15 @@ INLINE int opposite_bishops(const Pos *pos)
   return   piece_count(WHITE, BISHOP) == 1
         && piece_count(BLACK, BISHOP) == 1
         && opposite_colors(square_of(WHITE, BISHOP), square_of(BLACK, BISHOP));
-#else
+#elif 0
   return   (pos_material_key() & 0xf0000f0000) == 0x1000010000
         && (pieces_p(BISHOP) & DarkSquares)
         && (pieces_p(BISHOP) & DarkSquares) != pieces_p(BISHOP);
+#else
+  return   piece_count(WHITE, BISHOP) == 1
+        && piece_count(BLACK, BISHOP) == 1
+        && (pieces_p(BISHOP) & DarkSquares)
+        && (pieces_p(BISHOP) & ~DarkSquares);
 #endif
 }
 
