@@ -128,8 +128,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     if (    piecesCnt <= TB_Cardinality
         && (piecesCnt <  TB_Cardinality || depth >= TB_ProbeDepth)
         &&  pos_rule50_count() == 0
-        && !can_castle_cr(ANY_CASTLING)) {
-
+        && !can_castle_any())
+    {
       int found, v = TB_probe_wdl(pos, &found);
 
       if (found) {

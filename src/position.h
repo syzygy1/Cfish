@@ -232,6 +232,7 @@ PURE int is_draw(const Pos *pos);
 // Castling
 #define can_castle_cr(cr) (pos->st->castlingRights & (cr))
 #define can_castle_c(c) can_castle_cr((WHITE_OO | WHITE_OOO) << (2 * (c)))
+#define can_castle_any() (pos->st->castlingRights)
 #ifdef PEDANTIC
 #define castling_impeded(cr) (pieces() & pos->castlingPath[cr])
 #define castling_rook_square(cr) (pos->castlingRookSquare[cr])

@@ -872,7 +872,7 @@ ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
     TB_ProbeDepth = DEPTH_ZERO;
   }
 
-  if (TB_Cardinality < popcount(pieces()) || can_castle_cr(ANY_CASTLING))
+  if (TB_Cardinality < popcount(pieces()) || can_castle_any())
     return last;
 
   size_t num_moves = last - begin;
