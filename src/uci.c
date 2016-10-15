@@ -47,7 +47,6 @@ void position(Pos *pos, char *str)
 {
   char fen[128];
   char *moves;
-  int ply = 0;
 
   moves = strstr(str, "moves");
   if (moves) {
@@ -63,14 +62,16 @@ void position(Pos *pos, char *str)
   else
     return;
 
+  pos->st = pos->stack + 100;
   pos_set(pos, fen, option_value(OPT_CHESS960));
 
   // Parse move list (if any).
   if (moves) {
+    int ply = 0;
+
     for (moves = strtok(moves, " \t"); moves; moves = strtok(NULL, " \t")) {
       Move m = uci_to_move(pos, moves);
       if (!m) break;
-      pos->st->endMoves = (pos->st-1)->endMoves;
       do_move(pos, m, gives_check(pos, pos->st, m));
       pos->gamePly++;
       // Roll over if we reach 100 plies.
@@ -85,11 +86,19 @@ void position(Pos *pos, char *str)
           pos->st->pliesFromNull = 100;
       }
     }
+
     // Make sure that is_draw() never tries to look back more than 99 ply.
     // This is enough, since 100 ply history means draw by 50-move rule.
     if (pos->st->pliesFromNull > 99)
       pos->st->pliesFromNull = 99;
+
+    // Now move some game history from the end of the circular buffer
+    // to before the current position.
+    int k = (pos->st - (pos->stack + 100)) - max(5, pos->st->pliesFromNull);
+    for (; k < 0; k++)
+      memcpy(pos->st + k, pos->st + k + 100, StateSize);
   }
+  (pos->st-1)->endMoves = pos->moveList;
 }
 
 
@@ -138,47 +147,46 @@ error:
 
 void go(Pos *pos, char *str)
 {
-  LimitsType limits;
   char *token;
 
   process_delayed_settings();
 
-  limits.startTime = now(); // As early as possible!
+  Limits.startTime = now(); // As early as possible!
 
-  limits.time[0] = limits.time[1] = limits.inc[0] = limits.inc[1] = 0;
-  limits.npmsec = limits.movestogo = limits.depth = limits.movetime = 0;
-  limits.mate = limits.infinite = limits.ponder = limits.num_searchmoves = 0;
-  limits.nodes = 0;
+  Limits.time[0] = Limits.time[1] = Limits.inc[0] = Limits.inc[1] = 0;
+  Limits.npmsec = Limits.movestogo = Limits.depth = Limits.movetime = 0;
+  Limits.mate = Limits.infinite = Limits.ponder = Limits.num_searchmoves = 0;
+  Limits.nodes = 0;
 
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
     if (strcmp(token, "searchmoves") == 0)
       while ((token = strtok(NULL, " \t")))
-        limits.searchmoves[limits.num_searchmoves++] = uci_to_move(pos, token);
+        Limits.searchmoves[Limits.num_searchmoves++] = uci_to_move(pos, token);
     else if (strcmp(token, "wtime") == 0)
-      limits.time[WHITE] = atoi(strtok(NULL, " \t"));
+      Limits.time[WHITE] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "btime") == 0)
-      limits.time[BLACK] = atoi(strtok(NULL, " \t"));
+      Limits.time[BLACK] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "winc") == 0)
-      limits.inc[WHITE] = atoi(strtok(NULL, " \t"));
+      Limits.inc[WHITE] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "binc") == 0)
-      limits.inc[BLACK] = atoi(strtok(NULL, " \t"));
+      Limits.inc[BLACK] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "movestogo") == 0)
-      limits.movestogo = atoi(strtok(NULL, " \t"));
+      Limits.movestogo = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "depth") == 0)
-      limits.depth = atoi(strtok(NULL, " \t"));
+      Limits.depth = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "nodes") == 0)
-      limits.nodes = atoi(strtok(NULL, " \t"));
+      Limits.nodes = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "movetime") == 0)
-      limits.movetime = atoi(strtok(NULL, " \t"));
+      Limits.movetime = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "mate") == 0)
-      limits.mate = atoi(strtok(NULL, " \t"));
+      Limits.mate = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "infinite") == 0)
-      limits.infinite = 1;
+      Limits.infinite = 1;
     else if (strcmp(token, "ponder") == 0)
-      limits.ponder = 1;
+      Limits.ponder = 1;
   }
 
-  threads_start_thinking(pos, &limits);
+  start_thinking(pos);
 }
 
 
@@ -193,6 +201,7 @@ void uci_loop(int argc, char **argv)
 {
   Pos pos;
   char fen[strlen(StartFEN) + 1];
+  char str_buf[64];
   char *token;
 
   LOCK_INIT(Signals.lock);
@@ -210,20 +219,21 @@ void uci_loop(int argc, char **argv)
   // This variable must be accessed only after acquiring Signals.lock.
   Signals.sleeping = 0;
 
-  // Allocate 1 + 100 + 25 slots.
-  // 1 is for making available (pos->st-1)->endMoves.
-  // 100 is the circular buffer for game history moves.
-  // 25 may be used by perft.
-  pos.stack = malloc(126 * sizeof(Stack));
-  pos.stack++;
+  // Allocate 215 Stack slots.
+  // Slots 100-200 form a circular buffer to be filled with game moves.
+  // Slots 0-99 make room for prepending the part of game history relevant
+  // for repetition detection.
+  // Slots 201-214 may be used by TB root probing.
+  pos.stack = malloc(215 * sizeof(Stack));
   pos.moveList = malloc(1000 * sizeof(ExtMove));
-  pos.stack[-1].endMoves = pos.moveList;
+  pos.st = pos.stack + 100;
+  pos.st[-1].endMoves = pos.moveList;
 
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
     buf_size += strlen(argv[i]) + 1;
 
-  if (buf_size < 80) buf_size = 80;
+  if (buf_size < 1024) buf_size = 1024;
 
   char *cmd = malloc(buf_size);
 
@@ -310,10 +320,9 @@ void uci_loop(int argc, char **argv)
     else if (strcmp(token, "bench") == 0)     benchmark(&pos, str);
     else if (strcmp(token, "d") == 0)         print_pos(&pos);
     else if (strcmp(token, "perft") == 0) {
-      char str2[64];
-      sprintf(str2, "%d %d %d current perft", option_value(OPT_HASH),
+      sprintf(str_buf, "%d %d %d current perft", option_value(OPT_HASH),
                     option_value(OPT_THREADS), atoi(str));
-      benchmark(&pos, str2);
+      benchmark(&pos, str_buf);
     }
     else {
       printf("Unknown command: %s %s\n", token, str);
@@ -325,7 +334,7 @@ void uci_loop(int argc, char **argv)
     thread_wait_for_search_finished(threads_main());
 
   free(cmd);
-  free(pos.stack - 1);
+  free(pos.stack);
   free(pos.moveList);
 
   LOCK_DESTROY(Signals.lock);

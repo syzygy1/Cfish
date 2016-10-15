@@ -37,7 +37,7 @@ struct TimeManagement {
 
 extern struct TimeManagement Time;
 
-void time_init(LimitsType *limits, int us, int ply);
+void time_init(int us, int ply);
 
 #define time_optimum() Time.optimumTime
 #define time_maximum() Time.maximumTime

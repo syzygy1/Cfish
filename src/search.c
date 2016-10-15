@@ -279,7 +279,7 @@ void mainthread_search(void)
 {
   Pos *pos = Threads.pos[0];
   int us = pos_stm();
-  time_init(&Limits, us, pos_game_ply());
+  time_init(us, pos_game_ply());
   char buf[16];
 
   int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100; // From centipawns
@@ -536,7 +536,7 @@ void thread_search(Pos *pos)
       Signals.stop = 1;
 
     // Do we have time for the next iteration? Can we stop searching now?
-    if (use_time_management(&Limits)) {
+    if (use_time_management()) {
       if (!Signals.stop && !Signals.stopOnPonderhit) {
         // Stop the search if only one legal move is available, or if all
         // of the available time has been used, or if we matched an easyMove
@@ -774,7 +774,7 @@ static void check_time(void)
   if (Limits.ponder)
     return;
 
-  if (   (use_time_management(&Limits) && elapsed > time_maximum() - 10)
+  if (   (use_time_management() && elapsed > time_maximum() - 10)
       || (Limits.movetime && elapsed >= Limits.movetime)
       || (Limits.nodes && threads_nodes_searched() >= Limits.nodes))
         Signals.stop = 1;
@@ -901,5 +901,63 @@ ExtMove *TB_filter_root_moves(Pos *pos, ExtMove *begin, ExtMove *last)
   }
 
   return begin + num_moves;
+}
+
+
+// start_thinking() wakes up the main thread to start a new search,
+// then returns immediately.
+
+void start_thinking(Pos *root)
+{
+  if (Signals.searching)
+    thread_wait_for_search_finished(threads_main());
+
+  Signals.stopOnPonderhit = Signals.stop = 0;
+
+  // Generate all legal moves.
+  ExtMove list[MAX_MOVES];
+  ExtMove *end = generate_legal(root, list);
+
+  // Implement searchmoves option.
+  if (Limits.num_searchmoves) {
+    ExtMove *p = list;
+    for (ExtMove *m = p; m < end; m++)
+      for (int i = 0; i < Limits.num_searchmoves; i++)
+        if (m->move == Limits.searchmoves[i]) {
+          (p++)->move = m->move;
+          break;
+        }
+    end = p;
+  }
+
+  end = TB_filter_root_moves(root, list, end);
+
+  for (size_t idx = 0; idx < Threads.num_threads; idx++) {
+    Pos *pos = Threads.pos[idx];
+    pos->maxPly = 0;
+    pos->rootDepth = DEPTH_ZERO;
+    pos->nodes = pos->tb_hits = 0;
+    RootMoves *rm = pos->rootMoves;
+    rm->size = end - list;
+    for (size_t i = 0; i < rm->size; i++) {
+      rm->move[i].pv[0] = list[i].move;
+      rm->move[i].score = -VALUE_INFINITE;
+      rm->move[i].previousScore = -VALUE_INFINITE;
+    }
+    memcpy(pos, root, offsetof(Pos, moveList));
+    // Copy enough of the root State circular buffer.
+    int n = max(5, root->st->pliesFromNull);
+    for (int i = 0; i <= n; i++)
+      memcpy(&pos->stack[i], &root->st[i - n], StateSize);
+    pos->st = pos->stack + n;
+    (pos->st-1)->endMoves = pos->moveList;
+    pos_set_check_info(pos);
+  }
+
+  if (TB_RootInTB)
+    Threads.pos[0]->tb_hits = end - list;
+
+  Signals.searching = 1;
+  thread_start_searching(threads_main(), 0);
 }
 

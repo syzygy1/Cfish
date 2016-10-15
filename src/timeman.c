@@ -74,14 +74,14 @@ static int remaining(int myTime, int movesToGo, int ply, int slowMover,
 
 // tm_init() is called at the beginning of the search and calculates the
 // allowed thinking time out of the time control and current game ply. We
-// support four different kinds of time controls, passed in 'limits':
+// support four different kinds of time controls, set in 'Limits'.
 //
 //  inc == 0 && movestogo == 0 means: x basetime  [sudden death!]
 //  inc == 0 && movestogo != 0 means: x moves in y minutes
 //  inc >  0 && movestogo == 0 means: x basetime + z increment
 //  inc >  0 && movestogo != 0 means: x moves in y minutes + z increment
 
-void time_init(LimitsType *limits, int us, int ply)
+void time_init(int us, int ply)
 {
   int minThinkingTime = option_value(OPT_MIN_THINK_TIME);
   int moveOverhead    = option_value(OPT_MOVE_OVERHEAD);
@@ -94,26 +94,26 @@ void time_init(LimitsType *limits, int us, int ply)
   // the real engine speed to avoid time losses.
   if (npmsec) {
     if (!Time.availableNodes) // Only once at game start
-      Time.availableNodes = npmsec * limits->time[us]; // Time is in msec
+      Time.availableNodes = npmsec * Limits.time[us]; // Time is in msec
 
     // Convert from millisecs to nodes
-    limits->time[us] = (int)Time.availableNodes;
-    limits->inc[us] *= npmsec;
-    limits->npmsec = npmsec;
+    Limits.time[us] = (int)Time.availableNodes;
+    Limits.inc[us] *= npmsec;
+    Limits.npmsec = npmsec;
   }
 
-  Time.startTime = limits->startTime;
-  Time.optimumTime = Time.maximumTime = max(limits->time[us], minThinkingTime);
+  Time.startTime = Limits.startTime;
+  Time.optimumTime = Time.maximumTime = max(Limits.time[us], minThinkingTime);
 
-  int MaxMTG = limits->movestogo ? min(limits->movestogo, MoveHorizon) : MoveHorizon;
+  int MaxMTG = Limits.movestogo ? min(Limits.movestogo, MoveHorizon) : MoveHorizon;
 
   // We calculate optimum time usage for different hypothetical
   // "moves to go"-values and choose the minimum of calculated search
   // time values. Usually the greatest hypMTG gives the minimum values.
   for (int hypMTG = 1; hypMTG <= MaxMTG; hypMTG++) {
     // Calculate thinking time for hypothetical "moves to go"-value
-    int hypMyTime =  limits->time[us]
-                   + limits->inc[us] * (hypMTG - 1)
+    int hypMyTime =  Limits.time[us]
+                   + Limits.inc[us] * (hypMTG - 1)
                    - moveOverhead * (2 + min(hypMTG, 40));
 
     hypMyTime = max(hypMyTime, 0);

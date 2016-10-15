@@ -94,6 +94,7 @@ static Option options_map[] = {
   { "Clear Hash", OPT_TYPE_BUTTON, 0, 0, 0, NULL, on_clear_hash, 0, NULL },
   { "Ponder", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "MultiPV", OPT_TYPE_SPIN, 1, 1, 500, NULL, NULL, 0, NULL },
+  { "Repetition Fix", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "Skill Level", OPT_TYPE_SPIN, 20, 0, 20, NULL, NULL, 0, NULL },
   { "Move Overhead", OPT_TYPE_SPIN, 30, 0, 5000, NULL, NULL, 0, NULL },
   { "Minimum Thinking Time", OPT_TYPE_SPIN, 20, 0, 5000, NULL, NULL, 0, NULL },
@@ -132,6 +133,8 @@ void options_init()
   options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
 #endif
+  // Disable Repetition Fix for now, since it has not been implemented yet.
+  options_map[OPT_REP_FIX].type = OPT_TYPE_DISABLED;
   for (Option *opt = options_map; opt->name != NULL; opt++) {
     if (opt->type == OPT_TYPE_DISABLED)
       continue;

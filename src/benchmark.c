@@ -91,12 +91,11 @@ void benchmark(Pos *current, char *str)
   char *token;
   char **fens;
   size_t num_fens;
-  LimitsType limits;
 
-  limits.time[0] = limits.time[1] = limits.inc[0] = limits.inc[1] = 0;
-  limits.npmsec = limits.movestogo = limits.depth = limits.movetime = 0;
-  limits.mate = limits.infinite = limits.ponder = limits.num_searchmoves = 0;
-  limits.nodes = 0;
+  Limits.time[0] = Limits.time[1] = Limits.inc[0] = Limits.inc[1] = 0;
+  Limits.npmsec = Limits.movestogo = Limits.depth = Limits.movetime = 0;
+  Limits.mate = Limits.infinite = Limits.ponder = Limits.num_searchmoves = 0;
+  Limits.nodes = 0;
 
   int ttSize = 16, threads = 1, limit = 13;
   char *fenFile = NULL, *limitType = "";
@@ -125,13 +124,13 @@ void benchmark(Pos *current, char *str)
   search_clear();
 
   if (strcmp(limitType, "time") == 0)
-    limits.movetime = limit; // movetime is in millisecs
+    Limits.movetime = limit; // movetime is in millisecs
   else if (strcmp(limitType, "nodes") == 0)
-    limits.nodes = limit;
+    Limits.nodes = limit;
   else if (strcmp(limitType, "mate") == 0)
-    limits.mate = limit;
+    Limits.mate = limit;
   else
-    limits.depth = limit;
+    Limits.depth = limit;
 
   if (!fenFile || strcmp(fenFile, "default") == 0) {
     fens = Defaults;
@@ -168,8 +167,8 @@ void benchmark(Pos *current, char *str)
 
   uint64_t nodes = 0;
   Pos pos;
-  pos.stack = malloc(101 * sizeof(Stack)); // max perft 100
-  pos.stack++;
+  pos.stack = malloc(105 * sizeof(Stack)); // max perft 100
+  pos.st = pos.stack + 5;
   pos.moveList = malloc(10000 * sizeof(ExtMove));
   TimePoint elapsed = now();
 
@@ -180,10 +179,10 @@ void benchmark(Pos *current, char *str)
     fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", i + 1, num_fens);
 
     if (strcmp(limitType, "perft") == 0)
-      nodes += perft(&pos, limits.depth * ONE_PLY);
+      nodes += perft(&pos, Limits.depth * ONE_PLY);
     else {
-      limits.startTime = now();
-      threads_start_thinking(&pos, &limits);
+      Limits.startTime = now();
+      start_thinking(&pos);
       thread_wait_for_search_finished(threads_main());
       nodes += threads_nodes_searched();
     }
@@ -204,7 +203,7 @@ void benchmark(Pos *current, char *str)
       free(fens[i]);
     free(fens);
   }
-  free(pos.stack - 1);
+  free(pos.stack);
   free(pos.moveList);
 }
 

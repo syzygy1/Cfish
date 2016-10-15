@@ -181,8 +181,9 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   unsigned char col, row, token;
   Square sq = SQ_A8;
 
+  Stack *st = pos->st;
   memset(pos, 0, offsetof(Pos, moveList));
-  Stack *st = pos->st = pos->stack;
+  pos->st = st;
   memset(st, 0, StateSize);
 #ifdef PEDANTIC
   for (int i = 0; i < 256; i++)

@@ -74,11 +74,6 @@ struct LimitsType {
 
 typedef struct LimitsType LimitsType;
 
-INLINE int use_time_management(LimitsType *l)
-{
-  return !(l->mate | l->movetime | l->depth | l->nodes | l->infinite);
-}
-
 // The SignalsType struct stores atomic flags updated during the search
 // typically in an async fashion e.g. to stop the search by the GUI.
 
@@ -97,9 +92,16 @@ extern SignalsType Signals;
 extern LimitsType Limits;
 extern int TB_RootInTB;
 
+INLINE int use_time_management(void)
+{
+  return !(Limits.mate | Limits.movetime | Limits.depth | Limits.nodes
+                       | Limits.infinite);
+}
+
 void search_init();
 void search_clear();
 uint64_t perft(Pos *pos, Depth depth);
+void start_thinking(Pos *pos);
 
 #endif
 
