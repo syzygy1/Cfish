@@ -56,12 +56,14 @@ static void on_logger(Option *opt)
   start_logger(opt->val_string);
 }
 
-#ifdef NUMA
 static void on_numa(Option *opt)
 {
+#ifdef NUMA
   read_numa_nodes(opt->val_string);
-}
+#else
+  (void)opt;
 #endif
+}
 
 static void on_threads(Option *opt)
 {
