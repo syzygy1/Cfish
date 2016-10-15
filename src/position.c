@@ -969,7 +969,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     captured = 0;
   }
 
-  if (captured) {
+  else if (captured) {
     Square capsq = to;
 
     // If the captured piece is a pawn, update pawn hash key, otherwise
@@ -1005,6 +1005,9 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // Reset ply counters.
     st->plyCounters = 0;
   }
+
+  // Set captured piece
+  st->capturedPiece = captured;
 
   // Update hash key
   key ^= zob.psq[piece][from] ^ zob.psq[piece][to];
@@ -1066,9 +1069,6 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   // Update incremental scores
   st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
-
-  // Set captured piece
-  st->capturedPiece = captured;
 
   // Update the key with the final value
   st->key = key;
@@ -1423,10 +1423,10 @@ int is_draw(const Pos *pos)
   }
 
   // st->pliesFromNull is reset both on null moves and on zeroing moves.
-  int e = st->pliesFromNull;
-  if (e >= 4) {
+  int e = st->pliesFromNull - 4;
+  if (e >= 0) {
     Stack *stp = st - 2;
-    for (int i = 4; i <= e; i += 2) {
+    for (int i = 0; i <= e; i += 2) {
       stp -= 2;
       if (stp->key == st->key)
         return 1; // Draw at first repetition
