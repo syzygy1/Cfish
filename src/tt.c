@@ -89,11 +89,11 @@ void tt_allocate(size_t mbSize)
   size_t alignment = settings.large_pages ? (1ULL << 21) : 1;
   size_t alloc_size = size + alignment - 1;
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(VM_FLAGS_SUPERPAGE_SIZE_2MB)
 
   if (settings.large_pages) {
     TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, VM_SUPERPAGE_SIZE_2MB, 0);
+                  MAP_PRIVATE | MAP_ANONYMOUS, VM_FLAGS_SUPERPAGE_SIZE_2MB, 0);
     if (!TT.mem)
       printf("info string Unable to allocate large pages for the "
              "transposition table.\n");
