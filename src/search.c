@@ -104,15 +104,13 @@ static Move easy_move_get(Key key)
 
 static void easy_move_update(Pos *pos, Move *newPv)
 {
-//  assert(newPv.size() >= 3);
-
   // Keep track of how many times in a row the 3rd ply remains stable
-  if (newPv[2] == EM.pv[2])
-    EM.stableCnt++;
-  else
-    EM.stableCnt = 0;
+  EM.stableCnt = (newPv[2] == EM.pv[2]) ? EM.stableCnt + 1 : 0;
 
   if (newPv[0] != EM.pv[0] || newPv[1] != EM.pv[1] || newPv[2] != EM.pv[2]) {
+    EM.pv[0] = newPv[0];
+    EM.pv[1] = newPv[1];
+    EM.pv[2] = newPv[2];
     do_move(pos, newPv[0], gives_check(pos, pos->st, newPv[0]));
     do_move(pos, newPv[1], gives_check(pos, pos->st, newPv[1]));
     EM.expectedPosKey = pos_key();
@@ -434,7 +432,7 @@ void thread_search(Pos *pos)
       rootMoves->move[idx].previousScore = rootMoves->move[idx].score;
 
     // MultiPV loop. We perform a full root search for each PV line
-    for (size_t PVIdx = 0; PVIdx < multiPV && !Signals.stop; ++PVIdx) {
+    for (size_t PVIdx = 0; PVIdx < multiPV && !Signals.stop; PVIdx++) {
       pos->PVIdx = PVIdx;
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
@@ -553,7 +551,8 @@ void thread_search(Pos *pos)
 
         if (   rootMoves->size == 1
             || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 628
-            || (mainThread.easyMovePlayed = doEasyMove)) {
+            || (mainThread.easyMovePlayed = doEasyMove, doEasyMove))
+        {
           // If we are allowed to ponder do not stop the search now but
           // keep pondering until the GUI sends "ponderhit" or "stop".
           if (Limits.ponder)

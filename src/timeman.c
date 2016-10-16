@@ -54,7 +54,7 @@ static double move_importance(int ply)
 }
 
 static int remaining(int myTime, int movesToGo, int ply, int slowMover,
-                     int ttype)
+                     const int ttype)
 {
   double TMaxRatio   = (ttype == TIMET_OPTIMUM ? 1 : MaxRatio);
   double TStealRatio = (ttype == TIMET_OPTIMUM ? 0 : StealRatio);
@@ -62,7 +62,7 @@ static int remaining(int myTime, int movesToGo, int ply, int slowMover,
   double moveImportance = (move_importance(ply) * slowMover) / 100;
   double otherMovesImportance = 0;
 
-  for (int i = 1; i < movesToGo; ++i)
+  for (int i = 1; i < movesToGo; i++)
     otherMovesImportance += move_importance(ply + 2 * i);
 
   double ratio1 = (TMaxRatio * moveImportance) / (TMaxRatio * moveImportance + otherMovesImportance);
