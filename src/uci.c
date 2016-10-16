@@ -78,6 +78,7 @@ void position(Pos *pos, char *str)
       if (++ply == 100) {
         memcpy(pos->st - 100, pos->st, StateSize);
         pos->st -= 100;
+        pos_set_check_info(pos);
         ply -= 100;
         // Make sure rule50 and pliesFromNull do not overflow.
         if (pos->st->rule50 > 100)
