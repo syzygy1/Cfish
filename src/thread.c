@@ -341,7 +341,7 @@ void threads_exit(void)
 // threads_set_number() creates/destroys threads to match the requested
 // number.
 
-void threads_set_number(size_t num)
+void threads_set_number(int num)
 {
   while (Threads.num_threads < num)
     thread_create(Threads.num_threads++);
@@ -372,7 +372,7 @@ void threads_set_number(size_t num)
 uint64_t threads_nodes_searched(void)
 {
   uint64_t nodes = 0;
-  for (size_t idx = 0; idx < Threads.num_threads; idx++)
+  for (int idx = 0; idx < Threads.num_threads; idx++)
     nodes += Threads.pos[idx]->nodes;
   return nodes;
 }
@@ -383,7 +383,7 @@ uint64_t threads_nodes_searched(void)
 uint64_t threads_tb_hits(void)
 {
   uint64_t hits = 0;
-  for (size_t idx = 0; idx < Threads.num_threads; idx++)
+  for (int idx = 0; idx < Threads.num_threads; idx++)
     hits += Threads.pos[idx]->tb_hits;
   return hits;
 }

@@ -564,7 +564,7 @@ int TB_probe_dtz(Pos *pos, int *success)
       if (v > 0 && v + 1 < best)
         best = v + 1;
     } else {
-      if (v -1 < best)
+      if (v - 1 < best)
         best = v - 1;
     }
   }
@@ -591,159 +591,80 @@ static int has_repeated(Pos *pos)
   }
 }
 
-static Value wdl_to_Value[5] = {
-  -VALUE_MATE + MAX_PLY + 1,
-  VALUE_DRAW - 2,
-  VALUE_DRAW,
-  VALUE_DRAW + 2,
-  VALUE_MATE - MAX_PLY - 1
-};
-
-// Use the DTZ tables to filter out root moves that do not preserve the
-// win or draw. If the position is lost, but DTZ is fairly high, only keep
-// moves that maximise DTZ.
-//
-// A return value of 0 indicates that not all probes were successful and
-// that no moves were filtered out.
-int TB_root_probe(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
+// Use the DTZ tables to rank all root moves in the list.
+// A return value of 0 means that not all probes were successful.
+int TB_root_probe(Pos *pos, ExtMove *rm, size_t num_moves)
 {
   int success;
-
-  int dtz = TB_probe_dtz(pos, &success);
-  if (!success) return 0;
-
-  // Probe each move.
-  size_t num = *num_moves;
-  pos->st->endMoves = (pos->st-1)->endMoves;
-  for (size_t i = 0; i < num; i++) {
-    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
-    int v = 0;
-    // Testing for mate should only be necessary if dtz == 1.
-    if (pos_checkers() && dtz > 0) {
-      if (generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
-        v = 1;
-    }
-    if (!v) {
-      if (pos_rule50_count() != 0) {
-        v = -TB_probe_dtz(pos, &success);
-        if (v > 0) v++;
-        else if (v < 0) v--;
-      } else {
-        v = -TB_probe_wdl(pos, &success);
-        v = wdl_to_dtz[v + 2];
-      }
-    }
-    undo_move(pos, rm[i].move);
-    if (!success) return 0;
-    rm[i].value = v;
-  }
 
   // Obtain 50-move counter for the root position.
   int cnt50 = pos_rule50_count();
 
-  // Use 50-move counter to determine whether the root position is
-  // won, lost or drawn.
-  int wdl = 0;
-  if (dtz > 0)
-    wdl = (dtz + cnt50 <= 100) ? 2 : 1;
-  else if (dtz < 0)
-    wdl = (-dtz + cnt50 <= 100) ? -2 : -1;
+  // Check whether there has been a repeat since the last zeroing move.
+  int repetitions = has_repeated(pos);
 
-  // Determine the score to report to the user.
-  *score = wdl_to_Value[wdl + 2];
-
-  // If the position is winning or losing, but too few moves are left,
-  // adjust the score to show how close it is to winning or losing.
-  // NOTE: (int)PawnValueEg is used as scaling factor in score_to_uci().
-  if (wdl == 1 && dtz <= 100)
-    *score = (Value)(((200 - dtz - cnt50) * (int)(PawnValueEg)) / 200);
-  else if (wdl == -1 && dtz >= -100)
-    *score = -(Value)(((200 + dtz - cnt50) * (int)(PawnValueEg)) / 200);
-
-  // Now be a bit smart about filtering out moves.
-  size_t j = 0;
-  if (dtz > 0) { // winning (or 50-move rule draw)
-    int best = 0xffff;
-    for (size_t i = 0; i < num; i++) {
-      int v = rm[i].value;
-      if (v > 0 && v < best)
-        best = v;
+  // Probe and rank each move.
+  pos->st->endMoves = (pos->st-1)->endMoves;
+  for (size_t i = 0; i < num_moves; i++) {
+    int v;
+    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
+    // Calculate dtz for the current move counting from the root position.
+    if (pos_rule50_count() == 0) {
+      // If the move resets the 50-move counter, dtz is -101/-1/0/1/101.
+      v = -TB_probe_wdl(pos, &success);
+      v = wdl_to_dtz[v + 2];
+    } else {
+      // Otherwise, take dtz for the new position and correct by 1 ply.
+      v = -TB_probe_dtz(pos, &success);
+      if (v > 0) v++;
+      else if (v < 0) v--;
     }
-    // If there has been any repetition since the last capture or pawn
-    // move, we might stumble into a third repetition == draw if we are
-    // not careful.
-    // So first set max_dtz_allowed to the DTZ-optimal value.
-    int max_dtz_allowed = best;
-
-    // If there was no repetition and we have 50-move budget left,
-    // relax max_dtz_allowed.
-    if (!has_repeated(pos) && best + cnt50 <= 99)
-      max_dtz_allowed = 99 - cnt50;
-
-    // Now keep all winning moves with dtz <= max_allowed.
-    for (size_t i = 0; i < num; i++) {
-      int v = rm[i].value;
-      if (v > 0 && v <= max_dtz_allowed)
-        rm[j++].move = rm[i].move;
+    // Make sure that a mating move gets value 1.
+    if (pos_checkers() && v == 2) {
+      if (generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
+        v = 1;
     }
-  } else if (dtz < 0) { // losing (or 50-move rule draw)
-    int best = 0;
-    for (size_t i = 0; i < num; i++)
-      if (best < rm[i].value)
-        best = rm[i].value;
-
-    // Try all moves, unless we approach or have a 50-move rule draw.
-    if (-best * 2 + cnt50 < 100)
-      return 1;
-
-    // Since we approach or have a 50-move rule draw, we play DTZ-optimal.
-    for (size_t i = 0; i < num; i++)
-      if (rm[i].value == best)
-        rm[j++].move = rm[i].move;
-  } else { // drawing
-    // Try all moves that preserve the draw.
-    for (size_t i = 0; i < num; i++)
-      if (rm[i].value == 0)
-        rm[j++].move = rm[i].move;
+    undo_move(pos, rm[i].move);
+    if (!success) return 0;
+    if (v > 0) {
+      // Moves that are certain to win are ranked equally. Other
+      if (v + cnt50 <= 99 && !repetitions)
+        rm[i].value = 1000;
+      else
+        rm[i].value = 1000 - (v + cnt50);
+    } else if (v < 0) {
+      // Rank losing moves equally, except if we approach or have a 50-move
+      // rule draw.
+      if (-v * 2 + cnt50 < 100)
+        rm[i].value = -1000;
+      else
+        rm[i].value = -1000 + (-v + cnt50);
+    } else
+      rm[i].value = 0;
   }
-  *num_moves = j;
 
   return 1;
 }
 
-// Use the WDL tables to filter out moves that don't preserve the win or draw.
+// Use the WDL tables to rank all root moves in the list.
 // This is a fallback for the case that some or all DTZ tables are missing.
-//
-// A return value false indicates that not all probes were successful and that
-// no moves were filtered out.
-int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t *num_moves, Value *score)
+// A return value of 0 means that not all probes were successful.
+int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t num_moves)
 {
+  static int wdl_to_rank[] = { -1000, -899, 0, 899, 1000 };
+
   int success;
 
-  int wdl = TB_probe_wdl(pos, &success);
-  if (!success) return 0;
-  *score = wdl_to_Value[wdl + 2];
-
-  int best = -2;
-
-  // Probe each move.
-  size_t num = *num_moves;
-  pos->st->endMoves=(pos->st-1)->endMoves;
-  for (size_t i = 0; i < num; i++) {
+  // Probe and rank each move.
+  pos->st->endMoves = (pos->st-1)->endMoves;
+  for (size_t i = 0; i < num_moves; i++) {
+    int v;
     do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
-    int v = -TB_probe_wdl(pos, &success);
+    v = -TB_probe_wdl(pos, &success);
     undo_move(pos, rm[i].move);
     if (!success) return 0;
-    rm[i].value = v;
-    if (v > best)
-      best = v;
+    rm[i].value = wdl_to_rank[v - 2];
   }
-
-  size_t j = 0;
-  for (size_t i = 0; i < num; i++)
-    if (rm[i].value == best)
-      rm[j++].move = rm[i].move;
-  *num_moves = j;
 
   return 1;
 }

@@ -148,7 +148,7 @@ struct Pos {
   Stack *stack;
   uint64_t nodes;
   uint64_t tb_hits;
-  int PVIdx;
+  int PVIdx, PVLast;
   int maxPly;
   Depth rootDepth;
   Depth completedDepth;

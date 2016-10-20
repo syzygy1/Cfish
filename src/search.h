@@ -37,16 +37,17 @@ typedef CounterMoveStats CounterMoveHistoryStats[16][64];
 // moves.
 
 struct RootMove {
-  size_t pv_size;
+  int pv_size;
   Value score;
   Value previousScore;
+  Value TBRank;
   Move pv[MAX_PLY];
 };
 
 typedef struct RootMove RootMove;
 
 struct RootMoves {
-  size_t size;
+  int size;
   RootMove move[MAX_MOVES];
 };
 

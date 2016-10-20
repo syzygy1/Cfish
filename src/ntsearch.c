@@ -43,7 +43,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     pos->callsCnt = 0;
   }
   if (++pos->callsCnt > 4096) {
-    for (size_t idx = 0; idx < Threads.num_threads; idx++)
+    for (int idx = 0; idx < Threads.num_threads; idx++)
       store_rlx(Threads.pos[idx]->resetCalls, 1);
 
     check_time();
@@ -317,11 +317,11 @@ moves_loop: // When in check search starts from here.
     // In MultiPV mode we also skip PV moves which have been already
     // searched.
     if (rootNode) {
-      size_t idx;
-      for (idx = pos->PVIdx; idx < pos->rootMoves->size; idx++)
+      int idx;
+      for (idx = pos->PVIdx; idx < pos->PVLast; idx++)
         if (pos->rootMoves->move[idx].pv[0] == move)
           break;
-      if (idx == pos->rootMoves->size)
+      if (idx == pos->PVLast)
         continue;
     }
 
@@ -519,7 +519,7 @@ moves_loop: // When in check search starts from here.
 
     if (rootNode) {
       RootMove *rm = NULL;
-      for (size_t idx = 0; idx < pos->rootMoves->size; idx++)
+      for (int idx = 0; idx < pos->rootMoves->size; idx++)
         if (pos->rootMoves->move[idx].pv[0] == move) {
           rm = &pos->rootMoves->move[idx];
           break;
