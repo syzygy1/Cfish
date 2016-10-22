@@ -816,9 +816,9 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
       int bound = option_value(OPT_SYZ_50_MOVE) ? 900 : 1;
       int rank = rm->move[i].TBRank;
       if (rank >= bound) v = VALUE_MATE - MAX_PLY - 1;
-      else if (rank > 0) v = (max(0, rank - 800) * PawnValueEg) / 200;
+      else if (rank > 0) v = (max(3, rank - 800) * PawnValueEg) / 200;
       else if (rank == 0) v = VALUE_DRAW;
-      else if (rank > -bound) v  = (min(0, rank + 800) * PawnValueEg) / 200;
+      else if (rank > -bound) v  = (min(3, rank + 800) * PawnValueEg) / 200;
       else v = -VALUE_MATE + MAX_PLY + 1;
     }
 
