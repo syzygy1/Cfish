@@ -19,7 +19,7 @@
 
 #define PvNode (NT == PV)
 
-Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
+Value name_NT_InCheck(qsearch)(Pos* pos, Stack* st, Value alpha, BETA_ARG
                                Depth depth)
 {
   assert(InCheck == !!pos_checkers());
@@ -37,18 +37,18 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
 
   if (PvNode) {
     oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
-    (ss+1)->pv = pv;
-    ss->pv[0] = 0;
+    (st+1)->pv = pv;
+    st->pv[0] = 0;
   }
 
   bestMove = 0;
 
   // Check for an instant draw or if the maximum ply has been reached
-  if (is_draw(pos) || ss->ply >= MAX_PLY)
-    return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos)
+  if (is_draw(pos, st) || st->ply >= MAX_PLY)
+    return st->ply >= MAX_PLY && !InCheck ? evaluate(pos, st)
                                           : DrawValue[pos_stm()];
 
-  assert(0 <= ss->ply && ss->ply < MAX_PLY);
+  assert(0 <= st->ply && st->ply < MAX_PLY);
 
   // Decide whether or not to include checks: this fixes also the type of
   // TT entry depth that we are going to use. Note that in qsearch we use
@@ -60,7 +60,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   posKey = pos_key();
   tte = tt_probe(posKey, &ttHit);
   ttMove = ttHit ? tte_move(tte) : 0;
-  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
+  ttValue = ttHit ? value_from_tt(tte_value(tte), st->ply) : VALUE_NONE;
 
   if (  !PvNode
       && ttHit
@@ -72,28 +72,28 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
 
   // Evaluate the position statically
   if (InCheck) {
-    ss->staticEval = VALUE_NONE;
+    st->staticEval = VALUE_NONE;
     bestValue = futilityBase = -VALUE_INFINITE;
   } else {
     if (ttHit) {
       // Never assume anything on values stored in TT
-      if ((ss->staticEval = bestValue = tte_eval(tte)) == VALUE_NONE)
-         ss->staticEval = bestValue = evaluate(pos);
+      if ((st->staticEval = bestValue = tte_eval(tte)) == VALUE_NONE)
+         st->staticEval = bestValue = evaluate(pos, st);
 
       // Can ttValue be used as a better position evaluation?
       if (ttValue != VALUE_NONE)
         if (tte_bound(tte) & (ttValue > bestValue ? BOUND_LOWER : BOUND_UPPER))
           bestValue = ttValue;
     } else
-      ss->staticEval = bestValue =
-      (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
-                                       : -(ss-1)->staticEval + 2 * Tempo;
+      st->staticEval = bestValue =
+      (st-1)->currentMove != MOVE_NULL ? evaluate(pos, st)
+                                       : -(st-1)->staticEval + 2 * Tempo;
 
     // Stand pat. Return immediately if static value is at least beta
     if (bestValue >= beta) {
       if (!ttHit)
-        tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
-                 BOUND_LOWER, DEPTH_NONE, 0, ss->staticEval,
+        tte_save(tte, posKey, value_to_tt(bestValue, st->ply),
+                 BOUND_LOWER, DEPTH_NONE, 0, st->staticEval,
                  tt_generation());
 
       return bestValue;
@@ -109,13 +109,13 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   // to search the moves. Because the depth is <= 0 here, only captures,
   // queen promotions and checks (only if depth >= DEPTH_QS_CHECKS) will
   // be generated.
-  mp_init_q(pos, ttMove, depth, to_sq((ss-1)->currentMove));
+  mp_init_q(pos, st, ttMove, depth, to_sq((st-1)->currentMove));
 
   // Loop through the moves until no moves remain or a beta cutoff occurs
-  while ((move = next_move(pos))) {
+  while ((move = next_move(pos, st))) {
     assert(move_is_ok(move));
 
-    givesCheck = gives_check(pos, ss, move);
+    givesCheck = gives_check(pos, st, move);
 
     // Futility pruning
     if (   !InCheck
@@ -131,7 +131,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
         continue;
       }
 
-      if (futilityBase <= alpha && !see_test(pos, move, 1)) {
+      if (futilityBase <= alpha && !see_test(pos, st, move, 1)) {
         bestValue = max(bestValue, futilityBase);
         continue;
       }
@@ -145,28 +145,28 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     // Don't search moves with negative SEE values
     if (  (!InCheck || evasionPrunable)
         &&  type_of_m(move) != PROMOTION
-        &&  !see_test(pos, move, 0))
+        &&  !see_test(pos, st, move, 0))
       continue;
 
     // Speculative prefetch as early as possible
-    prefetch(tt_first_entry(key_after(pos, move)));
+    prefetch(tt_first_entry(key_after(pos, st, move)));
 
     // Check for legality just before making the move
-    if (!is_legal(pos, move))
+    if (!is_legal(pos, st, move))
       continue;
 
-    ss->currentMove = move;
+    st->currentMove = move;
 
     // Make and search the move
-    do_move(pos, move, givesCheck);
+    do_move(pos, st, move, givesCheck);
 #if PvNode
-    value = givesCheck ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
-                       : -qsearch_PV_false(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
+    value = givesCheck ? -qsearch_PV_true(pos, st+1, -beta, -alpha, depth - ONE_PLY)
+                       : -qsearch_PV_false(pos, st+1, -beta, -alpha, depth - ONE_PLY);
 #else
-    value = givesCheck ? -qsearch_NonPV_true(pos, ss+1, -beta, depth - ONE_PLY)
-                       : -qsearch_NonPV_false(pos, ss+1, -beta, depth - ONE_PLY);
+    value = givesCheck ? -qsearch_NonPV_true(pos, st+1, -beta, depth - ONE_PLY)
+                       : -qsearch_NonPV_false(pos, st+1, -beta, depth - ONE_PLY);
 #endif
-    undo_move(pos, move);
+    undo_move(pos, st + 1, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
 
@@ -176,14 +176,14 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
 
       if (value > alpha) {
         if (PvNode) // Update pv even in fail-high case
-          update_pv(ss->pv, move, (ss+1)->pv);
+          update_pv(st->pv, move, (st+1)->pv);
 
         if (PvNode && value < beta) { // Update alpha here!
           alpha = value;
           bestMove = move;
         } else { // Fail high
-          tte_save(tte, posKey, value_to_tt(value, ss->ply), BOUND_LOWER,
-                   ttDepth, move, ss->staticEval, tt_generation());
+          tte_save(tte, posKey, value_to_tt(value, st->ply), BOUND_LOWER,
+                   ttDepth, move, st->staticEval, tt_generation());
 
           return value;
         }
@@ -194,11 +194,11 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   // All legal moves have been searched. A special case: If we're in check
   // and no legal moves were found, it is checkmate.
   if (InCheck && bestValue == -VALUE_INFINITE)
-    return mated_in(ss->ply); // Plies to mate from the root
+    return mated_in(st->ply); // Plies to mate from the root
 
-  tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
+  tte_save(tte, posKey, value_to_tt(bestValue, st->ply),
            PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
-           ttDepth, bestMove, ss->staticEval, tt_generation());
+           ttDepth, bestMove, st->staticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 

@@ -94,15 +94,13 @@ INLINE Value ft_get(FromToStats ft, int c, Move m)
 #define ST_PROBCUT_GEN             20
 #define ST_PROBCUT_2               21
 
-Move next_move(const Pos *pos);
+Move next_move(const Pos *pos, Stack *st);
 
 // Initialisation of move picker data.
 
-INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
+INLINE void mp_init(const Pos *pos, Stack *st, Move ttm, Depth depth)
 {
   assert(depth > DEPTH_ZERO);
-
-  Stack *st = pos->st;
 
   st->depth = depth;
 
@@ -111,17 +109,16 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
 
   st->stage = pos_checkers() ? ST_EVASIONS : ST_MAIN_SEARCH;
   st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm)) {
+  if (!ttm || !is_pseudo_legal(pos, st, ttm)) {
     st->stage++;
     st->ttMove = 0;
   }
 }
 
-INLINE void mp_init_q(const Pos *pos, Move ttm, Depth depth, Square s)
+INLINE void mp_init_q(const Pos *pos, Stack *st, Move ttm, Depth depth,
+                      Square s)
 {
   assert (depth <= DEPTH_ZERO);
-
-  Stack *st = pos->st;
 
   if (pos_checkers())
     st->stage = ST_EVASIONS;
@@ -136,17 +133,16 @@ INLINE void mp_init_q(const Pos *pos, Move ttm, Depth depth, Square s)
   }
 
   st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm)) {
+  if (!ttm || !is_pseudo_legal(pos, st, ttm)) {
     st->stage++;
     st->ttMove = 0;
   }
 }
 
-INLINE void mp_init_pc(const Pos *pos, Move ttm, Value threshold)
+INLINE void mp_init_pc(const Pos *pos, Stack *st, Move ttm,
+                       Value threshold)
 {
   assert(!pos_checkers());
-
-  Stack *st = pos->st;
 
   st->threshold = threshold;
 
@@ -154,8 +150,8 @@ INLINE void mp_init_pc(const Pos *pos, Move ttm, Value threshold)
 
   // In ProbCut we generate captures with SEE higher than the given
   // threshold.
-  st->ttMove =   ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-              && see_test(pos, ttm, threshold + 1) ? ttm : 0;
+  st->ttMove =   ttm && is_pseudo_legal(pos, st, ttm) && is_capture(pos, ttm)
+              && see_test(pos, st, ttm, threshold + 1) ? ttm : 0;
   if (st->ttMove == 0) st->stage++;
 }
 

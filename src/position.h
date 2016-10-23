@@ -124,7 +124,6 @@ typedef struct Stack Stack;
 // the search tree.
 
 struct Pos {
-  Stack *st;
   // Board / game representation.
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
@@ -142,12 +141,12 @@ struct Pos {
   uint16_t gamePly;
 
   ExtMove *moveList;
+  uint64_t nodes;
+  uint64_t tb_hits;
 
   // Relevant mainly to the search of the root position.
   RootMoves *rootMoves;
-  Stack *stack;
-  uint64_t nodes;
-  uint64_t tb_hits;
+  Stack *stack, *rootStack;
   int PVIdx, PVLast;
   int maxPly;
   Depth rootDepth;
@@ -177,31 +176,30 @@ struct Pos {
 };
 
 // FEN string input/output
-void pos_set(Pos *pos, char *fen, int isChess960);
-void pos_fen(const Pos *pos, char *fen);
-void print_pos(Pos *pos);
+void pos_set(Pos *pos, Stack *st, char *fen, int isChess960);
+void pos_fen(const Pos *pos, const Stack *st, char *fen);
+void print_pos(Pos *pos, Stack *st);
 
 //PURE Bitboard pos_attackers_to_occ(const Pos *pos, Square s, Bitboard occupied);
 PURE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
                               Bitboard *pinners);
 
-PURE int is_legal(const Pos *pos, Move m);
-PURE int is_pseudo_legal(const Pos *pos, Move m);
-PURE int gives_check_special(const Pos *pos, Stack *st, Move m);
+PURE int is_legal(const Pos *pos, const Stack *st, Move m);
+PURE int is_pseudo_legal(const Pos *pos, const Stack *st, Move m);
+PURE int gives_check_special(const Pos *pos, const Stack *st, Move m);
 
 // Doing and undoing moves
-void do_move(Pos *pos, Move m, int givesCheck);
-void undo_move(Pos *pos, Move m);
-void do_null_move(Pos *pos);
+void do_move(Pos *pos, Stack *st, Move m, int givesCheck);
+void undo_move(Pos *pos, Stack *st, Move m);
+void do_null_move(Pos *pos, Stack *st);
 INLINE void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
-PURE Value see_sign(const Pos *pos, Move m);
-PURE Value see_test(const Pos *pos, Move m, int value);
+PURE Value see_test(const Pos *pos, Stack *st, Move m, int value);
 
-PURE Key key_after(const Pos *pos, Move m);
-PURE int game_phase(const Pos *pos);
-PURE int is_draw(const Pos *pos);
+PURE Key key_after(const Pos *pos, const Stack *st, Move m);
+PURE int game_phase(const Stack *st);
+PURE int is_draw(const Pos *pos, const Stack *st);
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])
@@ -211,7 +209,7 @@ PURE int is_draw(const Pos *pos);
 #define pieces_cp(c,p) (pieces_p(p) & pieces_c(c))
 #define pieces_cpp(c,p1,p2) (pieces_pp(p1,p2) & pieces_c(c))
 #define piece_on(s) (pos->board[s])
-#define ep_square() (pos->st->epSquare)
+#define ep_square() (st->epSquare)
 #define is_empty(s) (!piece_on(s))
 #ifdef PEDANTIC
 #define piece_count(c,p) (pos->pieceCount[8 * (c) + (p)] - (8*(c)+(p)) * 16)
@@ -230,9 +228,9 @@ PURE int is_draw(const Pos *pos);
 #define piece_count_mk(c, p) (((pos_material_key()) >> (20 * (c) + 4 * (p) + 4)) & 15)
 
 // Castling
-#define can_castle_cr(cr) (pos->st->castlingRights & (cr))
+#define can_castle_cr(cr) (st->castlingRights & (cr))
 #define can_castle_c(c) can_castle_cr((WHITE_OO | WHITE_OOO) << (2 * (c)))
-#define can_castle_any() (pos->st->castlingRights)
+#define can_castle_any() (st->castlingRights)
 #ifdef PEDANTIC
 #define castling_impeded(cr) (pieces() & pos->castlingPath[cr])
 #define castling_rook_square(cr) (pos->castlingRookSquare[cr])
@@ -242,7 +240,7 @@ PURE int is_draw(const Pos *pos);
 #endif
 
 // Checking
-#define pos_checkers() (pos->st->checkersBB)
+#define pos_checkers() (st->checkersBB)
 
 // Attacks to/from a given square
 #define attackers_to_occ(s,occ) pos_attackers_to_occ(pos,s,occ)
@@ -257,36 +255,36 @@ PURE int is_draw(const Pos *pos);
 
 // Properties of moves
 #define moved_piece(m) (piece_on(from_sq(m)))
-#define captured_piece() (pos->st->capturedPiece)
+#define captured_piece() (st->capturedPiece)
 
 // Accessing hash keys
-#define pos_key() (pos->st->key)
-#define pos_material_key() (pos->st->materialKey)
-#define pos_pawn_key() (pos->st->pawnKey)
+#define pos_key() (st->key)
+#define pos_material_key() (st->materialKey)
+#define pos_pawn_key() (st->pawnKey)
 
 // Other properties of the position
 #define pos_stm() (pos->sideToMove)
 #define pos_game_ply() (pos->gamePly)
 #define is_chess960() (pos->chess960)
 #define pos_nodes_searched() (pos->nodes)
-#define pos_rule50_count() (pos->st->rule50)
-#define pos_psq_score() (pos->st->psq)
-#define pos_non_pawn_material(c) (pos->st->nonPawnMaterial[c])
-#define pos_pawns_only() (!pos->st->nonPawn)
+#define pos_rule50_count() (st->rule50)
+#define pos_psq_score() (st->psq)
+#define pos_non_pawn_material(c) (st->nonPawnMaterial[c])
+#define pos_pawns_only() (!st->nonPawn)
 
-INLINE Bitboard discovered_check_candidates(const Pos *pos)
+INLINE Bitboard discovered_check_candidates(const Pos *pos, const Stack *st)
 {
-  return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
+  return st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
 }
 
-INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
+INLINE Bitboard blockers_for_king(const Stack *st, uint32_t c)
 {
-  return pos->st->blockersForKing[c];
+  return st->blockersForKing[c];
 }
 
-INLINE Bitboard pinned_pieces(const Pos *pos, uint32_t c)
+INLINE Bitboard pinned_pieces(const Pos *pos, const Stack *st, uint32_t c)
 {
-  return pos->st->blockersForKing[c] & pieces_c(c);
+  return st->blockersForKing[c] & pieces_c(c);
 }
 
 INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
@@ -331,22 +329,19 @@ INLINE int is_capture(const Pos *pos, Move m)
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
 }
 
-INLINE int gives_check(const Pos *pos, Stack *st, Move m)
+INLINE int gives_check(const Pos *pos, const Stack *st, Move m)
 {
-  return  type_of_m(m) == NORMAL && !discovered_check_candidates(pos)
+  return  type_of_m(m) == NORMAL && !discovered_check_candidates(pos, st)
         ? !!(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
         : gives_check_special(pos, st, m);
 }
 
-void pos_set_check_info(Pos *pos);
+void pos_set_check_info(Pos *pos, Stack *st);
 
 // undo_null_move is used to undo a null move.
 
 INLINE void undo_null_move(Pos *pos)
 {
-  assert(!pos_checkers());
-
-  pos->st--;
   pos->sideToMove ^= 1;
 }
 

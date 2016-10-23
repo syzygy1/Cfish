@@ -86,7 +86,7 @@ static char *Defaults[] = {
 // format (defaults are the positions defined above) and the type of the
 // limit value: depth (default), time in millisecs or number of nodes.
 
-void benchmark(Pos *current, char *str)
+void benchmark(Pos *current, Stack *st, char *str)
 {
   char *token;
   char **fens;
@@ -139,7 +139,7 @@ void benchmark(Pos *current, char *str)
   else if (strcmp(fenFile, "current") == 0) {
     fens = malloc(sizeof(char *));
     fens[0] = malloc(128);
-    pos_fen(current, fens[0]);
+    pos_fen(current, st, fens[0]);
     num_fens = 1;
   }
   else {
@@ -168,22 +168,22 @@ void benchmark(Pos *current, char *str)
   uint64_t nodes = 0;
   Pos pos;
   pos.stack = malloc(105 * sizeof(Stack)); // max perft 100
-  pos.st = pos.stack + 5;
+  pos.rootStack = pos.stack + 5;
   pos.moveList = malloc(10000 * sizeof(ExtMove));
   TimePoint elapsed = now();
 
   for (size_t i = 0; i < num_fens; i++) {
-    pos_set(&pos, fens[i], option_value(OPT_CHESS960));
-    (pos.st-1)->endMoves = pos.moveList;
+    pos_set(&pos, pos.rootStack, fens[i], option_value(OPT_CHESS960));
+    (pos.rootStack-1)->endMoves = pos.moveList;
 
     fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", i + 1, num_fens);
 
     if (strcmp(limitType, "perft") == 0)
-      nodes += perft(&pos, Limits.depth * ONE_PLY);
+      nodes += perft(&pos, pos.rootStack, Limits.depth * ONE_PLY);
     else {
       Limits.startTime = now();
       start_thinking(&pos);
-      thread_wait_for_search_finished(threads_main());
+      thread_wait_for_search_finished(Threads.pos[0]);
       nodes += threads_nodes_searched();
     }
   }

@@ -49,20 +49,20 @@ static const int QuadraticTheirs[][8] = {
 };
 
 // Helper used to detect a given material distribution.
-static int is_KXK(const Pos *pos, int us)
+static int is_KXK(const Pos *pos, const Stack *st, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
         && pos_non_pawn_material(us) >= RookValueMg;
 }
 
-static int is_KBPsKs(const Pos *pos, int us)
+static int is_KBPsKs(const Pos *pos, const Stack *st, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
         && pieces_cp(us, BISHOP)
         && pieces_cp(us, PAWN);
 }
 
-static int is_KQKRPs(const Pos *pos, int us) {
+static int is_KQKRPs(const Pos *pos, const Stack *st, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
         && pieces_cp(us, QUEEN)
@@ -103,12 +103,13 @@ typedef int PieceCountType[2][8];
 // there, so we don't have to recompute all when the same material
 // configuration occurs again.
 
-void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
+void material_entry_fill(const Pos *pos, const Stack *st, MaterialEntry *e,
+                         Key key)
 {
   memset(e, 0, sizeof(MaterialEntry));
   e->key = key;
   e->factor[WHITE] = e->factor[BLACK] = (uint8_t)SCALE_FACTOR_NORMAL;
-  e->gamePhase = game_phase(pos);
+  e->gamePhase = game_phase(st);
 
   // Look for a specialized evaluation function.
   for (int i = 0; i < NUM_EVAL; i++)
@@ -120,7 +121,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
       }
 
   for (int c = 0; c < 2; c++)
-    if (is_KXK(pos, c)) {
+    if (is_KXK(pos, st, c)) {
       e->eval_func = 9; // EvaluateKXK
       e->eval_func_side = c;
       return;
@@ -138,10 +139,10 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   // generic ones that refer to more than one material distribution. Note
   // that in this case we do not return after setting the function.
   for (int c = 0; c < 2; c++) {
-    if (is_KBPsKs(pos, c))
+    if (is_KBPsKs(pos, st, c))
       e->scal_func[c] = 18; // ScaleKBPsK
 
-    else if (is_KQKRPs(pos, c))
+    else if (is_KQKRPs(pos, st, c))
       e->scal_func[c] = 19; // ScaleKQKRPs
   }
 

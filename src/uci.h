@@ -81,7 +81,7 @@ char *uci_value(char *str, Value v);
 char *uci_square(char *str, Square s);
 char *uci_move(char *str, Move m, int chess960);
 void print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
-Move uci_to_move(const Pos *pos, char *str);
+Move uci_to_move(const Pos *pos, const Stack *st, char *str);
 
 #endif
 

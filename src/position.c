@@ -13,7 +13,7 @@
 #include "uci.h"
 #include "tbprobe.h"
 
-static void set_castling_right(Pos *pos, uint32_t c, Square rfrom);
+static void set_castling_right(Pos *pos, Stack *st, uint32_t c, Square rfrom);
 static void set_state(Pos *pos, Stack *st);
 
 #ifndef NDEBUG
@@ -90,10 +90,8 @@ INLINE void move_piece(Pos *pos, uint32_t c, uint32_t piece, Square from, Square
 
 // Calculate CheckInfo data.
 
-INLINE void set_check_info(Pos *pos)
+INLINE void set_check_info(Pos *pos, Stack *st)
 {
-  Stack *st = pos->st;
-
   st->blockersForKing[WHITE] = slider_blockers(pos, pieces_c(BLACK), square_of(WHITE, KING), &st->pinnersForKing[WHITE]);
   st->blockersForKing[BLACK] = slider_blockers(pos, pieces_c(WHITE), square_of(BLACK, KING), &st->pinnersForKing[BLACK]);
 
@@ -111,10 +109,10 @@ INLINE void set_check_info(Pos *pos)
 
 // print_pos() prints an ASCII representation of the position to stdout.
 
-void print_pos(Pos *pos)
+void print_pos(Pos *pos, Stack *st)
 {
   char fen[128];
-  pos_fen(pos, fen);
+  pos_fen(pos, st, fen);
 
   printf("\n +---+---+---+---+---+---+---+---+\n");
 
@@ -134,8 +132,8 @@ void print_pos(Pos *pos)
 
   if (popcount(pieces()) <= TB_MaxCardinality && !can_castle_cr(ANY_CASTLING)) {
     int s1, s2;
-    int wdl = TB_probe_wdl(pos, &s1);
-    int dtz = TB_probe_dtz(pos, &s2);
+    int wdl = TB_probe_wdl(pos, st, &s1);
+    int dtz = TB_probe_dtz(pos, st, &s2);
     printf("\nTablebases WDL: %4d (%d)\nTablebases DTZ: %4d (%d)",
            wdl, s1, dtz, s2);
   }
@@ -176,14 +174,12 @@ void zob_init(void) {
 // This function is not very robust - make sure that input FENs are correct,
 // this is assumed to be the responsibility of the GUI.
 
-void pos_set(Pos *pos, char *fen, int isChess960)
+void pos_set(Pos *pos, Stack *st, char *fen, int isChess960)
 {
   unsigned char col, row, token;
   Square sq = SQ_A8;
 
-  Stack *st = pos->st;
   memset(pos, 0, offsetof(Pos, moveList));
-  pos->st = st;
   memset(st, 0, StateSize);
 #ifdef PEDANTIC
   for (int i = 0; i < 256; i++)
@@ -245,7 +241,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
     else
       continue;
 
-    set_castling_right(pos, c, rsq);
+    set_castling_right(pos, st, c, rsq);
   }
 
   // En passant square. Ignore if no pawn capture is possible.
@@ -278,7 +274,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
 // set_castling_right() is a helper function used to set castling rights
 // given the corresponding color and the rook starting square.
 
-static void set_castling_right(Pos *pos, uint32_t c, Square rfrom)
+static void set_castling_right(Pos *pos, Stack *st, uint32_t c, Square rfrom)
 {
   Square kfrom = square_of(c, KING);
   int cs = kfrom < rfrom ? KING_SIDE : QUEEN_SIDE;
@@ -287,7 +283,7 @@ static void set_castling_right(Pos *pos, uint32_t c, Square rfrom)
   Square kto = relative_square(c, cs == KING_SIDE ? SQ_G1 : SQ_C1);
   Square rto = relative_square(c, cs == KING_SIDE ? SQ_F1 : SQ_D1);
 
-  pos->st->castlingRights |= cr;
+  st->castlingRights |= cr;
 
 #ifdef PEDANTIC
   pos->castlingRightsMask[kfrom] |= cr;
@@ -338,7 +334,7 @@ static void set_state(Pos *pos, Stack *st)
 
   st->checkersBB = attackers_to(square_of(pos_stm(), KING)) & pieces_c(pos_stm() ^ 1);
 
-  set_check_info(pos);
+  set_check_info(pos, st);
 
   for (Bitboard b = pieces(); b; ) {
     Square s = pop_lsb(&b);
@@ -374,7 +370,7 @@ static void set_state(Pos *pos, Stack *st)
 // Chess960 the Shredder-FEN notation is used. This is used for copying
 // the root position to search threads.
 
-void pos_fen(const Pos *pos, char *str)
+void pos_fen(const Pos *pos, const Stack *st, char *str)
 {
   int cnt;
 
@@ -392,7 +388,7 @@ void pos_fen(const Pos *pos, char *str)
   *str++ = pos_stm() == WHITE ? 'w' : 'b';
   *str++ = ' ';
 
-  int cr = pos->st->castlingRights;
+  int cr = st->castlingRights;
 
   if (!is_chess960()) {
     if (cr & WHITE_OO) *str++ = 'K';
@@ -424,7 +420,7 @@ void pos_fen(const Pos *pos, char *str)
 // game_phase() calculates the game phase interpolating total non-pawn
 // material between endgame and midgame limits.
 
-int game_phase(const Pos *pos)
+int game_phase(const Stack *st)
 {
   Value npm = pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK);
 
@@ -491,7 +487,7 @@ Bitboard pos_attackers_to_occ(const Pos *pos, Square s, Bitboard occupied)
 
 // is_legal() tests whether a pseudo-legal move is legal
 
-int is_legal(const Pos *pos, Move m)
+int is_legal(const Pos *pos, const Stack *st, Move m)
 {
   assert(move_is_ok(m));
 
@@ -528,7 +524,7 @@ int is_legal(const Pos *pos, Move m)
 
   // A non-king move is legal if and only if it is not pinned or it
   // is moving along the ray towards or away from the king.
-  return   !(blockers_for_king(pos, us) & sq_bb(from))
+  return   !(blockers_for_king(st, us) & sq_bb(from))
         ||  aligned(m, square_of(us, KING));
 }
 
@@ -609,7 +605,7 @@ int is_pseudo_legal_old(Pos *pos, Move m)
 }
 #endif
 
-int is_pseudo_legal(const Pos *pos, Move m)
+int is_pseudo_legal(const Pos *pos, const Stack *st, Move m)
 {
   uint64_t us = pos_stm();
   Square from = from_sq(m);
@@ -620,7 +616,7 @@ int is_pseudo_legal(const Pos *pos, Move m)
   if (unlikely(type_of_m(m) == CASTLING)) {
     if (pos_checkers()) return 0;
     ExtMove list[MAX_MOVES];
-    ExtMove *end = generate_quiets(pos, list);
+    ExtMove *end = generate_quiets(pos, st, list);
     for (ExtMove *p = list; p < end; p++)
       if (p->move == m) return 1;
     return 0;
@@ -715,7 +711,7 @@ exit(1);
 // gives_check_special() is invoked by gives_check() if there are
 // discovered check candidates or the move is of a special type.
 
-int gives_check_special(const Pos *pos, Stack *st, Move m)
+int gives_check_special(const Pos *pos, const Stack *st, Move m)
 {
   assert(move_is_ok(m));
   assert(color_of(moved_piece(m)) == pos_stm());
@@ -723,7 +719,7 @@ int gives_check_special(const Pos *pos, Stack *st, Move m)
   Square from = from_sq(m);
   Square to = to_sq(m);
 
-  if ((blockers_for_king(pos, pos_stm() ^ 1) & sq_bb(from)) && !aligned(m, st->ksq))
+  if ((blockers_for_king(st, pos_stm() ^ 1) & sq_bb(from)) && !aligned(m, st->ksq))
     return 1;
 
   switch (type_of_m(m)) {
@@ -870,17 +866,16 @@ void do_move(Pos *pos, Move m, int givesCheck)
   pos->sideToMove ^= 1;
   pos->nodes++;
 
-  set_check_info(pos);
+  set_check_info(pos, st);
 
   check_pos(pos);
 }
 
-void undo_move(Pos *pos, Move m)
+void undo_move(Pos *pos, Stack *st, Move m)
 {
   uint32_t from = from_sq(m);
   uint32_t to = to_sq(m);
   uint32_t piece = pos->board[to];
-  Stack *st = pos->st--;
   pos->sideToMove ^= 1;
   uint32_t us = pos->sideToMove;
  
@@ -916,7 +911,7 @@ void undo_move(Pos *pos, Move m)
   check_pos(pos);
 }
 #else
-void do_move(Pos *pos, Move m, int givesCheck)
+void do_move(Pos *pos, Stack *st, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
 
@@ -926,7 +921,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // ones which are going to be recalculated from scratch anyway and then
   // switch our state pointer to point to the new (ready to be updated)
   // state.
-  Stack *st = ++pos->st;
+  st++;
   memcpy(st, st - 1, (StateCopySize + 7) & ~7);
 
   // Increment ply counters. In particular, rule50 will be reset to zero
@@ -1090,7 +1085,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   pos->sideToMove ^= 1;
   pos->nodes++;
 
-  set_check_info(pos);
+  set_check_info(pos, st);
 
   assert(pos_is_ok(pos, &failed_step));
 }
@@ -1099,7 +1094,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 // undo_move() unmakes a move. When it returns, the position should
 // be restored to exactly the same state as before the move was made.
 
-void undo_move(Pos *pos, Move m)
+void undo_move(Pos *pos, Stack *st, Move m)
 {
   assert(move_is_ok(m));
 
@@ -1111,7 +1106,7 @@ void undo_move(Pos *pos, Move m)
   uint32_t piece = piece_on(to);
 
   assert(is_empty(from) || type_of_m(m) == CASTLING);
-  assert(type_of_p(pos->st->capturedPiece) != KING);
+  assert(type_of_p(st->capturedPiece) != KING);
 
   if (unlikely(type_of_m(m) == PROMOTION)) {
     assert(relative_rank_s(us, to) == RANK_8);
@@ -1141,25 +1136,22 @@ void undo_move(Pos *pos, Move m)
   } else {
     move_piece(pos, us, piece, to, from); // Put the piece back at the source square
 
-    if (pos->st->capturedPiece) {
+    if (st->capturedPiece) {
       Square capsq = to;
 
       if (unlikely(type_of_m(m) == ENPASSANT)) {
         capsq -= pawn_push(us);
 
         assert(type_of_p(piece) == PAWN);
-        assert(to == (pos->st-1)->epSquare);
+        assert(to == (st-1)->epSquare);
         assert(relative_rank_s(us, to) == RANK_6);
         assert(is_empty(capsq));
-        assert(pos->st->capturedPiece == make_piece(us ^ 1, PAWN));
+        assert(st->capturedPiece == make_piece(us ^ 1, PAWN));
       }
 
-      put_piece(pos, us ^ 1, pos->st->capturedPiece, capsq); // Restore the captured piece
+      put_piece(pos, us ^ 1, st->capturedPiece, capsq); // Restore the captured piece
     }
   }
-
-  // Finally point our state pointer back to the previous state.
-  pos->st--;
 
   assert(pos_is_ok(pos, &failed_step));
 }
@@ -1168,11 +1160,11 @@ void undo_move(Pos *pos, Move m)
 
 // do_null_move() is used to do a null move.
 
-void do_null_move(Pos *pos)
+void do_null_move(Pos *pos, Stack *st)
 {
   assert(!pos_checkers());
 
-  Stack *st = ++pos->st;
+  st++;
   memcpy(st, st - 1, (StateSize + 7) & ~7);
 
   if (unlikely(st->epSquare)) {
@@ -1188,7 +1180,7 @@ void do_null_move(Pos *pos)
 
   pos->sideToMove ^= 1;
 
-  set_check_info(pos);
+  set_check_info(pos, st);
 
   assert(pos_is_ok(pos, &failed_step));
 }
@@ -1200,7 +1192,7 @@ void do_null_move(Pos *pos)
 // for speculative prefetch. It does not recognize special moves like
 // castling, en-passant and promotions.
 
-Key key_after(const Pos *pos, Move m)
+Key key_after(const Pos *pos, const Stack *st, Move m)
 {
   Square from = from_sq(m);
   Square to = to_sq(m);
@@ -1216,7 +1208,7 @@ Key key_after(const Pos *pos, Move m)
 
 
 // Test whether SEE >= value.
-int see_test(const Pos *pos, Move m, int value)
+int see_test(const Pos *pos, Stack *st, Move m, int value)
 {
   if (unlikely(type_of_m(m) == CASTLING))
     return 0 >= value;
@@ -1246,9 +1238,9 @@ int see_test(const Pos *pos, Move m, int value)
     stm ^= 1;
     attackers &= occ;
     if (!(stmAttackers = attackers & pieces_c(stm))) break;
-    if (    (stmAttackers & blockers_for_king(pos, stm))
-        && !(pos->st->pinnersForKing[stm] & ~occ))
-      stmAttackers &= ~blockers_for_king(pos, stm);
+    if (    (stmAttackers & blockers_for_king(st, stm))
+        && !(st->pinnersForKing[stm] & ~occ))
+      stmAttackers &= ~blockers_for_king(st, stm);
     if (!stmAttackers) break;
     res ^= 1;
     Bitboard bb;
@@ -1412,20 +1404,18 @@ int see_test(Pos *pos, Move m, int value)
 // repetition. It does not detect stalemates.
 
 __attribute__((optimize("Os")))
-int is_draw(const Pos *pos)
+int is_draw(const Pos *pos, const Stack *st)
 {
-  Stack *st = pos->st;
-
   if (unlikely(st->rule50 > 99)) {
     if (!pos_checkers())
       return 1;
-    return generate_legal(pos, (st-1)->endMoves) != (st-1)->endMoves;
+    return generate_legal(pos, st, (st-1)->endMoves) != (st-1)->endMoves;
   }
 
   // st->pliesFromNull is reset both on null moves and on zeroing moves.
   int e = st->pliesFromNull - 4;
   if (e >= 0) {
-    Stack *stp = st - 2;
+    const Stack *stp = st - 2;
     for (int i = 0; i <= e; i += 2) {
       stp -= 2;
       if (stp->key == st->key)
@@ -1437,9 +1427,9 @@ int is_draw(const Pos *pos)
 }
 
 
-void pos_set_check_info(Pos *pos)
+void pos_set_check_info(Pos *pos, Stack *st)
 {
-  set_check_info(pos);
+  set_check_info(pos, st);
 }
 
 // pos_is_ok() performs some consistency checks for the position object.
@@ -1447,7 +1437,7 @@ void pos_set_check_info(Pos *pos)
 
 #ifdef PEDANTIC
 #ifndef NDEBUG
-static int pos_is_ok(Pos *pos, int *failedStep)
+static int pos_is_ok(Pos *pos, Stack *st, int *failedStep)
 {
   int Fast = 1; // Quick (default) or full check?
 
@@ -1484,9 +1474,9 @@ static int pos_is_ok(Pos *pos, int *failedStep)
     }
 
     if (step == StackOK) {
-      Stack si = *(pos->st);
+      Stack si = *st;
       set_state(pos, &si);
-      if (memcmp(&si, pos->st, StateSize))
+      if (memcmp(&si, st, StateSize))
         return 0;
     }
 
@@ -1520,7 +1510,7 @@ static int pos_is_ok(Pos *pos, int *failedStep)
 }
 #endif
 #else
-static int pos_is_ok(Pos *pos, int *failedStep)
+static int pos_is_ok(Pos *pos, Stack *st, int *failedStep)
 {
 (void)pos;
 (void)failedStep;
@@ -1528,7 +1518,7 @@ static int pos_is_ok(Pos *pos, int *failedStep)
 }
 
 #ifndef NDEBUG
-static int check_pos(Pos *pos)
+static int check_pos(Pos *pos, Stack *st)
 {
   Bitboard color_bb[2];
   Bitboard piece_bb[8];
@@ -1561,9 +1551,9 @@ static int check_pos(Pos *pos)
       key ^= zob.psq[pos->board[sq]][sq];
   if (pos->sideToMove == BLACK)
     key ^= zob.side;
-  if (pos->st->epSquare)
-    key ^= zob.enpassant[pos->st->epSquare & 7];
-  key ^= zob.castling[pos->st->castlingRights];
+  if (st->epSquare)
+    key ^= zob.enpassant[st->epSquare & 7];
+  key ^= zob.castling[st->castlingRights];
 
   for (int sq = 0; sq < 64; sq++)
     if ((pos->board[sq] & 7) == PAWN)
@@ -1577,9 +1567,9 @@ static int check_pos(Pos *pos)
   assert(npm_w == pos_non_pawn_material(WHITE));
   assert(npm_b == pos_non_pawn_material(BLACK));
 
-  assert(key == pos->st->key);
-  assert(pawnKey == pos->st->pawnKey);
-  assert(matKey == pos->st->materialKey);
+  assert(key == st->key);
+  assert(pawnKey == st->pawnKey);
+  assert(matKey == st->materialKey);
 
   return 1;
 }

@@ -236,8 +236,8 @@ INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
 // do_king_safety() calculates a bonus for king safety. It is called only
 // when king square changes, which is about 20% of total king_safety() calls.
 
-INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
-                                   const int Us)
+INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, const Stack *st,
+                            Square ksq, const int Us)
 {
   pe->kingSquares[Us] = ksq;
   pe->castlingRights[Us] = can_castle_c(Us);
@@ -260,13 +260,15 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
 }
 
 // "template" instantiation:
-Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
+Score do_king_safety_white(PawnEntry *pe, const Pos *pos, const Stack *st,
+                           Square ksq)
 {
-  return do_king_safety(pe, pos, ksq, WHITE);
+  return do_king_safety(pe, pos, st, ksq, WHITE);
 }
 
-Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
+Score do_king_safety_black(PawnEntry *pe, const Pos *pos, const Stack *st,
+                           Square ksq)
 {
-  return do_king_safety(pe, pos, ksq, BLACK);
+  return do_king_safety(pe, pos, st, ksq, BLACK);
 }
 

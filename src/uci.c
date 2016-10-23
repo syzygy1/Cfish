@@ -33,7 +33,7 @@
 #include "timeman.h"
 #include "uci.h"
 
-extern void benchmark(Pos *pos, char *str);
+extern void benchmark(Pos *pos, Stack *st, char *str);
 
 // FEN string of the initial position, normal chess
 const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -43,7 +43,7 @@ const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 // string ("fen") or the starting position ("startpos") and then makes
 // the moves given in the following move list ("moves").
 
-void position(Pos *pos, char *str)
+static void position(Pos *pos, char *str)
 {
   char fen[128];
   char *moves;
@@ -62,44 +62,46 @@ void position(Pos *pos, char *str)
   else
     return;
 
-  pos->st = pos->stack + 100;
-  pos_set(pos, fen, option_value(OPT_CHESS960));
+  Stack *st = pos->stack + 100;
+  pos_set(pos, st, fen, option_value(OPT_CHESS960));
 
   // Parse move list (if any).
   if (moves) {
     int ply = 0;
 
     for (moves = strtok(moves, " \t"); moves; moves = strtok(NULL, " \t")) {
-      Move m = uci_to_move(pos, moves);
+      Move m = uci_to_move(pos, st, moves);
       if (!m) break;
-      do_move(pos, m, gives_check(pos, pos->st, m));
+      do_move(pos, st, m, gives_check(pos, st, m));
+      st++;
       pos->gamePly++;
       // Roll over if we reach 100 plies.
       if (++ply == 100) {
-        memcpy(pos->st - 100, pos->st, StateSize);
-        pos->st -= 100;
-        pos_set_check_info(pos);
+        memcpy(st - 100, st, StateSize);
+        st -= 100;
+        pos_set_check_info(pos, st);
         ply -= 100;
         // Make sure rule50 and pliesFromNull do not overflow.
-        if (pos->st->rule50 > 100)
-          pos->st->rule50 = 100;
-        if (pos->st->pliesFromNull > 100)
-          pos->st->pliesFromNull = 100;
+        if (st->rule50 > 100)
+          st->rule50 = 100;
+        if (st->pliesFromNull > 100)
+          st->pliesFromNull = 100;
       }
     }
 
     // Make sure that is_draw() never tries to look back more than 99 ply.
     // This is enough, since 100 ply history means draw by 50-move rule.
-    if (pos->st->pliesFromNull > 99)
-      pos->st->pliesFromNull = 99;
+    if (st->pliesFromNull > 99)
+      st->pliesFromNull = 99;
 
     // Now move some game history from the end of the circular buffer
     // to before the current position.
-    int k = (pos->st - (pos->stack + 100)) - max(5, pos->st->pliesFromNull);
+    int k = (st - (pos->stack + 100)) - max(5, st->pliesFromNull);
     for (; k < 0; k++)
-      memcpy(pos->st + k, pos->st + k + 100, StateSize);
+      memcpy(st + k, st + k + 100, StateSize);
   }
-  (pos->st-1)->endMoves = pos->moveList;
+  (st-1)->endMoves = pos->moveList;
+  pos->rootStack = st;
 }
 
 
@@ -162,7 +164,8 @@ void go(Pos *pos, char *str)
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
     if (strcmp(token, "searchmoves") == 0)
       while ((token = strtok(NULL, " \t")))
-        Limits.searchmoves[Limits.num_searchmoves++] = uci_to_move(pos, token);
+        Limits.searchmoves[Limits.num_searchmoves++] =
+                                     uci_to_move(pos, pos->rootStack, token);
     else if (strcmp(token, "wtime") == 0)
       Limits.time[WHITE] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "btime") == 0)
@@ -227,8 +230,8 @@ void uci_loop(int argc, char **argv)
   // Slots 201-214 may be used by TB root probing.
   pos.stack = malloc(215 * sizeof(Stack));
   pos.moveList = malloc(1000 * sizeof(ExtMove));
-  pos.st = pos.stack + 100;
-  pos.st[-1].endMoves = pos.moveList;
+  Stack *st = pos.rootStack = pos.stack + 100;
+  st[-1].endMoves = pos.moveList;
 
   size_t buf_size = 1;
   for (int i = 1; i < argc; i++)
@@ -245,7 +248,7 @@ void uci_loop(int argc, char **argv)
   }
 
   strcpy(fen, StartFEN);
-  pos_set(&pos, fen, 0);
+  pos_set(&pos, st, fen, 0);
 
   do {
     if (argc == 1 && !getline(&cmd, &buf_size, stdin))
@@ -279,7 +282,7 @@ void uci_loop(int argc, char **argv)
         Signals.stop = 1;
         LOCK(Signals.lock);
         if (Signals.sleeping)
-          thread_start_searching(threads_main(), 1); // Wake up main thread.
+          thread_start_searching(Threads.pos[0], 1); // Wake up main thread.
         Signals.sleeping = 0;
         UNLOCK(Signals.lock);
       }
@@ -291,7 +294,7 @@ void uci_loop(int argc, char **argv)
       LOCK(Signals.lock);
       if (Signals.sleeping) {
         Signals.stop = 1;
-        thread_start_searching(threads_main(), 1); // Wake up main thread.
+        thread_start_searching(Threads.pos[0], 1); // Wake up main thread.
         Signals.sleeping = 0;
       }
       UNLOCK(Signals.lock);
@@ -318,12 +321,12 @@ void uci_loop(int argc, char **argv)
     else if (strcmp(token, "setoption") == 0) setoption(str);
 
     // Additional custom non-UCI commands, useful for debugging
-    else if (strcmp(token, "bench") == 0)     benchmark(&pos, str);
-    else if (strcmp(token, "d") == 0)         print_pos(&pos);
+    else if (strcmp(token, "bench") == 0)     benchmark(&pos, st, str);
+    else if (strcmp(token, "d") == 0)         print_pos(&pos, st);
     else if (strcmp(token, "perft") == 0) {
       sprintf(str_buf, "%d %d %d current perft", option_value(OPT_HASH),
                     option_value(OPT_THREADS), atoi(str));
-      benchmark(&pos, str_buf);
+      benchmark(&pos, st, str_buf);
     }
     else {
       printf("Unknown command: %s %s\n", token, str);
@@ -332,7 +335,7 @@ void uci_loop(int argc, char **argv)
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
   if (Signals.searching)
-    thread_wait_for_search_finished(threads_main());
+    thread_wait_for_search_finished(Threads.pos[0]);
 
   free(cmd);
   free(pos.stack);
@@ -408,13 +411,13 @@ char *uci_move(char *str, Move m, int chess960)
 // uci_to_move() converts a string representing a move in coordinate
 // notation (g1f3, a7a8q) to the corresponding legal Move, if any.
 
-Move uci_to_move(const Pos *pos, char *str)
+Move uci_to_move(const Pos *pos, const Stack *st, char *str)
 {
   if (strlen(str) == 5) // Junior could send promotion piece in uppercase
     str[4] = tolower(str[4]);
 
   ExtMove list[MAX_MOVES];
-  ExtMove *last = generate_legal(pos, list);
+  ExtMove *last = generate_legal(pos, st, list);
 
   char buf[16];
 

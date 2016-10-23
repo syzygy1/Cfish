@@ -101,7 +101,7 @@ static Move easy_move_get(Key key)
   return EM.expectedPosKey == key ? EM.pv[2] : 0;
 }
 
-static void easy_move_update(Pos *pos, Move *newPv)
+static void easy_move_update(Pos *pos, Stack *st, Move *newPv)
 {
   // Keep track of how many times in a row the 3rd ply remains stable
   EM.stableCnt = (newPv[2] == EM.pv[2]) ? EM.stableCnt + 1 : 0;
@@ -110,11 +110,13 @@ static void easy_move_update(Pos *pos, Move *newPv)
     EM.pv[0] = newPv[0];
     EM.pv[1] = newPv[1];
     EM.pv[2] = newPv[2];
-    do_move(pos, newPv[0], gives_check(pos, pos->st, newPv[0]));
-    do_move(pos, newPv[1], gives_check(pos, pos->st, newPv[1]));
+    do_move(pos, st, newPv[0], gives_check(pos, st, newPv[0]));
+    st++;
+    do_move(pos, st, newPv[1], gives_check(pos, st, newPv[1]));
+    st++;
     EM.expectedPosKey = pos_key();
-    undo_move(pos, newPv[1]);
-    undo_move(pos, newPv[0]);
+    undo_move(pos, st--, newPv[1]);
+    undo_move(pos, st--, newPv[0]);
   }
 }
 
@@ -172,7 +174,7 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int
 static void check_time(void);
 static void stable_sort(RootMove *rm, int num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
-static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
+static int extract_ponder_from_tt(RootMove *rm, Pos *pos, Stack *st);
 
 static TimePoint lastInfoTime;
 
@@ -228,40 +230,40 @@ void search_clear()
 // perft() is our utility to verify move generation. All the leaf nodes
 // up to the given depth are generated and counted, and the sum is returned.
 
-static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
+static uint64_t perft_helper(Pos *pos, Stack *st, Depth depth, uint64_t nodes)
 {
-  ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
+  ExtMove *m = (st-1)->endMoves;
+  ExtMove *last = st->endMoves = generate_legal(pos, st, m);
   for (; m < last; m++) {
-    do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+    do_move(pos, st, m->move, gives_check(pos, st, m->move));
     if (depth == 0) {
-      nodes += generate_legal(pos, last) - last;
+      nodes += generate_legal(pos, st + 1, last) - last;
     } else
-      nodes = perft_helper(pos, depth - ONE_PLY, nodes);
-    undo_move(pos, m->move);
+      nodes = perft_helper(pos, st + 1, depth - ONE_PLY, nodes);
+    undo_move(pos, st + 1, m->move);
   }
   return nodes;
 }
 
-uint64_t perft(Pos *pos, Depth depth)
+uint64_t perft(Pos *pos, Stack *st, Depth depth)
 {
   uint64_t cnt, nodes = 0;
   char buf[16];
 
   ExtMove *m = pos->moveList;
-  ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
+  ExtMove *last = st->endMoves = generate_legal(pos, st, m);
   for (; m < last; m++) {
     if (depth <= ONE_PLY) {
       cnt = 1;
       nodes++;
     } else {
-      do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+      do_move(pos, st, m->move, gives_check(pos, st, m->move));
       if (depth == 2 * ONE_PLY)
-        cnt = generate_legal(pos, last) - last;
+        cnt = generate_legal(pos, st + 1, last) - last;
       else
-        cnt = perft_helper(pos, depth - 3 * ONE_PLY, 0);
+        cnt = perft_helper(pos, st + 1, depth - 3 * ONE_PLY, 0);
       nodes += cnt;
-      undo_move(pos, m->move);
+      undo_move(pos, st + 1, m->move);
     }
     printf("%s: %"PRIu64"\n", uci_move(buf, m->move, is_chess960()), cnt);
   }
@@ -275,6 +277,7 @@ uint64_t perft(Pos *pos, Depth depth)
 void mainthread_search(void)
 {
   Pos *pos = Threads.pos[0];
+  Stack *st = pos->rootStack;
   int us = pos_stm();
   time_init(us, pos_game_ply());
   char buf[16];
@@ -349,7 +352,7 @@ void mainthread_search(void)
 
   printf("bestmove %s", uci_move(buf, bestThread->rootMoves->move[0].pv[0], is_chess960()));
 
-  if (bestThread->rootMoves->move[0].pv_size > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos))
+  if (bestThread->rootMoves->move[0].pv_size > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos, st))
     printf(" ponder %s", uci_move(buf, bestThread->rootMoves->move[0].pv[1], is_chess960()));
 
   printf("\n");
@@ -368,14 +371,15 @@ void thread_search(Pos *pos)
   Value bestValue, alpha, beta, delta;
   Move easyMove = 0;
 
-  Stack *ss = pos->st; // At least the fifth element of the allocated array.
+  Stack *st = pos->rootStack;
+  // st points to at least the fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
-    memset(SStackBegin(ss[i]), 0, SStackSize);
-  (ss-1)->endMoves = pos->moveList;
+    memset(SStackBegin(st[i]), 0, SStackSize);
+  (st-1)->endMoves = pos->moveList;
 
   for (int i = 0; i < MAX_PLY; i++) {
-    ss[i].ply = i + 1;
-    ss[i].skipEarlyPruning = 0;
+    st[i].ply = i + 1;
+    st[i].skipEarlyPruning = 0;
   }
 
   bestValue = delta = alpha = -VALUE_INFINITE;
@@ -407,7 +411,7 @@ void thread_search(Pos *pos)
   // is reached.
   while (   (pos->rootDepth += ONE_PLY) < DEPTH_MAX
          && !Signals.stop
-         && (!Limits.depth || threads_main()->rootDepth <= Limits.depth))
+         && (!Limits.depth || Threads.pos[0]->rootDepth <= Limits.depth))
   {
     // Set up the new depths for the helper threads skipping on average every
     // 2nd ply (using a half-density matrix).
@@ -454,7 +458,7 @@ void thread_search(Pos *pos)
       // high/low, re-search with a bigger window until we're not failing
       // high/low anymore.
       while (1) {
-        bestValue = search_PV(pos, ss, alpha, beta, pos->rootDepth);
+        bestValue = search_PV(pos, st, alpha, beta, pos->rootDepth);
 
         // Bring the best move to the front. It is critical that sorting
         // is done with a stable algorithm because all the values but the
@@ -572,7 +576,7 @@ void thread_search(Pos *pos)
       }
 
       if (rm->move[0].pv_size >= 3)
-        easy_move_update(pos, rm->move[0].pv);
+        easy_move_update(pos, st, rm->move[0].pv);
       else
         easy_move_clear();
     }
@@ -799,7 +803,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
   int PVIdx = pos->PVIdx;
   int multiPV = min(option_value(OPT_MULTI_PV), rm->size);
   uint64_t nodes_searched = threads_nodes_searched();
-  uint64_t tbhits = threads_tb_hits();
+  uint64_t tbhits = threads_tb_hits() + (TB_RootInTB ? rm->size : 0);
   char buf[16];
 
   for (int i = 0; i < multiPV; ++i) {
@@ -850,19 +854,20 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 // return to the GUI, otherwise in case of 'ponder on' we have nothing
 // to think on.
 
-static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
+static int extract_ponder_from_tt(RootMove *rm, Pos *pos, Stack *st)
 {
   int ttHit;
 
   assert(rm->pv_size == 1);
 
-  do_move(pos, rm->pv[0], gives_check(pos, pos->st, rm->pv[0]));
+  do_move(pos, st, rm->pv[0], gives_check(pos, st, rm->pv[0]));
+  st++;
   TTEntry *tte = tt_probe(pos_key(), &ttHit);
 
   if (ttHit) {
     Move m = tte_move(tte); // Local copy to be SMP safe
     ExtMove list[MAX_MOVES];
-    ExtMove *last = generate_legal(pos, list);
+    ExtMove *last = generate_legal(pos, st, list);
     for (ExtMove *p = list; p < last; p++)
       if (p->move == m) {
         rm->pv[rm->pv_size++] = m;
@@ -870,11 +875,12 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
       }
   }
 
-  undo_move(pos, rm->pv[0]);
+  undo_move(pos, st--, rm->pv[0]);
   return rm->pv_size > 1;
 }
 
-void TB_rank_root_moves(Pos *pos, ExtMove *list, int num_moves)
+static void TB_rank_root_moves(Pos *pos, Stack *st, ExtMove *list,
+                               int num_moves)
 {
   TB_RootInTB = 0;
   TB_ProbeDepth = option_value(OPT_SYZ_PROBE_DEPTH) * ONE_PLY;
@@ -889,14 +895,14 @@ void TB_rank_root_moves(Pos *pos, ExtMove *list, int num_moves)
 
   if (TB_Cardinality >= popcount(pieces()) && !can_castle_any()) {
     // Try ranking moves using DTZ tables.
-    TB_RootInTB = TB_root_probe(pos, list, num_moves);
+    TB_RootInTB = TB_root_probe(pos, st, list, num_moves);
 
     if (!TB_RootInTB) {
       // DTZ tables are missing.
       dtz_available = 0;
 
       // Try ranking moves using WDL tables as fallback.
-      TB_RootInTB = TB_root_probe_wdl(pos, list, num_moves);
+      TB_RootInTB = TB_root_probe_wdl(pos, st, list, num_moves);
     }
   }
 
@@ -926,13 +932,13 @@ void TB_rank_root_moves(Pos *pos, ExtMove *list, int num_moves)
 void start_thinking(Pos *root)
 {
   if (Signals.searching)
-    thread_wait_for_search_finished(threads_main());
+    thread_wait_for_search_finished(Threads.pos[0]);
 
   Signals.stopOnPonderhit = Signals.stop = 0;
 
   // Generate all legal moves.
   ExtMove list[MAX_MOVES];
-  ExtMove *end = generate_legal(root, list);
+  ExtMove *end = generate_legal(root, root->rootStack, list);
 
   // Implement searchmoves option.
   if (Limits.num_searchmoves) {
@@ -947,7 +953,7 @@ void start_thinking(Pos *root)
   }
 
   // Rank root moves if root position is a TB position.
-  TB_rank_root_moves(root, list, end - list);
+  TB_rank_root_moves(root, root->rootStack, list, end - list);
 
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
@@ -964,18 +970,15 @@ void start_thinking(Pos *root)
     }
     memcpy(pos, root, offsetof(Pos, moveList));
     // Copy enough of the root State buffer.
-    int n = max(5, root->st->pliesFromNull);
+    int n = max(5, root->rootStack->pliesFromNull);
     for (int i = 0; i <= n; i++)
-      memcpy(&pos->stack[i], &root->st[i - n], StateSize);
-    pos->st = pos->stack + n;
-    (pos->st-1)->endMoves = pos->moveList;
-    pos_set_check_info(pos);
+      memcpy(&pos->stack[i], &root->rootStack[i - n], StateSize);
+    pos->rootStack = pos->stack + n;
+    (pos->rootStack-1)->endMoves = pos->moveList;
+    pos_set_check_info(pos, pos->rootStack);
   }
 
-  if (TB_RootInTB)
-    Threads.pos[0]->tb_hits = end - list;
-
   Signals.searching = 1;
-  thread_start_searching(threads_main(), 0);
+  thread_start_searching(Threads.pos[0], 0);
 }
 

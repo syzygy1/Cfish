@@ -180,12 +180,13 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
 
-INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
+INLINE void evalinfo_init(const Pos *pos, const Stack *st, EvalInfo *ei,
+                          const int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Down = (Us == WHITE ? DELTA_S : DELTA_N);
 
-  ei->pinnedPieces[Us] = pinned_pieces(pos, Us);
+  ei->pinnedPieces[Us] = pinned_pieces(pos, st, Us);
   Bitboard b = ei->attackedBy[Them][KING];
   ei->attackedBy[Them][0] |= b;
   ei->attackedBy[Us][0] |= ei->attackedBy[Us][PAWN] = ei->pi->pawnAttacks[Us];
@@ -205,8 +206,9 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
 // color and type.
 
-INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
-                            Bitboard *mobilityArea, const int Us, const int Pt)
+INLINE Score evaluate_piece(const Pos *pos, const Stack *st, EvalInfo *ei,
+                            Score *mobility, Bitboard *mobilityArea,
+                            const int Us, const int Pt)
 {
   Bitboard b, bb;
   Square s;
@@ -315,17 +317,17 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 // come last). We rely on the inlining compiler to expand all calls to
 // evaluate_piece(). No need for C++ templates!
 
-INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
-                             Bitboard *mobilityArea)
+INLINE Score evaluate_pieces(const Pos *pos, const Stack *st, EvalInfo *ei,
+                             Score *mobility, Bitboard *mobilityArea)
 {
-  return  evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, KNIGHT)
-        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, KNIGHT)
-        + evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, BISHOP)
-        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, BISHOP)
-        + evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, ROOK)
-        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, ROOK)
-        + evaluate_piece(pos, ei, mobility, mobilityArea, WHITE, QUEEN)
-        - evaluate_piece(pos, ei, mobility, mobilityArea, BLACK, QUEEN);
+  return  evaluate_piece(pos, st, ei, mobility, mobilityArea, WHITE, KNIGHT)
+        - evaluate_piece(pos, st, ei, mobility, mobilityArea, BLACK, KNIGHT)
+        + evaluate_piece(pos, st, ei, mobility, mobilityArea, WHITE, BISHOP)
+        - evaluate_piece(pos, st, ei, mobility, mobilityArea, BLACK, BISHOP)
+        + evaluate_piece(pos, st, ei, mobility, mobilityArea, WHITE, ROOK)
+        - evaluate_piece(pos, st, ei, mobility, mobilityArea, BLACK, ROOK)
+        + evaluate_piece(pos, st, ei, mobility, mobilityArea, WHITE, QUEEN)
+        - evaluate_piece(pos, st, ei, mobility, mobilityArea, BLACK, QUEEN);
 }
 
 
@@ -344,7 +346,8 @@ static const Bitboard KingFlank[2][8] = {
     CenterFiles & BlackCamp, KingSide  & BlackCamp, KingSide  & BlackCamp, KingSide    & BlackCamp },
 };
 
-INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
+INLINE Score evaluate_king(const Pos *pos, const Stack *st, EvalInfo *ei,
+                           const int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Up = (Us == WHITE ? DELTA_N : DELTA_S);
@@ -354,8 +357,8 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
   const Square ksq = square_of(Us, KING);
 
   // King shelter and enemy pawns storm
-  Score score = Us == WHITE ? king_safety_white(ei->pi, pos, ksq)
-                            : king_safety_black(ei->pi, pos, ksq);
+  Score score = Us == WHITE ? king_safety_white(ei->pi, pos, st, ksq)
+                            : king_safety_black(ei->pi, pos, st, ksq);
 
   // Main king safety evaluation
   if (ei->kingAttackersCount[Them]) {
@@ -678,10 +681,11 @@ INLINE Score evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
 
 // evaluate_scale_factor() computes the scale factor for the winning side
 
-INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
+INLINE int evaluate_scale_factor(const Pos *pos, const Stack *st, EvalInfo *ei,
+                                 Value eg)
 {
   int strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
-  int sf = material_scale_factor(ei->me, pos, strongSide);
+  int sf = material_scale_factor(ei->me, pos, st, strongSide);
 
   // If we don't already have an unusual scale factor, check for certain
   // types of endgames, and use a lower scale for those.
@@ -715,7 +719,7 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 // evaluate() is the main evaluation function. It returns a static evaluation
 // of the position from the point of view of the side to move.
 
-Value evaluate(const Pos *pos)
+Value evaluate(const Pos *pos, const Stack *st)
 {
   assert(!pos_checkers());
 
@@ -723,12 +727,12 @@ Value evaluate(const Pos *pos)
   EvalInfo ei;
 
   // Probe the material hash table
-  ei.me = material_probe(pos);
+  ei.me = material_probe(pos, st);
 
   // If we have a specialized evaluation function for the current material
   // configuration, call it and return.
   if (material_specialized_eval_exists(ei.me))
-    return material_evaluate(ei.me, pos);
+    return material_evaluate(ei.me, pos, st);
 
   // Initialize score by reading the incrementally updated scores included
   // in the position struct (material + piece square tables) and the
@@ -737,15 +741,15 @@ Value evaluate(const Pos *pos)
   Score score = pos_psq_score() + material_imbalance(ei.me);
 
   // Probe the pawn hash table
-  ei.pi = pawn_probe(pos);
+  ei.pi = pawn_probe(pos, st);
   score += ei.pi->score;
 
   // Initialize attack and king safety bitboards.
   ei.attackedBy[WHITE][0] = ei.attackedBy[BLACK][0] = 0;
   ei.attackedBy[WHITE][KING] = attacks_from_king(square_of(WHITE, KING));
   ei.attackedBy[BLACK][KING] = attacks_from_king(square_of(BLACK, KING));
-  evalinfo_init(pos, &ei, WHITE);
-  evalinfo_init(pos, &ei, BLACK);
+  evalinfo_init(pos, st, &ei, WHITE);
+  evalinfo_init(pos, st, &ei, BLACK);
 
   // Pawns blocked or on ranks 2 and 3 will be excluded from the mobility area
   Bitboard blockedPawns[] = {
@@ -761,13 +765,13 @@ Value evaluate(const Pos *pos)
   };
 
   // Evaluate all pieces but king and pawns
-  score += evaluate_pieces(pos, &ei, mobility, mobilityArea);
+  score += evaluate_pieces(pos, st, &ei, mobility, mobilityArea);
   score += mobility[WHITE] - mobility[BLACK];
 
   // Evaluate kings after all other pieces because we need full attack
   // information when computing the king safety evaluation.
-  score +=  evaluate_king(pos, &ei, WHITE)
-          - evaluate_king(pos, &ei, BLACK);
+  score +=  evaluate_king(pos, st, &ei, WHITE)
+          - evaluate_king(pos, st, &ei, BLACK);
 
   // Evaluate tactical threats, we need full attack information including king
   score +=  evaluate_threats(pos, &ei, WHITE)
@@ -796,7 +800,7 @@ Value evaluate(const Pos *pos)
   score += evaluate_initiative(pos, ei.pi->asymmetry, eg_value(score));
 
   // Evaluate scale factor for the winning side
-  int sf = evaluate_scale_factor(pos, &ei, eg_value(score));
+  int sf = evaluate_scale_factor(pos, st, &ei, eg_value(score));
 
   // Interpolate between a middlegame and a (scaled by 'sf') endgame score
   Value v =  mg_value(score) * ei.me->gamePhase

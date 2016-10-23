@@ -24,8 +24,9 @@
 #include "types.h"
 
 typedef struct Pos Pos;
+typedef struct Stack Stack;
 
-typedef Value (EgFunc)(const Pos *, unsigned);
+typedef Value (EgFunc)(const Pos *, const Stack *, unsigned);
 
 EgFunc EvaluateKPK, EvaluateKNNK, EvaluateKBNK, EvaluateKRKP,
        EvaluateKRKB, EvaluateKRKN, EvaluateKQKP, EvaluateKQKR,

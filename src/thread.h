@@ -67,9 +67,6 @@ typedef struct MainThread MainThread;
 
 extern MainThread mainThread;
 
-void mainthread_search();
-
-
 // ThreadPool struct handles all the threads-related stuff like init,
 // starting, parking and, most importantly, launching a thread. All the
 // access to threads data is done through this class.
@@ -96,11 +93,6 @@ uint64_t threads_nodes_searched(void);
 uint64_t threads_tb_hits(void);
 
 extern ThreadPool Threads;
-
-INLINE Pos *threads_main(void)
-{
-  return Threads.pos[0];
-}
 
 CounterMoveHistoryStats **cmh_tables;
 int num_cmh_tables;

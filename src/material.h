@@ -53,15 +53,15 @@ typedef struct MaterialEntry MaterialEntry;
 
 typedef MaterialEntry MaterialTable[8192];
 
-void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key);
+void material_entry_fill(const Pos *pos, const Stack *st, MaterialEntry *e, Key key);
 
-INLINE MaterialEntry *material_probe(const Pos *pos)
+INLINE MaterialEntry *material_probe(const Pos *pos, const Stack *st)
 {
   Key key = pos_material_key();
   MaterialEntry *e = &pos->materialTable[key >> (64-13)];
 
   if (unlikely(e->key != key))
-    material_entry_fill(pos, e, key);
+    material_entry_fill(pos, st, e, key);
 
   return e;
 }
@@ -76,9 +76,9 @@ INLINE int material_specialized_eval_exists(MaterialEntry *me)
   return me->eval_func != 0;
 }
 
-INLINE Value material_evaluate(MaterialEntry *me, const Pos *pos)
+INLINE Value material_evaluate(MaterialEntry *me, const Pos *pos, const Stack *st)
 {
-  return endgame_funcs[me->eval_func](pos, me->eval_func_side);
+  return endgame_funcs[me->eval_func](pos, st, me->eval_func_side);
 }
 
 // scale_factor takes a position and a color as input and returns a scale factor
@@ -86,11 +86,11 @@ INLINE Value material_evaluate(MaterialEntry *me, const Pos *pos)
 // because the scale factor may also be a function which should be applied to
 // the position. For instance, in KBP vs K endgames, the scaling function looks
 // for rook pawns and wrong-colored bishops.
-INLINE int material_scale_factor(MaterialEntry *me, const Pos *pos, int c)
+INLINE int material_scale_factor(MaterialEntry *me, const Pos *pos, const Stack *st, int c)
 {
   int sf = SCALE_FACTOR_NONE;
   if (me->scal_func[c])
-    sf = endgame_funcs[me->scal_func[c]](pos, c);
+    sf = endgame_funcs[me->scal_func[c]](pos, st, c);
   return sf != SCALE_FACTOR_NONE ? sf : me->factor[c];
 }
 
