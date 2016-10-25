@@ -84,6 +84,7 @@ struct Stack {
   Move excludedMove;
   Move killers[2];
   Value staticEval;
+  Value history;
   int moveCount;
   CounterMoveStats *counterMoves;
 

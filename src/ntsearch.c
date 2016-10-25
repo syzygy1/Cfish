@@ -35,6 +35,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
   moveCount = quietCount =  ss->moveCount = 0;
+  ss->history = 0;
   bestValue = -VALUE_INFINITE;
 
   // Check for the available remaining time
@@ -196,7 +197,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       &&  eval - futility_margin(depth) >= beta
       &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
       &&  pos_non_pawn_material(pos_stm()))
-    return eval - futility_margin(depth);
+    return eval; // - futility_margin(depth); (do not do the right thing)
 
   // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
@@ -440,7 +441,7 @@ moves_loop: // When in check search starts from here.
     ss->currentMove = move;
     ss->counterMoves = &(*pos->counterMoveHistory)[moved_piece][to_sq(move)];
 
-    // Step 14. Make the move
+    // Step 14. Make the move.
     do_move(pos, move, givesCheck);
 
     // Step 15. Reduced depth search (LMR). If the move fails high it will be
@@ -453,7 +454,7 @@ moves_loop: // When in check search starts from here.
       if (captureOrPromotion)
         r -= r ? ONE_PLY : DEPTH_ZERO;
       else {
-        // Increase reduction for cut nodes
+        // Increase reduction for cut nodes.
         if (cutNode)
           r += 2 * ONE_PLY;
 
@@ -466,14 +467,22 @@ moves_loop: // When in check search starts from here.
                  && !see_test(pos, make_move(to_sq(move), from_sq(move)), 0))
           r -= 2 * ONE_PLY;
 
-        // Decrease/increase reduction for moves with a good/bad history
-        Value val =  (*pos->history)[moved_piece][to_sq(move)]
-                   + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
-                   + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
-                   + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
-                   + ft_get(*pos->fromTo, pos_stm() ^ 1, move);
-        int rHist = (val - 8000) / 20000;
-        r = max(DEPTH_ZERO, (r / ONE_PLY - rHist) * ONE_PLY);
+        ss->history =  (*pos->history)[moved_piece][to_sq(move)]
+                     + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
+                     + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
+                     + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
+                     + ft_get(*pos->fromTo, pos_stm() ^ 1, move)
+                     - 8000; // Correction factor.
+
+        // Decrease/increase reduction by comparing with opponent's stat score.
+        if (ss->history > VALUE_ZERO && (ss-1)->history < VALUE_ZERO)
+          r -= ONE_PLY;
+
+        else if (ss->history < VALUE_ZERO && (ss-1)->history > VALUE_ZERO)
+          r += ONE_PLY;
+
+        // Decrease/increase reduction for moves with a good/bad history.
+        r = max(DEPTH_ZERO, (r / ONE_PLY - ss->history / 20000) * ONE_PLY);
       }
 
       Depth d = max(newDepth - r, ONE_PLY);
@@ -485,7 +494,7 @@ moves_loop: // When in check search starts from here.
     } else
       doFullDepthSearch = !PvNode || moveCount > 1;
 
-    // Step 16. Full depth search when LMR is skipped or fails high
+    // Step 16. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch)
         value = newDepth <   ONE_PLY ?
                           givesCheck ? -qsearch_NonPV_true(pos, ss+1, -(alpha+1), DEPTH_ZERO)

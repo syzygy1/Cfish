@@ -157,6 +157,7 @@ static const Score WeakQueen           = S(35,  0);
 static const Score Hanging             = S(48, 27);
 static const Score ThreatByPawnPush    = S(38, 22);
 static const Score Unstoppable         = S( 0, 20);
+static const Score PawnlessFlank       = S(20, 80);
 
 // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
 // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
@@ -445,7 +446,8 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
   }
 
   // King tropism: firstly, find squares that we attack in the enemy king flank
-  b = ei->attackedBy[Them][0] & KingFlank[Us][file_of(ksq)];
+  uint32_t kf = file_of(ksq);
+  b = ei->attackedBy[Them][0] & KingFlank[Us][kf];
 
   assert(((Us == WHITE ? b << 4 : b >> 4) & b) == 0);
   assert(popcount(Us == WHITE ? b << 4 : b >> 4) == popcount(b));
@@ -456,6 +458,10 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
      | (b & ei->attackedBy2[Them] & ~ei->attackedBy[Us][PAWN]);
 
   score -= CloseEnemies * popcount(b);
+
+  // Penalty when our king is on a pawnless flank.
+  if (!(pieces_p(PAWN) & (KingFlank[WHITE][kf] | KingFlank[BLACK][kf])))
+    score -= PawnlessFlank;
 
   return score;
 }
