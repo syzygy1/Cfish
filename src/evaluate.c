@@ -72,7 +72,7 @@ struct EvalInfo {
 typedef struct EvalInfo EvalInfo;
 
 #define V(v) (Value)(v)
-#define S(mg,eg) make_score((unsigned)(mg),(unsigned)(eg))
+#define S(mg,eg) make_score(mg,eg)
 
 // MobilityBonus[PieceType][attacked] contains bonuses for middle and
 // end game, indexed by piece type and number of attacked squares in the

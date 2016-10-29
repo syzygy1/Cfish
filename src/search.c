@@ -509,15 +509,7 @@ void thread_search(Pos *pos)
       if (pos->thread_idx != 0)
         continue;
 
-      if (Signals.stop) {
-        IO_LOCK;
-        printf("info nodes %"PRIu64" time %d\n",
-                         threads_nodes_searched(), time_elapsed());
-        fflush(stdout);
-        IO_UNLOCK;
-      }
-
-      else if (PVIdx + 1 == multiPV || time_elapsed() > 3000) {
+      if (Signals.stop || PVIdx + 1 == multiPV || time_elapsed() > 3000) {
         IO_LOCK;
         uci_print_pv(pos, pos->rootDepth, alpha, beta);
         IO_UNLOCK;

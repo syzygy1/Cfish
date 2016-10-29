@@ -26,7 +26,7 @@ Value PieceValue[2][16] = {
 
 uint32_t NonPawnPieceValue[16];
 
-#define S(mg, eg) make_score((unsigned)(mg), (unsigned)(eg))
+#define S(mg, eg) make_score(mg, eg)
 
 // Bonus[PieceType][Square / 2] contains Piece-Square scores. For each
 // piece type on a given square a (middlegame, endgame) score pair is
