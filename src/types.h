@@ -327,26 +327,29 @@ typedef int32_t Depth;
 typedef uint32_t Square;
 
 // Score type stores a middlegame and an endgame value in a single integer.
-// The least significant 16 bits are used to store the endgame value
-// and the upper 16 bits are used to store the middlegame value.
+// The endgame value goes in the upper 16 bits, the middlegame value in
+// the lower 16 bits. We take care to avoid undefined behavior and
+// relying on implementation-defined behavior.
 
 typedef uint32_t Score;
 
 #define SCORE_ZERO 0
 
-#define make_score(mg,eg) ((Score)((((unsigned)(eg))<<16) + (mg)))
+#define make_score(mg,eg) ((((unsigned)(eg))<<16) + (mg))
 
-// Extracting the signed lower and upper 16 bits is not so trivial because
-// according to the standard a simple cast to short is implementation
-// defined and so is a right shift of a signed integer.
+INLINE int16_t cast_to_int16_t(uint16_t v)
+{
+  return v < 0x8000 ? v : v - 0x10000;
+}
+
 INLINE Value eg_value(Score s)
 {
-  return (int16_t)(uint16_t)((s + 0x8000) >> 16);
+  return cast_to_int16_t((s + 0x8000) >> 16);
 }
 
 INLINE Value mg_value(Score s)
 {
-  return (int16_t)(uint16_t)s;
+  return cast_to_int16_t(s);
 }
 
 /// Division of a Score must be handled separately for each tEerm
