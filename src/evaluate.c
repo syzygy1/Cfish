@@ -158,6 +158,7 @@ static const Score Hanging             = S(48, 27);
 static const Score ThreatByPawnPush    = S(38, 22);
 static const Score Unstoppable         = S( 0, 20);
 static const Score PawnlessFlank       = S(20, 80);
+static const Score HinderPassedPawn    = S( 7,  0);
 
 // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
 // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
@@ -554,7 +555,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
 
-  Bitboard b, squaresToQueen, defendedSquares, unsafeSquares;
+  Bitboard b, bb, squaresToQueen, defendedSquares, unsafeSquares;
   Score score = SCORE_ZERO;
 
   b = ei->pi->passedPawns[Us];
@@ -564,6 +565,9 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 
     assert(pawn_passed(pos, Us, s));
     assert(!(pieces_p(PAWN) & forward_bb(Us, s)));
+
+    bb = forward_bb(Us, s) & (ei->attackedBy[Them][0] | pieces_c(Them));
+    score -= HinderPassedPawn * popcount(bb);
 
     int r = relative_rank_s(Us, s) - RANK_2;
     int rr = r * (r - 1);
@@ -588,7 +592,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         // in the pawn's path attacked or occupied by the enemy.
         defendedSquares = unsafeSquares = squaresToQueen = forward_bb(Us, s);
 
-        Bitboard bb = forward_bb(Them, s) & pieces_pp(ROOK, QUEEN) & attacks_from_rook(s);
+        bb = forward_bb(Them, s) & pieces_pp(ROOK, QUEEN) & attacks_from_rook(s);
 
         if (!(pieces_c(Us) & bb))
           defendedSquares &= ei->attackedBy[Us][0];
