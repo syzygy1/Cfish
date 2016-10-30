@@ -75,9 +75,9 @@ static int probe_wdl_table(Pos *pos, int *success)
 {
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
-  uint64 idx;
+  uint64_t idx;
   int i;
-  ubyte res;
+  uint8_t res;
   int p[TBPIECES];
 
   // Obtain the position's material signature key.
@@ -135,7 +135,7 @@ static int probe_wdl_table(Pos *pos, int *success)
   // Pieces of the same type are guaranteed to be consecutive.
   if (!ptr->has_pawns) {
     struct TBEntry_piece *entry = (struct TBEntry_piece *)ptr;
-    ubyte *pc = entry->pieces[bside];
+    uint8_t *pc = entry->pieces[bside];
     for (i = 0; i < entry->num;) {
       Bitboard bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
@@ -143,7 +143,7 @@ static int probe_wdl_table(Pos *pos, int *success)
       } while (bb);
     }
     idx = encode_piece(entry, entry->norm[bside], p, entry->factor[bside]);
-    res = decompress_pairs(entry->precomp[bside], idx);
+    res = (int)decompress_pairs(entry->precomp[bside], idx);
   } else {
     struct TBEntry_pawn *entry = (struct TBEntry_pawn *)ptr;
     int k = entry->file[0].pieces[0][0] ^ cmirror;
@@ -153,7 +153,7 @@ static int probe_wdl_table(Pos *pos, int *success)
       p[i++] = pop_lsb(&bb) ^ mirror;
     } while (bb);
     int f = pawn_file(entry, p);
-    ubyte *pc = entry->file[f].pieces[bside];
+    uint8_t *pc = entry->file[f].pieces[bside];
     for (; i < entry->num;) {
       bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
@@ -162,10 +162,10 @@ static int probe_wdl_table(Pos *pos, int *success)
       } while (bb);
     }
     idx = encode_pawn(entry, entry->file[f].norm[bside], p, entry->file[f].factor[bside]);
-    res = decompress_pairs(entry->file[f].precomp[bside], idx);
+    res = (int)decompress_pairs(entry->file[f].precomp[bside], idx);
   }
 
-  return ((int)res) - 2;
+  return res - 2;
 }
 
 // The value of wdl MUST correspond to the WDL value of the position without
@@ -173,8 +173,9 @@ static int probe_wdl_table(Pos *pos, int *success)
 static int probe_dtz_table(Pos *pos, int wdl, int *success)
 {
   struct TBEntry *ptr;
-  uint64 idx;
-  int i, res;
+  uint64_t idx;
+  int i;
+  uint32_t res;
   int p[TBPIECES];
 
   // Obtain the position's material signature key.
@@ -236,7 +237,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       *success = -1;
       return 0;
     }
-    ubyte *pc = entry->pieces;
+    uint8_t *pc = entry->pieces;
     for (i = 0; i < entry->num;) {
       Bitboard bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
@@ -264,7 +265,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       *success = -1;
       return 0;
     }
-    ubyte *pc = entry->file[f].pieces;
+    uint8_t *pc = entry->file[f].pieces;
     for (; i < entry->num;) {
       bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
@@ -663,7 +664,7 @@ int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t num_moves)
     v = -TB_probe_wdl(pos, &success);
     undo_move(pos, rm[i].move);
     if (!success) return 0;
-    rm[i].value = wdl_to_rank[v - 2];
+    rm[i].value = wdl_to_rank[v + 2];
   }
 
   return 1;
