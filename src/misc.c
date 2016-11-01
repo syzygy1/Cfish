@@ -30,7 +30,7 @@
 
 // Version number. If Version is left empty, then compile date in the format
 // DD-MM-YY and show in engine_info.
-char Version[] = "";
+char Version[] = "8";
 
 #ifndef __WIN32__
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -126,8 +126,10 @@ void print_engine_info(int to_uci)
 
   printf("%s%s%s%s\n", Is64Bit ? " 64" : ""
                      , HasPext ? " BMI2" : (HasPopCnt ? " POPCNT" : "")
-                     , to_uci ? "\nid author " : " by "
-                     , "T. Romstad, M. Costalba, J. Kiiski, G. Linscott");
+                     , HasNuma ? " NUMA" : ""
+                     , to_uci ? "\nid author T. Romstad, M. Costalba, "
+                                "J. Kiiski, G. Linscott"
+                              : " by Syzygy based on Stockfish");
   fflush(stdout);
 }
 
