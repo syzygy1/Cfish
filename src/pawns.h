@@ -83,8 +83,8 @@ INLINE int pawns_on_same_color_squares(PawnEntry *pe, int c, Square s)
 
 INLINE Score king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
 {
-  if (  pe->kingSquares[WHITE] == ksq
-      && pe->castlingRights[WHITE] == can_castle_cr(WHITE_OO | WHITE_OOO))
+  if (   pe->kingSquares[WHITE] == ksq
+      && pe->castlingRights[WHITE] == can_castle_c(WHITE))
     return pe->kingSafety[WHITE];
   else
     return pe->kingSafety[WHITE] = do_king_safety_white(pe, pos, ksq);
@@ -92,8 +92,8 @@ INLINE Score king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
 
 INLINE Score king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
 {
-  if (  pe->kingSquares[BLACK] == ksq
-      && pe->castlingRights[BLACK] == can_castle_cr(BLACK_OO | BLACK_OOO))
+  if (   pe->kingSquares[BLACK] == ksq
+      && pe->castlingRights[BLACK] == can_castle_c(BLACK))
     return pe->kingSafety[BLACK];
   else
     return pe->kingSafety[BLACK] = do_king_safety_black(pe, pos, ksq);

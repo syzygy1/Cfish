@@ -110,7 +110,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   loop_through_pieces(Us, PAWN, s) {
     assert(piece_on(s) == make_piece(Us, PAWN));
 
-    int f = file_of(s);
+    uint32_t f = file_of(s);
 
     e->semiopenFiles[Us] &= ~(1 << f);
     e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s);
