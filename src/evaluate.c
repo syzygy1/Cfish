@@ -669,7 +669,8 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 // position, i.e., second order bonus/malus based on the known
 // attacking/defending status of the players.
 
-INLINE Score evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
+// Since only eg is involved, we return a Value and not a Score.
+INLINE Value evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
 {
   int kingDistance =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                     - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
@@ -681,9 +682,10 @@ INLINE Score evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the endgame value, and that we carefully cap the bonus so
   // that the endgame score will never be divided by more than two.
-  int value = ((eg > 0) - (eg < 0)) * max(initiative, -abs(eg / 2));
+  Value value = ((eg > 0) - (eg < 0)) * max(initiative, -abs(eg / 2));
 
-  return make_score(0, value);
+//  return make_score(0, value);
+  return value;
 }
 
 // evaluate_scale_factor() computes the scale factor for the winning side
@@ -803,14 +805,19 @@ Value evaluate(const Pos *pos)
               - evaluate_space(pos, &ei, BLACK);
 
   // Evaluate position potential for the winning side
-  score += evaluate_initiative(pos, ei.pi->asymmetry, eg_value(score));
+  //  score += evaluate_initiative(pos, ei.pi->asymmetry, eg_value(score));
+  int eg = eg_value(score);
+  eg += evaluate_initiative(pos, ei.pi->asymmetry, eg);
 
   // Evaluate scale factor for the winning side
-  int sf = evaluate_scale_factor(pos, &ei, eg_value(score));
+  //int sf = evaluate_scale_factor(pos, &ei, eg_value(score));
+  int sf = evaluate_scale_factor(pos, &ei, eg);
 
   // Interpolate between a middlegame and a (scaled by 'sf') endgame score
+  //  Value v =  mg_value(score) * ei.me->gamePhase
+  //           + eg_value(score) * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
   Value v =  mg_value(score) * ei.me->gamePhase
-           + eg_value(score) * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
+           + eg * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
 
   v /= PHASE_MIDGAME;
 
