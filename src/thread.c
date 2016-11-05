@@ -67,7 +67,7 @@ void thread_init(void *arg)
 
   if (settings.numa_enabled) {
     pos = numa_alloc(sizeof(Pos));
-    pos->pawnTable = numa_alloc(16384 * sizeof(PawnEntry));
+    pos->pawnTable = numa_alloc(PAWN_ENTRIES * sizeof(PawnEntry));
     pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
     pos->history = numa_alloc(sizeof(HistoryStats));
     pos->counterMoves = numa_alloc(sizeof(MoveStats));
@@ -77,7 +77,7 @@ void thread_init(void *arg)
     pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
   } else {
     pos = calloc(sizeof(Pos), 1);
-    pos->pawnTable = calloc(16384 * sizeof(PawnEntry), 1);
+    pos->pawnTable = calloc(PAWN_ENTRIES * sizeof(PawnEntry), 1);
     pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
     pos->history = calloc(sizeof(HistoryStats), 1);
     pos->counterMoves = calloc(sizeof(MoveStats), 1);
@@ -167,7 +167,7 @@ void thread_destroy(Pos *pos)
 #endif
 
   if (settings.numa_enabled) {
-    numa_free(pos->pawnTable, 16384 * sizeof(PawnEntry));
+    numa_free(pos->pawnTable, PAWN_ENTRIES * sizeof(PawnEntry));
     numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
     numa_free(pos->history, sizeof(HistoryStats));
     numa_free(pos->counterMoves, sizeof(MoveStats));

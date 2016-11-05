@@ -1061,7 +1061,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
     // Update pawn hash key and prefetch access to pawnsTable
     st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
-    prefetch(&pos->pawnTable[st->pawnKey & 16383]);
+    prefetch(&pos->pawnTable[st->pawnKey & (PAWN_ENTRIES -1)]);
 
     // Reset ply counters.
     st->plyCounters = 0;

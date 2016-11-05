@@ -25,6 +25,9 @@
 #include "position.h"
 #include "types.h"
 
+// Number of entries in the pawn hash table. Must be a power of 2.
+#define PAWN_ENTRIES 16384
+
 // PawnEntry contains various information about a pawn structure. A lookup
 // to the pawn hash table (performed by calling the probe function) returns
 // a pointer to an Entry object.
@@ -45,7 +48,7 @@ struct PawnEntry {
 };
 
 typedef struct PawnEntry PawnEntry;
-typedef PawnEntry PawnTable[16384];
+typedef PawnEntry PawnTable[PAWN_ENTRIES];
 
 Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq);
 Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq);
@@ -58,7 +61,7 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key k);
 INLINE PawnEntry *pawn_probe(const Pos *pos)
 {
   Key key = pos_pawn_key();
-  PawnEntry *e = &pos->pawnTable[key & 16383];
+  PawnEntry *e = &pos->pawnTable[key & (PAWN_ENTRIES - 1)];
 
   if (unlikely(e->key != key))
     pawn_entry_fill(pos, e, key);
