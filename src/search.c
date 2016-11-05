@@ -184,8 +184,6 @@ void search_init(void)
     for (int d = 1; d < 64; ++d)
       for (int mc = 1; mc < 64; ++mc) {
         double r = log(d) * log(mc) / 2;
-        if (r < 0.80)
-          continue;
 
         Reductions[NonPV][imp][d][mc] = ((int)lround(r));
         Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);

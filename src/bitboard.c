@@ -134,7 +134,7 @@ Square msb(Bitboard b)
     result = 32;
   }
 
-  b32 = unsigned(b);
+  b32 = (unsigned)b;
 
   if (b32 > 0xFFFF) {
     b32 >>= 16;
@@ -146,7 +146,7 @@ Square msb(Bitboard b)
     result += 8;
   }
 
-  return Square(result + MSBTable[b32]);
+  return (Square)(result + MSBTable[b32]);
 }
 
 #endif // ifdef NO_BSF
