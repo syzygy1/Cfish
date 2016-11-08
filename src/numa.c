@@ -398,8 +398,9 @@ int bind_thread_to_numa_node(int thread_idx)
   if (node == num_nodes)
     node = idx % num_nodes;
   if (!node_mask) {
-    printf("info string Binding thread %d to group %d, node %d\n", thread_idx, node_group_mask[node].Group, node_number[node]);
-    if (!imp_SetThreadGroupAffinity(GetCurrentThread(), &node_group_mask[node], NULL))
+    GROUP_AFFINITY aff = node_group_mask[node];
+    printf("info string Binding thread %d to group %d, node %d\n", thread_idx, aff.Group, node_number[node]);
+    if (!imp_SetThreadGroupAffinity(GetCurrentThread(), &aff, NULL))
       printf("info string error code = %"PRIu64"\n", (uint64_t)GetLastError());
     else
       printf("info string OK\n");
