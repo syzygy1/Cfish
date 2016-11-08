@@ -9,6 +9,7 @@
 #include <windows.h>
 #endif
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "settings.h"
 #include "types.h"
@@ -212,7 +213,7 @@ void numa_init(void)
 
   if (imp_GetLogicalProcessorInformationEx && imp_SetThreadGroupAffinity) {
     // use windows processor groups
-
+printf("GROUPS\n");
     // get array of node and core data
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *buffer = NULL;
     while (1) {
@@ -247,7 +248,7 @@ void numa_init(void)
         num_nodes++;
       }
       offset += ptr->Size;
-      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)(((char *)ptr) + ptr->Size);        
+      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((char *)ptr + ptr->Size);
     }
 
     // Then count cores in each node.
@@ -265,9 +266,12 @@ void numa_init(void)
             num_physical_cores[i]++;
       }
       offset += ptr->Size;
-      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);        
+      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((char*)ptr + ptr->Size);
     }
     free(buffer);
+
+for(int i = 0; i < num_nodes; i++)
+printf("node = %d, node_number = %d, mask.group = %d, mask.mask = %"PRIu64"\n", i, node_number[i], node_group_mask[i].Group, node_group_mask[i].Mask);
 
   } else {
     // Use windows but not its processor groups.
@@ -324,7 +328,7 @@ void numa_init(void)
     free(buffer);
   }
 
-  if (num_nodes <= 1) {
+  if (num_nodes <= 0) {
     numa_avail = 0;
     settings.numa_enabled = delayed_settings.numa_enabled = 0;
   }
@@ -393,13 +397,15 @@ int bind_thread_to_numa_node(int thread_idx)
   // Then assign threads round-robin.
   if (node == num_nodes)
     node = idx % num_nodes;
-  printf("info string Binding thread %d to node %d\n", thread_idx, node);
-  fflush(stdout);
-  if (!node_mask)
+  if (!node_mask) {
+    printf("info string Binding thread %d to group %d, node %d\n", thread_idx, node_group_mask[node].Group, node_number[node]);
     imp_SetThreadGroupAffinity(GetCurrentThread(), &node_group_mask[node],
                                NULL);
-  else
+  } else {
+    printf("info string Binding thread %d to node %d\n", thread_idx, node);
     SetThreadAffinityMask(GetCurrentThread(), node_mask[node]);
+  }
+  fflush(stdout);
 
   return node;
 }
