@@ -393,13 +393,22 @@ int bind_thread_to_numa_node(int thread_idx)
   // Then assign threads round-robin.
   if (node == num_nodes)
     node = idx % num_nodes;
-  printf("info string Binding thread %d to node %d\n", thread_idx, node);
+
+  if (!node_mask) {
+    GROUP_AFFINITY aff;
+    memset(&aff, 0, sizeof(aff));
+    aff.Group = node_group_mask[node].Group;
+    aff.Mask = node_group_mask[node].Mask;
+    printf("info string Binding thread %d to node %d in group %d.\n",
+           thread_idx, node_number[node], aff.Group);
+    if (!imp_SetThreadGroupAffinity(GetCurrentThread(), &aff, NULL))
+      printf("info string error code = %d\n", (int)GetLastError());
+  } else {
+    printf("info string Binding thread %d to node %d.\n", thread_idx, node);
+    if (!SetThreadAffinityMask(GetCurrentThread(), node_mask[node]))
+      printf("info string error code = %d\n", (int)GetLastError());
+  }
   fflush(stdout);
-  if (!node_mask)
-    imp_SetThreadGroupAffinity(GetCurrentThread(), &node_group_mask[node],
-                               NULL);
-  else
-    SetThreadAffinityMask(GetCurrentThread(), node_mask[node]);
 
   return node;
 }
