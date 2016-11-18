@@ -48,17 +48,25 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
-#ifdef __WIN32__
+#if (defined(__GNUC__) && defined(__WIN32__)) || defined(_WIN32)
 #include <windows.h>
 #endif
 
+#ifdef __GNUC__
 #define INLINE static inline __attribute__((always_inline))
+#else
+#define INLINE static __forceinline
+#endif
 
 // Declaring pure functions as pure seems not to help. (Investigate later.)
 //#define PURE __attribute__((pure))
 #define PURE
 
+#ifdef __GNUC__
 #define SMALL __attribute__((optimize("Os")))
+#else
+#define SMALL
+#endif
 
 // Predefined macros hell:
 //
@@ -421,12 +429,12 @@ struct PSQT {
 
 extern struct PSQT psqt;
 
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
-#ifndef __WIN32__
+#if (defined(__GNUC__) && !defined(__WIN32__)) || defined(__POCC__)
 #define FMT_Z "z"
 #else
 #define FMT_Z "I"
@@ -438,8 +446,13 @@ extern struct PSQT psqt;
 #define assume(x) assert(x)
 #endif
 
+#ifdef __GNUC__
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+#define likely(x) x
+#define unlikely(x) x
+#endif
 
 #endif
 

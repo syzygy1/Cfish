@@ -33,7 +33,10 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
-#ifndef _MSC_VER
+#ifdef __POCC__
+#define BSWAP32(v) _bswap(v)
+#define BSWAP64(v) _bswap64(v)
+#elif !defined(_MSC_VER)
 #define BSWAP32(v) __builtin_bswap32(v)
 #define BSWAP64(v) __builtin_bswap64(v)
 #else

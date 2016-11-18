@@ -204,7 +204,7 @@ void search_init(void)
 
 // search_clear() resets search state to zero, to obtain reproducible results
 
-void search_clear()
+void search_clear(void)
 {
   tt_clear();
 
@@ -918,7 +918,8 @@ void start_thinking(Pos *root)
   if (Signals.searching)
     thread_wait_for_search_finished(threads_main());
 
-  Signals.stopOnPonderhit = Signals.stop = 0;
+  Signals.stopOnPonderhit = 0;
+  Signals.stop = 0;
 
   // Generate all legal moves.
   ExtMove list[MAX_MOVES];

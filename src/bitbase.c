@@ -128,7 +128,7 @@ static uint8_t classify(uint8_t *db, unsigned idx)
   return db[idx] = r & good  ? good  : r & RES_UNKNOWN ? RES_UNKNOWN : bad;
 }
 
-void bitbases_init()
+void bitbases_init(void)
 {
   uint8_t *db = malloc(MAX_INDEX);
   unsigned idx, repeat = 1;

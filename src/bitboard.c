@@ -171,7 +171,7 @@ void print_pretty(Bitboard b)
 // bitboards_init() initializes various bitboard tables. It is called at
 // startup and relies on global objects to be already zero-initialized.
 
-void bitboards_init()
+void bitboards_init(void)
 {
 #ifndef USE_POPCNT
   for (unsigned i = 0; i < (1 << 16); ++i)

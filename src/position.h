@@ -22,7 +22,7 @@
 #define POSITION_H
 
 #include <assert.h>
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 #include <pthread.h>
 #endif
 #include <stdatomic.h>
@@ -167,7 +167,7 @@ struct Pos {
   int callsCnt;
   int exit, searching;
   int thread_idx;
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_t nativeThread;
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;

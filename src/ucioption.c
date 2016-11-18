@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 #include <sys/mman.h>
 #endif
 
@@ -114,7 +114,7 @@ static Option options_map[] = {
 // options_init() initializes the UCI options to their hard-coded default
 // values.
 
-void options_init()
+void options_init(void)
 {
 #ifdef NUMA
   // On a non-NUMA machine, disable the NUMA option to diminish confusion.
@@ -123,7 +123,7 @@ void options_init()
 #else
   options_map[OPT_NUMA].type = OPT_TYPE_DISABLED;
 #endif
-#ifdef __WIN32__
+#if (defined(__GNUC__) && defined(__WIN32__)) || defined(_WIN32)
   // Disable the LargePages option if the machine does not support it.
   if (!large_pages_supported())
     options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
@@ -216,7 +216,11 @@ int option_set_by_name(char *name, char *value)
   for (Option *opt = options_map; opt->name != NULL; opt++) {
     if (opt->type == OPT_TYPE_DISABLED)
       continue;
+#ifndef __GNUC__
+    if (_stricmp(opt->name, name) == 0) {
+#else
     if (strcasecmp(opt->name, name) == 0) {
+#endif
       int val;
       switch (opt->type) {
       case OPT_TYPE_CHECK:

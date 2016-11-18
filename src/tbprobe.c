@@ -494,7 +494,7 @@ int TB_probe_dtz(Pos *pos, int *success)
   if (*success == 2)
     return wdl_to_dtz[wdl + 2];
 
-  ExtMove *end, *m = (pos->st-1)->endMoves;
+  ExtMove *end = NULL, *m = (pos->st-1)->endMoves;
 
   // If winning, check for a winning pawn move.
   if (wdl > 0) {
