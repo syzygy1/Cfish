@@ -867,6 +867,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
 void TB_rank_root_moves(Pos *pos, ExtMove *list, int num_moves)
 {
   TB_RootInTB = 0;
+  TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);
   TB_ProbeDepth = option_value(OPT_SYZ_PROBE_DEPTH) * ONE_PLY;
   TB_Cardinality = option_value(OPT_SYZ_PROBE_LIMIT);
   int dtz_available = 1;
