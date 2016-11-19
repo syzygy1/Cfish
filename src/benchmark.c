@@ -97,7 +97,8 @@ void benchmark(Pos *current, char *str)
   Limits.mate = Limits.infinite = Limits.ponder = Limits.num_searchmoves = 0;
   Limits.nodes = 0;
 
-  int ttSize = 16, threads = 1, limit = 13;
+  int ttSize = 16, threads = 1;
+  int64_t limit = 13;
   char *fenFile = NULL, *limitType = "";
 
   token = strtok(str, " ");
@@ -108,7 +109,7 @@ void benchmark(Pos *current, char *str)
       threads = atoi(token);
       token = strtok(NULL, " ");
       if (token) {
-        limit = atoi(token);
+        limit = atoll(token);
         fenFile = strtok(NULL, " ");
         if (fenFile) {
           token = strtok(NULL, " ");

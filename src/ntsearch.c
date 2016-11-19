@@ -41,9 +41,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
     store_rlx(pos->resetCalls, 0);
-    pos->callsCnt = 0;
+    pos->callsCnt = Limits.nodes ? min(4096, Limits.nodes / 1024)
+                                 : 4096;
   }
-  if (++pos->callsCnt > 4096) {
+  if (--pos->callsCnt <= 0) {
     for (int idx = 0; idx < Threads.num_threads; idx++)
       store_rlx(Threads.pos[idx]->resetCalls, 1);
 
@@ -424,9 +425,16 @@ moves_loop: // When in check search starts from here.
             && !see_test(pos, move, -35 * lmrDepth * lmrDepth))
           continue;
       }
-      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
-               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-        continue;
+//      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
+//               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
+      else if (depth < 7 * ONE_PLY && !extension) {
+        Value v = -35 * depth / ONE_PLY * depth / ONE_PLY;
+        if (ss->staticEval != VALUE_NONE)
+          v += ss->staticEval - alpha - 200;
+
+        if (!see_test(pos, move, v))
+          continue;
+      }
     }
 
     // Speculative prefetch as early as possible
