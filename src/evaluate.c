@@ -297,7 +297,6 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
         Square ksq = square_of(Us, KING);
 
         if (   ((file_of(ksq) < FILE_E) == (file_of(s) < file_of(ksq)))
-            && (rank_of(ksq) == rank_of(s) || relative_rank_s(Us, ksq) == RANK_1)
             && !semiopen_side(ei->pi, Us, file_of(ksq), file_of(s) < file_of(ksq)))
           score -= (TrappedRook - make_score(mob * 22, 0)) * (1 + !can_castle_c(Us));
       }
