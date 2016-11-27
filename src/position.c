@@ -169,6 +169,7 @@ void zob_init(void) {
   }
 
   zob.side = prng_rand(&rng);
+  zob.noPawns = prng_rand(&rng);
 }
 
 
@@ -332,7 +333,8 @@ static void set_castling_right(Pos *pos, uint32_t c, Square rfrom)
 
 static void set_state(Pos *pos, Stack *st)
 {
-  st->key = st->pawnKey = st->materialKey = 0;
+  st->key = st->materialKey = 0;
+  st->pawnKey = zob.noPawns;
   st->nonPawn = 0;
   st->psq = 0;
 

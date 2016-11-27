@@ -121,7 +121,7 @@ static const Score ThreatBySafePawn[8] = {
 // Threat[by minor/by rook][attacked PieceType] contains
 // bonuses according to which piece type attacks which one.
 // Attacks on lesser pieces which are pawn-defended are not considered.
-static const Score Threat[][8] = {
+static const Score Threat[2][8] = {
   { S(0, 0), S(0, 33), S(45, 43), S(46, 47), S(72,107), S(48,118) }, // by Minor
   { S(0, 0), S(0, 25), S(40, 62), S(40, 59), S( 0, 34), S(35, 48) }  // by Rook
 };
@@ -159,6 +159,7 @@ static const Score ThreatByPawnPush    = S(38, 22);
 static const Score Unstoppable         = S( 0, 20);
 static const Score PawnlessFlank       = S(20, 80);
 static const Score HinderPassedPawn    = S( 7,  0);
+static const Score ThreatByRank        = S(16,  3);
 
 // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
 // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
@@ -517,12 +518,20 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Add a bonus according to the kind of attacking pieces
   if (defended | weak) {
     b = (defended | weak) & (ei->attackedBy[Us][KNIGHT] | ei->attackedBy[Us][BISHOP]);
-    while (b)
-      score += Threat[Minor][piece_on(pop_lsb(&b)) - 8 * Them];
+    while (b) {
+      Square s = pop_lsb(&b);
+      score += Threat[Minor][piece_on(s) - 8 * Them];
+      if (piece_on(s) != make_piece(Them, PAWN))
+        score += ThreatByRank * relative_rank_s(Them, s);
+    }
 
     b = (pieces_cp(Them, QUEEN) | weak) & ei->attackedBy[Us][ROOK];
-    while (b)
-      score += Threat[Rook ][piece_on(pop_lsb(&b)) - 8 * Them];
+    while (b) {
+      Square s = pop_lsb(&b);
+      score += Threat[Rook ][piece_on(s) - 8 * Them];
+      if (piece_on(s) != make_piece(Them, PAWN))
+        score += ThreatByRank * relative_rank_s(Them, s);
+    }
 
     score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
 

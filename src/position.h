@@ -36,7 +36,7 @@ struct Zob {
   Key psq[16][64];
   Key enpassant[8];
   Key castling[16];
-  Key side;
+  Key side, noPawns;
 };
 
 extern struct Zob zob;
