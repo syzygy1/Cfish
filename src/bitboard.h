@@ -302,7 +302,7 @@ INLINE int lsb(Bitboard b)
 INLINE int msb(Bitboard b)
 {
   assert(b);
-  return 63 - __builtin_clzll(b);
+  return 63 ^ __builtin_clzll(b);
 }
 
 #elif defined(_WIN64) && defined(_MSC_VER)
