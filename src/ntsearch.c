@@ -472,7 +472,6 @@ moves_loop: // When in check search starts from here.
         // hence break make_move(). Also use see() instead of see_sign(),
         // because the destination square is empty.
         else if (   type_of_m(move) == NORMAL
-                 && type_of_p(piece_on(to_sq(move))) != PAWN
                  && !see_test(pos, make_move(to_sq(move), from_sq(move)), 0))
           r -= 2 * ONE_PLY;
 
