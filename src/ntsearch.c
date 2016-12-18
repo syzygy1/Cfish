@@ -427,15 +427,10 @@ moves_loop: // When in check search starts from here.
       }
 //      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
 //               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-      else if (depth < 7 * ONE_PLY && !extension) {
-        Value v = -(399 + 35 * depth / ONE_PLY * depth / ONE_PLY);
-
-        if (PvNode)
-          v += beta - alpha - 1;
-
-        if (!see_test(pos, move, v))
-          continue;
-      }
+      else if (    depth < 7 * ONE_PLY
+               && !extension
+               && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
+        continue;
     }
 
     // Speculative prefetch as early as possible

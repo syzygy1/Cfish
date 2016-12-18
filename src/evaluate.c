@@ -156,7 +156,7 @@ static const Score LooseEnemies        = S( 0, 25);
 static const Score WeakQueen           = S(50, 10);
 static const Score Hanging             = S(48, 27);
 static const Score ThreatByPawnPush    = S(38, 22);
-static const Score Unstoppable         = S( 0, 20);
+static const Score Unstoppable         = S( 0, 45);
 static const Score PawnlessFlank       = S(20, 80);
 static const Score HinderPassedPawn    = S( 7,  0);
 static const Score ThreatByRank        = S(16,  3);
@@ -799,12 +799,11 @@ Value evaluate(const Pos *pos)
 
   // If both sides have only pawns, score for potential unstoppable pawns
   if (pos_pawns_only()) {
-    Bitboard b;
-    if ((b = ei.pi->passedPawns[WHITE]) != 0)
-      score += Unstoppable * relative_rank_s(WHITE, frontmost_sq(WHITE, b));
+    if (ei.pi->passedPawns[WHITE])
+      score += Unstoppable;
 
-    if ((b = ei.pi->passedPawns[BLACK]) != 0)
-      score -= Unstoppable * relative_rank_s(BLACK, frontmost_sq(BLACK, b));
+    if (ei.pi->passedPawns[BLACK])
+      score -= Unstoppable;
   }
 
   // Evaluate space for both sides, only during opening
