@@ -118,12 +118,15 @@ static const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
 static const Score ThreatBySafePawn[8] = {
   S(0, 0), S(0, 0), S(176, 139), S(131, 127), S(217, 218), S(203, 215) };
 
-// Threat[by minor/by rook][attacked PieceType] contains
-// bonuses according to which piece type attacks which one.
-// Attacks on lesser pieces which are pawn-defended are not considered.
-static const Score Threat[2][8] = {
-  { S(0, 0), S(0, 33), S(45, 43), S(46, 47), S(72,107), S(48,118) }, // by Minor
-  { S(0, 0), S(0, 25), S(40, 62), S(40, 59), S( 0, 34), S(35, 48) }  // by Rook
+// ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
+// which piece type attacks which one. Attacks on lesser pieces which are
+// pawn defended are not considered.
+static const Score ThreatByMinor[8] = {
+  S(0, 0), S(0, 33), S(45, 43), S(46, 47), S(72,107), S(48,118)
+};
+
+static const Score ThreatByRook[8] = {
+  S(0, 0), S(0, 25), S(40, 62), S(40, 59), S( 0, 34), S(35, 48)
 };
 
 // ThreatByKing[on one/on many] contains bonuses for King attacks on
@@ -140,7 +143,7 @@ static const Value Passed[][8] = {
 // PassedFile[File] contains a bonus according to the file of a passed pawn
 static const Score PassedFile[8] = {
   S(  9, 10), S( 2, 10), S( 1, -8), S(-20,-12),
-  S(-20,-12), S( 1, -8), S( 2, 10), S( 9, 10)
+  S(-20,-12), S( 1, -8), S( 2, 10), S(  9, 10)
 };
 
 // Assorted bonuses and penalties used by evaluation
@@ -148,18 +151,16 @@ static const Score MinorBehindPawn     = S(16,  0);
 static const Score BishopPawns         = S( 8, 12);
 static const Score RookOnPawn          = S( 8, 24);
 static const Score TrappedRook         = S(92,  0);
-static const Score CloseEnemies        = S( 7,  0);
-static const Score SafeCheck           = S(20, 20);
-static const Score OtherCheck          = S(10, 10);
-static const Score ThreatByHangingPawn = S(71, 61);
-static const Score LooseEnemies        = S( 0, 25);
 static const Score WeakQueen           = S(50, 10);
+static const Score OtherCheck          = S(10, 10);
+static const Score CloseEnemies        = S( 7,  0);
+static const Score PawnlessFlank       = S(20, 80);
+static const Score LooseEnemies        = S( 0, 25);
+static const Score ThreatByHangingPawn = S(71, 61);
+static const Score ThreatByRank        = S(16,  3);
 static const Score Hanging             = S(48, 27);
 static const Score ThreatByPawnPush    = S(38, 22);
-static const Score Unstoppable         = S( 0, 45);
-static const Score PawnlessFlank       = S(20, 80);
 static const Score HinderPassedPawn    = S( 7,  0);
-static const Score ThreatByRank        = S(16,  3);
 
 // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
 // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
@@ -174,10 +175,10 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 
 // Penalties for enemy's safe checks
 #define QueenContactCheck 997
-#define QueenCheck        695
-#define RookCheck         638
-#define BishopCheck       538
-#define KnightCheck       874
+#define QueenCheck        745
+#define RookCheck         688
+#define BishopCheck       588
+#define KnightCheck       924
 
 
 // eval_init() initializes king and attack bitboards for a given color
@@ -197,8 +198,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // Init king safety tables only if we are going to use them
   if (pos_non_pawn_material(Us) >= QueenValueMg) {
     ei->kingRing[Them] = b | shift_bb(Down, b);
-    b &= ei->attackedBy[Us][PAWN];
-    ei->kingAttackersCount[Us] = popcount(b);
+    ei->kingAttackersCount[Us] = popcount(b & ei->attackedBy[Us][PAWN]);
     ei->kingAdjacentZoneAttacksCount[Us] = ei->kingAttackersWeight[Us] = 0;
   }
   else
@@ -211,13 +211,13 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
 INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
                             Bitboard *mobilityArea, const int Us, const int Pt)
 {
-  Bitboard b, bb;
-  Square s;
-  Score score = SCORE_ZERO;
-
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
                                              : Rank5BB | Rank4BB | Rank3BB);
+
+  Bitboard b, bb;
+  Square s;
+  Score score = SCORE_ZERO;
 
   ei->attackedBy[Us][Pt] = 0;
 
@@ -401,10 +401,8 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
     b2 = attacks_from_bishop(ksq);
 
     // Enemy queen safe checks
-    if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe) {
+    if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe)
       kingDanger += QueenCheck;
-      score -= SafeCheck;
-    }
 
     // For other pieces, also consider the square safe if attacked twice,
     // and only defended by a queen.
@@ -413,29 +411,23 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
            & ei->attackedBy[Us][QUEEN];
 
     // Enemy rooks safe and other checks
-    if (b1 & ei->attackedBy[Them][ROOK] & safe) {
+    if (b1 & ei->attackedBy[Them][ROOK] & safe)
       kingDanger += RookCheck;
-      score -= SafeCheck;
-    }
 
     else if (b1 & ei->attackedBy[Them][ROOK] & other)
       score -= OtherCheck;
 
     // Enemy bishops safe and other checks
-    if (b2 & ei->attackedBy[Them][BISHOP] & safe) {
+    if (b2 & ei->attackedBy[Them][BISHOP] & safe)
       kingDanger += BishopCheck;
-      score -= SafeCheck;
-    }
 
     else if (b2 & ei->attackedBy[Them][BISHOP] & other)
       score -= OtherCheck;
 
     // Enemy knights safe and other checks
     b = attacks_from_knight(ksq) & ei->attackedBy[Them][KNIGHT];
-    if (b & safe) {
+    if (b & safe)
       kingDanger += KnightCheck;
-      score -= SafeCheck;
-    }
 
     else if (b & other)
       score -= OtherCheck;
@@ -519,7 +511,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
     b = (defended | weak) & (ei->attackedBy[Us][KNIGHT] | ei->attackedBy[Us][BISHOP]);
     while (b) {
       Square s = pop_lsb(&b);
-      score += Threat[Minor][piece_on(s) - 8 * Them];
+      score += ThreatByMinor[piece_on(s) - 8 * Them];
       if (piece_on(s) != make_piece(Them, PAWN))
         score += ThreatByRank * relative_rank_s(Them, s);
     }
@@ -527,7 +519,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
     b = (pieces_cp(Them, QUEEN) | weak) & ei->attackedBy[Us][ROOK];
     while (b) {
       Square s = pop_lsb(&b);
-      score += Threat[Rook ][piece_on(s) - 8 * Them];
+      score += ThreatByRook[piece_on(s) - 8 * Them];
       if (piece_on(s) != make_piece(Them, PAWN))
         score += ThreatByRank * relative_rank_s(Them, s);
     }
@@ -626,10 +618,14 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         mbonus += rr + r * 2, ebonus += rr + r * 2;
     } // rr != 0
 
+    // Assign a small bonus when the opponent has no pieces left.
+    if (!pos_non_pawn_material(Them))
+      ebonus += 20;
+
     score += make_score(mbonus, ebonus) + PassedFile[file_of(s)];
   }
 
-  // Add the scores to the middlegame and endgame eval
+  // Add the scores to the middlegame and endgame eval.
   return score;
 }
 
@@ -796,15 +792,6 @@ Value evaluate(const Pos *pos)
   // Evaluate passed pawns, we need full attack information including king
   score +=  evaluate_passed_pawns(pos, &ei, WHITE)
           - evaluate_passed_pawns(pos, &ei, BLACK);
-
-  // If both sides have only pawns, score for potential unstoppable pawns
-  if (pos_pawns_only()) {
-    if (ei.pi->passedPawns[WHITE])
-      score += Unstoppable;
-
-    if (ei.pi->passedPawns[BLACK])
-      score -= Unstoppable;
-  }
 
   // Evaluate space for both sides, only during opening
   if (pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) >= 12222)

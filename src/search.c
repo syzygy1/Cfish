@@ -331,8 +331,10 @@ void mainthread_search(void)
   {
     for (int idx = 1; idx < Threads.num_threads; idx++) {
       Pos *p = Threads.pos[idx];
-      if (   p->completedDepth > bestThread->completedDepth
-          && p->rootMoves->move[0].score > bestThread->rootMoves->move[0].score)
+      Depth depthDiff = p->completedDepth - bestThread->completedDepth;
+      Value scoreDiff = p->rootMoves->move[0].score - bestThread->rootMoves->move[0].score;
+      if (   (depthDiff > 0 && scoreDiff >= 0)
+          || (scoreDiff > 0 && depthDiff >= 0))
         bestThread = p;
     }
   }

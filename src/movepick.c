@@ -106,14 +106,14 @@ static void score_quiets(const Pos *pos)
   HistoryStats *history = pos->history;
   FromToStats *fromTo = pos->fromTo;
 
-  CounterMoveStats *cm = (st-1)->counterMoves;
-  CounterMoveStats *fm = (st-2)->counterMoves;
-  CounterMoveStats *f2 = (st-4)->counterMoves;
+  CounterMoveStats *cmh = (st-1)->counterMoves;
+  CounterMoveStats *fmh = (st-2)->counterMoves;
+  CounterMoveStats *fmh2 = (st-4)->counterMoves;
 
   CounterMoveStats *tmp = &(*pos->counterMoveHistory)[0][0];
-  if (!cm) cm = tmp;
-  if (!fm) fm = tmp;
-  if (!f2) f2 = tmp;
+  if (!cmh) cmh = tmp;
+  if (!fmh) fmh = tmp;
+  if (!fmh2) fmh2 = tmp;
 
   uint32_t c = pos_stm();
 
@@ -122,9 +122,9 @@ static void score_quiets(const Pos *pos)
     uint32_t to = move & 63;
     uint32_t from = move >> 6;
     m->value =  (*history)[piece_on(from)][to]
-              + (*cm)[piece_on(from)][to]
-              + (*fm)[piece_on(from)][to]
-              + (*f2)[piece_on(from)][to]
+              + (*cmh)[piece_on(from)][to]
+              + (*fmh)[piece_on(from)][to]
+              + (*fmh2)[piece_on(from)][to]
               + ft_get(*fromTo, c, move);
   }
 }
@@ -287,7 +287,7 @@ Move next_move(const Pos *pos)
   case ST_PROBCUT_2:
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
-      if (move != st->ttMove && see_test(pos, move, st->threshold + 1))
+      if (move != st->ttMove && see_test(pos, move, st->threshold))
         return move;
     }
     break;

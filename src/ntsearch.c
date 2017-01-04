@@ -563,13 +563,6 @@ moves_loop: // When in check search starts from here.
       bestValue = value;
 
       if (value > alpha) {
-        // If there is an easy move for this position, clear it if unstable
-        if (    PvNode
-            &&  pos->thread_idx == 0
-            &&  easy_move_get(pos_key())
-            && (move != easy_move_get(pos_key()) || moveCount > 1))
-          easy_move_clear();
-
         bestMove = move;
 
         if (PvNode && !rootNode) // Update pv even in fail-high case

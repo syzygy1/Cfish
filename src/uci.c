@@ -98,6 +98,18 @@ void position(Pos *pos, char *str)
     int k = (pos->st - (pos->stack + 100)) - max(5, pos->st->pliesFromNull);
     for (; k < 0; k++)
       memcpy(pos->st + k, pos->st + k + 100, StateSize);
+
+    // Finally, clear history position keys that have not yet repeated.
+    // This ensures that is_draw() does not flag as a draw the first
+    // repetition of a position coming before the root position.
+    for (k = 1; k <= pos->st->pliesFromNull; k++) {
+      int l;
+      for (l = k + 4; l <= pos->st->pliesFromNull; l++)
+        if ((pos->st - k)->key == (pos->st - l)->key)
+          break;
+      if (l > pos->st->pliesFromNull)
+        (pos->st - k)->key = 0ULL;
+    }
   }
   (pos->st-1)->endMoves = pos->moveList;
 }
