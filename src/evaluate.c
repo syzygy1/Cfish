@@ -332,27 +332,25 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility)
 
 // evaluate_king() assigns bonuses and penalties to a king of a given color.
 
-#define WhiteCamp   (Rank1BB | Rank2BB | Rank3BB | Rank4BB | Rank5BB)
-#define BlackCamp   (Rank8BB | Rank7BB | Rank6BB | Rank5BB | Rank4BB)
 #define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
 #define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
 #define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
 
-static const Bitboard KingFlank[2][8] = {
-  { QueenSide   & WhiteCamp, QueenSide & WhiteCamp, QueenSide & WhiteCamp, CenterFiles & WhiteCamp,
-    CenterFiles & WhiteCamp, KingSide  & WhiteCamp, KingSide  & WhiteCamp, KingSide    & WhiteCamp },
-  { QueenSide   & BlackCamp, QueenSide & BlackCamp, QueenSide & BlackCamp, CenterFiles & BlackCamp,
-    CenterFiles & BlackCamp, KingSide  & BlackCamp, KingSide  & BlackCamp, KingSide    & BlackCamp },
+static const Bitboard KingFlank[8] = {
+  QueenSide, QueenSide, QueenSide, CenterFiles, CenterFiles, KingSide, KingSide, KingSide
 };
 
 INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Up = (Us == WHITE ? DELTA_N : DELTA_S);
+  const Bitboard Camp = (   Us == WHITE
+                         ? ~0ULL ^ Rank6BB ^ Rank7BB ^ Rank8BB
+                         : ~0ULL ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
+  const Square ksq = square_of(Us, KING);
   Bitboard undefended, b, b1, b2, safe, other;
   int kingDanger;
-  const Square ksq = square_of(Us, KING);
 
   // King shelter and enemy pawns storm
   Score score = Us == WHITE ? king_safety_white(ei->pe, pos, ksq)
@@ -435,7 +433,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 
   // King tropism: firstly, find squares that we attack in the enemy king flank
   uint32_t kf = file_of(ksq);
-  b = ei->attackedBy[Them][0] & KingFlank[Us][kf];
+  b = ei->attackedBy[Them][0] & KingFlank[kf] & Camp;
 
   assert(((Us == WHITE ? b << 4 : b >> 4) & b) == 0);
   assert(popcount(Us == WHITE ? b << 4 : b >> 4) == popcount(b));
@@ -448,7 +446,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
   score -= CloseEnemies * popcount(b);
 
   // Penalty when our king is on a pawnless flank.
-  if (!(pieces_p(PAWN) & (KingFlank[WHITE][kf] | KingFlank[BLACK][kf])))
+  if (!(pieces_p(PAWN) & KingFlank[kf]))
     score -= PawnlessFlank;
 
   return score;
@@ -672,14 +670,15 @@ INLINE Value evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
   int kingDistance =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                     - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
   int pawns = popcount(pieces_p(PAWN));
+  int bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
 
   // Compute the initiative bonus for the attacking side
-  int initiative = 8 * (asymmetry + kingDistance - 15) + 12 * pawns;
+  int initiative = 8 * (asymmetry + kingDistance - 17) + 12 * pawns + 16 * bothFlanks;
 
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the endgame value, and that we carefully cap the bonus so
-  // that the endgame score will never be divided by more than two.
-  Value value = ((eg > 0) - (eg < 0)) * max(initiative, -abs(eg / 2));
+  // that the endgame score will never change sign after the bonus.
+  Value value = ((eg > 0) - (eg < 0)) * max(initiative, -abs(eg));
 
 //  return make_score(0, value);
   return value;
