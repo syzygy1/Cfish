@@ -95,19 +95,12 @@ static const Score MobilityBonus[][32] = {
     S(118,174), S(119,177), S(123,191), S(128,199) }
 };
 
-// Outpost[knight/bishop][supported by pawn] contains bonuses for knights
-// and bishops outposts, bigger if outpost piece is supported by a pawn.
+// Outpost[knight/bishop][supported by pawn] contains bonuses for minors
+// if they can reach an outpost square, bigger if that square is supported0
+// by a pawn. If the minor occupies an outpost square, then score is doubled.
 static const Score Outpost[][2] = {
-  { S(43,11), S(65,20) }, // Knights
-  { S(20, 3), S(29, 8) }  // Bishops
-};
-
-// ReachableOutpost[knight/bishop][supported by pawn] contains bonuses for
-// knights and bishops which can reach an outpost square in one move,
-// bigger if outpost square is supported by a pawn.
-static const Score ReachableOutpost[][2] = {
-  { S(21, 5), S(35, 8) }, // Knights
-  { S( 8, 0), S(14, 4) }  // Bishops
+  { S(22, 6), S(33, 9) }, // Knight
+  { S( 9, 2), S(14, 4) }  // Bishop
 };
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
@@ -182,7 +175,7 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 #define KnightCheck       924
 
 // Threshold for lazy evaluation
-#define LazyEval 1500
+#define LazyThreshold 1500
 
 
 // eval_init() initializes king and attack bitboards for a given color
@@ -270,11 +263,11 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       // Bonus for outpost squares
       bb = OutpostRanks & ~ei->pe->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & sq_bb(s))];
+        score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & sq_bb(s))] * 2;
       else {
         bb &= b & ~pieces_c(Us);
         if (bb)
-          score += ReachableOutpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & bb)];
+          score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & bb)];
       }
 
       // Bonus when behind a pawn
@@ -746,17 +739,6 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 }
 
 
-Value lazy_eval(Value mg, Value eg)
-{
-  if (mg > LazyEval && eg > LazyEval)
-    return LazyEval + ((mg + eg) / 2 - LazyEval) / 4;
-  else if (mg < -LazyEval && eg < -LazyEval)
-    return -LazyEval + ((mg + eg) / 2 + LazyEval) / 4;
-
-  return VALUE_ZERO;
-}
-
-
 // evaluate() is the main evaluation function. It returns a static evaluation
 // of the position from the point of view of the side to move.
 
@@ -765,6 +747,7 @@ Value evaluate(const Pos *pos)
   assert(!pos_checkers());
 
   Score mobility[2] = { SCORE_ZERO, SCORE_ZERO };
+  Value v;
   EvalInfo ei;
 
   // Probe the material hash table
@@ -785,11 +768,10 @@ Value evaluate(const Pos *pos)
   ei.pe = pawn_probe(pos);
   score += ei.pe->score;
 
-  // We have taken into account all cheap evaluation terms.
-  // If score exceeds a threshold value, return a lazy evaluation.
-  Value lazy = lazy_eval(mg_value(score), eg_value(score));
-  if (lazy)
-    return pos_stm() == WHITE ? lazy : -lazy;
+  // Early exit if score is high
+  v = (mg_value(score) + eg_value(score)) / 2;
+  if (abs(v) > LazyThreshold)
+    return pos_stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);
@@ -829,8 +811,8 @@ Value evaluate(const Pos *pos)
   // Interpolate between a middlegame and a (scaled by 'sf') endgame score
   //  Value v =  mg_value(score) * ei.me->gamePhase
   //           + eg_value(score) * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
-  Value v =  mg_value(score) * ei.me->gamePhase
-           + eg * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
+  v =  mg_value(score) * ei.me->gamePhase
+     + eg * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
 
   v /= PHASE_MIDGAME;
 
