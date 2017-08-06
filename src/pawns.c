@@ -231,12 +231,13 @@ INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
     b  = theirPawns & file_bb(f);
     uint32_t rkThem = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : RANK_1;
 
-    safety -=  ShelterWeakness[min(f, FILE_H - f)][rkUs]
+    int d = min(f, FILE_H - f);
+    safety -=  ShelterWeakness[d][rkUs]
              + StormDanger
                [f == file_of(ksq) && rkThem == relative_rank_s(Us, ksq) + 1 ? BlockedByKing  :
                 rkUs   == RANK_1                                            ? Unopposed :
                 rkThem == rkUs + 1                                          ? BlockedByPawn  : Unblocked]
-               [min(f, FILE_H - f)][rkThem];
+               [d][rkThem];
   }
 
   return safety;

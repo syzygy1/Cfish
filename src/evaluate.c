@@ -74,11 +74,10 @@ typedef struct EvalInfo EvalInfo;
 #define V(v) (Value)(v)
 #define S(mg,eg) make_score(mg,eg)
 
-// MobilityBonus[PieceType][attacked] contains bonuses for middle and
+// MobilityBonus[PieceType-2][attacked] contains bonuses for middle and
 // end game, indexed by piece type and number of attacked squares in the
 // mobility area.
-static const Score MobilityBonus[][32] = {
-  {0}, {0},
+static const Score MobilityBonus[4][32] = {
   { S(-75,-76), S(-57,-54), S( -9,-28), S( -2,-10), S(  6,  5), S( 14, 12), // Knights
     S( 22, 26), S( 29, 29), S( 36, 29) },
   { S(-48,-59), S(-20,-23), S( 16, -3), S( 26, 13), S( 38, 24), S( 51, 42), // Bishops
@@ -139,10 +138,9 @@ static const Score PassedFile[8] = {
   S(-20,-12), S( 1, -8), S( 2, 10), S(  9, 10)
 };
 
-// Protector[PieceType][distance] contains a protecting bonus for our king,
+// Protector[PieceType-2][distance] contains a protecting bonus for our king,
 // indexed by piece type and distance between the piece and the king
-static const Score Protector[8][8] = {
-  { 0 }, { 0 },
+static const Score Protector[4][8] = {
   { S(0, 0), S( 7, 9), S( 7, 1), S( 1, 5), S(-10,-4), S( -1,-4), S( -7,-3), S(-16,-10) }, // Knight
   { S(0, 0), S(11, 8), S(-7,-1), S(-1,-2), S( -1,-7), S(-11,-3), S( -9,-1), S(-16, -1) }, // Bishop
   { S(0, 0), S(10, 0), S(-2, 2), S(-5, 4), S( -6, 2), S(-14,-3), S( -2,-9), S(-12, -7) }, // Rook
@@ -257,10 +255,10 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 
     int mob = popcount(b & ei->mobilityArea[Us]);
 
-    mobility[Us] += MobilityBonus[Pt][mob];
+    mobility[Us] += MobilityBonus[Pt - 2][mob];
 
     // Bonus for this piece as a king protector
-    score += Protector[Pt][distance(s, square_of(Us, KING))];
+    score += Protector[Pt - 2][distance(s, square_of(Us, KING))];
 
     if (Pt == BISHOP || Pt == KNIGHT) {
       // Bonus for outpost squares
