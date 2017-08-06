@@ -125,40 +125,18 @@ static void easy_move_update(Pos *pos, Move *newPv)
   }
 }
 
-// Set of rows with half bits set to 1 and half to 0. It is used to allocate
-// the search depths across the threads.
+// Skip half of the plies in blocks depending on hte helper thread idx
+int skip_ply(int idx, int ply)
+{
+  idx = (idx - 1) % 20 + 1; // Cycle after 20 threads
 
-#define HalfDensitySize 20
+  // Number of successive plies to skip, depending on idx
+  int ones = 1;
+  while (ones * (ones + 1) < idx)
+    ones++;
 
-static const int HalfDensity[HalfDensitySize][8] = {
-  {0, 1},
-  {1, 0},
-  {0, 0, 1, 1},
-  {0, 1, 1, 0},
-  {1, 1, 0, 0},
-  {1, 0, 0, 1},
-  {0, 0, 0, 1, 1, 1},
-  {0, 0, 1, 1, 1, 0},
-  {0, 1, 1, 1, 0, 0},
-  {1, 1, 1, 0, 0, 0},
-  {1, 1, 0, 0, 0, 1},
-  {1, 0, 0, 0, 1, 1},
-  {0, 0, 0, 0, 1, 1, 1, 1},
-  {0, 0, 0, 1, 1, 1, 1, 0},
-  {0, 0, 1, 1, 1, 1, 0 ,0},
-  {0, 1, 1, 1, 1, 0, 0 ,0},
-  {1, 1, 1, 1, 0, 0, 0 ,0},
-  {1, 1, 1, 0, 0, 0, 0 ,1},
-  {1, 1, 0, 0, 0, 0, 1 ,1},
-  {1, 0, 0, 0, 0, 1, 1 ,1},
-};
-
-static const int HalfDensityRowSize[HalfDensitySize] = {
-  2, 2,
-  4, 4, 4, 4,
-  6, 6, 6, 6, 6, 6,
-  8, 8, 8, 8, 8, 8, 8, 8
-};
+  return ((ply + idx - 1) / ones - ones) % 2 == 0;
+}
 
 static Value DrawValue[2];
 //static CounterMoveHistoryStats CounterMoveHistory;
@@ -414,15 +392,10 @@ void thread_search(Pos *pos)
          && !Signals.stop
          && (!Limits.depth || threads_main()->rootDepth <= Limits.depth))
   {
-    // Set up the new depths for the helper threads skipping on average every
-    // 2nd ply (using a half-density matrix).
-    if (pos->thread_idx != 0) {
-      int row = (pos->thread_idx - 1) % HalfDensitySize;
-      int col = (pos->rootDepth / ONE_PLY + pos_game_ply())
-                                               % HalfDensityRowSize[row];
-      if (HalfDensity[row][col])
-        continue;
-    }
+    // Skip plies for helper threads
+    if (   pos->thread_idx
+        && skip_ply(pos->thread_idx, pos->rootDepth / ONE_PLY + pos_game_ply()))
+      continue;
 
     // Age out PV variability metric
     if (pos->thread_idx == 0) {
