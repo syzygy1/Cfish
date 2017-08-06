@@ -86,6 +86,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   (ss+1)->excludedMove = bestMove = 0;
   ss->counterMoves = NULL;
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
+  Square prevSq = to_sq((ss-1)->currentMove);
 
   // Step 4. Transposition table lookup. We don't want the score of a
   // partial search to overwrite a previous full search TT value, so we
@@ -105,19 +106,22 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ttValue >= beta ? (tte_bound(tte) & BOUND_LOWER)
                           : (tte_bound(tte) & BOUND_UPPER))) {
     // If ttMove is quiet, update move sorting heuristics on TT hit.
-    if (ttValue >= beta && ttMove) {
-      int d = depth / ONE_PLY;
+    if (ttMove) {
+      if (ttValue >= beta) {
+        if (!is_capture_or_promotion(pos, ttMove))
+          update_stats(pos, ss, ttMove, NULL, 0, stat_bonus(depth));
 
-      if (!is_capture_or_promotion(pos, ttMove)) {
-        Value bonus = d * d + 2 * d - 2;
-        update_stats(pos, ss, ttMove, NULL, 0, bonus);
+        // Extra penalty for a quiet TT move in previous ply when it gets
+        // refuted.
+        if ((ss-1)->moveCount == 1 && !captured_piece())
+          update_cm_stats(ss-1, piece_on(prevSq), prevSq,
+                          -stat_bonus(depth + ONE_PLY));
       }
-
-      // Extra penalty for a quiet TT move in previous ply when it gets refuted.
-      if ((ss-1)->moveCount == 1 && !captured_piece()) {
-        Value penalty = d * d + 4 * d + 1;
-        Square prevSq = to_sq((ss-1)->currentMove);
-        update_cm_stats(ss-1, piece_on(prevSq), prevSq, -penalty);
+      // Penalty for a quiet ttMove that fails low
+      else if (!is_capture_or_promotion(pos, ttMove)) {
+        Value penalty = -stat_bonus(depth + ONE_PLY);
+        history_update(*pos->history, pos_stm(), ttMove, penalty);
+        update_cm_stats(ss, moved_piece(ttMove), to_sq(ttMove), penalty);
       }
     }
     return ttValue;
@@ -477,7 +481,7 @@ moves_loop: // When in check search starts from here.
                      + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
                      + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
                      + history_get(*pos->history, pos_stm() ^ 1, move)
-                     - 8000; // Correction factor.
+                     - 4000; // Correction factor.
 
         // Decrease/increase reduction by comparing with opponent's stat score.
         if (ss->history > VALUE_ZERO && (ss-1)->history < VALUE_ZERO)
@@ -599,31 +603,21 @@ moves_loop: // When in check search starts from here.
     bestValue = excludedMove ? alpha
                :     inCheck ? mated_in(ss->ply) : DrawValue[pos_stm()];
   else if (bestMove) {
-    int d = depth / ONE_PLY;
-
     // Quiet best move: update move sorting heuristics.
-    if (!is_capture_or_promotion(pos, bestMove)) {
-      Value bonus = d * d + 2 * d - 2;
-      update_stats(pos, ss, bestMove, quietsSearched, quietCount, bonus);
-    }
+    if (!is_capture_or_promotion(pos, bestMove))
+      update_stats(pos, ss, bestMove, quietsSearched, quietCount,
+                   stat_bonus(depth));
 
     // Extra penalty for a quiet TT move in previous ply when it gets refuted.
-    if ((ss-1)->moveCount == 1 && !captured_piece()) {
-      Value penalty = d * d + 4 * d + 1;
-      Square prevSq = to_sq((ss-1)->currentMove);
-      update_cm_stats(ss-1, piece_on(prevSq), prevSq, -penalty);
-    }
+    if ((ss-1)->moveCount == 1 && !captured_piece())
+      update_cm_stats(ss-1, piece_on(prevSq), prevSq,
+                      -stat_bonus(depth + ONE_PLY));
   }
   // Bonus for prior countermove that caused the fail low.
   else if (    depth >= 3 * ONE_PLY
            && !captured_piece()
            && move_is_ok((ss-1)->currentMove))
-  {
-    int d = depth / ONE_PLY;
-    Value bonus = d * d + 2 * d - 2;
-    Square prevSq = to_sq((ss-1)->currentMove);
-    update_cm_stats(ss-1, piece_on(prevSq), prevSq, bonus);
-  }
+    update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
   tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
            bestValue >= beta ? BOUND_LOWER :

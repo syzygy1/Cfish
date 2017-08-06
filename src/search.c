@@ -65,6 +65,13 @@ INLINE Depth reduction(int i, Depth d, int mn, const int NT)
   return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
 }
 
+// History and stats update bonus, based on depth
+Value stat_bonus(Depth depth)
+{
+  int d = depth / ONE_PLY;
+  return (Value)(d * d + 2 * d - 2);
+}
+
 // Skill structure is used to implement strength limit
 struct Skill {
 /*

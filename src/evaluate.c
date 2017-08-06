@@ -167,7 +167,6 @@ static const Score TrappedBishopA1H1 = S(50, 50);
 static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 
 // Penalties for enemy's safe checks
-#define QueenContactCheck 997
 #define QueenCheck        745
 #define RookCheck         688
 #define BishopCheck       588
@@ -388,15 +387,9 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
                 - 717 * !pieces_cp(Them, QUEEN)
                 -   7 * mg_value(score) / 5 - 5;
 
-    // Analyse the enemy's safe queen contact checks. Firstly, find the
-    // undefended squares around our king reachable by the enemy queen...
-    b = undefended & ei->attackedBy[Them][QUEEN] & ~pieces_c(Them);
-
-    // ...and keep squares supported by another enemy piece
-    kingDanger += QueenContactCheck * popcount(b & ei->attackedBy2[Them]);
-
     // Analyse the safe enemy's checks which are possible on next move
-    safe  = ~(ei->attackedBy[Us][0] | pieces_c(Them));
+    safe  = ~pieces_c(Them);
+    safe &= ~ei->attackedBy[Us][0] | (undefended & ei->attackedBy2[Them]);
 
     b1 = attacks_from_rook(ksq);
     b2 = attacks_from_bishop(ksq);
