@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -179,6 +179,9 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 #define RookCheck         688
 #define BishopCheck       588
 #define KnightCheck       924
+
+// Threshold for lazy evaluation
+#define LazyEval 1500
 
 
 // eval_init() initializes king and attack bitboards for a given color
@@ -728,6 +731,17 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 }
 
 
+Value lazy_eval(Value mg, Value eg)
+{
+  if (mg > LazyEval && eg > LazyEval)
+    return LazyEval + ((mg + eg) / 2 - LazyEval) / 4;
+  else if (mg < -LazyEval && eg < -LazyEval)
+    return -LazyEval + ((mg + eg) / 2 + LazyEval) / 4;
+
+  return VALUE_ZERO;
+}
+
+
 // evaluate() is the main evaluation function. It returns a static evaluation
 // of the position from the point of view of the side to move.
 
@@ -755,6 +769,12 @@ Value evaluate(const Pos *pos)
   // Probe the pawn hash table
   ei.pi = pawn_probe(pos);
   score += ei.pi->score;
+
+  // We have taken into account all cheap evaluation terms.
+  // If score exceeds a threshold value, return a lazy evaluation.
+  Value lazy = lazy_eval(mg_value(score), eg_value(score));
+  if (lazy)
+    return pos_stm() == WHITE ? lazy : -lazy;
 
   // Initialize attack and king safety bitboards.
   ei.attackedBy[WHITE][0] = ei.attackedBy[BLACK][0] = 0;

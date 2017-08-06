@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 #include "movepick.h"
 #include "thread.h"
 
-#define FromToStats_Max ((Value)(1<<28))
+#define HistoryStats_Max ((Value)(1<<28))
 
 // Our insertion sort, which is guaranteed to be stable, as it should be.
 
@@ -103,7 +103,7 @@ SMALL
 static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
-  FromToStats *fromTo = pos->fromTo;
+  HistoryStats *history = pos->history;
 
   CounterMoveStats *cmh = (st-1)->counterMoves;
   CounterMoveStats *fmh = (st-2)->counterMoves;
@@ -123,7 +123,7 @@ static void score_quiets(const Pos *pos)
     m->value =  (*cmh)[piece_on(from)][to]
               + (*fmh)[piece_on(from)][to]
               + (*fmh2)[piece_on(from)][to]
-              + ft_get(*fromTo, c, move);
+              + history_get(*history, c, move);
   }
 }
 
@@ -133,15 +133,15 @@ static void score_evasions(const Pos *pos)
   // Try captures ordered by MVV/LVA, then non-captures ordered by
   // stats heuristics.
 
-  FromToStats *fromTo = pos->fromTo;
+  HistoryStats *history = pos->history;
   uint32_t c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - (Value)type_of_p(moved_piece(m->move)) + FromToStats_Max;
+                - (Value)type_of_p(moved_piece(m->move)) + HistoryStats_Max;
     else
-      m->value = ft_get(*fromTo, c, m->move);
+      m->value = history_get(*history, c, m->move);
 }
 
 

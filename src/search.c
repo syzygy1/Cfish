@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -215,7 +215,7 @@ void search_clear()
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
     stats_clear(pos->counterMoves);
-    stats_clear(pos->fromTo);
+    stats_clear(pos->history);
   }
 
   mainThread.previousScore = VALUE_INFINITE;
@@ -702,7 +702,7 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
   }
 
   int c = pos_stm();
-  ft_update(*pos->fromTo, c, move, bonus);
+  history_update(*pos->history, c, move, bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 
   if ((ss-1)->counterMoves) {
@@ -712,7 +712,7 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
 
   // Decrease all the other played quiet moves
   for (int i = 0; i < quietsCnt; i++) {
-    ft_update(*pos->fromTo, c, quiets[i], -bonus);
+    history_update(*pos->history, c, quiets[i], -bonus);
     update_cm_stats(ss, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
   }
 }

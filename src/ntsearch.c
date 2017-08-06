@@ -473,7 +473,7 @@ moves_loop: // When in check search starts from here.
         ss->history =  (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
                      + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
                      + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
-                     + ft_get(*pos->fromTo, pos_stm() ^ 1, move)
+                     + history_get(*pos->history, pos_stm() ^ 1, move)
                      - 8000; // Correction factor.
 
         // Decrease/increase reduction by comparing with opponent's stat score.

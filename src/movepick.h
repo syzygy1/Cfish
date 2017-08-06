@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -40,20 +40,20 @@ INLINE void cms_update(CounterMoveStats cms, Piece pc, Square to, Value v)
   cms[pc][to] += ((int)v) * 32;
 }
 
-INLINE void ft_update(FromToStats ft, int c, Move m, Value v)
+INLINE void history_update(HistoryStats history, int c, Move m, Value v)
 {
   int w = v >= 0 ? v : -v;
   if (w >= 324)
     return;
 
   m &= 4095;
-  ft[c][m] -= ft[c][m] * w / 324;
-  ft[c][m] += ((int)v) * 32;
+  history[c][m] -= history[c][m] * w / 324;
+  history[c][m] += ((int)v) * 32;
 }
 
-INLINE Value ft_get(FromToStats ft, int c, Move m)
+INLINE Value history_get(HistoryStats history, int c, Move m)
 {
-  return ft[c][m & 4095];
+  return history[c][m & 4095];
 }
 
 #define ST_MAIN_SEARCH             0
