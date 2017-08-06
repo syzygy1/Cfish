@@ -65,6 +65,8 @@ static const int razor_margin[4] = { 483, 570, 603, 554 };
 static int FutilityMoveCounts[2][16]; // [improving][depth]
 static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
 
+static const int CounterMovePruneThreshold = VALUE_ZERO;
+
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
   return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
@@ -184,10 +186,13 @@ void search_init(void)
 void search_clear()
 {
   tt_clear();
-
   for (int i = 0; i < num_cmh_tables; i++)
-    if (cmh_tables[i])
+    if (cmh_tables[i]) {
       stats_clear(cmh_tables[i]);
+      for (int j = 0; j < 16; j++)
+        for (int k = 0; k < 64; k++)
+          (*cmh_tables[i])[0][0][j][k] = CounterMovePruneThreshold - 1;
+    }
 
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];

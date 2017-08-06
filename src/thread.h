@@ -30,7 +30,7 @@
 
 #include "types.h"
 
-#define MAX_THREADS 128
+#define MAX_THREADS 512
 
 #ifndef __WIN32__
 #define LOCK_T pthread_mutex_t

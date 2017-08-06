@@ -295,9 +295,6 @@ moves_loop: // When in check search starts from here.
   CounterMoveStats *cmh  = (ss-1)->counterMoves;
   CounterMoveStats *fmh  = (ss-2)->counterMoves;
   CounterMoveStats *fmh2 = (ss-4)->counterMoves;
-  int cm_ok = move_is_ok((ss-1)->currentMove);
-  int fm_ok = move_is_ok((ss-2)->currentMove);
-  int fm2_ok = move_is_ok((ss-4)->currentMove);
 
   mp_init(pos, ttMove, depth);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
@@ -419,9 +416,8 @@ moves_loop: // When in check search starts from here.
 
         // Countermoves based pruning
         if (   lmrDepth < 3
-            && ((*cmh )[moved_piece][to_sq(move)] < 0 || !cm_ok)
-            && ((*fmh )[moved_piece][to_sq(move)] < 0 || !fm_ok)
-            && ((*fmh2)[moved_piece][to_sq(move)] < 0 || !fm2_ok || (cm_ok && fm_ok)))
+            && (*cmh )[moved_piece][to_sq(move)] < CounterMovePruneThreshold
+            && (*fmh )[moved_piece][to_sq(move)] < CounterMovePruneThreshold)
           continue;
 
         // Futility pruning: parent node
@@ -623,7 +619,7 @@ moves_loop: // When in check search starts from here.
   // Bonus for prior countermove that caused the fail low.
   else if (    depth >= 3 * ONE_PLY
            && !captured_piece()
-           && cm_ok)
+           && move_is_ok((ss-1)->currentMove))
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
   if (!excludedMove)
