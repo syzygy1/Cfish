@@ -139,6 +139,16 @@ static const Score PassedFile[8] = {
   S(-20,-12), S( 1, -8), S( 2, 10), S(  9, 10)
 };
 
+// Protector[PieceType][distance] contains a protecting bonus for our king,
+// indexed by piece type and distance between the piece and the king
+static const Score Protector[8][8] = {
+  { 0 }, { 0 },
+  { S(0, 0), S( 7, 9), S( 7, 1), S( 1, 5), S(-10,-4), S( -1,-4), S( -7,-3), S(-16,-10) }, // Knight
+  { S(0, 0), S(11, 8), S(-7,-1), S(-1,-2), S( -1,-7), S(-11,-3), S( -9,-1), S(-16, -1) }, // Bishop
+  { S(0, 0), S(10, 0), S(-2, 2), S(-5, 4), S( -6, 2), S(-14,-3), S( -2,-9), S(-12, -7) }, // Rook
+  { S(0, 0), S( 3,-5), S( 2,-5), S(-4, 0), S( -9,-6),  S(-4, 7), S(-13,-7), S(-10, -7) }  // Queen
+};
+
 // Assorted bonuses and penalties used by evaluation
 static const Score MinorBehindPawn     = S(16,  0);
 static const Score BishopPawns         = S( 8, 12);
@@ -248,6 +258,9 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
     int mob = popcount(b & ei->mobilityArea[Us]);
 
     mobility[Us] += MobilityBonus[Pt][mob];
+
+    // Bonus for this piece as a king protector
+    score += Protector[Pt][distance(s, square_of(Us, KING))];
 
     if (Pt == BISHOP || Pt == KNIGHT) {
       // Bonus for outpost squares
@@ -467,7 +480,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
   enum { Minor, Rook };
 
-  Bitboard b, weak, defended, safeThreats;
+  Bitboard b, weak, defended, stronglyProtected, safeThreats;
   Score score = SCORE_ZERO;
 
   // Non-pawn enemies attacked by a pawn
@@ -486,12 +499,18 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatBySafePawn[piece_on(pop_lsb(&safeThreats)) - 8 * Them];
   }
 
-  // Non-pawn enemies defended by a pawn
-  defended = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Them][PAWN];
+  // Squares strongly protected by the opponent, either because they attack the
+  // square with a pawn or because they attack the square twice and we don't.
+  stronglyProtected =  ei->attackedBy[Them][PAWN]
+                     | (ei->attackedBy2[Them] & ~ei->attackedBy2[Us]);
 
-  // Enemies not defended by a pawn and under our attack
+  // Non-pawn enemies, strongly protected
+  defended =  (pieces_c(Them) ^ pieces_cp(Them, PAWN))
+            & stronglyProtected;
+
+  // Enemies not strongly protected and under our attack
   weak =   pieces_c(Them)
-        & ~ei->attackedBy[Them][PAWN]
+        & ~stronglyProtected
         &  ei->attackedBy[Us][0];
 
   // Add a bonus according to the kind of attacking pieces
@@ -607,7 +626,7 @@ INLINE Score evaluate_passer_pawns(const Pos *pos, EvalInfo *ei, const int Us)
     } // rr != 0
 
     // Scale down bonus for candidate passers which need more than one
-    // pawn push to become passed.
+    // push to become passed.
     if (!pawn_passed(pos, Us, s + pawn_push(Us))) {
       mbonus /= 2;
       ebonus /= 2;
@@ -616,7 +635,6 @@ INLINE Score evaluate_passer_pawns(const Pos *pos, EvalInfo *ei, const int Us)
     score += make_score(mbonus, ebonus) + PassedFile[file_of(s)];
   }
 
-  // Add the scores to the middlegame and endgame eval.
   return score;
 }
 
