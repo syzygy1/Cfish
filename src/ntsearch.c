@@ -184,7 +184,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Razoring (skipped when in check)
   if (   !PvNode
       &&  depth < 4 * ONE_PLY
-      &&  !ttMove
       &&  eval + razor_margin[depth / ONE_PLY] <= alpha) {
 
     if (depth <= ONE_PLY)

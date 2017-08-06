@@ -469,7 +469,7 @@ void thread_search(Pos *pos)
         // search the already searched PV lines are preserved.
         stable_sort(&rm->move[PVIdx], PVLast - PVIdx);
 
-        // If search has been stopped, break immediately. Sorting and
+        // If search has been stopped, we break immediately. Sorting and
         // writing PV back to TT is safe because RootMoves is still
         // valid, although it refers to the previous iteration.
         if (Signals.stop)
