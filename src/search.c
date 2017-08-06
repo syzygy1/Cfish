@@ -348,6 +348,9 @@ void thread_search(Pos *pos)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;
 
+  for (int i = -4; i < 0; i++)
+    ss[i].counterMoves = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
+
   for (int i = 0; i < MAX_PLY; i++) {
     ss[i].ply = i + 1;
     ss[i].skipEarlyPruning = 0;
@@ -650,18 +653,14 @@ static void update_pv(Move *pv, Move move, Move *childPv)
 
 static void update_cm_stats(Stack *ss, Piece pc, Square s, Value bonus)
 {
-  CounterMoveStats *cmh  = (ss-1)->counterMoves;
-  CounterMoveStats *fmh1 = (ss-2)->counterMoves;
-  CounterMoveStats *fmh2 = (ss-4)->counterMoves;
+  if (move_is_ok((ss-1)->currentMove))
+    cms_update(*(ss-1)->counterMoves, pc, s, bonus);
 
-  if (cmh)
-    cms_update(*cmh, pc, s, bonus);
+  if (move_is_ok((ss-2)->currentMove))
+    cms_update(*(ss-2)->counterMoves, pc, s, bonus);
 
-  if (fmh1)
-    cms_update(*fmh1, pc, s, bonus);
-
-  if (fmh2)
-    cms_update(*fmh2, pc, s, bonus);
+  if (move_is_ok((ss-4)->currentMove))
+    cms_update(*(ss-4)->counterMoves, pc, s, bonus);
 }
 
 // update_stats() updates killers, history, countermove and countermove
@@ -679,7 +678,7 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
   history_update(*pos->history, c, move, bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 
-  if ((ss-1)->counterMoves) {
+  if (move_is_ok((ss-1)->currentMove)) {
     Square prevSq = to_sq((ss-1)->currentMove);
     (*pos->counterMoves)[piece_on(prevSq)][prevSq] = move;
   }

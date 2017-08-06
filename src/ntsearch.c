@@ -84,7 +84,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
   (ss+1)->excludedMove = bestMove = 0;
-  ss->counterMoves = NULL;
+  ss->counterMoves = &(*pos->counterMoveHistory)[0][0];
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
   Square prevSq = to_sq((ss-1)->currentMove);
 
@@ -209,13 +209,13 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
       &&  pos_non_pawn_material(pos_stm())) {
 
-    ss->currentMove = MOVE_NULL;
-    ss->counterMoves = NULL;
-
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
     Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
+
+    ss->currentMove = MOVE_NULL;
+    ss->counterMoves = &(*pos->counterMoveHistory)[0][0];
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
@@ -256,8 +256,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     Depth rdepth = depth - 4 * ONE_PLY;
 
     assert(rdepth >= ONE_PLY);
-    assert((ss-1)->currentMove != 0);
-    assert((ss-1)->currentMove != MOVE_NULL);
+    assert(move_is_ok((ss-1)->currentMove));
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
@@ -296,6 +295,9 @@ moves_loop: // When in check search starts from here.
   CounterMoveStats *cmh  = (ss-1)->counterMoves;
   CounterMoveStats *fmh  = (ss-2)->counterMoves;
   CounterMoveStats *fmh2 = (ss-4)->counterMoves;
+  int cm_ok = move_is_ok((ss-1)->currentMove);
+  int fm_ok = move_is_ok((ss-2)->currentMove);
+  int fm2_ok = move_is_ok((ss-4)->currentMove);
 
   mp_init(pos, ttMove, depth);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
@@ -414,9 +416,9 @@ moves_loop: // When in check search starts from here.
 
         // Countermoves based pruning
         if (   lmrDepth < 3
-            && (!cmh  || (*cmh )[moved_piece][to_sq(move)] < 0)
-            && (!fmh  || (*fmh )[moved_piece][to_sq(move)] < 0)
-            && (!fmh2 || (*fmh2)[moved_piece][to_sq(move)] < 0 || (cmh && fmh)))
+            && ((*cmh )[moved_piece][to_sq(move)] < 0 || !cm_ok)
+            && ((*fmh )[moved_piece][to_sq(move)] < 0 || !fm_ok)
+            && ((*fmh2)[moved_piece][to_sq(move)] < 0 || !fm2_ok || (cm_ok && fm_ok)))
           continue;
 
         // Futility pruning: parent node
@@ -479,9 +481,9 @@ moves_loop: // When in check search starts from here.
                  && !see_test(pos, make_move(to_sq(move), from_sq(move)), 0))
           r -= 2 * ONE_PLY;
 
-        ss->history =  (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
-                     + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
-                     + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
+        ss->history =  (*cmh )[moved_piece][to_sq(move)]
+                     + (*fmh )[moved_piece][to_sq(move)]
+                     + (*fmh2)[moved_piece][to_sq(move)]
                      + history_get(*pos->history, pos_stm() ^ 1, move)
                      - 4000; // Correction factor.
 
@@ -618,7 +620,7 @@ moves_loop: // When in check search starts from here.
   // Bonus for prior countermove that caused the fail low.
   else if (    depth >= 3 * ONE_PLY
            && !captured_piece()
-           && move_is_ok((ss-1)->currentMove))
+           && cm_ok)
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
   tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),

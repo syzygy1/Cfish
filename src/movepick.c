@@ -109,11 +109,6 @@ static void score_quiets(const Pos *pos)
   CounterMoveStats *fmh = (st-2)->counterMoves;
   CounterMoveStats *fmh2 = (st-4)->counterMoves;
 
-  CounterMoveStats *tmp = &(*pos->counterMoveHistory)[0][0];
-  if (!cmh) cmh = tmp;
-  if (!fmh) fmh = tmp;
-  if (!fmh2) fmh2 = tmp;
-
   uint32_t c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++) {
