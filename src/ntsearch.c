@@ -352,7 +352,8 @@ moves_loop: // When in check search starts from here.
     moveCountPruning =   depth < 16 * ONE_PLY
                 && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
-    // Step 12. Extend checks
+    // Step 12. Extensions
+    // Extend checks
     if (    givesCheck
         && !moveCountPruning
         &&  see_test(pos, move, 0))
@@ -387,7 +388,7 @@ moves_loop: // When in check search starts from here.
       ss->countermove = cm; // pedantic
     }
 
-    // Update the current move (this must be done after singular extension search)
+    // Calculate new depth for this move
     newDepth = depth - ONE_PLY + extension;
 
     // Step 13. Pruning at shallow depth
@@ -442,6 +443,8 @@ moves_loop: // When in check search starts from here.
       continue;
     }
 
+    // Update the current move (this must be done after singular extension
+    // search)
     ss->currentMove = move;
     ss->counterMoves = &(*pos->counterMoveHistory)[moved_piece][to_sq(move)];
 
