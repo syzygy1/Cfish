@@ -74,7 +74,7 @@ INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 Value stat_bonus(Depth depth)
 {
   int d = depth / ONE_PLY;
-  return (Value)(d * d + 2 * d - 2);
+  return d > 17 ? VALUE_ZERO : (Value)(d * d + 2 * d - 2);
 }
 
 // Skill structure is used to implement strength limit
@@ -160,7 +160,7 @@ void search_init(void)
   for (int imp = 0; imp <= 1; imp++)
     for (int d = 1; d < 64; ++d)
       for (int mc = 1; mc < 64; ++mc) {
-        double r = log(d) * log(mc) / 2;
+        double r = log(d) * log(mc) / 1.95;
 
         Reductions[NonPV][imp][d][mc] = ((int)lround(r));
         Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);

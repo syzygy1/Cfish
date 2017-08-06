@@ -33,8 +33,6 @@
 INLINE void cms_update(CounterMoveStats cms, Piece pc, Square to, Value v)
 {
   int w = v >= 0 ? v : -v;
-  if (w >= 324)
-    return;
 
   cms[pc][to] -= cms[pc][to] * w / 936;
   cms[pc][to] += ((int)v) * 32;
@@ -43,8 +41,6 @@ INLINE void cms_update(CounterMoveStats cms, Piece pc, Square to, Value v)
 INLINE void history_update(HistoryStats history, int c, Move m, Value v)
 {
   int w = v >= 0 ? v : -v;
-  if (w >= 324)
-    return;
 
   m &= 4095;
   history[c][m] -= history[c][m] * w / 324;
@@ -84,7 +80,7 @@ INLINE Value history_get(HistoryStats history, int c, Move m)
 #define ST_PROBCUT_GEN             20
 #define ST_PROBCUT_2               21
 
-Move next_move(const Pos *pos);
+Move next_move(const Pos *pos, int skipQuiets);
 
 // Initialisation of move picker data.
 
