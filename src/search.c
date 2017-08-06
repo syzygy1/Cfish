@@ -125,19 +125,6 @@ static void easy_move_update(Pos *pos, Move *newPv)
   }
 }
 
-// Skip half of the plies in blocks depending on hte helper thread idx
-int skip_ply(int idx, int ply)
-{
-  idx = (idx - 1) % 20 + 1; // Cycle after 20 threads
-
-  // Number of successive plies to skip, depending on idx
-  int ones = 1;
-  while (ones * (ones + 1) < idx)
-    ones++;
-
-  return ((ply + idx - 1) / ones - ones) % 2 == 0;
-}
-
 static Value DrawValue[2];
 //static CounterMoveHistoryStats CounterMoveHistory;
 
@@ -341,6 +328,11 @@ void mainthread_search(void)
 }
 
 
+// Sizes and phases of the skip blocks, used for distributing search depths
+// across the threads
+static int skipsize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
+static int phase   [20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
+
 // thread_search() is the main iterative deepening loop. It calls search()
 // repeatedly with increasing depth until the allocated thinking time has
 // been consumed, the user stops the search, or the maximum search depth is
@@ -386,6 +378,8 @@ void thread_search(Pos *pos)
   RootMoves *rm = pos->rootMoves;
   multiPV = min(multiPV, rm->size);
 
+  int hIdx = (pos->thread_idx - 1) % 20;
+
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.
   while (   (pos->rootDepth += ONE_PLY) < DEPTH_MAX
@@ -394,7 +388,7 @@ void thread_search(Pos *pos)
   {
     // Skip plies for helper threads
     if (   pos->thread_idx
-        && skip_ply(pos->thread_idx, pos->rootDepth / ONE_PLY + pos_game_ply()))
+        && ((pos->rootDepth / ONE_PLY + pos_game_ply() + phase[hIdx]) / skipsize[hIdx]) % 2)
       continue;
 
     // Age out PV variability metric
