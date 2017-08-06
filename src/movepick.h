@@ -30,16 +30,6 @@
 
 #define stats_clear(s) memset(s, 0, sizeof(*s))
 
-INLINE void hs_update(HistoryStats hs, Piece pc, Square to, Value v)
-{
-  int w = v >= 0 ? v : -v;
-  if (w >= 324)
-    return;
-
-  hs[pc][to] -= hs[pc][to] * w / 324;
-  hs[pc][to] += ((int)v) * 32;
-}
-
 INLINE void cms_update(CounterMoveStats cms, Piece pc, Square to, Value v)
 {
   int w = v >= 0 ? v : -v;

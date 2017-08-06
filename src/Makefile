@@ -151,7 +151,7 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow -m$(bits)
+	CFLAGS += -Wimplicit-fallthrough=0 -pedantic -Wextra -Wshadow -m$(bits)
 	ifneq ($(UNAME),Darwin)
 	   LDFLAGS += -Wl,--no-as-needed
 	endif

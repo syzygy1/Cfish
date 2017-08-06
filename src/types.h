@@ -403,7 +403,6 @@ typedef struct PawnEntry PawnEntry;
 typedef struct MaterialEntry MaterialEntry;
 
 typedef Move MoveStats[16][64];
-typedef Value HistoryStats[16][64];
 typedef Value CounterMoveStats[16][64];
 typedef CounterMoveStats CounterMoveHistoryStats[16][64];
 typedef Value FromToStats[2][4096];

@@ -214,7 +214,6 @@ void search_clear()
 
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
-    stats_clear(pos->history);
     stats_clear(pos->counterMoves);
     stats_clear(pos->fromTo);
   }
@@ -333,8 +332,7 @@ void mainthread_search(void)
       Pos *p = Threads.pos[idx];
       Depth depthDiff = p->completedDepth - bestThread->completedDepth;
       Value scoreDiff = p->rootMoves->move[0].score - bestThread->rootMoves->move[0].score;
-      if (   (depthDiff > 0 && scoreDiff >= 0)
-          || (scoreDiff > 0 && depthDiff >= 0))
+      if (scoreDiff > 0 && depthDiff >= 0)
         bestThread = p;
     }
   }
@@ -705,7 +703,6 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
 
   int c = pos_stm();
   ft_update(*pos->fromTo, c, move, bonus);
-  hs_update(*pos->history, moved_piece(move), to_sq(move), bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 
   if ((ss-1)->counterMoves) {
@@ -716,7 +713,6 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
   // Decrease all the other played quiet moves
   for (int i = 0; i < quietsCnt; i++) {
     ft_update(*pos->fromTo, c, quiets[i], -bonus);
-    hs_update(*pos->history, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
     update_cm_stats(ss, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
   }
 }

@@ -104,7 +104,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && ttValue != VALUE_NONE // Possible in case of TT access race.
       && (ttValue >= beta ? (tte_bound(tte) & BOUND_LOWER)
                           : (tte_bound(tte) & BOUND_UPPER))) {
-    // If ttMove is quiet, update killers, history, counter move on TT hit.
+    // If ttMove is quiet, update move sorting heuristics on TT hit.
     if (ttValue >= beta && ttMove) {
       int d = depth / ONE_PLY;
 
@@ -470,8 +470,7 @@ moves_loop: // When in check search starts from here.
                  && !see_test(pos, make_move(to_sq(move), from_sq(move)), 0))
           r -= 2 * ONE_PLY;
 
-        ss->history =  (*pos->history)[moved_piece][to_sq(move)]
-                     + (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
+        ss->history =  (cmh  ? (*cmh )[moved_piece][to_sq(move)] : 0)
                      + (fmh  ? (*fmh )[moved_piece][to_sq(move)] : 0)
                      + (fmh2 ? (*fmh2)[moved_piece][to_sq(move)] : 0)
                      + ft_get(*pos->fromTo, pos_stm() ^ 1, move)
@@ -599,7 +598,7 @@ moves_loop: // When in check search starts from here.
   else if (bestMove) {
     int d = depth / ONE_PLY;
 
-    // Quiet best move: update killers, history and countermoves.
+    // Quiet best move: update move sorting heuristics.
     if (!is_capture_or_promotion(pos, bestMove)) {
       Value bonus = d * d + 2 * d - 2;
       update_stats(pos, ss, bestMove, quietsSearched, quietCount, bonus);
