@@ -48,11 +48,17 @@ INLINE void prefetch(void *addr)
 #endif
 
 #if defined(__INTEL_COMPILER) || defined(_MSC_VER)
-  _mm_prefetch((char*)addr, _MM_HINT_T0);
+  _mm_prefetch((char *)addr, _MM_HINT_T0);
 #else
   __builtin_prefetch(addr);
 #endif
 #endif
+}
+
+INLINE void prefetch2(void *addr)
+{
+  prefetch(addr);
+  prefetch((uint8_t *)addr + 64);
 }
 
 void start_logger(const char *fname);

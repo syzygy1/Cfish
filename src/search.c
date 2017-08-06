@@ -51,6 +51,11 @@ Depth TB_ProbeDepth;
 #define NonPV 0
 #define PV    1
 
+// Sizes and phases of the skip blocks, used for distributing search depths
+// across the threads
+static int skipSize[20]  = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
+static int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
+
 // Razoring and futility margin based on depth
 static const int razor_margin[4] = { 483, 570, 603, 554 };
 
@@ -328,11 +333,6 @@ void mainthread_search(void)
 }
 
 
-// Sizes and phases of the skip blocks, used for distributing search depths
-// across the threads
-static int skipsize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
-static int phase   [20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
-
 // thread_search() is the main iterative deepening loop. It calls search()
 // repeatedly with increasing depth until the allocated thinking time has
 // been consumed, the user stops the search, or the maximum search depth is
@@ -389,10 +389,12 @@ void thread_search(Pos *pos)
          && !Signals.stop
          && (!Limits.depth || threads_main()->rootDepth <= Limits.depth))
   {
-    // Skip plies for helper threads
-    if (   pos->thread_idx
-        && ((pos->rootDepth / ONE_PLY + pos_game_ply() + phase[hIdx]) / skipsize[hIdx]) % 2)
-      continue;
+    // Distribute search depths across the threads
+    if (pos->thread_idx) {
+      int i = (pos->thread_idx - 1) % 20;
+      if (((pos->rootDepth / ONE_PLY + pos_game_ply() + skipPhase[i]) / skipSize[hIdx]) % 2)
+        continue;
+    }
 
     // Age out PV variability metric
     if (pos->thread_idx == 0) {
