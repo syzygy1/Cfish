@@ -119,7 +119,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       }
       // Penalty for a quiet ttMove that fails low
       else if (!is_capture_or_promotion(pos, ttMove)) {
-        Value penalty = -stat_bonus(depth + ONE_PLY);
+        Value penalty = -stat_bonus(depth);
         history_update(*pos->history, pos_stm(), ttMove, penalty);
         update_cm_stats(ss, moved_piece(ttMove), to_sq(ttMove), penalty);
       }
@@ -359,12 +359,7 @@ moves_loop: // When in check search starts from here.
     moveCountPruning =   depth < 16 * ONE_PLY
                 && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
-    // Step 12. Extensions
-    // Extend checks
-    if (    givesCheck
-        && !moveCountPruning
-        &&  see_test(pos, move, 0))
-      extension = ONE_PLY;
+    // Step 12. Singular and Gives Check Extensions
 
     // Singular extension search. If all moves but one fail low on a search
     // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
@@ -394,13 +389,18 @@ moves_loop: // When in check search starts from here.
       ss->stage++;
       ss->countermove = cm; // pedantic
     }
+    else if (    givesCheck
+             && !moveCountPruning
+             &&  see_test(pos, move, 0))
+      extension = ONE_PLY;
 
     // Calculate new depth for this move
     newDepth = depth - ONE_PLY + extension;
 
     // Step 13. Pruning at shallow depth
-    if (   !rootNode
-        &&  bestValue > VALUE_MATED_IN_MAX_PLY)
+    if (  !rootNode
+        && pos_non_pawn_material(pos_stm())
+        && bestValue > VALUE_MATED_IN_MAX_PLY)
     {
       if (   !captureOrPromotion
           && !givesCheck
@@ -626,10 +626,11 @@ moves_loop: // When in check search starts from here.
            && cm_ok)
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
-  tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
-           bestValue >= beta ? BOUND_LOWER :
-           PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-           depth, bestMove, ss->staticEval, tt_generation());
+  if (!excludedMove)
+    tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
+             bestValue >= beta ? BOUND_LOWER :
+             PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
+             depth, bestMove, ss->staticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 

@@ -124,7 +124,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     stoppers   = theirPawns & passed_pawn_mask(Us, s);
     lever      = theirPawns & pawnAttacksBB[s];
     leverPush  = theirPawns & pawnAttacksBB[s + Up];
-    doubled    = ourPawns   & sq_bb(s + Up);
+    doubled    = ourPawns   & sq_bb(s - Up);
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
     supported  = neighbours & rank_bb_s(s - Up);
@@ -169,7 +169,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     if (connected)
       score += Connected[opposed][!!phalanx][!!more_than_one(supported)][relative_rank_s(Us, s)];
 
-    if (doubled)
+    if (doubled && !supported)
       score -= Doubled;
 
     if (lever)
