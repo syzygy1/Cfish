@@ -148,7 +148,6 @@ static const Score WeakQueen           = S(50, 10);
 static const Score OtherCheck          = S(10, 10);
 static const Score CloseEnemies        = S( 7,  0);
 static const Score PawnlessFlank       = S(20, 80);
-static const Score LooseEnemies        = S( 0, 25);
 static const Score ThreatByHangingPawn = S(71, 61);
 static const Score ThreatByRank        = S(16,  3);
 static const Score Hanging             = S(48, 27);
@@ -245,11 +244,6 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       ei->kingAttackersWeight[Us] += KingAttackWeights[Pt];
       ei->kingAdjacentZoneAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
     }
-
-    if (Pt == QUEEN)
-      b &= ~(  ei->attackedBy[Them][KNIGHT]
-             | ei->attackedBy[Them][BISHOP]
-             | ei->attackedBy[Them][ROOK]);
 
     int mob = popcount(b & ei->mobilityArea[Us]);
 
@@ -478,11 +472,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   Bitboard b, weak, defended, safeThreats;
   Score score = SCORE_ZERO;
 
-  // Small bonus if the opponent has loose pawns or pieces
-  if (  pieces_c(Them) & ~pieces_pp(QUEEN, KING)
-      & ~(ei->attackedBy[Us][0] | ei->attackedBy[Them][0]))
-    score += LooseEnemies;
-
   // Non-pawn enemies attacked by a pawn
   weak = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Us][PAWN];
 
@@ -619,10 +608,6 @@ INLINE Score evaluate_passer_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         mbonus += rr + r * 2, ebonus += rr + r * 2;
     } // rr != 0
 
-    // Assign a small bonus when the opponent has no pieces left.
-    if (!pos_non_pawn_material(Them))
-      ebonus += 20;
-
     // Scale down bonus for candidate passers which need more than one
     // pawn push to become passed.
     if (!pawn_passed(pos, Us, s + pawn_push(Us))) {
@@ -709,27 +694,25 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 
   // If we don't already have an unusual scale factor, check for certain
   // types of endgames, and use a lower scale for those.
-  if (    ei->me->gamePhase < PHASE_MIDGAME
-      && (sf == SCALE_FACTOR_NORMAL || sf == SCALE_FACTOR_ONEPAWN)) {
+  if (sf == SCALE_FACTOR_NORMAL || sf == SCALE_FACTOR_ONEPAWN) {
     if (opposite_bishops(pos)) {
       // Endgame with opposite-colored bishops and no other pieces
       // (ignoring pawns) is almost a draw, in case of KBP vs KB, it is
       // even more a draw.
       if (   pos_non_pawn_material(WHITE) == BishopValueMg
           && pos_non_pawn_material(BLACK) == BishopValueMg)
-        sf = more_than_one(pieces_p(PAWN)) ? 31 : 9;
+        return more_than_one(pieces_p(PAWN)) ? 31 : 9;
 
       // Endgame with opposite-colored bishops, but also other pieces. Still
       // a bit drawish, but not as drawish as with only the two bishops.
-      else
-        sf = 46;
+      return 46;
     }
     // Endings where weaker side can place his king in front of the opponent's
     // pawns are drawish.
     else if (    abs(eg) <= BishopValueEg
              &&  piece_count(strongSide, PAWN) <= 2
              && !pawn_passed(pos, strongSide ^ 1, square_of(strongSide ^ 1, KING)))
-      sf = 37 + 7 * piece_count(strongSide, PAWN);
+      return 37 + 7 * piece_count(strongSide, PAWN);
   }
 
   return sf;

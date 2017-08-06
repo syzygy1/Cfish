@@ -26,7 +26,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
-  Value bestValue, value, ttValue, eval, nullValue;
+  Value bestValue, value, ttValue, eval;
   int ttHit, inCheck, givesCheck, singularExtensionNode, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
   Piece moved_piece;
@@ -221,8 +221,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
     (ss+1)->skipEarlyPruning = 1;
-    nullValue = depth-R < ONE_PLY ? -qsearch_NonPV_false(pos, ss+1, -beta, DEPTH_ZERO)
-                                  : - search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);
+    Value nullValue =   depth-R < ONE_PLY
+                     ? -qsearch_NonPV_false(pos, ss+1, -beta, DEPTH_ZERO)
+                     : - search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);
     (ss+1)->skipEarlyPruning = 0;
     undo_null_move(pos);
 

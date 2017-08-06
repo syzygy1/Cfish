@@ -553,7 +553,7 @@ void thread_search(Pos *pos)
 
         int doEasyMove =   rm->move[0].pv[0] == easyMove
                          && mainThread.bestMoveChanges < 0.03
-                         && time_elapsed() > time_optimum() * 5 / 42;
+                         && time_elapsed() > time_optimum() * 5 / 44;
 
         if (   rm->size == 1
             || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 628
