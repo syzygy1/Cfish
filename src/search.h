@@ -28,7 +28,7 @@
 #include "thread.h"
 #include "types.h"
 
-typedef Value CounterMoveStats[16][64];
+typedef int CounterMoveStats[16][64];
 typedef CounterMoveStats CounterMoveHistoryStats[16][64];
 
 // RootMove struct is used for moves at the root of the tree. For each root

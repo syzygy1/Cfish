@@ -170,10 +170,10 @@ static const Score TrappedBishopA1H1 = S(50, 50);
 static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 
 // Penalties for enemy's safe checks
-#define QueenCheck        745
-#define RookCheck         688
-#define BishopCheck       588
-#define KnightCheck       924
+#define QueenCheck        810
+#define RookCheck         888
+#define BishopCheck       400
+#define KnightCheck       790
 
 // Threshold for lazy evaluation
 #define LazyThreshold 1500
@@ -379,12 +379,12 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
     // number and types of the enemy's attacking pieces, the number of
     // attacked and undefended squares around our king and the quality of
     // the pawn shelter (current 'score' value).
-    kingDanger =  min(807, ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them])
-                + 101 * ei->kingAdjacentZoneAttacksCount[Them]
-                + 235 * popcount(undefended)
-                + 134 * (popcount(b) + !!pinned_pieces(pos, Us))
-                - 717 * !pieces_cp(Them, QUEEN)
-                -   7 * mg_value(score) / 5 - 5;
+    kingDanger =  min(820, ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them])
+                + 103 * ei->kingAdjacentZoneAttacksCount[Them]
+                + 190 * popcount(undefended)
+                + 142 * (popcount(b) + !!pinned_pieces(pos, Us))
+                - 810 * !pieces_cp(Them, QUEEN)
+                -   6 * mg_value(score) / 5 - 5;
 
     // Analyse the safe enemy's checks which are possible on next move
     safe  = ~pieces_c(Them);

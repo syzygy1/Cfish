@@ -23,14 +23,14 @@
 #include "movepick.h"
 #include "thread.h"
 
-#define HistoryStats_Max ((Value)(1<<28))
+#define HistoryStats_Max (1<<28)
 
 // An insertion sort which sorts moves in descending order up to and
 // including a given limit. The order of moves smaller than the limit is
 // left unspecified. To keep the implementation simple, *begin is always
 // included in the list of sorted moves.
 
-INLINE void partial_insertion_sort(ExtMove *begin, ExtMove *end, Value limit)
+INLINE void partial_insertion_sort(ExtMove *begin, ExtMove *end, int limit)
 {
   for (ExtMove *sortedEnd = begin + 1, *p = begin + 1; p < end; p++)
     if (p->value >= limit) {
@@ -72,7 +72,7 @@ static void score_captures(const Pos *pos)
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-              - (Value)(200 * relative_rank_s(pos_stm(), to_sq(m->move)));
+              - (200 * relative_rank_s(pos_stm(), to_sq(m->move)));
 }
 
 SMALL
@@ -110,7 +110,7 @@ static void score_evasions(const Pos *pos)
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - (Value)type_of_p(moved_piece(m->move)) + HistoryStats_Max;
+                - type_of_p(moved_piece(m->move)) + HistoryStats_Max;
     else
       m->value = history_get(*history, c, m->move);
 }
@@ -175,13 +175,12 @@ Move next_move(const Pos *pos, int skipQuiets)
     st->cur = st->endBadCaptures;
     st->endMoves = generate_quiets(pos, st->cur);
     score_quiets(pos);
-    partial_insertion_sort(st->cur, st->endMoves,
-                           st->depth < 3 * ONE_PLY ? VALUE_ZERO : INT_MIN);
+    partial_insertion_sort(st->cur, st->endMoves, -4000 * st->depth / ONE_PLY);
     st->stage++;
 
   case ST_QUIET:
     while (    st->cur < st->endMoves
-           && (!skipQuiets || st->cur->value >= VALUE_ZERO)) {
+           && (!skipQuiets || st->cur->value >= 0)) {
       move = (st->cur++)->move;
       if (   move != st->ttMove && move != st->killers[0]
           && move != st->killers[1] && move != st->countermove)
