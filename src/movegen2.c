@@ -93,7 +93,7 @@ INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
   // Knight promotion is the only promotion that can give a direct check
   // that's not already included in the queen promotion.
   if (   Type == QUIET_CHECKS
-      && (StepAttacksBB[W_KNIGHT][to] & sq_bb(ksq)))
+      && (PseudoAttacks[KNIGHT][to] & sq_bb(ksq)))
     (list++)->move = make_promotion(to - Delta, to, KNIGHT);
 
   return list;

@@ -60,7 +60,6 @@ Bitboard FileBB[8];
 Bitboard RankBB[8];
 Bitboard AdjacentFilesBB[8];
 Bitboard InFrontBB[2][8];
-Bitboard StepAttacksBB[16][64];
 Bitboard BetweenBB[64][64];
 Bitboard LineBB[64][64];
 Bitboard DistanceRingBB[64][8];
@@ -68,6 +67,7 @@ Bitboard ForwardBB[2][64];
 Bitboard PassedPawnMask[2][64];
 Bitboard PawnAttackSpan[2][64];
 Bitboard PseudoAttacks[8][64];
+Bitboard PawnAttacks[2][64];
 
 #ifndef PEDANTIC
 Bitboard EPMask[16];
@@ -223,17 +223,22 @@ void bitboards_init()
                        | ((sq_bb(s) << 1) & ~FileABB);
 #endif
 
-  int steps[][9] = { {0}, { 7, 9 }, { 17, 15, 10, 6, -6, -10, -15, -17 },
-                     {0}, {0}, {0}, { 9, 7, -7, -9, 8, 1, -1, -8 } };
+  int steps[][5] = {
+    {0}, { 7, 9 }, { 6, 10, 15, 17 }, {0}, {0}, {0}, { 1, 7, 8, 9 }
+  };
 
   for (int c = 0; c < 2; c++)
     for (int pt = PAWN; pt <= KING; pt++)
-      for (int s = SQ_A1; s < 64; s++)
+      for (int s = 0; s < 64; s++)
         for (int i = 0; steps[pt][i]; i++) {
           Square to = s + (Square)(c == WHITE ? steps[pt][i] : -steps[pt][i]);
 
-          if (square_is_ok(to) && distance(s, to) < 3)
-            StepAttacksBB[make_piece(c, pt)][s] |= sq_bb(to);
+          if (square_is_ok(to) && distance(s, to) < 3) {
+            if (pt == PAWN)
+              PawnAttacks[c][s] |= sq_bb(to);
+            else
+              PseudoAttacks[pt][s] |= sq_bb(to);
+          }
         }
 
   init_sliding_attacks();
@@ -242,13 +247,13 @@ void bitboards_init()
     PseudoAttacks[QUEEN][s1] = PseudoAttacks[BISHOP][s1] = attacks_bb_bishop(s1, 0);
     PseudoAttacks[QUEEN][s1] |= PseudoAttacks[ROOK][s1] = attacks_bb_rook(s1, 0);
 
-    for (Piece pc = W_BISHOP; pc <= W_ROOK; pc++)
+    for (int pt = BISHOP; pt <= ROOK; pt++)
       for (Square s2 = 0; s2 < 64; s2++) {
-        if (!(PseudoAttacks[pc][s1] & sq_bb(s2)))
+        if (!(PseudoAttacks[pt][s1] & sq_bb(s2)))
           continue;
 
-        LineBB[s1][s2] = (attacks_bb(pc, s1, 0) & attacks_bb(pc, s2, 0)) | sq_bb(s1) | sq_bb(s2);
-        BetweenBB[s1][s2] = attacks_bb(pc, s1, SquareBB[s2]) & attacks_bb(pc, s2, SquareBB[s1]);
+        LineBB[s1][s2] = (attacks_bb(pt, s1, 0) & attacks_bb(pt, s2, 0)) | sq_bb(s1) | sq_bb(s2);
+        BetweenBB[s1][s2] = attacks_bb(pt, s1, SquareBB[s2]) & attacks_bb(pt, s2, SquareBB[s1]);
       }
   }
 }

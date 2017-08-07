@@ -67,7 +67,7 @@ static uint8_t initial(unsigned idx)
   if (   distance(ksq[WHITE], ksq[BLACK]) <= 1
       || ksq[WHITE] == psq
       || ksq[BLACK] == psq
-      || (us == WHITE && (StepAttacksBB[PAWN][psq] & sq_bb(ksq[BLACK]))))
+      || (us == WHITE && (PawnAttacks[WHITE][psq] & sq_bb(ksq[BLACK]))))
     return RES_INVALID;
 
   // Immediate win if a pawn can be promoted without getting captured
@@ -75,13 +75,13 @@ static uint8_t initial(unsigned idx)
       && rank_of(psq) == RANK_7
       && ksq[us] != psq + DELTA_N
       && (    distance(ksq[us ^ 1], psq + DELTA_N) > 1
-          || (StepAttacksBB[KING][ksq[us]] & sq_bb((psq + DELTA_N)))))
+          || (PseudoAttacks[KING][ksq[us]] & sq_bb((psq + DELTA_N)))))
     return RES_WIN;
 
   // Immediate draw if it is a stalemate or a king captures undefended pawn
   if (   us == BLACK
-      && (  !(StepAttacksBB[KING][ksq[us]] & ~(StepAttacksBB[KING][ksq[us ^ 1]] | StepAttacksBB[PAWN][psq]))
-          || (StepAttacksBB[KING][ksq[us]] & sq_bb(psq) & ~StepAttacksBB[KING][ksq[us ^ 1]])))
+      && (  !(PseudoAttacks[KING][ksq[us]] & ~(PseudoAttacks[KING][ksq[us ^ 1]] | PawnAttacks[us ^ 1][psq]))
+          || (PseudoAttacks[KING][ksq[us]] & sq_bb(psq) & ~PseudoAttacks[KING][ksq[us ^ 1]])))
     return RES_DRAW;
 
   // Position will be classified later
@@ -109,7 +109,7 @@ static uint8_t classify(uint8_t *db, unsigned idx)
   int bad  = (us == WHITE ? RES_DRAW : RES_WIN);
 
   uint8_t r = RES_INVALID;
-  Bitboard b = StepAttacksBB[KING][ksq[us]];
+  Bitboard b = PseudoAttacks[KING][ksq[us]];
 
   while (b)
     r |= us == WHITE ? db[index(them, ksq[them]  , pop_lsb(&b), psq)]

@@ -98,7 +98,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   Square s;
   int opposed, backward;
   Score score = SCORE_ZERO;
-  const Bitboard* pawnAttacksBB = StepAttacksBB[make_piece(Us, PAWN)];
 
   Bitboard ourPawns   = pieces_cp(Us, PAWN);
   Bitboard theirPawns = pieces_p(PAWN) ^ ourPawns;
@@ -122,8 +121,8 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // Flag the pawn
     opposed    = !!(theirPawns & forward_bb(Us, s));
     stoppers   = theirPawns & passed_pawn_mask(Us, s);
-    lever      = theirPawns & pawnAttacksBB[s];
-    leverPush  = theirPawns & pawnAttacksBB[s + Up];
+    lever      = theirPawns & PawnAttacks[Us][s];
+    leverPush  = theirPawns & PawnAttacks[Us][s + Up];
     doubled    = ourPawns   & sq_bb(s - Up);
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
