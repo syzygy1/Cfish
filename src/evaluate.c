@@ -139,7 +139,7 @@ static const Score Protector[4][8] = {
   { S(0, 0), S( 7, 9), S( 7, 1), S( 1, 5), S(-10,-4), S( -1,-4), S( -7,-3), S(-16,-10) }, // Knight
   { S(0, 0), S(11, 8), S(-7,-1), S(-1,-2), S( -1,-7), S(-11,-3), S( -9,-1), S(-16, -1) }, // Bishop
   { S(0, 0), S(10, 0), S(-2, 2), S(-5, 4), S( -6, 2), S(-14,-3), S( -2,-9), S(-12, -7) }, // Rook
-  { S(0, 0), S( 3,-5), S( 2,-5), S(-4, 0), S( -9,-6),  S(-4, 7), S(-13,-7), S(-10, -7) }  // Queen
+  { S(0, 0), S( 3,-5), S( 2,-5), S(-4, 0), S( -9,-6), S( -4, 7), S(-13,-7), S(-10, -7) }  // Queen
 };
 
 // Assorted bonuses and penalties used by evaluation
@@ -175,8 +175,9 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 #define BishopCheck       400
 #define KnightCheck       790
 
-// Threshold for lazy evaluation
+// Thresholds for lazy and space evaluation
 #define LazyThreshold 1500
+#define SpaceThreshold 12222
 
 
 // eval_init() initializes king and attack bitboards for a given color
@@ -486,10 +487,10 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
     safeThreats = (shift_bb(Right, b) | shift_bb(Left, b)) & weak;
 
+    score += ThreatBySafePawn * popcount(safeThreats);
+
     if (weak ^ safeThreats)
       score += ThreatByHangingPawn;
-
-    score += ThreatBySafePawn * popcount(safeThreats);
   }
 
   // Squares strongly protected by the opponent, either because they attack the
@@ -784,7 +785,7 @@ Value evaluate(const Pos *pos)
           - evaluate_passer_pawns(pos, &ei, BLACK);
 
   // Evaluate space for both sides, only during opening
-  if (pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) >= 12222)
+  if (pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) >= SpaceThreshold)
       score +=  evaluate_space(pos, &ei, WHITE)
               - evaluate_space(pos, &ei, BLACK);
 
