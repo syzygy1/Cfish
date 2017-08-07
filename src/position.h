@@ -93,6 +93,7 @@ struct Stack {
   Depth depth;
   Move ttMove;
   Value threshold;
+  Move mp_killers[2];
   uint8_t stage;
   uint8_t recaptureSquare;
   ExtMove *cur, *endMoves, *endBadCaptures;

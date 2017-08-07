@@ -94,6 +94,8 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
 
   Square prevSq = to_sq((st-1)->currentMove);
   st->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
+  st->mp_killers[0] = st->killers[0];
+  st->mp_killers[1] = st->killers[1];
 
   st->stage = pos_checkers() ? ST_EVASIONS : ST_MAIN_SEARCH;
   st->ttMove = ttm;

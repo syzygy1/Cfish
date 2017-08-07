@@ -373,7 +373,7 @@ moves_loop: // When in check search starts from here.
       ss->excludedMove = move;
       ss->skipEarlyPruning = 1;
       Move cm = ss->countermove;
-//  Move k1 = ss->killers[0], k2 = ss->killers[1];
+      Move k1 = ss->mp_killers[0], k2 = ss->mp_killers[1];
       value = search_NonPV(pos, ss, rBeta - 1, d, cutNode);
       ss->skipEarlyPruning = 0;
       ss->excludedMove = 0;
@@ -386,7 +386,7 @@ moves_loop: // When in check search starts from here.
       mp_init(pos, ttMove, depth);
       ss->stage++;
       ss->countermove = cm; // pedantic
-//  ss->killers[0] = k1; ss->killers[1] = k2;
+      ss->mp_killers[0] = k1; ss->mp_killers[1] = k2;
     }
     else if (    givesCheck
              && !moveCountPruning
