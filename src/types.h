@@ -182,14 +182,14 @@ INLINE int make_castling_right(int c, int s)
 
 #define PawnValueMg   188
 #define PawnValueEg   248
-#define KnightValueMg 753
-#define KnightValueEg 832
-#define BishopValueMg 814
-#define BishopValueEg 890
-#define RookValueMg   1285
-#define RookValueEg   1371
-#define QueenValueMg  2513
-#define QueenValueEg  2648
+#define KnightValueMg 764
+#define KnightValueEg 848
+#define BishopValueMg 826
+#define BishopValueEg 891
+#define RookValueMg   1282
+#define RookValueEg   1373
+#define QueenValueMg  2526
+#define QueenValueEg  2646
 
 #define MidgameLimit 15258
 #define EndgameLimit 3915

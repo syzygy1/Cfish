@@ -103,8 +103,8 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   Bitboard theirPawns = pieces_p(PAWN) ^ ourPawns;
 
   e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
-  e->kingSquares[Us] = SQ_NONE;
   e->semiopenFiles[Us] = 0xFF;
+  e->kingSquares[Us] = SQ_NONE;
   e->pawnAttacks[Us] = shift_bb(Right, ourPawns) | shift_bb(Left, ourPawns);
   e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
@@ -127,7 +127,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
     supported  = neighbours & rank_bb_s(s - Up);
-    connected  = !!(supported | phalanx);
+    connected  = supported | phalanx;
 
     // A pawn is backward when it is behind all pawns of the same color on the
     // adjacent files and cannot be safely advanced.
@@ -154,6 +154,15 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
         && popcount(supported) >= popcount(lever)
         && popcount(phalanx)   >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
+
+    else if (   stoppers == sq_bb(s + Up)
+             && relative_rank_s(Us, s) >= RANK_5)
+    {
+      b = shift_bb(Up, supported) & ~theirPawns;
+      while (b)
+        if (!more_than_one(theirPawns & PawnAttacks[Us][pop_lsb(&b)]))
+          e->passedPawns[Us] |= sq_bb(s);
+    }
 
     // Score this pawn
     if (!neighbours)

@@ -606,6 +606,8 @@ void thread_search(Pos *pos)
 #undef true
 #undef false
 
+#define rm_lt(m1,m2) ((m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
+
 // stable_sort() sorts RootMoves from highest-scoring move to lowest-scoring
 // move while preserving order of equal elements.
 static void stable_sort(RootMove *rm, int num)
@@ -613,10 +615,10 @@ static void stable_sort(RootMove *rm, int num)
   int i, j;
 
   for (i = 1; i < num; i++)
-    if (rm[i - 1].score < rm[i].score) {
+    if (rm_lt(rm[i - 1], rm[i])) {
       RootMove tmp = rm[i];
       rm[i] = rm[i - 1];
-      for (j = i - 1; j > 0 && rm[j - 1].score < tmp.score; j--)
+      for (j = i - 1; j > 0 && rm_lt(rm[j - 1], tmp); j--)
         rm[j] = rm[j - 1];
       rm[j] = tmp;
     }
@@ -772,7 +774,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
   char buf[16];
 
   for (int i = 0; i < multiPV; ++i) {
-    int updated = (i <= PVIdx);
+    int updated = (i <= PVIdx && rm->move[i].score != -VALUE_INFINITE);
 
     if (depth == ONE_PLY && !updated)
         continue;
