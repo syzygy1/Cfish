@@ -30,7 +30,7 @@
 
 #define stats_clear(s) memset(s, 0, sizeof(*s))
 
-INLINE void cms_update(CounterMoveStats cms, Piece pc, Square to, int v)
+INLINE void cms_update(PieceToHistory cms, Piece pc, Square to, int v)
 {
   int w = v >= 0 ? v : -v;
 
@@ -38,18 +38,13 @@ INLINE void cms_update(CounterMoveStats cms, Piece pc, Square to, int v)
   cms[pc][to] += v * 32;
 }
 
-INLINE void history_update(HistoryStats history, int c, Move m, int v)
+INLINE void history_update(ButterflyHistory history, int c, Move m, int v)
 {
   int w = v >= 0 ? v : -v;
 
   m &= 4095;
   history[c][m] -= history[c][m] * w / 324;
   history[c][m] += v * 32;
-}
-
-INLINE int history_get(HistoryStats history, int c, Move m)
-{
-  return history[c][m & 4095];
 }
 
 #define ST_MAIN_SEARCH             0

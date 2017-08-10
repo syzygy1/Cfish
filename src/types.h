@@ -382,6 +382,7 @@ extern uint32_t NonPawnPieceValue[16];
 #define pawn_push(c) ((c) == WHITE ? 8 : -8)
 #define from_sq(m) ((Square)((m)>>6) & 0x3f)
 #define to_sq(m) ((Square)((m) & 0x3f))
+#define from_to(m) ((m) & 0xfff)
 #define type_of_m(m) ((m) >> 14)
 #define promotion_type(m) ((((m)>>12) & 3) + KNIGHT)
 #define make_move(from,to) ((Move)((to) | ((from) << 6)))
@@ -402,10 +403,10 @@ typedef struct RootMoves RootMoves;
 typedef struct PawnEntry PawnEntry;
 typedef struct MaterialEntry MaterialEntry;
 
-typedef Move MoveStats[16][64];
-typedef int CounterMoveStats[16][64];
-typedef CounterMoveStats CounterMoveHistoryStats[16][64];
-typedef int HistoryStats[2][4096];
+typedef Move CounterMoveStat[16][64];
+typedef int PieceToHistory[16][64];
+typedef PieceToHistory CounterMoveHistoryStat[16][64];
+typedef int ButterflyHistory[2][4096];
 
 struct ExtMove {
   Move move;

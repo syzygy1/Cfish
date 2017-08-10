@@ -78,14 +78,14 @@ struct Stack {
 
   // Original search stack data
   Move* pv;
-  CounterMoveStats *counterMoves;
+  PieceToHistory *history;
   uint8_t ply;
   uint8_t skipEarlyPruning;
   Move currentMove;
   Move excludedMove;
   Move killers[2];
   Value staticEval;
-  Value history;
+  Value statScore;
   int moveCount;
 
   // MovePicker data
@@ -156,11 +156,11 @@ struct Pos {
   Depth completedDepth;
 
   // Pointers to thread-specific tables.
-  MoveStats *counterMoves;
-  HistoryStats *history;
+  CounterMoveStat *counterMoves;
+  ButterflyHistory *history;
   PawnEntry *pawnTable;
   MaterialEntry *materialTable;
-  CounterMoveHistoryStats *counterMoveHistory;
+  CounterMoveHistoryStat *counterMoveHistory;
 
   // Thread-control data.
   atomic_bool resetCalls;

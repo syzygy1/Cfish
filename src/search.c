@@ -134,7 +134,7 @@ static void easy_move_update(Pos *pos, Move *newPv)
 }
 
 static Value DrawValue[2];
-//static CounterMoveHistoryStats CounterMoveHistory;
+//static CounterMoveHistoryStat CounterMoveHistory;
 
 static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
 static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode);
@@ -355,7 +355,7 @@ void thread_search(Pos *pos)
   (ss-1)->endMoves = pos->moveList;
 
   for (int i = -4; i < 0; i++)
-    ss[i].counterMoves = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
+    ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
 
   for (int i = 0; i < MAX_PLY; i++) {
     ss[i].ply = i + 1;
@@ -664,13 +664,13 @@ static void update_pv(Move *pv, Move move, Move *childPv)
 static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus)
 {
   if (move_is_ok((ss-1)->currentMove))
-    cms_update(*(ss-1)->counterMoves, pc, s, bonus);
+    cms_update(*(ss-1)->history, pc, s, bonus);
 
   if (move_is_ok((ss-2)->currentMove))
-    cms_update(*(ss-2)->counterMoves, pc, s, bonus);
+    cms_update(*(ss-2)->history, pc, s, bonus);
 
   if (move_is_ok((ss-4)->currentMove))
-    cms_update(*(ss-4)->counterMoves, pc, s, bonus);
+    cms_update(*(ss-4)->history, pc, s, bonus);
 }
 
 // update_stats() updates killers, history, countermove and countermove

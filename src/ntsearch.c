@@ -35,7 +35,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
   moveCount = quietCount =  ss->moveCount = 0;
-  ss->history = 0;
+  ss->statScore = 0;
   bestValue = -VALUE_INFINITE;
 
   // Check for the available remaining time
@@ -84,7 +84,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
   (ss+1)->excludedMove = bestMove = 0;
-  ss->counterMoves = &(*pos->counterMoveHistory)[0][0];
+  ss->history = &(*pos->counterMoveHistory)[0][0];
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
   Square prevSq = to_sq((ss-1)->currentMove);
 
@@ -215,7 +215,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
 
     ss->currentMove = MOVE_NULL;
-    ss->counterMoves = &(*pos->counterMoveHistory)[0][0];
+    ss->history = &(*pos->counterMoveHistory)[0][0];
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
@@ -263,7 +263,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     while ((move = next_move(pos, 0)))
       if (is_legal(pos, move)) {
         ss->currentMove = move;
-        ss->counterMoves = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
+        ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
         do_move(pos, move, gives_check(pos, ss, move));
         value = -search_NonPV(pos, ss+1, -rbeta, rdepth, !cutNode);
         undo_move(pos, move);
@@ -292,9 +292,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
 moves_loop: // When in check search starts from here.
   ;  // Avoid a compiler warning. A label must be followed by a statement.
-  CounterMoveStats *cmh  = (ss-1)->counterMoves;
-  CounterMoveStats *fmh  = (ss-2)->counterMoves;
-  CounterMoveStats *fmh2 = (ss-4)->counterMoves;
+  PieceToHistory *cmh  = (ss-1)->history;
+  PieceToHistory *fmh  = (ss-2)->history;
+  PieceToHistory *fmh2 = (ss-4)->history;
 
   mp_init(pos, ttMove, depth);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
@@ -455,7 +455,7 @@ moves_loop: // When in check search starts from here.
     // Update the current move (this must be done after singular extension
     // search)
     ss->currentMove = move;
-    ss->counterMoves = &(*pos->counterMoveHistory)[moved_piece][to_sq(move)];
+    ss->history = &(*pos->counterMoveHistory)[moved_piece][to_sq(move)];
 
     // Step 14. Make the move.
     do_move(pos, move, givesCheck);
@@ -482,21 +482,21 @@ moves_loop: // When in check search starts from here.
                  && !see_test(pos, make_move(to_sq(move), from_sq(move)), 0))
           r -= 2 * ONE_PLY;
 
-        ss->history =  (*cmh )[moved_piece][to_sq(move)]
-                     + (*fmh )[moved_piece][to_sq(move)]
-                     + (*fmh2)[moved_piece][to_sq(move)]
-                     + history_get(*pos->history, pos_stm() ^ 1, move)
-                     - 4000; // Correction factor.
+        ss->statScore =  (*cmh )[moved_piece][to_sq(move)]
+                       + (*fmh )[moved_piece][to_sq(move)]
+                       + (*fmh2)[moved_piece][to_sq(move)]
+                       + (*pos->history)[pos_stm() ^ 1][from_to(move)]
+                       - 4000; // Correction factor.
 
         // Decrease/increase reduction by comparing with opponent's stat score.
-        if (ss->history > 0 && (ss-1)->history < 0)
+        if (ss->statScore > 0 && (ss-1)->statScore < 0)
           r -= ONE_PLY;
 
-        else if (ss->history < 0 && (ss-1)->history > 0)
+        else if (ss->statScore < 0 && (ss-1)->statScore > 0)
           r += ONE_PLY;
 
         // Decrease/increase reduction for moves with a good/bad history.
-        r = max(DEPTH_ZERO, (r / ONE_PLY - ss->history / 20000) * ONE_PLY);
+        r = max(DEPTH_ZERO, (r / ONE_PLY - ss->statScore / 20000) * ONE_PLY);
       }
 
       Depth d = max(newDepth - r, ONE_PLY);

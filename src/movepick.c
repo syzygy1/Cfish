@@ -23,8 +23,6 @@
 #include "movepick.h"
 #include "thread.h"
 
-#define HistoryStats_Max (1<<28)
-
 // An insertion sort which sorts moves in descending order up to and
 // including a given limit. The order of moves smaller than the limit is
 // left unspecified.
@@ -77,11 +75,11 @@ SMALL
 static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
-  HistoryStats *history = pos->history;
+  ButterflyHistory *history = pos->history;
 
-  CounterMoveStats *cmh = (st-1)->counterMoves;
-  CounterMoveStats *fmh = (st-2)->counterMoves;
-  CounterMoveStats *fmh2 = (st-4)->counterMoves;
+  PieceToHistory *cmh = (st-1)->history;
+  PieceToHistory *fmh = (st-2)->history;
+  PieceToHistory *fmh2 = (st-4)->history;
 
   uint32_t c = pos_stm();
 
@@ -92,7 +90,7 @@ static void score_quiets(const Pos *pos)
     m->value =  (*cmh)[piece_on(from)][to]
               + (*fmh)[piece_on(from)][to]
               + (*fmh2)[piece_on(from)][to]
-              + history_get(*history, c, move);
+              + (*history)[c][move];
   }
 }
 
@@ -102,15 +100,15 @@ static void score_evasions(const Pos *pos)
   // Try captures ordered by MVV/LVA, then non-captures ordered by
   // stats heuristics.
 
-  HistoryStats *history = pos->history;
+  ButterflyHistory *history = pos->history;
   uint32_t c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - type_of_p(moved_piece(m->move)) + HistoryStats_Max;
+                - type_of_p(moved_piece(m->move)) + (1 << 28);
     else
-      m->value = history_get(*history, c, m->move);
+      m->value = (*history)[c][from_to(m->move)];
 }
 
 
