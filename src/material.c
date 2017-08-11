@@ -55,8 +55,8 @@ static const int PawnSet[9] = {
 
 // QueenMinorsImbalance[opp_minor_count] is applied when only one side has
 // a queen. It contains a bonus/malus for the side with the queen.
-static const int QueenMinorsImbalance[16] = {
-  31, -8, -15, -25, -5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+static const int QueenMinorsImbalance[13] = {
+  31, -8, -15, -25, -5
 };
 
 // Helper used to detect a given material distribution.
@@ -123,7 +123,13 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   memset(e, 0, sizeof(MaterialEntry));
   e->key = key;
   e->factor[WHITE] = e->factor[BLACK] = (uint8_t)SCALE_FACTOR_NORMAL;
-  e->gamePhase = game_phase(pos);
+
+  Value npm = pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK);
+  if (npm > MidgameLimit)
+      npm = MidgameLimit;
+  if (npm < EndgameLimit)
+      npm = EndgameLimit;
+  e->gamePhase = ((npm - EndgameLimit) * PHASE_MIDGAME) / (MidgameLimit - EndgameLimit);
 
   // Look for a specialized evaluation function.
   for (int i = 0; i < NUM_EVAL; i++)

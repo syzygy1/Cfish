@@ -92,7 +92,7 @@ void thread_init(void *arg)
 
   atomic_store(&pos->resetCalls, 0);
   pos->exit = 0;
-  pos->maxPly = pos->callsCnt = 0;
+  pos->selDepth = pos->callsCnt = 0;
 
 #ifndef __WIN32__  // linux
 

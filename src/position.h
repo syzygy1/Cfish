@@ -152,7 +152,7 @@ struct Pos {
   uint64_t nodes;
   uint64_t tb_hits;
   int PVIdx, PVLast;
-  int maxPly;
+  int selDepth;
   Depth rootDepth;
   Depth completedDepth;
 
@@ -202,7 +202,6 @@ PURE Value see_sign(const Pos *pos, Move m);
 PURE Value see_test(const Pos *pos, Move m, int value);
 
 PURE Key key_after(const Pos *pos, Move m);
-PURE int game_phase(const Pos *pos);
 PURE int is_draw(const Pos *pos);
 
 // Position representation

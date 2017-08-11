@@ -180,8 +180,8 @@ INLINE int make_castling_right(int c, int s)
 #define VALUE_MATE_IN_MAX_PLY  (VALUE_MATE - 2 * MAX_PLY)
 #define VALUE_MATED_IN_MAX_PLY (-VALUE_MATE + 2 * MAX_PLY)
 
-#define PawnValueMg   188
-#define PawnValueEg   248
+#define PawnValueMg   171
+#define PawnValueEg   240
 #define KnightValueMg 764
 #define KnightValueEg 848
 #define BishopValueMg 826
