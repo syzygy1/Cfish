@@ -29,6 +29,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Value bestValue, value, ttValue, eval;
   int ttHit, inCheck, givesCheck, singularExtensionNode, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
+  int ttCapture;
   Piece moved_piece;
   int moveCount, quietCount;
 
@@ -309,6 +310,7 @@ moves_loop: // When in check search starts from here.
                          && (tte_bound(tte) & BOUND_LOWER)
                          &&  tte_depth(tte) >= depth - 3 * ONE_PLY;
   skipQuiets = 0;
+  ttCapture = 0;
 
   // Step 11. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta cutoff occurs
@@ -452,6 +454,9 @@ moves_loop: // When in check search starts from here.
       continue;
     }
 
+    if (move == ttMove && captureOrPromotion)
+      ttCapture = 1;
+
     // Update the current move (this must be done after singular extension
     // search)
     ss->currentMove = move;
@@ -472,7 +477,11 @@ moves_loop: // When in check search starts from here.
       if (captureOrPromotion)
         r -= r ? ONE_PLY : DEPTH_ZERO;
       else {
-        // Increase reduction for cut nodes.
+        // Increase reduction if ttMove is a capture
+        if (ttCapture)
+          r += ONE_PLY;
+
+        // Increase reduction for cut nodes
         if (cutNode)
           r += 2 * ONE_PLY;
 

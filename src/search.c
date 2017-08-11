@@ -257,6 +257,7 @@ void mainthread_search(void)
   Pos *pos = Threads.pos[0];
   int us = pos_stm();
   time_init(us, pos_game_ply());
+  tt_new_search();
   char buf[16];
 
   int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100; // From centipawns
@@ -371,7 +372,6 @@ void thread_search(Pos *pos)
     easy_move_clear();
     mainThread.easyMovePlayed = mainThread.failedLow = 0;
     mainThread.bestMoveChanges = 0;
-    tt_new_search();
   }
 
   int multiPV = option_value(OPT_MULTI_PV);
