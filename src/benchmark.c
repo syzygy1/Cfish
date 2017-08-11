@@ -176,6 +176,9 @@ void benchmark(Pos *current, char *str)
   for (size_t i = 0; i < num_fens; i++) {
     pos_set(&pos, fens[i], option_value(OPT_CHESS960));
     (pos.st-1)->endMoves = pos.moveList;
+    // HACK: clear root history position key to keep the right bench
+    // after the ugly and wrong 2-fold rep MultiPV fix in Stockfish.
+    pos.rootKeyFlip = pos.st->key;
 
     fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", i + 1, num_fens);
 

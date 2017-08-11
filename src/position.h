@@ -141,6 +141,7 @@ struct Pos {
   uint8_t castlingRookSquare[16];
   Bitboard castlingPath[16];
 #endif
+  Key rootKeyFlip;
   uint16_t gamePly;
 
   ExtMove *moveList;

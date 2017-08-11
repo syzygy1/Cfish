@@ -459,6 +459,8 @@ moves_loop: // When in check search starts from here.
 
     // Step 14. Make the move.
     do_move(pos, move, givesCheck);
+    // HACK: Fix bench after introduction of 2-fold MultiPV bug
+    if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
     // Step 15. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
@@ -529,6 +531,8 @@ moves_loop: // When in check search starts from here.
     }
 
     // Step 17. Undo move
+    // HACK: Fix bench after introduction of 2-fold MultiPV bug
+    if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
     undo_move(pos, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
