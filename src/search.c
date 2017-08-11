@@ -393,7 +393,9 @@ void thread_search(Pos *pos)
   // is reached.
   while (   (pos->rootDepth += ONE_PLY) < DEPTH_MAX
          && !Signals.stop
-         && (!Limits.depth || threads_main()->rootDepth <= Limits.depth))
+         && !(   Limits.depth
+              && pos->thread_idx == 0
+              && pos->rootDepth / ONE_PLY > Limits.depth))
   {
     // Distribute search depths across the threads
     if (pos->thread_idx) {
