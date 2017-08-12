@@ -24,7 +24,7 @@
 #ifndef USE_POPCNT
 uint8_t PopCnt16[1 << 16];
 #endif
-int SquareDistance[64][64];
+uint8_t SquareDistance[64][64];
 
 static int RookDeltas[] = { DELTA_N,  DELTA_E,  DELTA_S,  DELTA_W  };
 static int BishopDeltas[] = { DELTA_NE, DELTA_SE, DELTA_SW, DELTA_NW };
@@ -59,11 +59,11 @@ Bitboard SquareBB[64];
 Bitboard FileBB[8];
 Bitboard RankBB[8];
 Bitboard AdjacentFilesBB[8];
-Bitboard InFrontBB[2][8];
+Bitboard ForwardRanksBB[2][8];
 Bitboard BetweenBB[64][64];
 Bitboard LineBB[64][64];
 Bitboard DistanceRingBB[64][8];
-Bitboard ForwardBB[2][64];
+Bitboard ForwardFileBB[2][64];
 Bitboard PassedPawnMask[2][64];
 Bitboard PawnAttackSpan[2][64];
 Bitboard PseudoAttacks[8][64];
@@ -201,13 +201,13 @@ void bitboards_init()
     AdjacentFilesBB[f] = (f > FILE_A ? FileBB[f - 1] : 0) | (f < FILE_H ? FileBB[f + 1] : 0);
 
   for (int r = 0; r < 7; r++)
-    InFrontBB[WHITE][r] = ~(InFrontBB[BLACK][r + 1] = InFrontBB[BLACK][r] | RankBB[r]);
+    ForwardRanksBB[WHITE][r] = ~(ForwardRanksBB[BLACK][r + 1] = ForwardRanksBB[BLACK][r] | RankBB[r]);
 
   for (int c = 0; c < 2; c++)
     for (Square s = 0; s < 64; s++) {
-      ForwardBB[c][s]      = InFrontBB[c][rank_of(s)] & FileBB[file_of(s)];
-      PawnAttackSpan[c][s] = InFrontBB[c][rank_of(s)] & AdjacentFilesBB[file_of(s)];
-      PassedPawnMask[c][s] = ForwardBB[c][s] | PawnAttackSpan[c][s];
+      ForwardFileBB[c][s]  = ForwardRanksBB[c][rank_of(s)] & FileBB[file_of(s)];
+      PawnAttackSpan[c][s] = ForwardRanksBB[c][rank_of(s)] & AdjacentFilesBB[file_of(s)];
+      PassedPawnMask[c][s] = ForwardFileBB[c][s] | PawnAttackSpan[c][s];
     }
 
   for (Square s1 = 0; s1 < 64; s1++)
