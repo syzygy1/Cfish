@@ -245,6 +245,8 @@ INLINE unsigned distance_r(Square x, Square y)
 #include "magic-fancy.h"
 #elif defined(MAGIC_PLAIN)
 #include "magic-plain.h"
+#elif defined(MAGIC_BLACK)
+#include "magic-black.h"
 #elif defined(BMI2_FANCY)
 #include "bmi2-fancy.h"
 #elif defined(BMI2_PLAIN)
