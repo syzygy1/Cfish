@@ -4,8 +4,8 @@
 #define PEDANTIC
 
 #ifdef USE_PEXT
-#define BMI2_PLAIN
-//#define BMI2_FANCY
+//#define BMI2_PLAIN
+#define BMI2_FANCY
 #else
 //#define MAGIC_BLACK
 #define MAGIC_PLAIN
