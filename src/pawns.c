@@ -138,7 +138,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       // stopper on adjacent file which controls the way to that rank.
       backward = !!((b | shift_bb(Up, b & adjacent_files_bb(f))) & stoppers);
 
-      assert(!(backward && (forward_ranks_bb(Us ^ 1, s + Up) & neighbours)));
+      assert(!(backward && (forward_ranks_bb(Us ^ 1, rank_of(s + Up)) & neighbours)));
     }
 
     // Passed pawns will be properly scored in evaluation because we need
