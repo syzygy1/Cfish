@@ -47,16 +47,14 @@ typedef void (*OnChange)(Option *);
 #define OPT_REP_FIX         7
 #define OPT_SKILL_LEVEL     8
 #define OPT_MOVE_OVERHEAD   9
-#define OPT_MIN_THINK_TIME  10
-#define OPT_SLOW_MOVER      11
-#define OPT_NODES_TIME      12
-#define OPT_CHESS960        13
-#define OPT_SYZ_PATH        14
-#define OPT_SYZ_PROBE_DEPTH 15
-#define OPT_SYZ_50_MOVE     16
-#define OPT_SYZ_PROBE_LIMIT 17
-#define OPT_LARGE_PAGES     18
-#define OPT_NUMA            19
+#define OPT_NODES_TIME      10
+#define OPT_CHESS960        11
+#define OPT_SYZ_PATH        12
+#define OPT_SYZ_PROBE_DEPTH 13
+#define OPT_SYZ_50_MOVE     14
+#define OPT_SYZ_PROBE_LIMIT 15
+#define OPT_LARGE_PAGES     16
+#define OPT_NUMA            17
 
 struct Option {
   char *name;
