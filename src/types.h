@@ -404,9 +404,9 @@ typedef struct PawnEntry PawnEntry;
 typedef struct MaterialEntry MaterialEntry;
 
 typedef Move CounterMoveStat[16][64];
-typedef int PieceToHistory[16][64];
+typedef int16_t PieceToHistory[16][64];
 typedef PieceToHistory CounterMoveHistoryStat[16][64];
-typedef int ButterflyHistory[2][4096];
+typedef int16_t ButterflyHistory[2][4096];
 
 struct ExtMove {
   Move move;
