@@ -757,7 +757,7 @@ static void check_time(void)
   if (Limits.ponder)
     return;
 
-  if (   (use_time_management() && elapsed > time_maximum() - 10)
+  if (   (use_time_management() && elapsed > time_maximum())
       || (Limits.movetime && elapsed >= Limits.movetime)
       || (Limits.nodes && threads_nodes_searched() >= Limits.nodes))
         Signals.stop = 1;
