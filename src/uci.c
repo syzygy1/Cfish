@@ -197,6 +197,13 @@ void go(Pos *pos, char *str)
       Limits.infinite = 1;
     else if (strcmp(token, "ponder") == 0)
       Limits.ponder = 1;
+    else if (strcmp(token, "perft") == 0) {
+      char str_buf[64];
+      sprintf(str_buf, "%d %d %d current perft", option_value(OPT_HASH),
+                    option_value(OPT_THREADS), atoi(strtok(NULL, " \t")));
+      benchmark(pos, str_buf);
+      return;
+    }
   }
 
   start_thinking(pos);
