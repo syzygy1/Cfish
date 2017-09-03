@@ -26,7 +26,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
-  Value bestValue, value, ttValue, eval;
+  Value bestValue, value, ttValue, eval, maxValue;
   int ttHit, inCheck, givesCheck, singularExtensionNode, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
   int ttCapture;
@@ -38,6 +38,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   moveCount = quietCount =  ss->moveCount = 0;
   ss->statScore = 0;
   bestValue = -VALUE_INFINITE;
+  maxValue = VALUE_INFINITE;
 
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
@@ -148,11 +149,27 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
                : v >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply
                                 :  VALUE_DRAW + 2 * v * drawScore;
 
-        tte_save(tte, posKey, value_to_tt(value, ss->ply), BOUND_EXACT,
+        int b =  v < -drawScore ? BOUND_UPPER
+               : v >  drawScore ? BOUND_LOWER : BOUND_EXACT;
+
+        if (    b == BOUND_EXACT
+            || (b == BOUND_LOWER ? value >= beta : value <= alpha))
+        {
+          tte_save(tte, posKey, value_to_tt(value, ss->ply), BOUND_EXACT,
                  min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
                  0, VALUE_NONE, tt_generation());
 
-        return value;
+          return value;
+        }
+
+        if (PvNode) {
+          if (b == BOUND_LOWER) {
+            bestValue = value;
+            if (bestValue > alpha)
+              alpha = bestValue;
+          } else
+            maxValue = value;
+        }
       }
     }
   }
@@ -639,6 +656,9 @@ moves_loop: // When in check search starts from here.
            && !captured_piece()
            && move_is_ok((ss-1)->currentMove))
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
+
+  if (PvNode && bestValue > maxValue)
+     bestValue = maxValue;
 
   if (!excludedMove)
     tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
