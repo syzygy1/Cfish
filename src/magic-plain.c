@@ -6,7 +6,7 @@ Bitboard  BishopMasks  [64];
 Bitboard  BishopMagics [64];
 Bitboard *BishopAttacks[64];
 
-static Bitboard AttacksTable[88772 + 7] __attribute__ ((aligned(64)));
+static Bitboard AttacksTable[88772];
 
 // Fixed shift magics found by Volker Annuss.
 // From: http://talkchess.com/forum/viewtopic.php?p=727500#727500
@@ -160,7 +160,7 @@ static void init_magics(struct MagicInit *magic_init, Bitboard *attacks[],
 
   for (int s = 0; s < 64; s++) {
     magics[s] = magic_init[s].magic;
-    attacks[s] = &AttacksTable[magic_init[s].index + 6];
+    attacks[s] = &AttacksTable[magic_init[s].index];
 
     // Board edges are not considered in the relevant occupancies
     edges = ((Rank1BB | Rank8BB) & ~rank_bb_s(s)) | ((FileABB | FileHBB) & ~file_bb_s(s));
@@ -179,7 +179,6 @@ static void init_magics(struct MagicInit *magic_init, Bitboard *attacks[],
 
 static void init_sliding_attacks(void)
 {
-printf("AttacksTable at %lx\n", (uintptr_t)AttacksTable);
   init_magics(rook_init, RookAttacks, RookMagics, RookMasks,
               RookDeltas, magic_index_rook);
   init_magics(bishop_init, BishopAttacks, BishopMagics, BishopMasks,
