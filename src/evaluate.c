@@ -349,11 +349,11 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const int Up = (Us == WHITE ? DELTA_N : DELTA_S);
   const Bitboard Camp = (   Us == WHITE
-                         ? ~0ULL ^ Rank6BB ^ Rank7BB ^ Rank8BB
-                         : ~0ULL ^ Rank1BB ^ Rank2BB ^ Rank3BB);
+                         ? AllSquares ^ Rank6BB ^ Rank7BB ^ Rank8BB
+                         : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
   const Square ksq = square_of(Us, KING);
-  Bitboard kingOnlyDefended, b, b1, b2, safe, other;
+  Bitboard kingOnlyDefended, undefended, b, b1, b2, safe, other;
   int kingDanger;
 
   // King shelter and enemy pawns storm
@@ -368,8 +368,10 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
                       & ~ei->attackedBy2[Us];
 
     // ... and those which are not defended at all in the larger king ring
-    b =  ei->attackedBy[Them][0] & ~ei->attackedBy[Us][0]
-       & ei->kingRing[Us] & ~pieces_c(Them);
+    undefended =   ei->attackedBy[Them][0]
+                & ~ei->attackedBy[Us][0]
+                &  ei->kingRing[Us]
+                & ~pieces_c(Them);
 
     // Initialize the 'kingDanger' variable, which will be transformed
     // later into a king danger score. The initial value is based on the
@@ -378,8 +380,8 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
     // and the quality of the pawn shelter (current 'score' value).
     kingDanger =  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                 + 102 * ei->kingAdjacentZoneAttacksCount[Them]
-                + 201 * popcount(kingOnlyDefended)
-                + 143 * (popcount(b) + !!pinned_pieces(pos, Us))
+                + 191 * popcount(kingOnlyDefended | undefended)
+                + 143 * !!pinned_pieces(pos, Us)
                 - 848 * !pieces_cp(Them, QUEEN)
                 -   9 * mg_value(score) / 8
                 + 40;

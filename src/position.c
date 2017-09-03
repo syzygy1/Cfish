@@ -1203,18 +1203,13 @@ Key key_after(const Pos *pos, Move m)
 // Test whether SEE >= value.
 int see_test(const Pos *pos, Move m, int value)
 {
-  if (unlikely(type_of_m(m) == CASTLING))
+  if (unlikely(type_of_m(m) != NORMAL))
     return 0 >= value;
 
   Square from = from_sq(m), to = to_sq(m);
-  Bitboard occ = pieces();
+  Bitboard occ;
 
   int swap = PieceValue[MG][piece_on(to)] - value;
-  if (unlikely(type_of_m(m) == ENPASSANT)) {
-    assert(pos_stm() == color_of(piece_on(from)));
-    occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn
-    swap += PawnValueMg;
-  }
   if (swap < 0)
     return 0;
 
@@ -1222,7 +1217,7 @@ int see_test(const Pos *pos, Move m, int value)
   if (swap <= 0)
     return 1;
 
-  occ ^= sq_bb(from) ^ sq_bb(to);
+  occ = pieces() ^ sq_bb(from) ^ sq_bb(to);
   uint32_t stm = color_of(piece_on(from));
   Bitboard attackers = attackers_to_occ(to, occ), stmAttackers;
   int res = 1;

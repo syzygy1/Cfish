@@ -74,6 +74,9 @@ char *option_string_value(int opt);
 void option_set_value(int opt, int value);
 int option_set_by_name(char *name, char *value);
 
+void setoption(char *str);
+void position(Pos *pos, char *str);
+
 void uci_loop(int argc, char* argv[]);
 char *uci_value(char *str, Value v);
 char *uci_square(char *str, Square s);

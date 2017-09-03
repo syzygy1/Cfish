@@ -99,8 +99,8 @@ struct Skill {
 // multiple search iterations, we can quickly return the best move.
 
 struct {
-  int stableCnt;
   Key expectedPosKey;
+  int stableCnt;
   Move pv[3];
 } EM;
 
@@ -265,7 +265,9 @@ void mainthread_search(void)
   DrawValue[us ^ 1] = VALUE_DRAW + (Value)contempt;
 
   if (pos->rootMoves->size == 0) {
-    pos->rootMoves->move[pos->rootMoves->size++].pv[0] = 0;
+    pos->rootMoves->move[0].pv[0] = 0;
+    pos->rootMoves->move[0].pv_size = 1;
+    pos->rootMoves->size++;
     IO_LOCK;
     printf("info depth 0 score %s\n",
            uci_value(buf, pos_checkers() ? -VALUE_MATE : VALUE_DRAW));
@@ -316,7 +318,9 @@ void mainthread_search(void)
       Pos *p = Threads.pos[idx];
       Depth depthDiff = p->completedDepth - bestThread->completedDepth;
       Value scoreDiff = p->rootMoves->move[0].score - bestThread->rootMoves->move[0].score;
-      if (scoreDiff > 0 && depthDiff >= 0)
+      // Select the thread with the best score, always if it is a mate
+      if (    scoreDiff > 0
+          && (depthDiff >= 0 || p->rootMoves->move[0].score >= VALUE_MATE_IN_MAX_PLY))
         bestThread = p;
     }
   }
@@ -493,10 +497,9 @@ void thread_search(Pos *pos)
       // Sort the PV lines searched so far and update the GUI
       stable_sort(&rm->move[PVFirst], PVIdx - PVFirst + 1);
 
-      if (pos->thread_idx != 0)
-        continue;
-
-      if (Signals.stop || PVIdx + 1 == multiPV || time_elapsed() > 3000) {
+      if (    pos->thread_idx == 0
+          && (Signals.stop || PVIdx + 1 == multiPV || time_elapsed() > 3000))
+      {
         IO_LOCK;
         uci_print_pv(pos, pos->rootDepth, alpha, beta);
         IO_UNLOCK;
@@ -506,6 +509,12 @@ void thread_search(Pos *pos)
     if (!Signals.stop)
       pos->completedDepth = pos->rootDepth;
 
+    // Have we found a "mate in x"?
+    if (   Limits.mate
+        && bestValue >= VALUE_MATE_IN_MAX_PLY
+        && VALUE_MATE - bestValue <= 2 * Limits.mate)
+      Signals.stop = 1;
+
     if (pos->thread_idx != 0)
       continue;
 
@@ -514,12 +523,6 @@ void thread_search(Pos *pos)
     if (skill.enabled() && skill.time_to_pick(thread->rootDepth))
       skill.pick_best(multiPV);
 #endif
-
-    // Have we found a "mate in x"?
-    if (   Limits.mate
-        && bestValue >= VALUE_MATE_IN_MAX_PLY
-        && VALUE_MATE - bestValue <= 2 * Limits.mate)
-      Signals.stop = 1;
 
     // Do we have time for the next iteration? Can we stop searching now?
     if (use_time_management()) {
@@ -830,6 +833,9 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
   int ttHit;
 
   assert(rm->pv_size == 1);
+
+  if (!rm->pv[0])
+    return 0;
 
   do_move(pos, rm->pv[0], gives_check(pos, pos->st, rm->pv[0]));
   TTEntry *tte = tt_probe(pos_key(), &ttHit);

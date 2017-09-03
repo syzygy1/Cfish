@@ -473,7 +473,9 @@ moves_loop: // When in check search starts from here.
         &&  moveCount > 1
         && (!captureOrPromotion || moveCountPruning))
     {
-      Depth r = reduction(improving, depth, moveCount, NT);
+      int mch = max(1, moveCount - (ss-1)->moveCount / 16);
+      Depth r = reduction(improving, depth, mch, NT);
+
       if (captureOrPromotion)
         r -= r ? ONE_PLY : DEPTH_ZERO;
       else {
