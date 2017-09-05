@@ -490,12 +490,15 @@ moves_loop: // When in check search starts from here.
         &&  moveCount > 1
         && (!captureOrPromotion || moveCountPruning))
     {
-      int mch = max(1, moveCount - (ss-1)->moveCount / 16);
-      Depth r = reduction(improving, depth, mch, NT);
+      Depth r = reduction(improving, depth, moveCount, NT);
 
       if (captureOrPromotion)
         r -= r ? ONE_PLY : DEPTH_ZERO;
       else {
+        // Decrease reduction if opponent's move count is high
+        if ((ss-1)->moveCount > 15)
+          r -= ONE_PLY;
+
         // Increase reduction if ttMove is a capture
         if (ttCapture)
           r += ONE_PLY;
