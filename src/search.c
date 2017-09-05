@@ -264,16 +264,7 @@ void mainthread_search(void)
   DrawValue[us    ] = VALUE_DRAW - (Value)contempt;
   DrawValue[us ^ 1] = VALUE_DRAW + (Value)contempt;
 
-  if (pos->rootMoves->size == 0) {
-    pos->rootMoves->move[0].pv[0] = 0;
-    pos->rootMoves->move[0].pv_size = 1;
-    pos->rootMoves->size++;
-    IO_LOCK;
-    printf("info depth 0 score %s\n",
-           uci_value(buf, pos_checkers() ? -VALUE_MATE : VALUE_DRAW));
-    fflush(stdout);
-    IO_UNLOCK;
-  } else {
+  if (pos->rootMoves->size > 0) {
     for (int idx = 1; idx < Threads.num_threads; idx++)
       thread_start_searching(Threads.pos[idx], 0);
 
@@ -303,8 +294,17 @@ void mainthread_search(void)
   Signals.stop = 1;
 
   // Wait until all threads have finished
-  for (int idx = 1; idx < Threads.num_threads; idx++)
-    thread_wait_for_search_finished(Threads.pos[idx]);
+  if (pos->rootMoves->size > 0)
+    for (int idx = 1; idx < Threads.num_threads; idx++)
+      thread_wait_for_search_finished(Threads.pos[idx]);
+  else {
+    pos->rootMoves->move[0].pv[0] = 0;
+    pos->rootMoves->move[0].pv_size = 1;
+    pos->rootMoves->size++;
+    printf("info depth 0 score %s\n",
+           uci_value(buf, pos_checkers() ? -VALUE_MATE : VALUE_DRAW));
+    fflush(stdout);
+  }
 
   // Check if there are threads with a better score than main thread
   Pos *bestThread = pos;
