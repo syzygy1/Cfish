@@ -23,7 +23,7 @@
 
 #include <assert.h>
 #include <stdio.h>
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 #include <pthread.h>
 #endif
 #include <stdatomic.h>
@@ -66,22 +66,29 @@ void start_logger(const char *fname);
 void dbg_hit_on(int b);
 void dbg_hit_on_cond(int c, int b);
 void dbg_mean_of(int v);
-void dbg_print();
+void dbg_print(void);
 
 typedef uint64_t TimePoint; // A value in milliseconds
 
-INLINE TimePoint now() {
+INLINE TimePoint now(void) {
+#ifdef __POCC__
+  struct _timeval tv;
+  _gettimeofday(&tv, NULL);
+#else
   struct timeval tv;
   gettimeofday(&tv, NULL);
+#endif
   return 1000 * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec / 1000;
 }
 
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 extern pthread_mutex_t io_mutex;
 #define IO_LOCK   pthread_mutex_lock(&io_mutex)
 #define IO_UNLOCK pthread_mutex_unlock(&io_mutex)
 #else
+#ifndef __POCC__
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
+#endif
 extern HANDLE io_mutex;
 #define IO_LOCK WaitForSingleObject(io_mutex, INFINITE)
 #define IO_UNLOCK ReleaseMutex(io_mutex)

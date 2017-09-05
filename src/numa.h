@@ -3,7 +3,7 @@
 #include "types.h"
 
 #ifdef NUMA
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 #include <numa.h>
 #else
 #include <windows.h>
@@ -16,7 +16,7 @@ void read_numa_nodes(char *str);
 struct bitmask *numa_thread_to_node(int idx);
 int bind_thread_to_numa_node(int idx);
 
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 typedef struct bitmask *NodeMask;
 #define masks_equal numa_bitmask_equal
 #else

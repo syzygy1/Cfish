@@ -97,8 +97,8 @@ INLINE int use_time_management(void)
                        | Limits.infinite);
 }
 
-void search_init();
-void search_clear();
+void search_init(void);
+void search_clear(void);
 uint64_t perft(Pos *pos, Depth depth);
 void start_thinking(Pos *pos);
 

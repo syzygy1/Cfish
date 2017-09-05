@@ -22,7 +22,7 @@
 
 #include <string.h>   // For std::memset
 #include <stdio.h>
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 #include <sys/mman.h>
 #endif
 
@@ -39,7 +39,7 @@ TranspositionTable TT; // Our global transposition table
 
 void tt_free(void)
 {
-#ifdef __WIN32__
+#if (defined(__GNUC__) && defined(__WIN32__)) || defined(_WIN32)
   if (TT.mem)
     VirtualFree(TT.mem, 0, MEM_RELEASE);
 #else
@@ -61,7 +61,7 @@ void tt_allocate(size_t mbSize)
 
   size_t size = count * sizeof(Cluster);
 
-#ifdef __WIN32__
+#if (defined(__GNUC__) && defined(__WIN32__)) || defined(_WIN32)
 
   TT.mem = NULL;
   if (settings.large_pages) {

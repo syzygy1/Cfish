@@ -102,7 +102,7 @@ INLINE Score king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
     return pe->kingSafety[BLACK] = do_king_safety_black(pe, pos, ksq);
 }
 
-void pawn_init();
+void pawn_init(void);
 
 #endif
 

@@ -22,7 +22,7 @@
 #define THREAD_H
 
 #include <stdatomic.h>
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 #include <pthread.h>
 #else
 #include <windows.h>
@@ -32,7 +32,7 @@
 
 #define MAX_THREADS 512
 
-#ifndef __WIN32__
+#if defined(__GNUC) && !defined(__WIN32__)
 #define LOCK_T pthread_mutex_t
 #define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
 #define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
@@ -67,7 +67,7 @@ typedef struct MainThread MainThread;
 
 extern MainThread mainThread;
 
-void mainthread_search();
+void mainthread_search(void);
 
 
 // ThreadPool struct handles all the threads-related stuff like init,
@@ -77,7 +77,7 @@ void mainthread_search();
 struct ThreadPool {
   Pos *pos[MAX_THREADS];
   int num_threads;
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;
   int initializing;

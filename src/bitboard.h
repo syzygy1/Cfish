@@ -25,10 +25,10 @@
 
 #include "types.h"
 
-void bitbases_init();
+void bitbases_init(void);
 unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us);
 
-void bitboards_init();
+void bitboards_init(void);
 void print_pretty(Bitboard b);
 
 #define AllSquares (~0ULL)
@@ -83,7 +83,7 @@ extern uint8_t CastlingRookTo[16];
 #endif
 
 
-INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
+INLINE PURE Bitboard sq_bb(Square s)
 {
   return SquareBB[s];
 //  Bitboard b;

@@ -1217,7 +1217,7 @@ static int init_table_dtz(struct TBEntry *entry)
   return 1;
 }
 
-INLINE int is_little_endian() {
+INLINE int is_little_endian(void) {
   union {
     int i;
     char c[sizeof(int)];

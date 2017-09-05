@@ -20,7 +20,7 @@ void process_delayed_settings(void)
   if (numa_change) {
     threads_set_number(0);
     settings.num_threads = 0;
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
     if ((settings.numa_enabled = delayed_settings.numa_enabled))
       copy_bitmask_to_bitmask(delayed_settings.mask, settings.mask);
 #endif

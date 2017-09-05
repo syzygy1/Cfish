@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#ifdef __WIN32__
+#if (defined(__GNUC__) && defined(__WIN32__)) || defined(_WIN32)
 #include <windows.h>
 #endif
 
@@ -32,7 +32,7 @@
 // DD-MM-YY and show in engine_info.
 char Version[] = "";
 
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 #else
 HANDLE io_mutex;
@@ -215,7 +215,7 @@ uint64_t prng_sparse_rand(PRNG *rng)
   return r1 & r2 & r3;
 }
 
-#ifdef __WIN32__
+#if ((defined(__GNUC__) && defined(__WIN32__)) || defined(_WIN32)) && !defined(__POCC__)
 ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
   if (*n == 0)
@@ -234,7 +234,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 }
 #endif
 
-#ifdef __WIN32__
+#if (defined(__GNUC__) && defined(__WIN32__)) || defined(_WIN32)
 typedef SIZE_T (WINAPI *GLPM)(void);
 size_t large_page_minimum;
 

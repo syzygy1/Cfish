@@ -94,7 +94,7 @@ void thread_init(void *arg)
   pos->exit = 0;
   pos->selDepth = pos->callsCnt = 0;
 
-#ifndef __WIN32__  // linux
+#if defined(__GNUC__) && !defined(__WIN32__)  // linux
 
   pthread_mutex_init(&pos->mutex, NULL);
   pthread_cond_init(&pos->sleepCondition, NULL);
@@ -124,7 +124,7 @@ void thread_init(void *arg)
 
 void thread_create(int idx)
 {
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 
   pthread_t thread;
 
@@ -151,7 +151,7 @@ void thread_create(int idx)
 
 void thread_destroy(Pos *pos)
 {
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_mutex_lock(&pos->mutex);
   pos->exit = 1;
   pthread_cond_signal(&pos->sleepCondition);
@@ -194,7 +194,7 @@ void thread_destroy(Pos *pos)
 
 void thread_wait_for_search_finished(Pos *pos)
 {
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_mutex_lock(&pos->mutex);
   while (pos->searching)
     pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
@@ -212,7 +212,7 @@ void thread_wait_for_search_finished(Pos *pos)
 
 void thread_wait(Pos *pos, atomic_bool *condition)
 {
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_mutex_lock(&pos->mutex);
   while (!atomic_load(condition))
     pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
@@ -228,7 +228,7 @@ void thread_wait(Pos *pos, atomic_bool *condition)
 
 void thread_start_searching(Pos *pos, int resume)
 {
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_mutex_lock(&pos->mutex);
 
   if (!resume)
@@ -247,7 +247,7 @@ void thread_start_searching(Pos *pos, int resume)
 
 void thread_idle_loop(Pos *pos)
 {
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
 
   pthread_mutex_lock(&pos->mutex);
   while (1) {
@@ -298,7 +298,7 @@ void thread_idle_loop(Pos *pos)
 
 void threads_init(void)
 {
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_mutex_init(&Threads.mutex, NULL);
   pthread_cond_init(&Threads.sleepCondition, NULL);
 #else
@@ -323,7 +323,7 @@ void threads_exit(void)
 {
   threads_set_number(0);
 
-#ifndef __WIN32__
+#if defined(__GNUC__) && !defined(__WIN32__)
   pthread_cond_destroy(&Threads.sleepCondition);
   pthread_mutex_destroy(&Threads.mutex);
 #else
