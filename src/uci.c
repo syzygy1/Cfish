@@ -104,10 +104,10 @@ void position(Pos *pos, char *str)
     // repetition of a position coming before the root position.
     for (k = 1; k <= pos->st->pliesFromNull; k++) {
       int l;
-      for (l = k + 4; l <= pos->st->pliesFromNull; l++)
+      for (l = k + 4; l <= pos->st->pliesFromNull; l += 2)
         if ((pos->st - k)->key == (pos->st - l)->key)
           break;
-      if (l > pos->st->pliesFromNull)
+      if (l > pos->st->pliesFromNull && (pos->st - k)->key != pos->st->key)
         (pos->st - k)->key = 0ULL;
     }
   }
