@@ -143,6 +143,7 @@ struct Pos {
 #endif
   Key rootKeyFlip;
   uint16_t gamePly;
+  uint8_t hasRepeated;
 
   ExtMove *moveList;
 

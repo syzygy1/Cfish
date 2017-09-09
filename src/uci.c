@@ -102,12 +102,16 @@ void position(Pos *pos, char *str)
     // Finally, clear history position keys that have not yet repeated.
     // This ensures that is_draw() does not flag as a draw the first
     // repetition of a position coming before the root position.
-    for (k = 1; k <= pos->st->pliesFromNull; k++) {
+    // In addition, we set pos->hasRepeated to indicate whether a position
+    // has repeated since the last zeroing move.
+    for (k = 0; k <= pos->st->pliesFromNull; k++) {
       int l;
       for (l = k + 4; l <= pos->st->pliesFromNull; l += 2)
         if ((pos->st - k)->key == (pos->st - l)->key)
           break;
-      if (l > pos->st->pliesFromNull && (pos->st - k)->key != pos->st->key)
+      if (l <= pos->st->pliesFromNull)
+        pos->hasRepeated = 1;
+      else if ((pos->st - k)->key != pos->st->key)
         (pos->st - k)->key = 0ULL;
     }
   }

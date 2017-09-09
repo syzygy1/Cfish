@@ -572,26 +572,6 @@ int TB_probe_dtz(Pos *pos, int *success)
   return best;
 }
 
-// Check whether there has been at least one repetition of positions
-// since the last capture or pawn move.
-static int has_repeated(Pos *pos)
-{
-  Stack *st = pos->st;
-  while (1) {
-    int i = 4, e = st->pliesFromNull;
-    if (e < i)
-      return 0;
-    Stack *stp = st - 2;
-    do {
-      stp -= 2;
-      if (stp->key == st->key)
-        return 1;
-      i += 2;
-    } while (i <= e);
-    st--;
-  }
-}
-
 // Use the DTZ tables to rank all root moves in the list.
 // A return value of 0 means that not all probes were successful.
 int TB_root_probe(Pos *pos, ExtMove *rm, size_t num_moves)
@@ -600,9 +580,6 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t num_moves)
 
   // Obtain 50-move counter for the root position.
   int cnt50 = pos_rule50_count();
-
-  // Check whether there has been a repeat since the last zeroing move.
-  int repetitions = has_repeated(pos);
 
   // Probe and rank each move.
   pos->st->endMoves = (pos->st-1)->endMoves;
@@ -629,7 +606,7 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t num_moves)
     if (!success) return 0;
     if (v > 0) {
       // Moves that are certain to win are ranked equally. Other
-      if (v + cnt50 <= 99 && !repetitions)
+      if (v + cnt50 <= 99 && !pos->hasRepeated)
         rm[i].value = 1000;
       else
         rm[i].value = 1000 - (v + cnt50);
