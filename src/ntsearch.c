@@ -157,8 +157,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
             || (b == BOUND_LOWER ? value >= beta : value <= alpha))
         {
           tte_save(tte, posKey, value_to_tt(value, ss->ply), b,
-                 min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
-                 0, VALUE_NONE, tt_generation());
+                   min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY), 0,
+                   VALUE_NONE, tt_generation());
           return value;
         }
 
