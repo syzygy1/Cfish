@@ -362,8 +362,8 @@ void thread_search(Pos *pos)
   for (int i = -4; i < 0; i++)
     ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
 
-  for (int i = 0; i < MAX_PLY; i++) {
-    ss[i].ply = i + 1;
+  for (int i = 0; i <= MAX_PLY; i++) {
+    ss[i].ply = i;
     ss[i].skipEarlyPruning = 0;
   }
 
@@ -801,7 +801,8 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     }
 
     printf("info depth %d seldepth %d multipv %d score %s",
-           d / ONE_PLY, rm->move[i].selDepth, (int)i + 1, uci_value(buf, v));
+           d / ONE_PLY, rm->move[i].selDepth + 1, (int)i + 1,
+           uci_value(buf, v));
 
     if (!tb && i == PVIdx)
       printf("%s", v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");

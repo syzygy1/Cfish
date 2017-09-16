@@ -14,7 +14,7 @@ Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth)
 Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 #endif
 {
-  int rootNode = PvNode && (ss-1)->ply == 0;
+  int rootNode = PvNode && ss->ply == 0;
 
   assert(-VALUE_INFINITE <= alpha && alpha < beta && beta <= VALUE_INFINITE);
   assert(PvNode || (alpha == beta - 1));
@@ -146,8 +146,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
         int drawScore = TB_UseRule50 ? 1 : 0;
 
-        value =  v < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply
-               : v >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply
+        value =  v < -drawScore ? -VALUE_MATE + MAX_PLY + 1 + ss->ply
+               : v >  drawScore ?  VALUE_MATE - MAX_PLY - 1 - ss->ply
                                 :  VALUE_DRAW + 2 * v * drawScore;
 
         int b =  v < -drawScore ? BOUND_UPPER
