@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2017 Ronald de Man
   This file may be redistributed and/or modified without restrictions.
 
   tbcore.c contains engine-independent routines of the tablebase probing code.
@@ -780,7 +780,7 @@ static uint64_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos,
         j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += ((uint64_t)s) * ((uint64_t)factor[i]);
+    idx += (uint64_t)s * (uint64_t)factor[i];
     i += t;
   }
 
@@ -834,7 +834,7 @@ static uint64_t encode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, i
         j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += ((uint64_t)s) * ((uint64_t)factor[i]);
+    idx += (uint64_t)s * (uint64_t)factor[i];
     i = t;
   }
 
@@ -850,7 +850,7 @@ static uint64_t encode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, i
         j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += ((uint64_t)s) * ((uint64_t)factor[i]);
+    idx += (uint64_t)s * (uint64_t)factor[i];
     i += t;
   }
 
@@ -904,7 +904,7 @@ uint64_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *f
 	j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += ((uint64_t)s) * ((uint64_t)factor[i]);
+    idx += (uint64_t)s * (uint64_t)factor[i];
     i = t;
   }
 
@@ -920,7 +920,7 @@ uint64_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *f
 	j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += ((uint64_t)s) * ((uint64_t)factor[i]);
+    idx += (uint64_t)s * (uint64_t)factor[i];
     i += t;
   }
 
@@ -1249,7 +1249,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
     struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;
     setup_pieces_piece(ptr, data, &tb_size[0]);
     data += ptr->num + 1;
-    data += ((uintptr_t)data) & 0x01;
+    data += (uintptr_t)data & 0x01;
 
     ptr->precomp[0] = setup_pairs(data, tb_size[0], &size[0], &next, &flags, 1);
     data = next;
@@ -1272,7 +1272,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
           data += 1 + data[0];
         }
       }
-      data += ((uintptr_t)data) & 0x01;
+      data += (uintptr_t)data & 0x01;
     }
 
     ptr->precomp[0]->indextable = data;
@@ -1289,11 +1289,11 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       data += size[4];
     }
 
-    data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+    data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
     ptr->precomp[0]->data = data;
     data += size[2];
     if (split) {
-      data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+      data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
       ptr->precomp[1]->data = data;
     }
   } else if (!dtm) {
@@ -1303,7 +1303,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       setup_pieces_pawn((struct TBEntry_pawn *)ptr, data, &tb_size[2 * f], f);
       data += ptr->num + s;
     }
-    data += ((uintptr_t)data) & 0x01;
+    data += (uintptr_t)data & 0x01;
 
     for (f = 0; f < files; f++) {
       ptr->file[f].precomp[0] = setup_pairs(data, tb_size[2 * f], &size[6 * f], &next, &flags, 1);
@@ -1334,11 +1334,11 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
     }
 
     for (f = 0; f < files; f++) {
-      data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+      data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
       ptr->file[f].precomp[0]->data = data;
       data += size[6 * f + 2];
       if (split) {
-        data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+        data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
         ptr->file[f].precomp[1]->data = data;
         data += size[6 * f + 5];
       }
@@ -1351,7 +1351,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       setup_pieces_pawn_dtm((struct TBEntry_pawn2 *)ptr, data, &tb_size[2 * r], r);
       data += ptr->num + s;
     }
-    data += ((uintptr_t)data) & 0x01;
+    data += (uintptr_t)data & 0x01;
 
     for (r = 0; r < 6; r++) {
       ptr->rank[r].precomp[0] = setup_pairs(data, tb_size[2 * r], &size[6 * r], &next, &flags, 1);
@@ -1377,7 +1377,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
         }
       }
     }
-    data += ((uintptr_t)data) & 0x01;
+    data += (uintptr_t)data & 0x01;
 
     for (r = 0; r < 6; r++) {
       ptr->rank[r].precomp[0]->indextable = data;
@@ -1398,11 +1398,11 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
     }
 
     for (r = 0; r < 6; r++) {
-      data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+      data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
       ptr->rank[r].precomp[0]->data = data;
       data += size[6 * r + 2];
       if (split) {
-	data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+	data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
 	ptr->rank[r].precomp[1]->data = data;
 	data += size[6 * r + 5];
       }
@@ -1438,7 +1438,7 @@ static int init_table_dtz(struct TBEntry *entry)
     struct DTZEntry_piece *ptr = (struct DTZEntry_piece *)entry;
     setup_pieces_piece_dtz(ptr, data, &tb_size[0]);
     data += ptr->num + 1;
-    data += ((uintptr_t)data) & 0x01;
+    data += (uintptr_t)data & 0x01;
 
     ptr->precomp = setup_pairs(data, tb_size[0], &size[0], &next, &(ptr->flags), 0);
     data = next;
@@ -1449,7 +1449,7 @@ static int init_table_dtz(struct TBEntry *entry)
         ptr->map_idx[i] = data + 1 - ptr->map;
         data += 1 + data[0];
       }
-      data += ((uintptr_t)data) & 0x01;
+      data += (uintptr_t)data & 0x01;
     }
 
     ptr->precomp->indextable = data;
@@ -1458,7 +1458,7 @@ static int init_table_dtz(struct TBEntry *entry)
     ptr->precomp->sizetable = (uint16_t *)data;
     data += size[1];
 
-    data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+    data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
     ptr->precomp->data = data;
     data += size[2];
   } else {
@@ -1468,7 +1468,7 @@ static int init_table_dtz(struct TBEntry *entry)
       setup_pieces_pawn_dtz(ptr, data, &tb_size[f], f);
       data += ptr->num + s;
     }
-    data += ((uintptr_t)data) & 0x01;
+    data += (uintptr_t)data & 0x01;
 
     for (f = 0; f < files; f++) {
       ptr->file[f].precomp = setup_pairs(data, tb_size[f], &size[3 * f], &next, &(ptr->flags[f]), 0);
@@ -1484,7 +1484,7 @@ static int init_table_dtz(struct TBEntry *entry)
         }
       }
     }
-    data += ((uintptr_t)data) & 0x01;
+    data += (uintptr_t)data & 0x01;
 
     for (f = 0; f < files; f++) {
       ptr->file[f].precomp->indextable = data;
@@ -1497,7 +1497,7 @@ static int init_table_dtz(struct TBEntry *entry)
     }
 
     for (f = 0; f < files; f++) {
-      data = (uint8_t *)((((uintptr_t)data) + 0x3f) & ~0x3f);
+      data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
       ptr->file[f].precomp->data = data;
       data += size[3 * f + 2];
     }
@@ -1551,7 +1551,7 @@ static uint32_t decompress_pairs(struct PairsData *d, uint64_t idx)
   uint8_t *symlen = d->symlen;
   int sym, bitcnt;
 
-  uint64_t code = *((uint64_t *)ptr);
+  uint64_t code = *(uint64_t *)ptr;
   if (LittleEndian)
     code = BSWAP64(code);
 
@@ -1573,7 +1573,7 @@ static uint32_t decompress_pairs(struct PairsData *d, uint64_t idx)
       uint32_t tmp = *ptr++;
       if (LittleEndian)
         tmp = BSWAP32(tmp);
-      code |= ((uint64_t)tmp) << bitcnt;
+      code |= (uint64_t)tmp << bitcnt;
      }
    }
 

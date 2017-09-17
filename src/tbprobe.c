@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013 Ronald de Man
+  Copyright (c) 2013-2017 Ronald de Man
   This file may be redistributed and/or modified without restrictions.
 
   tbprobe.cpp contains the Stockfish-specific routines of the
@@ -725,7 +725,7 @@ int TB_probe_dtz(Pos *pos, int *success)
   if (wdl > 0) {
     // Generate at least all legal non-capturing pawn moves
     // including non-capturing promotions.
-    // (The call to generate<>() in fact generates all moves.)
+    // (The following calls in fact generate all moves.)
     if (!pos_checkers())
       end = generate_non_evasions(pos, m);
     else
@@ -920,7 +920,7 @@ int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
     if (!success) return 0;
     m->TBScore = wdl > 0 ? v - 1 : v + 1;
     // Let rank correspond to mate score, except for critical moves
-    // ranked 900. We rank them below all other mates.
+    // ranked 900. We rank them below all other mates for safety.
     // By ranking mates above 1000 or below -1000, we let the search
     // know it need not actually search these moves.
     m->TBRank = m->TBRank == 900 ? 1001 : m->TBScore;

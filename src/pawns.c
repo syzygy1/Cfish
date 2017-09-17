@@ -28,11 +28,11 @@
 #define V(v) ((Value)(v))
 #define S(mg, eg) make_score(mg, eg)
 
-// Isolated pawn penalty by opposed flag
-static const Score Isolated[2] = { S(27, 30), S(13, 18) };
+// Isolated pawn penalty
+static const Score Isolated = S(13, 18);
 
-// Backward pawn penalty by opposed flag
-static const Score Backward[2] = { S(40, 26), S(24, 12) };
+// Backward pawn penalty
+static const Score Backward = S(24, 12);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
@@ -105,7 +105,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   Bitboard ourPawns   = pieces_cp(Us, PAWN);
   Bitboard theirPawns = pieces_p(PAWN) ^ ourPawns;
 
-  e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
+  e->passedPawns[Us] = e->pawnAttacksSpan[Us] = e->weakUnopposed[Us] = 0;
   e->semiopenFiles[Us] = 0xFF;
   e->kingSquares[Us] = SQ_NONE;
   e->pawnAttacks[Us] = shift_bb(Right, ourPawns) | shift_bb(Left, ourPawns);
@@ -170,11 +170,15 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     if (supported | phalanx)
       score += Connected[opposed][!!phalanx][popcount(supported)][relative_rank_s(Us, s)];
 
-    else if (!neighbours)
-      score -= Isolated[opposed];
+    else if (!neighbours) {
+      score -= Isolated;
+      e->weakUnopposed[Us] += !opposed;
+    }
 
-    else if (backward)
-      score -= Backward[opposed];
+    else if (backward) {
+      score -= Backward;
+      e->weakUnopposed[Us] += !opposed;
+    }
 
     if (doubled && !supported)
       score -= Doubled;

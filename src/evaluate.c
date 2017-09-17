@@ -97,8 +97,8 @@ static const Score MobilityBonus[4][32] = {
 // if they can reach an outpost square, bigger if that square is supported0
 // by a pawn. If the minor occupies an outpost square, then score is doubled.
 static const Score Outpost[][2] = {
-  { S(22, 6), S(33, 9) }, // Knight
-  { S( 9, 2), S(14, 4) }  // Bishop
+  { S(22, 6), S(36,12) }, // Knight
+  { S( 9, 2), S(15, 5) }  // Bishop
 };
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
@@ -149,6 +149,7 @@ static const Score ThreatByHangingPawn = S( 71, 61);
 static const Score ThreatBySafePawn    = S(182,175);
 static const Score ThreatByRank        = S( 16,  3);
 static const Score Hanging             = S( 48, 27);
+static const Score WeakUnopposedPawn   = S(  5, 25);
 static const Score ThreatByPawnPush    = S( 38, 22);
 static const Score HinderPassedPawn    = S(  7,  0);
 
@@ -529,6 +530,10 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
     if (b)
       score += ThreatByKing[!!more_than_one(b)];
   }
+
+  // Bonus for opponent unopposed weak pawns
+  if (pieces_cpp(Us, ROOK, QUEEN))
+    score += WeakUnopposedPawn * ei->pe->weakUnopposed[Them];
 
   // Find the squares reachable by a single pawn push
   b  = shift_bb(Up, pieces_cp(Us, PAWN)) & ~pieces();
