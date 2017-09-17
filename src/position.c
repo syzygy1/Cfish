@@ -128,7 +128,7 @@ void print_pos(Pos *pos)
   printf("\nFen: %s\nKey: %16llX\nCheckers: ",
          fen, (unsigned long long)pos_key());
 
-  char buf[8]; 
+  char buf[16];
   for (Bitboard b = pos_checkers(); b; )
     printf("%s ", uci_square(buf, pop_lsb(&b)));
 
@@ -136,8 +136,11 @@ void print_pos(Pos *pos)
     int s1, s2;
     int wdl = TB_probe_wdl(pos, &s1);
     int dtz = TB_probe_dtz(pos, &s2);
-    printf("\nTablebases WDL: %4d (%d)\nTablebases DTZ: %4d (%d)",
-           wdl, s1, dtz, s2);
+    printf("\nTablebases WDL: %4d (%d)\nTablebases DTZ: %4d (%d)", wdl, s1, dtz, s2);
+    if (s1) {
+      Value dtm = TB_probe_dtm(pos, wdl, &s1);
+      printf("\nTablebases DTM: %s (%d)", uci_value(buf, dtm), s1);
+    }
   }
   printf("\n");
 }

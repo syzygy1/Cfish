@@ -11,6 +11,7 @@
 #include "movegen.h"
 #include "bitboard.h"
 #include "search.h"
+#include "uci.h"
 
 #include "tbprobe.h"
 #include "tbcore.h"
@@ -19,7 +20,8 @@
 
 extern Key mat_key[16];
 
-int TB_MaxCardinality = 0;
+int TB_MaxCardinality = 0, TB_MaxCardinalityDTM = 0;
+extern int TB_CardinalityDTM;
 
 // Given a position with 6 or fewer pieces, produce a text string
 // of the form KQPvKRP, where "KQP" represents the white pieces if
@@ -59,13 +61,28 @@ static Key calc_key(Pos *pos, int mirror)
 // defined by pcs[16], where pcs[1], ..., pcs[6] is the number of white
 // pawns, ..., kings and pcs[9], ..., pcs[14] is the number of black
 // pawns, ..., kings.
-Key calc_key_from_pcs(int *pcs, int mirror)
+static Key calc_key_from_pcs(int *pcs, int mirror)
 {
   Key key = 0;
 
   int color = !mirror ? 0 : 8;
   for (int i = W_PAWN; i <= B_KING; i++)
     key += mat_key[i] * pcs[i ^ color];
+
+  return key;
+}
+
+// Produce a 64-bit material key corresponding to the material combination
+// piece[0], ..., piece[num - 1], where each value corresponds to a piece
+// (1-6 for white pawn-king, 9-14 for black pawn-king).
+static Key calc_key_from_pieces(uint8_t *piece, int num, int mirror)
+{
+  Key key = 0;
+
+  int color = !mirror ? 0 : 8;
+  for (int i = 0; i < num; i++)
+    if (piece[i])
+      key += mat_key[piece[i] ^ color];
 
   return key;
 }
@@ -103,7 +120,7 @@ static int probe_wdl_table(Pos *pos, int *success)
     if (!atomic_load_explicit(&ptr->ready, memory_order_relaxed)) {
       char str[16];
       prt_str(pos, str, ptr->key != key);
-      if (!init_table_wdl(ptr, str)) {
+      if (!init_table(ptr, str, 0)) {
         ptr2[i].key = 0ULL;
         *success = 0;
         UNLOCK(TB_mutex);
@@ -166,6 +183,111 @@ static int probe_wdl_table(Pos *pos, int *success)
   }
 
   return res - 2;
+}
+
+static int probe_dtm_table(Pos *pos, int won, int *success)
+{
+  struct TBEntry *ptr;
+  struct TBHashEntry *ptr2;
+  uint64_t idx;
+  int i;
+  uint8_t res;
+  int p[TBPIECES];
+
+  // Obtain the position's material signature key.
+  Key key = pos_material_key();
+
+  // Test for KvK.
+  if (key == 2ULL)
+    return 0;
+
+  ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
+  for (i = 0; i < HSHMAX; i++)
+    if (ptr2[i].key == key) break;
+  if (i == HSHMAX) {
+    *success = 0;
+    return 0;
+  }
+
+  ptr = ptr2[i].dtm_ptr;
+  if (!ptr) {
+    *success = 0;
+    return 0;
+  }
+
+  // With the help of C11 atomics, we implement double-checked locking
+  // correctly.
+  if (!atomic_load_explicit(&ptr->ready, memory_order_acquire)) {
+    LOCK(TB_mutex);
+    if (!atomic_load_explicit(&ptr->ready, memory_order_relaxed)) {
+      char str[16];
+      prt_str(pos, str, ptr->key != key);
+      if (!init_table(ptr, str, 1)) {
+        ptr->data = NULL;
+        ptr2[i].dtm_ptr = NULL;
+        *success = 0;
+        UNLOCK(TB_mutex);
+        return 0;
+      }
+      atomic_store_explicit(&ptr->ready, 1, memory_order_release);
+    }
+    UNLOCK(TB_mutex);
+  }
+
+  int bside, mirror, cmirror;
+  if (!ptr->symmetric) {
+    if (key != ptr->key) {
+      cmirror = 8;
+      mirror = 0x38;
+      bside = (pos_stm() == WHITE);
+    } else {
+      cmirror = mirror = 0;
+      bside = !(pos_stm() == WHITE);
+    }
+  } else {
+    cmirror = pos_stm() == WHITE ? 0 : 8;
+    mirror = pos_stm() == WHITE ? 0 : 0x38;
+    bside = 0;
+  }
+
+  // p[i] is to contain the square 0-63 (A1-H8) for a piece of type
+  // pc[i] ^ cmirror, where 1 = white pawn, ..., 14 = black king.
+  // Pieces of the same type are guaranteed to be consecutive.
+  if (!ptr->has_pawns) {
+    struct DTMEntry_piece *entry = (struct DTMEntry_piece *)ptr;
+    uint8_t *pc = entry->pieces[bside];
+    for (i = 0; i < entry->num;) {
+      Bitboard bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
+      do {
+        p[i++] = pop_lsb(&bb);
+      } while (bb);
+    }
+    idx = encode_piece((struct TBEntry_piece *)entry, entry->norm[bside], p, entry->factor[bside]);
+    res = (int)decompress_pairs(entry->precomp[bside], idx);
+    res = entry->map[entry->map_idx[bside][won] + res];
+  } else {
+    struct DTMEntry_pawn *entry = (struct DTMEntry_pawn *)ptr;
+    int k = entry->rank[0].pieces[0][0] ^ cmirror;
+    Bitboard bb = pieces_cp(k >> 3, k & 0x07);
+    i = 0;
+    do {
+      p[i++] = pop_lsb(&bb) ^ mirror;
+    } while (bb);
+    int r = pawn_rank((struct TBEntry_pawn2 *)entry, p);
+    uint8_t *pc = entry->rank[r].pieces[bside];
+    for (; i < entry->num;) {
+      bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
+      do {
+        assume(i < TBPIECES); // Suppress a bogus warning.
+        p[i++] = pop_lsb(&bb) ^ mirror;
+      } while (bb);
+    }
+    idx = encode_pawn2((struct TBEntry_pawn2 *)entry, entry->rank[r].norm[bside], p, entry->rank[r].factor[bside]);
+    res = (int)decompress_pairs(entry->rank[r].precomp[bside], idx);
+    res = entry->map[entry->map_idx[r][bside][won] + res];
+  }
+
+  return res;
 }
 
 // The value of wdl MUST correspond to the WDL value of the position without
@@ -303,8 +425,11 @@ static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
   return extra;
 }
 
+// This will not be called for positions with en passant captures.
 static int probe_ab(Pos *pos, int alpha, int beta, int *success)
 {
+  assert(ep_square() == 0);
+
   int v;
   ExtMove *m = (pos->st-1)->endMoves;
   ExtMove *end;
@@ -450,6 +575,106 @@ int TB_probe_wdl(Pos *pos, int *success)
   return v;
 }
 
+// This will not be called for positions with en passant captures
+static Value probe_dtm_dc(Pos *pos, int won, int *success)
+{
+  assert(ep_square() == 0);
+
+  Value v, best_cap = -VALUE_INFINITE;
+
+  ExtMove *end, *m = (pos->st-1)->endMoves;
+
+  // Generate at least all legal captures including (under)promotions
+  if (!pos_checkers()) {
+    end = generate_captures(pos, m);
+    end = add_underprom_caps(pos, m, end);
+  } else
+    end = generate_evasions(pos, m);
+  pos->st->endMoves = end;
+
+  for (; m < end; m++) {
+    Move move = m->move;
+    if (!is_capture(pos, move) || !is_legal(pos, move))
+      continue;
+    do_move(pos, move, gives_check(pos, pos->st, move));
+    if (!won)
+      v = -probe_dtm_dc(pos, 1, success) + 1;
+    else if (probe_ab(pos, -1, 0, success) < 0 && *success)
+      v = -probe_dtm_dc(pos, 0, success) - 1;
+    else
+      v = -VALUE_INFINITE;
+    undo_move(pos, move);
+    best_cap = max(best_cap, v);
+    if (*success == 0) return 0;
+  }
+
+  int dtm = probe_dtm_table(pos, won, success);
+  v = won ? VALUE_MATE - 2 * dtm + 1 : -VALUE_MATE + 2 * dtm;
+
+  return max(best_cap, v);
+}
+
+// To be called only for non-drawn positions.
+Value TB_probe_dtm(Pos *pos, int wdl, int *success)
+{
+  assert(wdl != 0);
+
+  *success = 1;
+  Value v, best_cap = -VALUE_INFINITE, best_ep = -VALUE_INFINITE;
+
+  ExtMove *end, *m = (pos->st-1)->endMoves;
+
+  // Generate at least all legal captures including (under)promotions
+  if (!pos_checkers()) {
+    end = generate_captures(pos, m);
+    end = add_underprom_caps(pos, m, end);
+  } else
+    end = generate_evasions(pos, m);
+  pos->st->endMoves = end;
+
+  // We do capture resolution, letting best_cap keep track of the best
+  // non-ep capture and letting best_ep keep track of the best ep capture.
+
+  for (; m < end; m++) {
+    Move move = m->move;
+    if (!is_capture(pos, move) || !is_legal(pos, move))
+      continue;
+    do_move(pos, move, gives_check(pos, pos->st, move));
+    if (wdl < 0)
+      v = -probe_dtm_dc(pos, 1, success) + 1;
+    else if (probe_ab(pos, -1, 0, success) < 0 && *success)
+      v = -probe_dtm_dc(pos, 0, success) - 1;
+    else
+      v = -VALUE_MATE;
+    undo_move(pos, move);
+    if (type_of_m(move) == ENPASSANT)
+      best_ep = max(best_ep, v);
+    else
+      best_cap = max(best_cap, v);
+    if (*success == 0)
+      return 0;
+  }
+
+  // If there are en passant captures, we have to determine the WDL value
+  // for the position without ep rights if it might be different.
+  if (best_ep > -VALUE_INFINITE && (best_ep < 0 || best_cap < 0)) {
+    assert(ep_square() != 0);
+    uint8_t s = pos->st->epSquare;
+    pos->st->epSquare = 0;
+    wdl = probe_ab(pos, -2, 2, success);
+    pos->st->epSquare = s;
+    if (*success == 0)
+      return 0;
+    if (wdl == 0)
+      return best_ep;
+  }
+
+  best_cap = max(best_cap, best_ep);
+  int dtm = probe_dtm_table(pos, wdl > 0, success);
+  v = wdl > 0 ? VALUE_MATE - 2 * dtm + 1 : -VALUE_MATE + 2 * dtm;
+  return max(best_cap, v);
+}
+
 static int wdl_to_dtz[] = {
   -1, -101, 0, 101, 1
 };
@@ -572,20 +797,30 @@ int TB_probe_dtz(Pos *pos, int *success)
   return best;
 }
 
-// Use the DTZ tables to rank all root moves in the list.
+// Use the DTZ tables to rank and score all root moves in the list.
 // A return value of 0 means that not all probes were successful.
-int TB_root_probe(Pos *pos, ExtMove *rm, size_t num_moves)
+int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
 {
-  int success;
+  int v, success;
 
   // Obtain 50-move counter for the root position.
   int cnt50 = pos_rule50_count();
 
-  // Probe and rank each move.
+  // Check whether a position was repeated since the last zeroing move.
+  // In that case, we need to be careful and play DTZ-optimal moves if
+  // winning.
+  int rep = pos->hasRepeated;
+
+  // The border between draw and win lies at rank 1 or rank 900, depending
+  // on whether the 50-move rule is used.
+  int bound = option_value(OPT_SYZ_50_MOVE) ? 900 : 1;
+
+  // Probe, rank and score each move.
   pos->st->endMoves = (pos->st-1)->endMoves;
-  for (size_t i = 0; i < num_moves; i++) {
-    int v;
-    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
+  for (int i = 0; i < rm->size; i++) {
+    RootMove *m = &rm->move[i];
+    do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
+
     // Calculate dtz for the current move counting from the root position.
     if (pos_rule50_count() == 0) {
       // If the move resets the 50-move counter, dtz is -101/-1/0/1/101.
@@ -602,23 +837,28 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t num_moves)
       if (generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
         v = 1;
     }
-    undo_move(pos, rm[i].move);
+
+    undo_move(pos, m->pv[0]);
     if (!success) return 0;
-    if (v > 0) {
-      // Moves that are certain to win are ranked equally. Other
-      if (v + cnt50 <= 99 && !pos->hasRepeated)
-        rm[i].value = 1000;
-      else
-        rm[i].value = 1000 - (v + cnt50);
-    } else if (v < 0) {
-      // Rank losing moves equally, except if we approach or have a 50-move
-      // rule draw.
-      if (-v * 2 + cnt50 < 100)
-        rm[i].value = -1000;
-      else
-        rm[i].value = -1000 + (-v + cnt50);
-    } else
-      rm[i].value = 0;
+
+    // Better moves are ranked higher. Guaranteed wins are ranked equally.
+    // Losing moves are ranked equally unless a 50-move draw is in sight.
+    // Note that moves ranked 900 have dtz + cnt50 == 100, which in rare
+    // cases may be insufficient to win as dtz may be one off (see the
+    // comments before TB_probe_dtz()).
+    int r =  v > 0 ? (v + cnt50 <= 99 && !rep ? 1000 : 1000 - (v + cnt50))
+           : v < 0 ? (-v * 2 + cnt50 < 100 ? -1000 : -1000 + (-v + cnt50))
+           : 0;
+    m->TBRank = r;
+
+    // Determine the score to be displayed for this move. Assign at least
+    // 1 cp to cursed wins and let it grow to 49 cp as the position gets
+    // closer to a real win.
+    m->TBScore =  r >= bound ? VALUE_MATE - MAX_PLY - 1
+                : r >  0     ? max( 3, r - 800) * PawnValueEg / 200
+                : r == 0     ? VALUE_DRAW
+                : r > -bound ? min(-3, r + 800) * PawnValueEg / 200
+                :             -VALUE_MATE + MAX_PLY + 1;
   }
 
   return 1;
@@ -627,23 +867,111 @@ int TB_root_probe(Pos *pos, ExtMove *rm, size_t num_moves)
 // Use the WDL tables to rank all root moves in the list.
 // This is a fallback for the case that some or all DTZ tables are missing.
 // A return value of 0 means that not all probes were successful.
-int TB_root_probe_wdl(Pos *pos, ExtMove *rm, size_t num_moves)
+int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
 {
   static int wdl_to_rank[] = { -1000, -899, 0, 899, 1000 };
+  static Value wdl_to_Value[] = {
+    -VALUE_MATE + MAX_PLY + 1,
+    VALUE_DRAW - 2,
+    VALUE_DRAW,
+    VALUE_DRAW + 2,
+    VALUE_MATE - MAX_PLY - 1
+  };
 
+  int v, success;
+
+  // Probe, rank and score each move.
+  pos->st->endMoves = (pos->st-1)->endMoves;
+  for (int i = 0; i < rm->size; i++) {
+    RootMove *m = &rm->move[i];
+    do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
+    v = -TB_probe_wdl(pos, &success);
+    undo_move(pos, m->pv[0]);
+    if (!success) return 0;
+    m->TBRank = wdl_to_rank[v + 2];
+    m->TBScore = wdl_to_Value[v + 2];
+  }
+
+  return 1;
+}
+
+// Use the DTM tables to find mate scores.
+// Either DTZ or WDL must have been probed successfully earlier.
+// A return value of 0 means that not all probes were successful.
+int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
+{
   int success;
 
   // Probe and rank each move.
   pos->st->endMoves = (pos->st-1)->endMoves;
-  for (size_t i = 0; i < num_moves; i++) {
-    int v;
-    do_move(pos, rm[i].move, gives_check(pos, pos->st, rm[i].move));
-    v = -TB_probe_wdl(pos, &success);
-    undo_move(pos, rm[i].move);
+  for (int i = 0; i < rm->size; i++) {
+    RootMove *m = &rm->move[i];
+
+    // Use TBScore to find out if the position is won or lost.
+    int wdl =  m->TBScore >  PawnValueEg ?  2
+             : m->TBScore < -PawnValueEg ? -2 : 0;
+    // No need to probe DTM in case of a draw score.
+    if (wdl == 0) continue;
+
+    // Now probe, adjust the mate score by 1 ply and adjust the rank.
+    do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
+    Value v = -TB_probe_dtm(pos, -wdl, &success);
+    undo_move(pos, m->pv[0]);
     if (!success) return 0;
-    rm[i].value = wdl_to_rank[v + 2];
+    m->TBScore = wdl > 0 ? v - 1 : v + 1;
+    // Let rank correspond to mate score, except for critical moves
+    // ranked 900. We rank them below all other mates.
+    // By ranking mates above 1000 or below -1000, we let the search
+    // know it need not actually search these moves.
+    m->TBRank = m->TBRank == 900 ? 1001 : m->TBScore;
   }
 
   return 1;
+}
+
+// Use the DTM tables to complete a PV with mate score.
+void TB_expand_mate(Pos *pos, RootMove *move)
+{
+  int success = 1, chk = 0;
+  Value v = move->score, w = 0;
+  int wdl = v > 0 ? 2 : -2;
+  ExtMove *m;
+
+  if (move->pv_size == MAX_PLY)
+    return;
+
+  // First get to the end of the incomplete PV.
+  for (int i = 0; i < move->pv_size; i++) {
+    v = v > 0 ? -v - 1 : -v + 1;
+    wdl = -wdl;
+    pos->st->endMoves = (pos->st-1)->endMoves;
+    do_move(pos, move->pv[i], gives_check(pos, pos->st, move->pv[i]));
+  }
+
+  // Now try to expand until the actual mate.
+  if (popcount(pieces()) <= TB_CardinalityDTM)
+    while (v != -VALUE_MATE && move->pv_size < MAX_PLY) {
+      v = v > 0 ? -v - 1 : -v + 1;
+      wdl = -wdl;
+      pos->st->endMoves = generate_legal(pos, (pos->st-1)->endMoves);
+      for (m = (pos->st-1)->endMoves; m < pos->st->endMoves; m++) {
+        do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+        if (wdl < 0)
+          chk = TB_probe_wdl(pos, &success); // verify that m->move wins
+        w =  success && (wdl > 0 || chk < 0)
+           ? TB_probe_dtm(pos, wdl, &success)
+           : 0;
+        undo_move(pos, m->move);
+        if (!success || v == w) break;
+      }
+      if (!success || v != w)
+        break;
+      move->pv[move->pv_size++] = m->move;
+      do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+    }
+
+  // Move back to the root position.
+  for (int i = move->pv_size - 1; i >= 0; i--)
+    undo_move(pos, move->pv[i]);
 }
 

@@ -41,7 +41,7 @@
 SignalsType Signals;
 LimitsType Limits;
 
-int TB_Cardinality;
+int TB_Cardinality, TB_CardinalityDTM;
 int TB_RootInTB;
 int TB_UseRule50;
 Depth TB_ProbeDepth;
@@ -434,6 +434,14 @@ void thread_search(Pos *pos)
 
       pos->selDepth = 0;
 
+      // Skip the search if we have a mate value from DTM tables.
+      if (abs(rm->move[PVIdx].TBRank) > 1000) {
+        bestValue = rm->move[PVIdx].score = rm->move[PVIdx].TBScore;
+        alpha = -VALUE_INFINITE;
+        beta = VALUE_INFINITE;
+        goto skip_search;
+      }
+
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
         delta = (Value)18;
@@ -497,6 +505,7 @@ void thread_search(Pos *pos)
       // Sort the PV lines searched so far and update the GUI
       stable_sort(&rm->move[PVFirst], PVIdx - PVFirst + 1);
 
+skip_search:
       if (    pos->thread_idx == 0
           && (Signals.stop || PVIdx + 1 == multiPV || time_elapsed() > 3000))
       {
@@ -613,7 +622,7 @@ void thread_search(Pos *pos)
 #undef true
 #undef false
 
-#define rm_lt(m1,m2) ((m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
+#define rm_lt(m1,m2) ((m1).TBRank != (m2).TBRank ? (m1).TBRank < (m2).TBRank : (m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
 
 // stable_sort() sorts RootMoves from highest-scoring move to lowest-scoring
 // move while preserving order of equal elements.
@@ -780,7 +789,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
   uint64_t tbhits = threads_tb_hits();
   char buf[16];
 
-  for (int i = 0; i < multiPV; ++i) {
+  for (int i = 0; i < multiPV; i++) {
     int updated = (i <= PVIdx && rm->move[i].score != -VALUE_INFINITE);
 
     if (depth == ONE_PLY && !updated)
@@ -790,15 +799,16 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     Value v = updated ? rm->move[i].score : rm->move[i].previousScore;
 
     int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_PLY;
-    if (tb) {
-      int bound = option_value(OPT_SYZ_50_MOVE) ? 900 : 1;
-      int rank = rm->move[i].TBRank;
-      if (rank >= bound) v = VALUE_MATE - MAX_PLY - 1;
-      else if (rank > 0) v = (max(3, rank - 800) * PawnValueEg) / 200;
-      else if (rank == 0) v = VALUE_DRAW;
-      else if (rank > -bound) v  = (min(3, rank + 800) * PawnValueEg) / 200;
-      else v = -VALUE_MATE + MAX_PLY + 1;
-    }
+    if (tb)
+      v = rm->move[i].TBScore;
+
+    // An incomplete mate PV may be caused by cutoffs in qsearch() and
+    // by TB cutoffs. We try to complete the mate PV if we may be in the
+    // latter case.
+    if (   abs(v) > VALUE_MATE - MAX_PLY
+        && rm->move[i].pv_size < VALUE_MATE - abs(v)
+        && TB_MaxCardinalityDTM > 0)
+      TB_expand_mate(pos, &rm->move[i]);
 
     printf("info depth %d seldepth %d multipv %d score %s",
            d / ONE_PLY, rm->move[i].selDepth + 1, (int)i + 1,
@@ -856,50 +866,52 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
   return rm->pv_size > 1;
 }
 
-void TB_rank_root_moves(Pos *pos, ExtMove *list, int num_moves)
+void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 {
   TB_RootInTB = 0;
   TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);
   TB_ProbeDepth = option_value(OPT_SYZ_PROBE_DEPTH) * ONE_PLY;
   TB_Cardinality = option_value(OPT_SYZ_PROBE_LIMIT);
-  int dtz_available = 1;
+  int dtz_available = 1, dtm_available = 0;
 
-  // Skip TB probing when no TB found: !TBLargest -> !TB_Cardinality.
   if (TB_Cardinality > TB_MaxCardinality) {
     TB_Cardinality = TB_MaxCardinality;
     TB_ProbeDepth = DEPTH_ZERO;
   }
 
+  TB_CardinalityDTM =  option_value(OPT_SYZ_USE_DTM)
+                     ? min(TB_Cardinality, TB_MaxCardinalityDTM)
+                     : 0;
+
   if (TB_Cardinality >= popcount(pieces()) && !can_castle_any()) {
     // Try ranking moves using DTZ tables.
-    TB_RootInTB = TB_root_probe(pos, list, num_moves);
+    TB_RootInTB = TB_root_probe_dtz(pos, rm);
 
     if (!TB_RootInTB) {
       // DTZ tables are missing.
       dtz_available = 0;
 
       // Try ranking moves using WDL tables as fallback.
-      TB_RootInTB = TB_root_probe_wdl(pos, list, num_moves);
+      TB_RootInTB = TB_root_probe_wdl(pos, rm);
     }
+
+    // If ranking was successful, try to obtain mate values from DTM tables.
+    if (TB_RootInTB && TB_CardinalityDTM >= popcount(pieces()))
+      dtm_available = TB_root_probe_dtm(pos, rm);
   }
 
   if (TB_RootInTB) { // Ranking was successful.
     // Sort moves according to TB rank.
-    for (int i = 0; i < num_moves; i++)
-      for (int j = i + 1; j < num_moves; j++)
-        if (list[i].value < list[j].value) {
-          ExtMove tmp = list[i];
-          list[i] = list[j];
-          list[j] = tmp;
-        }
+    stable_sort(rm->move, rm->size);
 
-    // Only probe during search if DTZ is not available and we are winning.
-    if (dtz_available || list[0].value <= 0)
+    // Only probe during search if DTM and DTZ are not available
+    // and we are winning.
+    if (dtm_available || dtz_available || rm->move[0].TBRank <= 0)
       TB_Cardinality = 0;
   }
   else // Ranking was not successful.
-    for (int i = 0; i < num_moves; i++)
-      list[i].value = 0;
+    for (int i = 0; i < rm->size; i++)
+      rm->move[i].TBRank = 0;
 }
 
 
@@ -929,8 +941,13 @@ void start_thinking(Pos *root)
     end = p;
   }
 
+  RootMoves *moves = Threads.pos[0]->rootMoves;
+  moves->size = end - list;
+  for (int i = 0; i < moves->size; i++)
+    moves->move[i].pv[0] = list[i].move;
+
   // Rank root moves if root position is a TB position.
-  TB_rank_root_moves(root, list, end - list);
+  TB_rank_root_moves(root, moves);
 
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
@@ -940,11 +957,13 @@ void start_thinking(Pos *root)
     RootMoves *rm = pos->rootMoves;
     rm->size = end - list;
     for (int i = 0; i < rm->size; i++) {
-      rm->move[i].pv[0] = list[i].move;
+      rm->move[i].pv_size = 1;
+      rm->move[i].pv[0] = moves->move[i].pv[0];
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
       rm->move[i].selDepth = 0;
-      rm->move[i].TBRank = list[i].value;
+      rm->move[i].TBRank = moves->move[i].TBRank;
+      rm->move[i].TBScore = moves->move[i].TBScore;
     }
     memcpy(pos, root, offsetof(Pos, moveList));
     // Copy enough of the root State buffer.

@@ -139,19 +139,19 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
         &&  pos_rule50_count() == 0
         && !can_castle_any())
     {
-      int found, v = TB_probe_wdl(pos, &found);
+      int found, wdl = TB_probe_wdl(pos, &found);
 
       if (found) {
         pos->tb_hits++;
 
         int drawScore = TB_UseRule50 ? 1 : 0;
 
-        value =  v < -drawScore ? -VALUE_MATE + MAX_PLY + 1 + ss->ply
-               : v >  drawScore ?  VALUE_MATE - MAX_PLY - 1 - ss->ply
-                                :  VALUE_DRAW + 2 * v * drawScore;
+        value =  wdl < -drawScore ? -VALUE_MATE + MAX_PLY + 1 + ss->ply
+               : wdl >  drawScore ?  VALUE_MATE - MAX_PLY - 1 - ss->ply
+                                  :  VALUE_DRAW + 2 * wdl * drawScore;
 
-        int b =  v < -drawScore ? BOUND_UPPER
-               : v >  drawScore ? BOUND_LOWER : BOUND_EXACT;
+        int b =  wdl < -drawScore ? BOUND_UPPER
+               : wdl >  drawScore ? BOUND_LOWER : BOUND_EXACT;
 
         if (    b == BOUND_EXACT
             || (b == BOUND_LOWER ? value >= beta : value <= alpha))
@@ -160,6 +160,17 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
                    min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY), 0,
                    VALUE_NONE, tt_generation());
           return value;
+        }
+
+        if (piecesCnt <= TB_CardinalityDTM) {
+          Value mate = TB_probe_dtm(pos, wdl, &found);
+          if (found) {
+            mate += wdl > 0 ? -ss->ply : ss->ply;
+            tte_save(tte, posKey, value_to_tt(mate, ss->ply), BOUND_EXACT,
+                     min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY), 0,
+                     VALUE_NONE, tt_generation());
+            return mate;
+          }
         }
 
         if (PvNode) {
