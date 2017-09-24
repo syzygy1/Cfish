@@ -62,7 +62,7 @@ void position(Pos *pos, char *str)
   else
     return;
 
-  pos->st = pos->stack + 100;
+  pos->st = pos->stack + 100; // Start of circular buffer of 100 slots.
   pos_set(pos, fen, option_value(OPT_CHESS960));
 
   // Parse move list (if any).
@@ -80,11 +80,6 @@ void position(Pos *pos, char *str)
         pos->st -= 100;
         pos_set_check_info(pos);
         ply -= 100;
-        // Make sure rule50 and pliesFromNull do not overflow.
-        if (pos->st->rule50 > 100)
-          pos->st->rule50 = 100;
-        if (pos->st->pliesFromNull > 100)
-          pos->st->pliesFromNull = 100;
       }
     }
 
@@ -93,11 +88,11 @@ void position(Pos *pos, char *str)
     if (pos->st->pliesFromNull > 99)
       pos->st->pliesFromNull = 99;
 
-    // Now move some game history from the end of the circular buffer
-    // to before the current position.
+    // Now move some of the game history at the end of the circular buffer
+    // in front of that buffer.
     int k = (pos->st - (pos->stack + 100)) - max(5, pos->st->pliesFromNull);
     for (; k < 0; k++)
-      memcpy(pos->st + k, pos->st + k + 100, StateSize);
+      memcpy(pos->stack + 100 + k, pos->stack + 200 + k, StateSize);
 
     // Finally, clear history position keys that have not yet repeated.
     // This ensures that is_draw() does not flag as a draw the first
