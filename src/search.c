@@ -271,11 +271,6 @@ void mainthread_search(void)
     thread_search(pos); // Let's start searching!
   }
 
-  // When playing in 'nodes as time' mode, subtract the searched nodes from
-  // the available ones before exiting.
-  if (Limits.npmsec)
-      Time.availableNodes += Limits.inc[us] - threads_nodes_searched();
-
   // When we reach the maximum depth, we can arrive here without a raise
   // of Signals.stop. However, if we are pondering or in an infinite
   // search, the UCI protocol states that we shouldn't print the best
@@ -305,6 +300,11 @@ void mainthread_search(void)
            uci_value(buf, pos_checkers() ? -VALUE_MATE : VALUE_DRAW));
     fflush(stdout);
   }
+
+  // When playing in 'nodes as time' mode, subtract the searched nodes from
+  // the available ones before exiting.
+  if (Limits.npmsec)
+      Time.availableNodes += Limits.inc[us] - threads_nodes_searched();
 
   // Check if there are threads with a better score than main thread
   Pos *bestThread = pos;
