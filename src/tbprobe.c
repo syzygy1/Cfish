@@ -160,7 +160,7 @@ static int probe_wdl_table(Pos *pos, int *success)
       } while (bb);
     }
     idx = encode_piece(entry, entry->norm[bside], p, entry->factor[bside]);
-    res = (int)decompress_pairs(entry->precomp[bside], idx);
+    res = *decompress_pairs(entry->precomp[bside], idx);
   } else {
     struct TBEntry_pawn *entry = (struct TBEntry_pawn *)ptr;
     int k = entry->file[0].pieces[0][0] ^ cmirror;
@@ -179,7 +179,7 @@ static int probe_wdl_table(Pos *pos, int *success)
       } while (bb);
     }
     idx = encode_pawn(entry, entry->file[f].norm[bside], p, entry->file[f].factor[bside]);
-    res = (int)decompress_pairs(entry->file[f].precomp[bside], idx);
+    res = *decompress_pairs(entry->file[f].precomp[bside], idx);
   }
 
   return res - 2;
@@ -191,7 +191,7 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
   struct TBHashEntry *ptr2;
   uint64_t idx;
   int i;
-  uint8_t res;
+  int res;
   int p[TBPIECES];
 
   // Obtain the position's material signature key.
@@ -263,7 +263,8 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
       } while (bb);
     }
     idx = encode_piece((struct TBEntry_piece *)entry, entry->norm[bside], p, entry->factor[bside]);
-    res = (int)decompress_pairs(entry->precomp[bside], idx);
+    uint8_t *w = decompress_pairs(entry->precomp[bside], idx);
+    res = ((w[1] & 0x0f) << 8) | w[0];
     res = entry->map[entry->map_idx[bside][won] + res];
   } else {
     struct DTMEntry_pawn *entry = (struct DTMEntry_pawn *)ptr;
@@ -283,7 +284,8 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
       } while (bb);
     }
     idx = encode_pawn2((struct TBEntry_pawn2 *)entry, entry->rank[r].norm[bside], p, entry->rank[r].factor[bside]);
-    res = (int)decompress_pairs(entry->rank[r].precomp[bside], idx);
+    uint8_t *w = decompress_pairs(entry->rank[r].precomp[bside], idx);
+    res = ((w[1] & 0x0f) << 8) | w[0];
     res = entry->map[entry->map_idx[r][bside][won] + res];
   }
 
@@ -367,7 +369,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       } while (bb);
     }
     idx = encode_piece((struct TBEntry_piece *)entry, entry->norm, p, entry->factor);
-    res = decompress_pairs(entry->precomp, idx);
+    res = *decompress_pairs(entry->precomp, idx);
 
     if (entry->flags & 2)
       res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
@@ -396,7 +398,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       } while (bb);
     }
     idx = encode_pawn((struct TBEntry_pawn *)entry, entry->file[f].norm, p, entry->file[f].factor);
-    res = decompress_pairs(entry->file[f].precomp, idx);
+    res = *decompress_pairs(entry->file[f].precomp, idx);
 
     if (entry->flags[f] & 2)
       res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];

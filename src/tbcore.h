@@ -48,7 +48,7 @@
 
 const uint32_t WDL_MAGIC = 0x5d23e871;
 const uint32_t DTZ_MAGIC = 0xa50c66d7;
-const uint32_t DTM_MAGIC = 0xfef69f57;
+const uint32_t DTM_MAGIC = 0x88ac504b;
 
 #define TBHASHBITS 10
 
@@ -65,7 +65,8 @@ struct PairsData {
   uint8_t *sympat;
   uint32_t blocksize;
   uint32_t idxbits;
-  uint32_t min_len;
+  uint8_t min_len;
+  uint8_t const_val;
   base_t base[]; // must be base[1] in C++
 };
 
@@ -184,7 +185,7 @@ struct DTMEntry_piece {
   uint8_t pieces[2][TBPIECES];
   uint8_t norm[2][TBPIECES];
   uint16_t map_idx[2][2];
-  uint8_t *map;
+  uint16_t *map;
 };
 
 struct DTMEntry_pawn {
@@ -203,7 +204,7 @@ struct DTMEntry_pawn {
     uint8_t norm[2][TBPIECES];
   } rank[6];
   uint16_t map_idx[6][2][2];
-  uint8_t *map;
+  uint16_t *map;
 };
 
 struct TBHashEntry {

@@ -1168,9 +1168,9 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
     d = (struct PairsData *)malloc(sizeof(struct PairsData));
     d->idxbits = 0;
     if (wdl)
-      d->min_len = data[1];
+      d->const_val = data[1];
     else
-      d->min_len = 0;
+      d->const_val = 0;
     *next = data + 2;
     size[0] = size[1] = size[2] = 0;
     return d;
@@ -1180,9 +1180,9 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
   uint32_t idxbits = data[2];
   uint32_t real_num_blocks = read_uint32_t(&data[4]);
   uint32_t num_blocks = real_num_blocks + data[3];
-  uint32_t max_len = data[8];
-  uint32_t min_len = data[9];
-  uint32_t h = max_len - min_len + 1;
+  int max_len = data[8];
+  int min_len = data[9];
+  int h = max_len - min_len + 1;
   uint32_t num_syms = read_uint16_t(&data[10 + 2 * h]);
   d = (struct PairsData *)malloc(sizeof(struct PairsData) + h * sizeof(base_t) + num_syms);
   d->blocksize = blocksize;
@@ -1207,7 +1207,7 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
   d->base[h - 1] = 0;
   for (int i = h - 2; i >= 0; i--)
     d->base[i] = (d->base[i + 1] + read_uint16_t((uint8_t *)(d->offset + i)) - read_uint16_t((uint8_t *)(d->offset + i + 1))) / 2;
-  for (unsigned i = 0; i < h; i++)
+  for (int i = 0; i < h; i++)
     d->base[i] <<= 64 - (min_len + i);
 
   d->offset -= d->min_len;
@@ -1260,19 +1260,19 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       ptr->precomp[1] = NULL;
 
     if (dtm) {
+      data += (uintptr_t)data & 0x01;
       struct DTMEntry_piece *dtm_ptr = (struct DTMEntry_piece *)ptr;
-      dtm_ptr->map = data;
+      dtm_ptr->map = (uint16_t *)data;
       for (int i = 0; i < 2; i++) {
-        dtm_ptr->map_idx[0][i] = (data + 1 - dtm_ptr->map);
-        data += 1 + data[0];
+        dtm_ptr->map_idx[0][i] = (uint16_t *)data + 1 - dtm_ptr->map;
+        data += 2 + 2 * read_uint16_t(data);
       }
       if (split) {
         for (int i = 0; i < 2; i++) {
-          dtm_ptr->map_idx[1][i] = (data + 1 - dtm_ptr->map);
-          data += 1 + data[0];
+          dtm_ptr->map_idx[1][i] = (uint16_t *)data + 1 - dtm_ptr->map;
+          data += 2 + 2 * read_uint16_t(data);
         }
       }
-      data += (uintptr_t)data & 0x01;
     }
 
     ptr->precomp[0]->indextable = data;
@@ -1363,21 +1363,21 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
         ptr->rank[r].precomp[1] = NULL;
     }
 
+    data += (uintptr_t)data & 0x01;
     struct DTMEntry_pawn *dtm_ptr = (struct DTMEntry_pawn *)ptr;
-    dtm_ptr->map = data;
+    dtm_ptr->map = (uint16_t *)data;
     for (r = 0; r < 6; r++) {
       for (int i = 0; i < 2; i++) {
-        dtm_ptr->map_idx[r][0][i] = (data + 1 - dtm_ptr->map);
-        data += 1 + data[0];
+        dtm_ptr->map_idx[r][0][i] = (uint16_t *)data + 1 - dtm_ptr->map;
+        data += 2 + 2 * read_uint16_t(data);
       }
       if (split) {
         for (int i = 0; i < 2; i++) {
-          dtm_ptr->map_idx[r][1][i] = (data + 1 - dtm_ptr->map);
-          data += 1 + data[0];
+          dtm_ptr->map_idx[r][1][i] = (uint16_t *)data + 1 - dtm_ptr->map;
+          data += 2 + 2 * read_uint16_t(data);
         }
       }
     }
-    data += (uintptr_t)data & 0x01;
 
     for (r = 0; r < 6; r++) {
       ptr->rank[r].precomp[0]->indextable = data;
@@ -1515,12 +1515,12 @@ INLINE int is_little_endian() {
   return x.c[0] == 1;
 }
 
-static uint32_t decompress_pairs(struct PairsData *d, uint64_t idx)
+static uint8_t *decompress_pairs(struct PairsData *d, uint64_t idx)
 {
   const int LittleEndian = is_little_endian();
 
   if (!d->idxbits)
-    return d->min_len;
+    return &d->const_val;
 
   uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1ULL << d->idxbits) - 1)) - (1ULL << (d->idxbits - 1));
@@ -1589,7 +1589,7 @@ static uint32_t decompress_pairs(struct PairsData *d, uint64_t idx)
     }
   }
 
-  return sympat[3 * sym];
+  return &sympat[3 * sym];
 }
 
 void load_dtz_table(char *str, uint64_t key1, uint64_t key2)
