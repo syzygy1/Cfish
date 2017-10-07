@@ -104,7 +104,7 @@ static void *map_file(const char *name, const char *suffix, uint64_t *mapping)
   void *data = mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
   if (data == MAP_FAILED) {
     fprintf(stderr, "Could not mmap() %s.\n", name);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 #else
   DWORD size_low, size_high;
@@ -113,13 +113,13 @@ static void *map_file(const char *name, const char *suffix, uint64_t *mapping)
                                   NULL);
   if (map == NULL) {
     fprintf(stderr, "CreateFileMapping() failed.\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   *mapping = (uint64_t)map;
   void *data = MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
   if (data == NULL) {
     fprintf(stderr, "MapViewOfFile() failed, name = %s%s, error = %lu.\n", name, suffix, GetLastError());
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 #endif
   close_tb(fd);
@@ -151,7 +151,7 @@ static void add_to_hash(struct TBEntry *ptr, struct TBEntry *dtm_ptr, Key key)
     i++;
   if (i == HSHMAX) {
     fprintf(stderr, "HSHMAX too low!\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   } else {
     TB_hash[hshidx][i].key = key;
     TB_hash[hshidx][i].ptr = ptr;
@@ -216,14 +216,14 @@ static void init_tb(char *str)
   if (pcs[TB_WPAWN] + pcs[TB_BPAWN] == 0) {
     if (TBnum_piece == TBMAX_PIECE) {
       fprintf(stderr, "TBMAX_PIECE limit too low!\n");
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     dtm_entry = (struct TBEntry *)&DTM_piece[TBnum_piece];
     entry = (struct TBEntry *)&TB_piece[TBnum_piece++];
   } else {
     if (TBnum_pawn == TBMAX_PAWN) {
       fprintf(stderr, "TBMAX_PAWN limit too low!\n");
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     dtm_entry = (struct TBEntry *)&DTM_pawn[TBnum_pawn];
     entry = (struct TBEntry *)&TB_pawn[TBnum_pawn++];
