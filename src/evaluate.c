@@ -26,7 +26,6 @@
 #include "material.h"
 #include "pawns.h"
 
-static const Bitboard LongDiagonals = 0x8142241818244281ULL; // A1..H8 | H1..A8
 #define Center      ((FileDBB | FileEBB) & (Rank4BB | Rank5BB))
 #define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
 #define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
@@ -158,7 +157,7 @@ static const Score OtherCheck          = S( 10, 10);
 static const Score CloseEnemies        = S(  7,  0);
 static const Score PawnlessFlank       = S( 20, 80);
 static const Score ThreatByHangingPawn = S( 71, 61);
-static const Score ThreatBySafePawn    = S(182,175);
+static const Score ThreatBySafePawn    = S(192,175);
 static const Score ThreatByRank        = S( 16,  3);
 static const Score Hanging             = S( 48, 27);
 static const Score WeakUnopposedPawn   = S(  5, 25);
@@ -286,10 +285,9 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
         // Penalty for pawns on the same color square as the bishop
         score -= BishopPawns * pawns_on_same_color_squares(ei->pe, Us, s);
 
-        // Bonus for bishop on a long diagonal without pawns in the center
-        if (    (LongDiagonals & sq_bb(s))
-            && !(ei->attackedBy[Them][PAWN] & sq_bb(s))
-            && !(Center & PseudoAttacks[BISHOP][s] & pieces_p(PAWN)))
+        // Bonus for bishop on a long diagonal which can "see" both center
+        // squares
+        if (more_than_one(Center & (attacks_bb_bishop(s, pieces_p(PAWN)) | sq_bb(s))))
           score += LongRangedBishop;
       }
 
