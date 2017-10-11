@@ -165,7 +165,7 @@ static char *opt_type_str[] =
   "check", "spin", "button", "string"
 };
 
-// print_options() priints all options in the format required by the
+// print_options() prints all options in the format required by the
 // UCI protocol.
 
 void print_options(void)
@@ -176,7 +176,7 @@ void print_options(void)
     printf("option name %s type %s", opt->name, opt_type_str[opt->type]);
     switch (opt->type) {
     case OPT_TYPE_CHECK:
-      printf(" default %s", opt->value ? "true" : "false");
+      printf(" default %s", opt->def ? "true" : "false");
       break;
     case OPT_TYPE_SPIN:
       printf(" default %d min %d max %d", opt->def, opt->min_val, opt->max_val);

@@ -66,7 +66,7 @@ struct PairsData {
   uint32_t blocksize;
   uint32_t idxbits;
   uint8_t min_len;
-  uint8_t const_val;
+  uint8_t const_val[2];
   base_t base[]; // must be base[1] in C++
 };
 
@@ -78,6 +78,7 @@ struct TBEntry {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
 }
 #ifndef _WIN32
 __attribute__((__may_alias__))
@@ -92,6 +93,7 @@ struct TBEntry_piece {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
   uint8_t enc_type;
   struct PairsData *precomp[2];
   int factor[2][TBPIECES];
@@ -107,6 +109,7 @@ struct TBEntry_pawn {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
@@ -124,6 +127,7 @@ struct TBEntry_pawn2 {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
@@ -141,6 +145,7 @@ struct DTZEntry_piece {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
   uint8_t enc_type;
   struct PairsData *precomp;
   int factor[TBPIECES];
@@ -159,6 +164,7 @@ struct DTZEntry_pawn {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp;
@@ -179,6 +185,7 @@ struct DTMEntry_piece {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
   uint8_t enc_type;
   struct PairsData *precomp[2];
   int factor[2][TBPIECES];
@@ -196,6 +203,7 @@ struct DTMEntry_pawn {
   uint8_t num;
   uint8_t symmetric;
   uint8_t has_pawns;
+  uint8_t loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];

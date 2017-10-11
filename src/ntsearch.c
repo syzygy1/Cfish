@@ -146,8 +146,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
         int drawScore = TB_UseRule50 ? 1 : 0;
 
-        value =  wdl < -drawScore ? -VALUE_MATE + MAX_PLY + 1 + ss->ply
-               : wdl >  drawScore ?  VALUE_MATE - MAX_PLY - 1 - ss->ply
+        value =  wdl < -drawScore ? -VALUE_MATE + MAX_MATE_PLY + 1 + ss->ply
+               : wdl >  drawScore ?  VALUE_MATE - MAX_MATE_PLY - 1 - ss->ply
                                   :  VALUE_DRAW + 2 * wdl * drawScore;
 
         int b =  wdl < -drawScore ? BOUND_UPPER

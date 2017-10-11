@@ -265,7 +265,8 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
     idx = encode_piece((struct TBEntry_piece *)entry, entry->norm[bside], p, entry->factor[bside]);
     uint8_t *w = decompress_pairs(entry->precomp[bside], idx);
     res = ((w[1] & 0x0f) << 8) | w[0];
-    res = entry->map[entry->map_idx[bside][won] + res];
+    if (!entry->loss_only)
+      res = entry->map[entry->map_idx[bside][won] + res];
   } else {
     struct DTMEntry_pawn *entry = (struct DTMEntry_pawn *)ptr;
     int k = entry->rank[0].pieces[0][0] ^ cmirror;
@@ -286,7 +287,8 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
     idx = encode_pawn2((struct TBEntry_pawn2 *)entry, entry->rank[r].norm[bside], p, entry->rank[r].factor[bside]);
     uint8_t *w = decompress_pairs(entry->rank[r].precomp[bside], idx);
     res = ((w[1] & 0x0f) << 8) | w[0];
-    res = entry->map[entry->map_idx[r][bside][won] + res];
+    if (!entry->loss_only)
+      res = entry->map[entry->map_idx[r][bside][won] + res];
   }
 
   return res;
@@ -577,6 +579,7 @@ int TB_probe_wdl(Pos *pos, int *success)
   return v;
 }
 
+#if 0
 // This will not be called for positions with en passant captures
 static Value probe_dtm_dc(Pos *pos, int won, int *success)
 {
@@ -615,9 +618,89 @@ static Value probe_dtm_dc(Pos *pos, int won, int *success)
 
   return max(best_cap, v);
 }
+#endif
 
-// To be called only for non-drawn positions.
+static Value probe_dtm_win(Pos *pos, int *success);
+
+// Probe a position known to lose by probing the DTM table and looking
+// at captures.
+static Value probe_dtm_loss(Pos *pos, int *success)
+{
+  Value v, best = -VALUE_INFINITE, num_ep = 0;
+
+  ExtMove *end, *m = (pos->st-1)->endMoves;
+
+  // Generate at least all legal captures including (under)promotions
+  end = pos_checkers() ? generate_evasions(pos, m)
+                       : add_underprom_caps(pos, m, generate_captures(pos, m));
+  pos->st->endMoves = end;
+
+  for (; m < end; m++) {
+    Move move = m->move;
+    if (!is_capture(pos, move) || !is_legal(pos, move))
+      continue;
+    if (type_of_m(move) == ENPASSANT)
+      num_ep++;
+    do_move(pos, move, gives_check(pos, pos->st, move));
+    v = -probe_dtm_win(pos, success) + 1;
+    undo_move(pos, move);
+    best = max(best, v);
+    if (*success == 0)
+      return 0;
+  }
+
+  // If there are en passant captures, the position without ep rights
+  // may be a stalemate. If it is, we must avoid probing the DTM table.
+  if (num_ep != 0 && generate_legal(pos, m) == m + num_ep)
+    return best;
+
+  v = -VALUE_MATE + 2 * probe_dtm_table(pos, 0, success);
+  return max(best, v);
+}
+
+static Value probe_dtm_win(Pos *pos, int *success)
+{
+  Value v, best = -VALUE_INFINITE;
+
+  // Generate all moves
+  ExtMove *end, *m = (pos->st-1)->endMoves;
+  end = pos_checkers() ? generate_evasions(pos, m)
+                       : generate_non_evasions(pos, m);
+  pos->st->endMoves = end;
+
+  // Perform a 1-ply search
+  for (; m < end; m++) {
+    Move move = m->move;
+    if (!is_legal(pos, move))
+      continue;
+    do_move(pos, move, gives_check(pos, pos->st, move));
+    if (   (ep_square() ? TB_probe_wdl(pos, success)
+                        : probe_ab(pos, -1, 0, success)) < 0
+        && *success)
+      v = -probe_dtm_loss(pos, success) - 1;
+    else
+      v = -VALUE_INFINITE;
+    undo_move(pos, move);
+    best = max(best, v);
+    if (*success == 0) return 0;
+  }
+
+  return best;
+}
+
 Value TB_probe_dtm(Pos *pos, int wdl, int *success)
+{
+  assert(wdl != 0);
+
+  *success = 1;
+
+  return wdl > 0 ? probe_dtm_win(pos, success)
+                 : probe_dtm_loss(pos, success);
+}
+
+#if 0
+// To be called only for non-drawn positions.
+Value TB_probe_dtm2(Pos *pos, int wdl, int *success)
 {
   assert(wdl != 0);
 
@@ -634,9 +717,8 @@ Value TB_probe_dtm(Pos *pos, int wdl, int *success)
     end = generate_evasions(pos, m);
   pos->st->endMoves = end;
 
-  // We do capture resolution, letting best_cap keep track of the best
-  // non-ep capture and letting best_ep keep track of the best ep capture.
-
+  // Resolve captures, letting best_cap keep track of the best non-ep
+  // capture and letting best_ep keep track of the best ep capture.
   for (; m < end; m++) {
     Move move = m->move;
     if (!is_capture(pos, move) || !is_legal(pos, move))
@@ -676,6 +758,7 @@ Value TB_probe_dtm(Pos *pos, int wdl, int *success)
   v = wdl > 0 ? VALUE_MATE - 2 * dtm + 1 : -VALUE_MATE + 2 * dtm;
   return max(best_cap, v);
 }
+#endif
 
 static int wdl_to_dtz[] = {
   -1, -101, 0, 101, 1
@@ -903,8 +986,9 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
 int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
 {
   int success;
+  Value tmpScore[rm->size];
 
-  // Probe and rank each move.
+  // Probe each move.
   pos->st->endMoves = (pos->st-1)->endMoves;
   for (int i = 0; i < rm->size; i++) {
     RootMove *m = &rm->move[i];
@@ -912,19 +996,30 @@ int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
     // Use TBScore to find out if the position is won or lost.
     int wdl =  m->TBScore >  PawnValueEg ?  2
              : m->TBScore < -PawnValueEg ? -2 : 0;
-    // No need to probe DTM in case of a draw score.
-    if (wdl == 0) continue;
 
-    // Now probe, adjust the mate score by 1 ply and adjust the rank.
-    do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
-    Value v = -TB_probe_dtm(pos, -wdl, &success);
-    undo_move(pos, m->pv[0]);
-    if (!success) return 0;
-    m->TBScore = wdl > 0 ? v - 1 : v + 1;
+    if (wdl == 0)
+      tmpScore[i] = 0;
+    else {
+      // Probe and adjust mate score by 1 ply.
+      do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
+      Value v = -TB_probe_dtm(pos, -wdl, &success);
+      tmpScore[i] = wdl > 0 ? v - 1 : v + 1;
+      undo_move(pos, m->pv[0]);
+      if (success == 0)
+        return 0;
+    }
+  }
+
+  // All probes were successful. Now adjust TB scores and ranks.
+  for (int i = 0; i < rm->size; i++) {
+    RootMove *m = &rm->move[i];
+
+    m->TBScore = tmpScore[i];
+
     // Let rank correspond to mate score, except for critical moves
-    // ranked 900. We rank them below all other mates for safety.
+    // ranked 900, which we rank below all other mates for safety.
     // By ranking mates above 1000 or below -1000, we let the search
-    // know it need not actually search these moves.
+    // know it need not search those moves.
     m->TBRank = m->TBRank == 900 ? 1001 : m->TBScore;
   }
 

@@ -1167,10 +1167,8 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
   if (data[0] & 0x80) {
     d = (struct PairsData *)malloc(sizeof(struct PairsData));
     d->idxbits = 0;
-    if (wdl)
-      d->const_val = data[1];
-    else
-      d->const_val = 0;
+    d->const_val[0] = wdl ? data[1] : 0;
+    d->const_val[1] = 0;
     *next = data + 2;
     size[0] = size[1] = size[2] = 0;
     return d;
@@ -1242,6 +1240,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
 
   int split = data[4] & 0x01;
   int files = data[4] & 0x02 ? (dtm ? 6 : 4) : 1;
+  entry->loss_only = data[4] & 0x04 ? 1 : 0;
 
   data += 5;
 
@@ -1259,8 +1258,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
     } else
       ptr->precomp[1] = NULL;
 
-    if (dtm) {
-      data += (uintptr_t)data & 0x01;
+    if (dtm && !ptr->loss_only) {
       struct DTMEntry_piece *dtm_ptr = (struct DTMEntry_piece *)ptr;
       dtm_ptr->map = (uint16_t *)data;
       for (int i = 0; i < 2; i++) {
@@ -1363,18 +1361,19 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
         ptr->rank[r].precomp[1] = NULL;
     }
 
-    data += (uintptr_t)data & 0x01;
-    struct DTMEntry_pawn *dtm_ptr = (struct DTMEntry_pawn *)ptr;
-    dtm_ptr->map = (uint16_t *)data;
-    for (r = 0; r < 6; r++) {
-      for (int i = 0; i < 2; i++) {
-        dtm_ptr->map_idx[r][0][i] = (uint16_t *)data + 1 - dtm_ptr->map;
-        data += 2 + 2 * read_uint16_t(data);
-      }
-      if (split) {
+    if (!ptr->loss_only) {
+      struct DTMEntry_pawn *dtm_ptr = (struct DTMEntry_pawn *)ptr;
+      dtm_ptr->map = (uint16_t *)data;
+      for (r = 0; r < 6; r++) {
         for (int i = 0; i < 2; i++) {
-          dtm_ptr->map_idx[r][1][i] = (uint16_t *)data + 1 - dtm_ptr->map;
+          dtm_ptr->map_idx[r][0][i] = (uint16_t *)data + 1 - dtm_ptr->map;
           data += 2 + 2 * read_uint16_t(data);
+        }
+        if (split) {
+          for (int i = 0; i < 2; i++) {
+            dtm_ptr->map_idx[r][1][i] = (uint16_t *)data + 1 - dtm_ptr->map;
+            data += 2 + 2 * read_uint16_t(data);
+          }
         }
       }
     }
@@ -1520,7 +1519,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, uint64_t idx)
   const int LittleEndian = is_little_endian();
 
   if (!d->idxbits)
-    return &d->const_val;
+    return d->const_val;
 
   uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1ULL << d->idxbits) - 1)) - (1ULL << (d->idxbits - 1));

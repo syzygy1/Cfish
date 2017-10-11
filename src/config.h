@@ -2,6 +2,7 @@
 #define CONFIG_H
 
 #define PEDANTIC
+//#define LONG_MATES
 
 #ifdef USE_PEXT
 //#define BMI2_PLAIN

@@ -798,14 +798,14 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     Depth d = updated ? depth : depth - ONE_PLY;
     Value v = updated ? rm->move[i].score : rm->move[i].previousScore;
 
-    int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_PLY;
+    int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_MATE_PLY;
     if (tb)
       v = rm->move[i].TBScore;
 
     // An incomplete mate PV may be caused by cutoffs in qsearch() and
     // by TB cutoffs. We try to complete the mate PV if we may be in the
     // latter case.
-    if (   abs(v) > VALUE_MATE - MAX_PLY
+    if (   abs(v) > VALUE_MATE - MAX_MATE_PLY
         && rm->move[i].pv_size < VALUE_MATE - abs(v)
         && TB_MaxCardinalityDTM > 0)
       TB_expand_mate(pos, &rm->move[i]);
