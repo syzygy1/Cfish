@@ -52,6 +52,9 @@ int remaining(int myTime, int myInc, int moveOverhead, int movesToGo,
     else
       ratio *= 1.5;
 
+    if (movesToGo > 1)
+      ratio = min(0.75, ratio);
+
     ratio *= 1 + inc / (myTime * 8.5);
   }
   // Otherwise we increase usage of remaining time as the game goes on
