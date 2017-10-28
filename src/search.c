@@ -149,6 +149,7 @@ static Value value_from_tt(Value v, int ply);
 static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus);
 static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, int bonus);
+static int pv_is_draw(Pos *pos);
 static void check_time(void);
 static void stable_sort(RootMove *rm, int num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
@@ -543,9 +544,16 @@ skip_search:
                           bestValue - mainThread.previousScore };
 
         int improvingFactor = max(229, min(715, 357 + 119 * F[0] - 6 * F[1]));
-        double unstablePvFactor = 1 + mainThread.bestMoveChanges;
 
-        int doEasyMove =   rm->move[0].pv[0] == easyMove
+        int us = pos_stm();
+        int thinkHard =   DrawValue[us] == bestValue
+                       && Limits.time[us] - time_elapsed() > Limits.time[us ^ 1]
+                       && pv_is_draw(pos);
+
+        double unstablePvFactor = 1 + mainThread.bestMoveChanges + thinkHard;
+
+        int doEasyMove =    rm->move[0].pv[0] == easyMove
+                         && !thinkHard
                          && mainThread.bestMoveChanges < 0.03
                          && time_elapsed() > time_optimum() * 5 / 44;
 
@@ -714,6 +722,23 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
     history_update(*pos->history, c, quiets[i], -bonus);
     update_cm_stats(ss, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
   }
+}
+
+static int pv_is_draw(Pos *pos)
+{
+  RootMove *rm = &pos->rootMoves->move[0];
+
+  pos->st->endMoves = (pos->st-1)->endMoves;
+
+  for (int i = 0; i < rm->pv_size; i++)
+    do_move(pos, rm->pv[i], gives_check(pos, pos->st, rm->pv[i]));
+
+  int isDraw = is_draw(pos);
+
+  for (int i = rm->pv_size; i > 0; i--)
+    undo_move(pos, rm->pv[i - 1]);
+
+  return isDraw;
 }
 
 #if 0

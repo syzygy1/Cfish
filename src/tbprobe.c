@@ -964,6 +964,7 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
   };
 
   int v, success;
+  int move50 = option_value(OPT_SYZ_50_MOVE);
 
   // Probe, rank and score each move.
   pos->st->endMoves = (pos->st-1)->endMoves;
@@ -973,6 +974,8 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
     v = -TB_probe_wdl(pos, &success);
     undo_move(pos, m->pv[0]);
     if (!success) return 0;
+    if (!move50)
+      v = v > 0 ? 2 : v < 0 ? -2 : 0;
     m->TBRank = wdl_to_rank[v + 2];
     m->TBScore = wdl_to_Value[v + 2];
   }
