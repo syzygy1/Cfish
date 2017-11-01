@@ -1234,7 +1234,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
   if (read_uint32_t(data) != (!dtm ? WDL_MAGIC : DTM_MAGIC)) {
     fprintf(stderr, "Corrupted table.\n");
     unmap_file(entry->data, entry->mapping);
-    entry->data = 0;
+    entry->data = NULL;
     return 0;
   }
 
@@ -1632,6 +1632,7 @@ void load_dtz_table(char *str, uint64_t key1, uint64_t key2)
 
 static void free_wdl_entry(struct TBEntry *entry)
 {
+  if (!entry->ready) return;
   unmap_file(entry->data, entry->mapping);
   if (!entry->has_pawns) {
     struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;
@@ -1650,6 +1651,7 @@ static void free_wdl_entry(struct TBEntry *entry)
 
 static void free_dtm_entry(struct TBEntry *entry)
 {
+  if (!entry->ready) return;
   unmap_file(entry->data, entry->mapping);
   if (!entry->has_pawns) {
     struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;
