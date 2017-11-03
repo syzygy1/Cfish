@@ -111,6 +111,7 @@ static Value value_from_tt(Value v, int ply);
 static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus);
 static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, int bonus);
+static void update_capture_stats(const Pos *pos, Move move, Move *captures, int captureCnt, int bonus);
 static int pv_is_draw(Pos *pos);
 static void check_time(void);
 static void stable_sort(RootMove *rm, int num);
@@ -162,6 +163,7 @@ void search_clear()
     Pos *pos = Threads.pos[idx];
     stats_clear(pos->counterMoves);
     stats_clear(pos->history);
+    stats_clear(pos->captureHistory);
   }
 
   mainThread.previousScore = VALUE_INFINITE;
@@ -657,6 +659,24 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus)
 
   if (move_is_ok((ss-4)->currentMove))
     cms_update(*(ss-4)->history, pc, s, bonus);
+}
+
+// update_capture_stats() updates move sorting heuristics when a new capture
+// best move is found
+
+void update_capture_stats(const Pos *pos, Move move, Move *captures,
+                          int captureCnt, int bonus)
+{
+  Piece moved_piece = moved_piece(move);
+  int captured = type_of_p(piece_on(to_sq(move)));
+  cpth_update(*pos->captureHistory, moved_piece, to_sq(move), captured, bonus);
+
+  // Decrease all the other played capture moves
+  for (int i = 0; i < captureCnt; i++) {
+    moved_piece = moved_piece(captures[i]);
+    captured = type_of_p(piece_on(to_sq(captures[i])));
+    cpth_update(*pos->captureHistory, moved_piece, to_sq(captures[i]), captured, -bonus);
+  }
 }
 
 // update_stats() updates killers, history, countermove and countermove

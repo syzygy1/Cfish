@@ -21,7 +21,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   assert(DEPTH_ZERO < depth && depth < DEPTH_MAX);
   assert(!(PvNode && cutNode));
 
-  Move pv[MAX_PLY+1], quietsSearched[64];
+  Move pv[MAX_PLY+1], capturesSearched[32], quietsSearched[64];
   TTEntry *tte;
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
@@ -31,11 +31,11 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
   int ttCapture, pvExact;
   Piece movedPiece;
-  int moveCount, quietCount;
+  int moveCount, captureCount, quietCount;
 
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
-  moveCount = quietCount =  ss->moveCount = 0;
+  moveCount = captureCount = quietCount =  ss->moveCount = 0;
   ss->statScore = 0;
   bestValue = -VALUE_INFINITE;
   maxValue = VALUE_INFINITE;
@@ -113,6 +113,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       if (ttValue >= beta) {
         if (!is_capture_or_promotion(pos, ttMove))
           update_stats(pos, ss, ttMove, NULL, 0, stat_bonus(depth));
+        else
+          update_capture_stats(pos, ttMove, NULL, 0, stat_bonus(depth));
 
         // Extra penalty for a quiet TT move in previous ply when it gets
         // refuted.
@@ -641,6 +643,8 @@ moves_loop: // When in check search starts from here.
 
     if (!captureOrPromotion && move != bestMove && quietCount < 64)
       quietsSearched[quietCount++] = move;
+    else if (captureOrPromotion && move != bestMove && captureCount < 32)
+      capturesSearched[captureCount++] = move;
   }
 
   // The following condition would detect a stop only after move loop has
@@ -663,6 +667,9 @@ moves_loop: // When in check search starts from here.
     if (!is_capture_or_promotion(pos, bestMove))
       update_stats(pos, ss, bestMove, quietsSearched, quietCount,
                    stat_bonus(depth));
+    else
+      update_capture_stats(pos, bestMove, capturesSearched, captureCount,
+                           stat_bonus(depth));
 
     // Extra penalty for a quiet TT move in previous ply when it gets refuted.
     if ((ss-1)->moveCount == 1 && !captured_piece())

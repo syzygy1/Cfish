@@ -62,13 +62,14 @@ static Move pick_best(ExtMove *begin, ExtMove *end)
 static void score_captures(const Pos *pos)
 {
   Stack *st = pos->st;
+  CapturePieceToHistory *history = pos->captureHistory;
 
   // Winning and equal captures in the main search are ordered by MVV,
   // preferring captures near our home rank.
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-              - (200 * relative_rank_s(pos_stm(), to_sq(m->move)));
+              + (*history)[moved_piece(m->move)][to_sq(m->move)][type_of_p(piece_on(to_sq(m->move)))];
 }
 
 SMALL
