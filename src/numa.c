@@ -418,9 +418,9 @@ void *numa_alloc(size_t size)
   if (imp_VirtualAllocExNuma) {
     unsigned char num_node;
     GetNumaProcessorNode(GetCurrentProcessorNumber(), &num_node);
-    return VirtualAllocExNuma(GetCurrentProcess(), NULL, size,
-                              MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE,
-                              num_node);
+    return imp_VirtualAllocExNuma(GetCurrentProcess(), NULL, size,
+                                  MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE,
+                                  num_node);
   }
   return VirtualAllocEx(GetCurrentProcess(), NULL, size,
                         MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
