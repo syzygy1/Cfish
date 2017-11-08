@@ -236,9 +236,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
-      &&  eval >= beta
-      && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
-      &&  pos_non_pawn_material(pos_stm()))
+      && eval >= beta
+      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && pos_non_pawn_material(pos_stm()))
   {
     assert(eval - beta >= 0);
 
