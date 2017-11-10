@@ -113,8 +113,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       if (ttValue >= beta) {
         if (!is_capture_or_promotion(pos, ttMove))
           update_stats(pos, ss, ttMove, NULL, 0, stat_bonus(depth));
-        else
-          update_capture_stats(pos, ttMove, NULL, 0, stat_bonus(depth));
 
         // Extra penalty for a quiet TT move in previous ply when it gets
         // refuted.
