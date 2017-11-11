@@ -363,7 +363,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
   const Square ksq = square_of(Us, KING);
-  Bitboard kingOnlyDefended, undefended, b, b1, b2, safe, other;
+  Bitboard weak, b, b1, b2, safe, other;
   int kingDanger;
 
   // King shelter and enemy pawns storm
@@ -372,16 +372,11 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 
   // Main king safety evaluation
   if (ei->kingAttackersCount[Them] > (1 - piece_count(Them, QUEEN))) {
-    // Find the attacked squares which are defended only by our king...
-    kingOnlyDefended =   ei->attackedBy[Them][0]
-                      &  ei->attackedBy[Us][KING]
-                      & ~ei->attackedBy2[Us];
-
-    // ... and those which are not defended at all in the larger king ring
-    undefended =   ei->attackedBy[Them][0]
-                & ~ei->attackedBy[Us][0]
-                &  ei->kingRing[Us]
-                & ~pieces_c(Them);
+    // Attacked squares defended at msot once by our queen or king
+    weak =  ei->attackedBy[Them][0]
+          & ~ei->attackedBy2[Us]
+          & (   ei->attackedBy[Us][KING] | ei->attackedBy[Us][QUEEN]
+             | ~ei->attackedBy[Us][0]);
 
     // Initialize the 'kingDanger' variable, which will be transformed
     // later into a king danger score. The initial value is based on the
@@ -390,7 +385,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
     // and the quality of the pawn shelter (current 'score' value).
     kingDanger =  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                 + 102 * ei->kingAdjacentZoneAttacksCount[Them]
-                + 191 * popcount(kingOnlyDefended | undefended)
+                + 191 * popcount(ei->kingRing[Us] & weak)
                 + 143 * !!pinned_pieces(pos, Us)
                 - 848 * !pieces_cp(Them, QUEEN)
                 -   9 * mg_value(score) / 8
@@ -398,13 +393,13 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 
     // Analyse the safe enemy's checks which are possible on next move
     safe  = ~pieces_c(Them);
-    safe &= ~ei->attackedBy[Us][0] | (kingOnlyDefended & ei->attackedBy2[Them]);
+    safe &= ~ei->attackedBy[Us][0] | (weak & ei->attackedBy2[Them]);
 
     b1 = attacks_from_rook(ksq);
     b2 = attacks_from_bishop(ksq);
 
     // Enemy queen safe checks
-    if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe)
+    if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe & ~ei->attackedBy[Us][QUEEN])
       kingDanger += QueenCheck;
 
     // For minors and rooks, also consider the square safe if attacked twice
