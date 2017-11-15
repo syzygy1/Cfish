@@ -66,7 +66,7 @@ int remaining(int myTime, int myInc, int moveOverhead, int movesToGo,
   int time = min(1.0, ratio) * max(0, myTime - moveOverhead);
 
   if (type == OptimumTime && ponder)
-    ratio *= 1.25;
+    time = 5 * time / 4;
 
   return time;
 }

@@ -9,6 +9,7 @@ struct settings {
   size_t tt_size;
   size_t num_threads;
   int large_pages;
+  int clear;
 };
 
 extern struct settings settings, delayed_settings;

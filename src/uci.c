@@ -322,10 +322,8 @@ void uci_loop(int argc, char **argv)
       printf("uciok\n");
       fflush(stdout);
     }
-    else if (strcmp(token, "ucinewgame") == 0) {
+    else if (strcmp(token, "ucinewgame") == 0)
       search_clear();
-      Time.availableNodes = 0;
-    }
     else if (strcmp(token, "isready") == 0) {
       process_delayed_settings();
       printf("readyok\n");

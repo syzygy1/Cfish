@@ -29,6 +29,7 @@
 #include "movegen.h"
 #include "movepick.h"
 #include "search.h"
+#include "settings.h"
 #include "timeman.h"
 #include "thread.h"
 #include "tt.h"
@@ -65,8 +66,6 @@ static const int razor_margin[4] = { 0, 570, 603, 554 };
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
 static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
-
-static const int CounterMovePruneThreshold = 0;
 
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
@@ -150,6 +149,13 @@ void search_init(void)
 
 void search_clear()
 {
+  if (!settings.tt_size) {
+    delayed_settings.clear = 1;
+    return;
+  }
+
+  Time.availableNodes = 0;
+
   tt_clear();
   for (int i = 0; i < num_cmh_tables; i++)
     if (cmh_tables[i]) {

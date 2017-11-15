@@ -63,7 +63,7 @@ void thread_init(void *arg)
       cmh_tables[node] = calloc(sizeof(CounterMoveHistoryStat), 1);
     for (int j = 0; j < 16; j++)
       for (int k = 0; k < 64; k++)
-        (*cmh_tables[node])[0][0][j][k] = VALUE_ZERO - 1;
+        (*cmh_tables[node])[0][0][j][k] = CounterMovePruneThreshold - 1;
   }
 
   Pos *pos;
