@@ -141,12 +141,7 @@ Move next_move(const Pos *pos, int skipQuiets)
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
       if (move != st->ttMove) {
-        if (see_test(pos, move, 0))
-          return move;
-
-        if (   type_of_p(piece_on(to_sq(move))) == KNIGHT
-            && type_of_p(moved_piece(move)) == BISHOP
-            && (st->cur-1)->value > 1090)
+        if (see_test(pos, move, -55 * (st->cur-1)->value / 1024))
           return move;
 
         // Losing capture, move it to the beginning of the array.
