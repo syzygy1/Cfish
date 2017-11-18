@@ -67,7 +67,7 @@ static void score_captures(const Pos *pos)
   CapturePieceToHistory *history = pos->captureHistory;
 
   // Winning and equal captures in the main search are ordered by MVV,
-  // preferring captures near our home rank.
+  // preferring captures near our with a good history.
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     m->value =  PieceValue[MG][piece_on(to_sq(m->move))]

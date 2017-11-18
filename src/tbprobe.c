@@ -939,11 +939,11 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
     // Determine the score to be displayed for this move. Assign at least
     // 1 cp to cursed wins and let it grow to 49 cp as the position gets
     // closer to a real win.
-    m->TBScore =  r >= bound ? VALUE_MATE - MAX_PLY - 1
+    m->TBScore =  r >= bound ? VALUE_MATE - MAX_MATE_PLY - 1
                 : r >  0     ? max( 3, r - 800) * PawnValueEg / 200
                 : r == 0     ? VALUE_DRAW
                 : r > -bound ? min(-3, r + 800) * PawnValueEg / 200
-                :             -VALUE_MATE + MAX_PLY + 1;
+                :             -VALUE_MATE + MAX_MATE_PLY + 1;
   }
 
   return 1;
@@ -956,11 +956,11 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
 {
   static int wdl_to_rank[] = { -1000, -899, 0, 899, 1000 };
   static Value wdl_to_Value[] = {
-    -VALUE_MATE + MAX_PLY + 1,
+    -VALUE_MATE + MAX_MATE_PLY + 1,
     VALUE_DRAW - 2,
     VALUE_DRAW,
     VALUE_DRAW + 2,
-    VALUE_MATE - MAX_PLY - 1
+    VALUE_MATE - MAX_MATE_PLY - 1
   };
 
   int v, success;
