@@ -1,6 +1,7 @@
 #include <assert.h>
-#include <string.h>
 #include <ctype.h>
+#include <inttypes.h>
+#include <string.h>
 
 #include "bitboard.h"
 #include "material.h"
@@ -125,8 +126,7 @@ void print_pos(Pos *pos)
     printf(" |\n +---+---+---+---+---+---+---+---+\n");
   }
 
-  printf("\nFen: %s\nKey: %16llX\nCheckers: ",
-         fen, (unsigned long long)pos_key());
+  printf("\nFen: %s\nKey: %16"PRIX64"\nCheckers: ", fen, pos_key());
 
   char buf[16];
   for (Bitboard b = pos_checkers(); b; )
