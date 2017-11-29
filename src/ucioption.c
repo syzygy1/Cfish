@@ -51,11 +51,6 @@ static void on_hash_size(Option *opt)
   delayed_settings.tt_size = opt->value;
 }
 
-static void on_logger(Option *opt)
-{
-  start_logger(opt->val_string);
-}
-
 static void on_numa(Option *opt)
 {
 #ifdef NUMA
@@ -87,14 +82,12 @@ static void on_largepages(Option *opt)
 #endif
 
 static Option options_map[] = {
-  { "Debug Log File", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_logger, 0, NULL },
   { "Contempt", OPT_TYPE_SPIN, 0, -100, 100, NULL, NULL, 0, NULL },
   { "Threads", OPT_TYPE_SPIN, 1, 1, MAX_THREADS, NULL, on_threads, 0, NULL },
   { "Hash", OPT_TYPE_SPIN, 16, 1, MAXHASHMB, NULL, on_hash_size, 0, NULL },
   { "Clear Hash", OPT_TYPE_BUTTON, 0, 0, 0, NULL, on_clear_hash, 0, NULL },
   { "Ponder", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "MultiPV", OPT_TYPE_SPIN, 1, 1, 500, NULL, NULL, 0, NULL },
-  { "Repetition Fix", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "Skill Level", OPT_TYPE_SPIN, 20, 0, 20, NULL, NULL, 0, NULL },
   { "Move Overhead", OPT_TYPE_SPIN, 100, 0, 5000, NULL, NULL, 0, NULL },
   { "nodestime", OPT_TYPE_SPIN, 0, 0, 10000, NULL, NULL, 0, NULL },
@@ -132,8 +125,6 @@ void options_init()
   options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
 #endif
-  // Disable Repetition Fix for now, since it has not been implemented yet.
-  options_map[OPT_REP_FIX].type = OPT_TYPE_DISABLED;
   for (Option *opt = options_map; opt->name != NULL; opt++) {
     if (opt->type == OPT_TYPE_DISABLED)
       continue;

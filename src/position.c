@@ -254,8 +254,8 @@ void pos_set(Pos *pos, char *fen, int isChess960)
 
   // En passant square. Ignore if no pawn capture is possible.
   if (   ((col = *fen++) && (col >= 'a' && col <= 'h'))
-      && ((row = *fen++) && (row == '3' || row == '6'))) {
-
+      && ((row = *fen++) && (row == '3' || row == '6')))
+  {
     st->epSquare = make_square(col - 'a', row - '1');
 
     if (!(attackers_to(st->epSquare) & pieces_cp(pos_stm(), PAWN)))
@@ -405,10 +405,10 @@ void pos_fen(const Pos *pos, char *str)
     if (cr & BLACK_OO) *str++ = 'k';
     if (cr & BLACK_OOO) *str++ = 'q';
   } else {
-    if (cr & WHITE_OO) *str++ = 'A' + file_of(castling_rook_square(WHITE | KING_SIDE));
-    if (cr & WHITE_OOO) *str++ = 'A' + file_of(castling_rook_square(WHITE | QUEEN_SIDE));
-    if (cr & BLACK_OO) *str++ = 'A' + file_of(castling_rook_square(BLACK | KING_SIDE));
-    if (cr & BLACK_OOO) *str++ = 'A' + file_of(castling_rook_square(BLACK | QUEEN_SIDE));
+    if (cr & WHITE_OO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(WHITE, KING_SIDE)));
+    if (cr & WHITE_OOO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(WHITE, QUEEN_SIDE)));
+    if (cr & BLACK_OO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(BLACK, KING_SIDE)));
+    if (cr & BLACK_OOO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(BLACK, QUEEN_SIDE)));
   }
   if (!cr)
       *str++ = '-';
@@ -1007,7 +1007,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
   // Update castling rights if needed
   if (    st->castlingRights
-      && (pos->castlingRightsMask[from] | pos->castlingRightsMask[to])) {
+      && (pos->castlingRightsMask[from] | pos->castlingRightsMask[to]))
+  {
     uint32_t cr = pos->castlingRightsMask[from] | pos->castlingRightsMask[to];
     key ^= zob.castling[st->castlingRights & cr];
     st->castlingRights &= ~cr;
@@ -1020,9 +1021,10 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // If the moving piece is a pawn do some special extra work
   if (type_of_p(piece) == PAWN) {
     // Set en-passant square if the moved pawn can be captured
-    if ((to ^ from) == 16 && (attacks_from_pawn(to - pawn_push(us), us)
-                              & pieces_cp(them, PAWN))) {
-      st->epSquare = (from + to) / 2;
+    if (   (to ^ from) == 16
+        && (attacks_from_pawn(to ^ 8, us) & pieces_cp(them, PAWN)))
+    {
+      st->epSquare = to ^ 8;
       key ^= zob.enpassant[file_of(st->epSquare)];
     } else if (type_of_m(m) == PROMOTION) {
       uint32_t promotion = promotion_type(m);

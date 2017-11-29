@@ -225,8 +225,6 @@ void benchmark(Pos *current, char *str)
 
   elapsed = now() - elapsed + 1; // Ensure positivity to avoid a 'divide by zero'
 
-  dbg_print(); // Just before exiting
-
   fprintf(stderr, "\n==========================="
                   "\nTotal time (ms) : %" PRIu64
                   "\nNodes searched  : %" PRIu64

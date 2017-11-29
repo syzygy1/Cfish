@@ -773,10 +773,8 @@ static void check_time(void)
   int elapsed = time_elapsed();
   TimePoint tick = Limits.startTime + elapsed;
 
-  if (tick - lastInfoTime >= 1000) {
+  if (tick - lastInfoTime >= 1000)
     lastInfoTime = tick;
-    dbg_print();
-  }
 
   // An engine may not stop pondering until told so by the GUI
   if (Limits.ponder)

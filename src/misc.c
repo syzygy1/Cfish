@@ -38,64 +38,6 @@ pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 HANDLE io_mutex;
 #endif
 
-#if 0
-// Our fancy logging facility. The trick here is to replace cin.rdbuf() and
-// cout.rdbuf() with two Tie objects that tie cin and cout to a file stream. We
-/ can toggle the logging of std::cout and std:cin at runtime whilst preserving
-// usual I/O functionality, all without changing a single line of code!
-// Idea from http://groups.google.com/group/comp.lang.c++/msg/1d941c0f26ea0d81
-
-struct Tie: public streambuf { // MSVC requires split streambuf for cin and cout
-
-  Tie(streambuf* b, streambuf* l) : buf(b), logBuf(l) {}
-
-  int sync() { return logBuf->pubsync(), buf->pubsync(); }
-  int overflow(int c) { return log(buf->sputc((char)c), "<< "); }
-  int underflow() { return buf->sgetc(); }
-  int uflow() { return log(buf->sbumpc(), ">> "); }
-
-  streambuf *buf, *logBuf;
-
-  int log(int c, const char* prefix) {
-
-    static int last = '\n'; // Single log file
-
-    if (last == '\n')
-        logBuf->sputn(prefix, 3);
-
-    return last = logBuf->sputc((char)c);
-  }
-};
-
-class Logger {
-
-  Logger() : in(cin.rdbuf(), file.rdbuf()), out(cout.rdbuf(), file.rdbuf()) {}
- ~Logger() { start(""); }
-
-  ofstream file;
-  Tie in, out;
-
-public:
-  static void start(const std::string& fname) {
-
-    static Logger l;
-
-    if (!fname.empty() && !l.file.is_open())
-    {
-        l.file.open(fname, ifstream::out);
-        cin.rdbuf(&l.in);
-        cout.rdbuf(&l.out);
-    }
-    else if (fname.empty() && l.file.is_open())
-    {
-        cout.rdbuf(l.out.buf);
-        cin.rdbuf(l.in.buf);
-        l.file.close();
-    }
-  }
-};
-#endif
-
 static char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
 static char date[] = __DATE__;
 
@@ -131,48 +73,6 @@ void print_engine_info(int to_uci)
                                 "J. Kiiski, G. Linscott"
                               : " by Syzygy based on Stockfish");
   fflush(stdout);
-}
-
-
-// Debug functions used mainly to collect run-time statistics
-static int64_t hits[2], means[2];
-
-void dbg_hit_on(int b)
-{
-  hits[0]++;
-  if (b) hits[1]++;
-}
-
-void dbg_hit_on_cond(int c, int b)
-{
-  if (c) dbg_hit_on(b);
-}
-
-void dbg_mean_of(int v)
-{
-  means[0]++;
-  means[1] += v;
-}
-
-void dbg_print(void)
-{
-  if (hits[0])
-    fprintf(stderr, "Total %"PRIu64" Hits %"PRIu64" hit rate (%%%"PRIu64")\n",
-                    hits[0], hits[1] , 100 * hits[1] / hits[0]);
-
-  if (means[0])
-    fprintf(stderr, "Total %"PRIu64" Mean %f\n", means[0],
-                    (double)means[1] / means[0]);
-}
-
-#if 0
-/// Trampoline helper to avoid moving Logger to misc.h
-void start_logger(const std::string& fname) { Logger::start(fname); }
-#endif
-
-void start_logger(const char *fname)
-{
-  (void)fname;
 }
 
 // xorshift64star Pseudo-Random Number Generator

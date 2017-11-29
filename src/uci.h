@@ -37,25 +37,23 @@ typedef void (*OnChange)(Option *);
 #define OPT_TYPE_STRING   3
 #define OPT_TYPE_DISABLED 4
 
-#define OPT_DEBUG_LOG_FILE  0
-#define OPT_CONTEMPT        1
-#define OPT_THREADS         2
-#define OPT_HASH            3
-#define OPT_CLEAR_HASH      4
-#define OPT_PONDER          5
-#define OPT_MULTI_PV        6
-#define OPT_REP_FIX         7
-#define OPT_SKILL_LEVEL     8
-#define OPT_MOVE_OVERHEAD   9
-#define OPT_NODES_TIME      10
-#define OPT_CHESS960        11
-#define OPT_SYZ_PATH        12
-#define OPT_SYZ_PROBE_DEPTH 13
-#define OPT_SYZ_50_MOVE     14
-#define OPT_SYZ_PROBE_LIMIT 15
-#define OPT_SYZ_USE_DTM     16
-#define OPT_LARGE_PAGES     17
-#define OPT_NUMA            18
+#define OPT_CONTEMPT        0
+#define OPT_THREADS         1
+#define OPT_HASH            2
+#define OPT_CLEAR_HASH      3
+#define OPT_PONDER          4
+#define OPT_MULTI_PV        5
+#define OPT_SKILL_LEVEL     6
+#define OPT_MOVE_OVERHEAD   7
+#define OPT_NODES_TIME      8
+#define OPT_CHESS960        9
+#define OPT_SYZ_PATH        10
+#define OPT_SYZ_PROBE_DEPTH 11
+#define OPT_SYZ_50_MOVE     12
+#define OPT_SYZ_PROBE_LIMIT 13
+#define OPT_SYZ_USE_DTM     14
+#define OPT_LARGE_PAGES     15
+#define OPT_NUMA            16
 
 struct Option {
   char *name;

@@ -61,13 +61,6 @@ INLINE void prefetch2(void *addr)
   prefetch((uint8_t *)addr + 64);
 }
 
-void start_logger(const char *fname);
-
-void dbg_hit_on(int b);
-void dbg_hit_on_cond(int c, int b);
-void dbg_mean_of(int v);
-void dbg_print();
-
 typedef uint64_t TimePoint; // A value in milliseconds
 
 INLINE TimePoint now() {
