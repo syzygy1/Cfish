@@ -207,6 +207,8 @@ INLINE int make_castling_right(int c, int s)
 #define QUEEN  5
 #define KING   6
 
+#define QUEEN_DIAGONAL 7
+
 #define W_PAWN   1
 #define W_KNIGHT 2
 #define W_BISHOP 3
