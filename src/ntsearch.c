@@ -207,7 +207,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
              ss->staticEval, tt_generation());
   }
 
-  if (ss->skipEarlyPruning)
+  if (ss->skipEarlyPruning || !pos_non_pawn_material(pos_stm()))
     goto moves_loop;
 
   // Step 6. Razoring (skipped when in check)
@@ -228,15 +228,13 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (   !rootNode
       &&  depth < 7 * ONE_PLY
       &&  eval - futility_margin(depth) >= beta
-      &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
-      &&  pos_non_pawn_material(pos_stm()))
+      &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
     return eval; // - futility_margin(depth); (do not do the right thing)
 
   // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
-      && pos_non_pawn_material(pos_stm()))
+      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225)
   {
     assert(eval - beta >= 0);
 
