@@ -7,6 +7,8 @@ typedef struct Pos Pos;
 
 #define Tempo ((Value)20)
 
+extern Score Contempt;
+
 Value evaluate(const Pos *pos);
 
 #endif

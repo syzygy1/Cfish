@@ -47,8 +47,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
 
   // Check for an instant draw or if the maximum ply has been reached
   if (is_draw(pos) || ss->ply >= MAX_PLY)
-    return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos)
-                                          : DrawValue[pos_stm()];
+    return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos) : VALUE_DRAW;
 
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
 

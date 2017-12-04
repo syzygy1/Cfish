@@ -94,7 +94,6 @@ struct Skill {
 //  Move best = 0;
 };
 
-static Value DrawValue[2];
 //static CounterMoveHistoryStat CounterMoveHistory;
 
 static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
@@ -233,8 +232,9 @@ void mainthread_search(void)
   char buf[16];
 
   int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100; // From centipawns
-  DrawValue[us    ] = VALUE_DRAW - (Value)contempt;
-  DrawValue[us ^ 1] = VALUE_DRAW + (Value)contempt;
+
+  Contempt = us == WHITE ?  make_score(contempt, contempt / 2)
+                         : -make_score(contempt, contempt / 2);
 
   if (pos->rootMoves->size > 0) {
     for (int idx = 1; idx < Threads.num_threads; idx++)
@@ -520,7 +520,7 @@ skip_search:
         int improvingFactor = max(229, min(715, 357 + 119 * F[0] - 6 * F[1]));
 
         int us = pos_stm();
-        int thinkHard =   DrawValue[us] == bestValue
+        int thinkHard =   bestValue == VALUE_DRAW
                        && Limits.time[us] - time_elapsed() > Limits.time[us ^ 1]
                        && pv_is_draw(pos);
 
