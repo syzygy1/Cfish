@@ -186,7 +186,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Step 5. Evaluate the position statically
   if (inCheck) {
-    ss->staticEval = eval = VALUE_NONE;
+    ss->staticEval = VALUE_NONE;
     goto moves_loop;
   } else if (ttHit) {
     // Never assume anything on values stored in TT

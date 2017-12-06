@@ -400,8 +400,8 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
     safe  = ~pieces_c(Them);
     safe &= ~ei->attackedBy[Us][0] | (weak & ei->attackedBy2[Them]);
 
-    b1 = attacks_from_rook(ksq);
-    b2 = attacks_from_bishop(ksq);
+    b1 = attacks_bb_rook(ksq, pieces() ^ pieces_cp(Us, QUEEN));
+    b2 = attacks_bb_bishop(ksq, pieces() ^ pieces_cp(Us, QUEEN));
 
     // Enemy queen safe checks
     if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe & ~ei->attackedBy[Us][QUEEN])
