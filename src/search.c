@@ -28,6 +28,7 @@
 #include "misc.h"
 #include "movegen.h"
 #include "movepick.h"
+#include "polybook.h"
 #include "search.h"
 #include "settings.h"
 #include "timeman.h"
@@ -116,8 +117,6 @@ static void stable_sort(RootMove *rm, int num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
 static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 
-static TimePoint lastInfoTime;
-
 // search_init() is called during startup to initialize various lookup tables
 
 void search_init(void)
@@ -139,8 +138,6 @@ void search_init(void)
     FutilityMoveCounts[0][d] = (int)(2.4 + 0.74 * pow(d, 1.78));
     FutilityMoveCounts[1][d] = (int)(5.0 + 1.00 * pow(d, 2.00));
   }
-
-  lastInfoTime = now();
 }
 
 
@@ -237,10 +234,27 @@ void mainthread_search(void)
                          : -make_score(contempt, contempt / 2);
 
   if (pos->rootMoves->size > 0) {
-    for (int idx = 1; idx < Threads.num_threads; idx++)
-      thread_start_searching(Threads.pos[idx], 0);
+    Move bookMove = 0;
 
-    thread_search(pos); // Let's start searching!
+    if (!Limits.infinite && !Limits.mate)
+      bookMove = pb_probe(pos);
+
+    int found = 0;
+    for (int i = 0; i < pos->rootMoves->size; i++)
+      if (pos->rootMoves->move[i].pv[0] == bookMove) {
+        RootMove tmp = pos->rootMoves->move[0];
+        pos->rootMoves->move[0] = pos->rootMoves->move[i];
+        pos->rootMoves->move[i] = tmp;
+        found = 1;
+        break;
+      }
+
+    if (!found) {
+      for (int idx = 1; idx < Threads.num_threads; idx++)
+        thread_start_searching(Threads.pos[idx], 0);
+
+      thread_search(pos); // Let's start searching!
+    }
   }
 
   // When we reach the maximum depth, we can arrive here without a raise
@@ -771,10 +785,6 @@ static int pv_is_draw(Pos *pos)
 static void check_time(void)
 {
   int elapsed = time_elapsed();
-  TimePoint tick = Limits.startTime + elapsed;
-
-  if (tick - lastInfoTime >= 1000)
-    lastInfoTime = tick;
 
   // An engine may not stop pondering until told so by the GUI
   if (Limits.ponder)
