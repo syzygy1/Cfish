@@ -396,8 +396,8 @@ moves_loop: // When in check search starts from here.
         && !extension
         &&  is_legal(pos, move))
     {
-//      Value rBeta = max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
-      Value rBeta = min(max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE), VALUE_KNOWN_WIN);
+      Value rBeta = max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
+//      Value rBeta = min(max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE), VALUE_KNOWN_WIN);
       Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
       ss->excludedMove = move;
       ss->skipEarlyPruning = 1;
