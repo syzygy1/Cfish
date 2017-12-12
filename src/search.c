@@ -227,6 +227,7 @@ void mainthread_search(void)
   time_init(us, pos_game_ply());
   tt_new_search();
   char buf[16];
+  int playBookMove = 0;
 
   int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100; // From centipawns
 
@@ -239,17 +240,16 @@ void mainthread_search(void)
     if (!Limits.infinite && !Limits.mate)
       bookMove = pb_probe(pos);
 
-    int found = 0;
     for (int i = 0; i < pos->rootMoves->size; i++)
       if (pos->rootMoves->move[i].pv[0] == bookMove) {
         RootMove tmp = pos->rootMoves->move[0];
         pos->rootMoves->move[0] = pos->rootMoves->move[i];
         pos->rootMoves->move[i] = tmp;
-        found = 1;
+        playBookMove = 1;
         break;
       }
 
-    if (!found) {
+    if (!playBookMove) {
       for (int idx = 1; idx < Threads.num_threads; idx++)
         thread_start_searching(Threads.pos[idx], 0);
 
@@ -275,10 +275,12 @@ void mainthread_search(void)
   Signals.stop = 1;
 
   // Wait until all threads have finished
-  if (pos->rootMoves->size > 0)
-    for (int idx = 1; idx < Threads.num_threads; idx++)
-      thread_wait_for_search_finished(Threads.pos[idx]);
-  else {
+  if (pos->rootMoves->size > 0) {
+    if (!playBookMove) {
+      for (int idx = 1; idx < Threads.num_threads; idx++)
+        thread_wait_for_search_finished(Threads.pos[idx]);
+    }
+  } else {
     pos->rootMoves->move[0].pv[0] = 0;
     pos->rootMoves->move[0].pv_size = 1;
     pos->rootMoves->size++;
