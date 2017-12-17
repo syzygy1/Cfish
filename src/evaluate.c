@@ -362,7 +362,6 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility)
 INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
-  const int Up = (Us == WHITE ? DELTA_N : DELTA_S);
   const Bitboard Camp = (   Us == WHITE
                          ? AllSquares ^ Rank6BB ^ Rank7BB ^ Rank8BB
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
@@ -425,10 +424,8 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
       unsafeChecks |= b;
 
     // Unsafe or occupied checking squares will also be considered, as long
-    // as the square is not defended by our pawns or occupied by a blocked
-    // pawn.
-    unsafeChecks &= ~(   ei->attackedBy[Us][PAWN]
-                      | (pieces_cp(Them, PAWN) & shift_bb(Up, pieces_p(PAWN))));
+    // the square is in the attacker's mobility area.
+    unsafeChecks &= ei->mobilityArea[Them];
 
     kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                  + 102 * ei->kingAdjacentZoneAttacksCount[Them]
@@ -493,7 +490,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
     score += ThreatBySafePawn * popcount(safeThreats);
 
-    if (weak ^ safeThreats)
+    if (weak != safeThreats)
       score += ThreatByHangingPawn;
   }
 
@@ -766,7 +763,7 @@ Value evaluate(const Pos *pos)
   // If we have a specialized evaluation function for the current material
   // configuration, call it and return.
   if (material_specialized_eval_exists(ei.me))
-    return material_evaluate(ei.me, pos);
+    return material_evaluate(ei.me, pos) + Tempo;
 
   // Initialize score by reading the incrementally updated scores included
   // in the position struct (material + piece square tables) and the
@@ -781,7 +778,7 @@ Value evaluate(const Pos *pos)
   // Early exit if score is high
   v = (mg_value(score) + eg_value(score)) / 2;
   if (abs(v) > LazyThreshold)
-    return pos_stm() == WHITE ? v : -v;
+    return (pos_stm() == WHITE ? v : -v) + Tempo;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);

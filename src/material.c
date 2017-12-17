@@ -34,7 +34,7 @@ static const int QuadraticOurs[][8] = {
   {  32,  255,  -3                    }, // Knight      OUR PIECES
   {   0,  104,   4,    0              }, // Bishop
   { -26,   -2,  47,   105,  -149      }, // Rook
-  {-185,   24, 122,   137,  -134,   0 }  // Queen
+  {-189,   24, 117,   133,  -134, -10 }  // Queen
 };
 
 static const int QuadraticTheirs[][8] = {
@@ -45,13 +45,7 @@ static const int QuadraticTheirs[][8] = {
   {   9,   63,   0                    }, // Knight      OUR PIECES
   {  59,   65,  42,     0             }, // Bishop
   {  46,   39,  24,   -24,    0       }, // Rook
-  { 101,  100, -37,   141,  268,    0 }  // Queen
-};
-
-// QueenMinorsImbalance[opp_minor_count] is applied when only one side has
-// a queen. It contains a bonus/malus for the side with the queen.
-static const int QueenMinorsImbalance[13] = {
-  31, -8, -15, -25, -5
+  {  97,  100, -42,   137,  268,    0 }  // Queen
 };
 
 // Helper used to detect a given material distribution.
@@ -97,10 +91,6 @@ int imbalance(int us, int pieceCount[][8])
 
     bonus += pc_us[pt1] * v;
   }
-
-  // Special handling of queen vs minors
-  if (pc_us[QUEEN] == 1 && pc_them[QUEEN] == 0)
-    bonus += QueenMinorsImbalance[pc_them[KNIGHT] + pc_them[BISHOP]];
 
   return bonus;
 }
