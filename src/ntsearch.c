@@ -93,7 +93,11 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // partial search to overwrite a previous full search TT value, so we
   // use a different position key in case of an excluded move.
   excludedMove = ss->excludedMove;
+#ifdef BIG_TT
   posKey = pos_key() ^ (Key)excludedMove;
+#else
+  posKey = pos_key() ^ (Key)(excludedMove << 16);
+#endif
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->PVIdx].pv[0]
@@ -233,7 +237,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225)
+      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && (ss->ply >= pos->nmp_ply || ss->ply % 2 == pos->pair))
   {
     assert(eval - beta >= 0);
 
@@ -261,10 +266,20 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
          return nullValue;
 
       // Do verification search at high depths
+      R += ONE_PLY;
+      // Disable null move pruning for side to move for the first part of
+      // the remaining search tree
+      int nmp_ply = pos->nmp_ply;
+      int pair = pos->pair;
+      pos->nmp_ply = ss->ply + 3 * (depth-R) / (4 * ONE_PLY);
+      pos->pair = ss->ply % 2 == 0;
+
       ss->skipEarlyPruning = 1;
       Value v = depth-R < ONE_PLY ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
                                   :  search_NonPV(pos, ss, beta-1, depth-R, 0);
       ss->skipEarlyPruning = 0;
+      pos->pair = pair;
+      pos->nmp_ply = nmp_ply;
 
       if (v >= beta)
         return nullValue;

@@ -109,7 +109,13 @@ struct Cluster {
 typedef struct Cluster Cluster;
 
 struct TranspositionTable {
+#ifdef BIG_TT
   size_t mask;         // clusterCount - 1
+  size_t clusterCount;
+#else
+  size_t clusterCount;
+  size_t mask;         // clusterCount - 1
+#endif
   Cluster *table;
   void *mem;
   size_t alloc_size;
@@ -134,7 +140,11 @@ INLINE uint8_t tt_generation(void)
 
 INLINE TTEntry *tt_first_entry(Key key)
 {
+#ifdef BIG_TT
   return &TT.table[(size_t)key & TT.mask].entry[0];
+#else
+  return &TT.table[((uint32_t)key * (uint64_t)TT.clusterCount) >> 32].entry[0];
+#endif
 }
 
 TTEntry *tt_probe(Key key, int *found);

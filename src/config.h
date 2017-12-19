@@ -13,5 +13,7 @@
 //#define MAGIC_FANCY
 #endif
 
+//#define BIG_TT
+
 #endif
 

@@ -55,9 +55,14 @@ void tt_free(void)
 
 void tt_allocate(size_t mbSize)
 {
+#ifdef BIG_TT
   size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
+#else
+  size_t count = mbSize * 1024 * 1024 / sizeof(Cluster);
+#endif
 
   TT.mask = count - 1;
+  TT.clusterCount = count;
 
   size_t size = count * sizeof(Cluster);
 
