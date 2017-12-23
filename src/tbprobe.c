@@ -515,8 +515,8 @@ int TB_probe_wdl(Pos *pos, int *success)
     if (*success == 0) return 0;
     if (v > best_cap) {
       if (v == 2) {
-	*success = 2;
-	return 2;
+        *success = 2;
+        return 2;
       }
       if (type_of_m(move) != ENPASSANT)
         best_cap = v;

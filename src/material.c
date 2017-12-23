@@ -120,9 +120,9 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   for (int i = 0; i < NUM_EVAL; i++)
     for (int c = 0; c < 2; c++)
       if (endgame_keys[i][c] == key) {
-	e->eval_func = 1 + i;
-	e->eval_func_side = c;
-	return;
+        e->eval_func = 1 + i;
+        e->eval_func_side = c;
+        return;
       }
 
   for (int c = 0; c < 2; c++)

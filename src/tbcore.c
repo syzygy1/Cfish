@@ -882,7 +882,7 @@ uint64_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *f
   for (i = 1; i < ptr->pawns[0]; i++)
     for (j = i + 1; j < ptr->pawns[0]; j++)
       if (ptwist2[pos[i]] < ptwist2[pos[j]])
-	Swap(pos[i], pos[j]);
+        Swap(pos[i], pos[j]);
 
   t = ptr->pawns[0] - 1;
   idx = pawnidx2[t][flap2[pos[0]]];
@@ -896,12 +896,12 @@ uint64_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *f
   if (t > i) {
     for (j = i; j < t; j++)
       for (k = j + 1; k < t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     s = 0;
     for (m = i; m < t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
-	j += (p > pos[k]);
+        j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
     idx += (uint64_t)s * (uint64_t)factor[i];
@@ -912,12 +912,12 @@ uint64_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *f
     t = norm[i];
     for (j = i; j < i + t; j++)
       for (k = j + 1; k < i + t; k++)
-	if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+        if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
     s = 0;
     for (m = i; m < i + t; m++) {
       int p = pos[m];
       for (k = 0, j = 0; k < i; k++)
-	j += (p > pos[k]);
+        j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
     idx += (uint64_t)s * (uint64_t)factor[i];
@@ -1382,8 +1382,8 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       ptr->rank[r].precomp[0]->indextable = data;
       data += size[6 * r];
       if (split) {
-	ptr->rank[r].precomp[1]->indextable = data;
-	data += size[6 * r + 3];
+        ptr->rank[r].precomp[1]->indextable = data;
+        data += size[6 * r + 3];
       }
     }
 
@@ -1391,8 +1391,8 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       ptr->rank[r].precomp[0]->sizetable = (uint16_t *)data;
       data += size[6 * r + 1];
       if (split) {
-	ptr->rank[r].precomp[1]->sizetable = (uint16_t *)data;
-	data += size[6 * r + 4];
+        ptr->rank[r].precomp[1]->sizetable = (uint16_t *)data;
+        data += size[6 * r + 4];
       }
     }
 
@@ -1401,9 +1401,9 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       ptr->rank[r].precomp[0]->data = data;
       data += size[6 * r + 2];
       if (split) {
-	data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
-	ptr->rank[r].precomp[1]->data = data;
-	data += size[6 * r + 5];
+        data = (uint8_t *)(((uintptr_t)data + 0x3f) & ~0x3f);
+        ptr->rank[r].precomp[1]->data = data;
+        data += size[6 * r + 5];
       }
     }
 

@@ -166,11 +166,13 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     // Make and search the move
     do_move(pos, move, givesCheck);
 #if PvNode
-    value = givesCheck ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
-                       : -qsearch_PV_false(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
+    value =  givesCheck
+           ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
+           : -qsearch_PV_false(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
 #else
-    value = givesCheck ? -qsearch_NonPV_true(pos, ss+1, -beta, depth - ONE_PLY)
-                       : -qsearch_NonPV_false(pos, ss+1, -beta, depth - ONE_PLY);
+    value =  givesCheck
+           ? -qsearch_NonPV_true(pos, ss+1, -beta, depth - ONE_PLY)
+           : -qsearch_NonPV_false(pos, ss+1, -beta, depth - ONE_PLY);
 #endif
     undo_move(pos, move);
 

@@ -275,8 +275,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       pos->pair = ss->ply % 2 == 0;
 
       ss->skipEarlyPruning = 1;
-      Value v = depth-R < ONE_PLY ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
-                                  :  search_NonPV(pos, ss, beta-1, depth-R, 0);
+      Value v =  depth-R < ONE_PLY
+               ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
+               : search_NonPV(pos, ss, beta-1, depth-R, 0);
       ss->skipEarlyPruning = 0;
       pos->pair = pair;
       pos->nmp_ply = nmp_ply;
@@ -346,7 +347,7 @@ moves_loop: // When in check search starts from here.
   singularExtensionNode =   !rootNode
                          &&  depth >= 8 * ONE_PLY
                          &&  ttMove
-                         && !excludedMove // Recursive singular search is not allowed
+                         && !excludedMove // No recursive singular search
                          && (tte_bound(tte) & BOUND_LOWER)
                          &&  tte_depth(tte) >= depth - 3 * ONE_PLY;
   skipQuiets = 0;
@@ -354,7 +355,8 @@ moves_loop: // When in check search starts from here.
   pvExact = PvNode && ttHit && tte_bound(tte) == BOUND_EXACT;
 
   // Step 11. Loop through moves
-  // Loop through all pseudo-legal moves until no moves remain or a beta cutoff occurs
+  // Loop through all pseudo-legal moves until no moves remain or a beta
+  // cutoff occurs
   while ((move = next_move(pos, skipQuiets))) {
     assert(move_is_ok(move));
 
@@ -396,7 +398,7 @@ moves_loop: // When in check search starts from here.
 
     givesCheck = gives_check(pos, ss, move);
 
-    moveCountPruning =   depth < 16 * ONE_PLY
+    moveCountPruning = depth < 16 * ONE_PLY
                 && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
     // Step 12. Singular and Gives Check Extensions
@@ -571,22 +573,26 @@ moves_loop: // When in check search starts from here.
 
     // Step 16. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch)
-        value = newDepth <   ONE_PLY ?
-                          givesCheck ? -qsearch_NonPV_true(pos, ss+1, -(alpha+1), DEPTH_ZERO)
-                                     : -qsearch_NonPV_false(pos, ss+1, -(alpha+1), DEPTH_ZERO)
-                                     : - search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
+        value =  newDepth <   ONE_PLY
+               ?   givesCheck
+                 ? -qsearch_NonPV_true(pos, ss+1, -(alpha+1), DEPTH_ZERO)
+                 : -qsearch_NonPV_false(pos, ss+1, -(alpha+1), DEPTH_ZERO)
+               : -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
 
     // For PV nodes only, do a full PV search on the first move or after a fail
     // high (in the latter case search only if value < beta), otherwise let the
     // parent node fail low with value <= alpha and try another move.
-    if (PvNode && (moveCount == 1 || (value > alpha && (rootNode || value < beta)))) {
+    if (PvNode
+        && (moveCount == 1 || (value > alpha && (rootNode || value < beta))))
+    {
       (ss+1)->pv = pv;
       (ss+1)->pv[0] = 0;
 
-      value = newDepth <   ONE_PLY ?
-                        givesCheck ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
-                                   : -qsearch_PV_false(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
-                                   : - search_PV(pos, ss+1, -beta, -alpha, newDepth);
+      value =  newDepth <   ONE_PLY
+             ?   givesCheck
+               ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
+               : -qsearch_PV_false(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
+             : -search_PV(pos, ss+1, -beta, -alpha, newDepth);
     }
 
     // Step 17. Undo move
