@@ -110,7 +110,7 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
 
 INLINE void mp_init_q(const Pos *pos, Move ttm, Depth depth, Square s)
 {
-  assert (depth <= DEPTH_ZERO);
+  assert(depth <= DEPTH_ZERO);
 
   Stack *st = pos->st;
 
