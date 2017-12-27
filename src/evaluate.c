@@ -190,9 +190,9 @@ Score Contempt = SCORE_ZERO;
 
 INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
 {
-  const int Them = (Us == WHITE ? BLACK   : WHITE);
-  const int Up   = (Us == WHITE ? DELTA_N : DELTA_S);
-  const int Down = (Us == WHITE ? DELTA_S : DELTA_N);
+  const int Them = (Us == WHITE ? BLACK : WHITE);
+  const int Up   = (Us == WHITE ? NORTH : SOUTH);
+  const int Down = (Us == WHITE ? SOUTH : NORTH);
   const Bitboard LowRanks = (Us == WHITE ? Rank2BB | Rank3BB
                                          : Rank7BB | Rank6BB);
 
@@ -303,7 +303,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       if (   Pt == BISHOP
           && is_chess960()
           && (s == relative_square(Us, SQ_A1) || s == relative_square(Us, SQ_H1))) {
-        Square d = pawn_push(Us) + (file_of(s) == FILE_A ? DELTA_E : DELTA_W);
+        Square d = pawn_push(Us) + (file_of(s) == FILE_A ? EAST : WEST);
         if (piece_on(s + d) == make_piece(Us, PAWN))
           score -=  piece_on(s + d + pawn_push(Us))             ? TrappedBishopA1H1 * 4
                   : piece_on(s + d + d) == make_piece(Us, PAWN) ? TrappedBishopA1H1 * 2
@@ -377,7 +377,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 
   // Main king safety evaluation
   if (ei->kingAttackersCount[Them] > (1 - piece_count(Them, QUEEN))) {
-    // Attacked squares defended at msot once by our queen or king
+    // Attacked squares defended at most once by our queen or king
     weak =  ei->attackedBy[Them][0]
           & ~ei->attackedBy2[Us]
           & (   ei->attackedBy[Us][KING] | ei->attackedBy[Us][QUEEN]
@@ -469,10 +469,10 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 
 INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 {
-  const int Them  = (Us == WHITE ? BLACK    : WHITE);
-  const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
-  const int Left  = (Us == WHITE ? DELTA_NW : DELTA_SE);
-  const int Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
+  const int Them  = (Us == WHITE ? BLACK      : WHITE);
+  const int Up    = (Us == WHITE ? NORTH      : SOUTH);
+  const int Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
+  const int Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
   const Bitboard TRank3BB = (Us == WHITE ? Rank3BB  : Rank6BB);
 
   enum { Minor, Rook };
@@ -570,8 +570,8 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
 INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 {
-  const int Them = (Us == WHITE ? BLACK   : WHITE);
-  const int Up   = (Us == WHITE ? DELTA_N : DELTA_S);
+  const int Them = (Us == WHITE ? BLACK : WHITE);
+  const int Up   = (Us == WHITE ? NORTH : SOUTH);
 
   Bitboard b, bb, squaresToQueen, defendedSquares, unsafeSquares;
   Score score = SCORE_ZERO;

@@ -73,9 +73,9 @@ static uint8_t initial(unsigned idx)
   // Immediate win if a pawn can be promoted without getting captured
   if (   us == WHITE
       && rank_of(psq) == RANK_7
-      && ksq[us] != psq + DELTA_N
-      && (    distance(ksq[us ^ 1], psq + DELTA_N) > 1
-          || (PseudoAttacks[KING][ksq[us]] & sq_bb((psq + DELTA_N)))))
+      && ksq[us] != psq + NORTH
+      && (    distance(ksq[us ^ 1], psq + NORTH) > 1
+          || (PseudoAttacks[KING][ksq[us]] & sq_bb((psq + NORTH)))))
     return RES_WIN;
 
   // Immediate draw if it is a stalemate or a king captures undefended pawn
@@ -117,12 +117,12 @@ static uint8_t classify(uint8_t *db, unsigned idx)
 
   if (us == WHITE) {
     if (rank_of(psq) < RANK_7)      // Single push
-      r |= db[index(them, ksq[them], ksq[us], psq + DELTA_N)];
+      r |= db[index(them, ksq[them], ksq[us], psq + NORTH)];
 
     if (   rank_of(psq) == RANK_2   // Double push
-        && psq + DELTA_N != ksq[us]
-        && psq + DELTA_N != ksq[them])
-      r |= db[index(them, ksq[them], ksq[us], psq + DELTA_N + DELTA_N)];
+        && psq + NORTH != ksq[us]
+        && psq + NORTH != ksq[them])
+      r |= db[index(them, ksq[them], ksq[us], psq + NORTH + NORTH)];
   }
 
   return db[idx] = r & good  ? good  : r & RES_UNKNOWN ? RES_UNKNOWN : bad;

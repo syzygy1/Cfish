@@ -93,8 +93,8 @@ static void init_magics(Bitboard table[], Bitboard *attacks[],
 static void init_sliding_attacks(void)
 {
   init_magics(RookTable, RookAttacks, RookMagics, RookMasks,
-              RookShifts, RookDeltas, magic_index_rook);
+              RookShifts, RookDirs, magic_index_rook);
   init_magics(BishopTable, BishopAttacks, BishopMagics, BishopMasks,
-              BishopShifts, BishopDeltas, magic_index_bishop);
+              BishopShifts, BishopDirs, magic_index_bishop);
 }
 

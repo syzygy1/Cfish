@@ -35,8 +35,8 @@ static void init_bmi2(Bitboard table[], Bitboard *attacks[], Bitboard masks[],
 
 static void init_sliding_attacks(void)
 {
-  init_bmi2(RookTable, RookAttacks, RookMasks, RookDeltas, bmi2_index_rook);
-  init_bmi2(BishopTable, BishopAttacks, BishopMasks, BishopDeltas,
+  init_bmi2(RookTable, RookAttacks, RookMasks, RookDirs, bmi2_index_rook);
+  init_bmi2(BishopTable, BishopAttacks, BishopMasks, BishopDirs,
             bmi2_index_bishop);
 }
 

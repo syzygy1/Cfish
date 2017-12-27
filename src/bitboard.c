@@ -26,16 +26,16 @@ uint8_t PopCnt16[1 << 16];
 #endif
 uint8_t SquareDistance[64][64];
 
-static int RookDeltas[] = { DELTA_N,  DELTA_E,  DELTA_S,  DELTA_W  };
-static int BishopDeltas[] = { DELTA_NE, DELTA_SE, DELTA_SW, DELTA_NW };
+static int RookDirs[] = { NORTH, EAST, SOUTH, WEST };
+static int BishopDirs[] = { NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST };
 
-static Bitboard sliding_attack(int deltas[], Square sq, Bitboard occupied)
+static Bitboard sliding_attack(int dirs[], Square sq, Bitboard occupied)
 {
   Bitboard attack = 0;
 
   for (int i = 0; i < 4; i++)
-    for (Square s = sq + deltas[i];
-         square_is_ok(s) && distance(s, s - deltas[i]) == 1; s += deltas[i])
+    for (Square s = sq + dirs[i];
+         square_is_ok(s) && distance(s, s - dirs[i]) == 1; s += dirs[i])
     {
       attack |= sq_bb(s);
       if (occupied & sq_bb(s))

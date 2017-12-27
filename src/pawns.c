@@ -92,9 +92,9 @@ static const Value MaxSafetyBonus = V(258);
 
 INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 {
-  const int Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
-  const int Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
-  const int Left  = (Us == WHITE ? DELTA_NW : DELTA_SE);
+  const int Up    = (Us == WHITE ? NORTH      : SOUTH);
+  const int Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
+  const int Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
 
   Bitboard b, neighbours, stoppers, doubled, supported, phalanx;
   Bitboard lever, leverPush;

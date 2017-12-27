@@ -50,8 +50,8 @@ INLINE ExtMove *generate_castling(const Pos *pos, ExtMove *list, int us,
 
   assert(!pos_checkers());
 
-  const int K = Chess960 ? kto > kfrom ? DELTA_W : DELTA_E
-                         : KingSide    ? DELTA_W : DELTA_E;
+  const int K = Chess960 ? kto > kfrom ? WEST : EAST
+                         : KingSide    ? WEST : EAST;
 
   for (Square s = kto; s != kfrom; s += K)
     if (attackers_to(s) & enemies)
@@ -79,22 +79,22 @@ INLINE ExtMove *generate_castling(const Pos *pos, ExtMove *list, int us,
 
 
 INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
-                                const int Type, const int Delta)
+                                const int Type, const int Direction)
 {
   if (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS)
-    (list++)->move = make_promotion(to - Delta, to, QUEEN);
+    (list++)->move = make_promotion(to - Direction, to, QUEEN);
 
   if (Type == QUIETS || Type == EVASIONS || Type == NON_EVASIONS) {
-    (list++)->move = make_promotion(to - Delta, to, ROOK);
-    (list++)->move = make_promotion(to - Delta, to, BISHOP);
-    (list++)->move = make_promotion(to - Delta, to, KNIGHT);
+    (list++)->move = make_promotion(to - Direction, to, ROOK);
+    (list++)->move = make_promotion(to - Direction, to, BISHOP);
+    (list++)->move = make_promotion(to - Direction, to, KNIGHT);
   }
 
   // Knight promotion is the only promotion that can give a direct check
   // that's not already included in the queen promotion.
   if (   Type == QUIET_CHECKS
       && (PseudoAttacks[KNIGHT][to] & sq_bb(ksq)))
-    (list++)->move = make_promotion(to - Delta, to, KNIGHT);
+    (list++)->move = make_promotion(to - Direction, to, KNIGHT);
 
   return list;
 }
@@ -106,13 +106,13 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 {
   // Compute our parametrized parameters at compile time, named according to
   // the point of view of white side.
-  const int      Them     = (Us == WHITE ? BLACK    : WHITE);
-  const Bitboard TRank8BB = (Us == WHITE ? Rank8BB  : Rank1BB);
-  const Bitboard TRank7BB = (Us == WHITE ? Rank7BB  : Rank2BB);
-  const Bitboard TRank3BB = (Us == WHITE ? Rank3BB  : Rank6BB);
-  const int      Up       = (Us == WHITE ? DELTA_N  : DELTA_S);
-  const int      Right    = (Us == WHITE ? DELTA_NE : DELTA_SW);
-  const int      Left     = (Us == WHITE ? DELTA_NW : DELTA_SE);
+  const int      Them     = (Us == WHITE ? BLACK      : WHITE);
+  const Bitboard TRank8BB = (Us == WHITE ? Rank8BB    : Rank1BB);
+  const Bitboard TRank7BB = (Us == WHITE ? Rank7BB    : Rank2BB);
+  const Bitboard TRank3BB = (Us == WHITE ? Rank3BB    : Rank6BB);
+  const int      Up       = (Us == WHITE ? NORTH      : SOUTH);
+  const int      Right    = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
+  const int      Left     = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
 
   Bitboard emptySquares;
 
