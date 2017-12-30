@@ -495,7 +495,7 @@ int is_legal(const Pos *pos, Move m)
   if (unlikely(type_of_m(m) == ENPASSANT)) {
     Square ksq = square_of(us, KING);
     Square to = to_sq(m);
-    Square capsq = to - pawn_push(us);
+    Square capsq = to ^ 8;
     Bitboard occupied = pieces() ^ sq_bb(from) ^ sq_bb(capsq) ^ sq_bb(to);
 
     assert(to == ep_square());
@@ -964,7 +964,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // update non-pawn material.
     if (type_of_p(captured) == PAWN) {
       if (unlikely(type_of_m(m) == ENPASSANT)) {
-        capsq -= pawn_push(us);
+        capsq ^= 8;
 
         assert(piece == make_piece(us, PAWN));
         assert(to == (st-1)->epSquare);
@@ -1135,7 +1135,7 @@ void undo_move(Pos *pos, Move m)
       Square capsq = to;
 
       if (unlikely(type_of_m(m) == ENPASSANT)) {
-        capsq -= pawn_push(us);
+        capsq ^= 8;
 
         assert(type_of_p(piece) == PAWN);
         assert(to == (pos->st-1)->epSquare);
