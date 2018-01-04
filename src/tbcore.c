@@ -431,15 +431,6 @@ static const uint8_t triangle[] = {
   6, 0, 1, 2, 2, 1, 0, 6
 };
 
-static const uint8_t invtriangle[] = {
-  1, 2, 3, 10, 11, 19, 0, 9, 18, 27
-};
-
-static const uint8_t invdiag[] = {
-  0, 9, 18, 27, 36, 45, 54, 63,
-  7, 14, 21, 28, 35, 42, 49, 56
-};
-
 static const uint8_t flipdiag[] = {
    0,  8, 16, 24, 32, 40, 48, 56,
    1,  9, 17, 25, 33, 41, 49, 57,
@@ -741,9 +732,9 @@ static uint64_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos,
     else if (offdiag[pos[1]])
       idx = 6*63*62 + diag[pos[0]] * 28*62 + lower[pos[1]] * 62 + pos[2] - j;
     else if (offdiag[pos[2]])
-      idx = 6*63*62 + 4*28*62 + (diag[pos[0]]) * 7*28 + (diag[pos[1]] - i) * 28 + lower[pos[2]];
+      idx = 6*63*62 + 4*28*62 + diag[pos[0]] * 7*28 + (diag[pos[1]] - i) * 28 + lower[pos[2]];
     else
-      idx = 6*63*62 + 4*28*62 + 4*7*28 + (diag[pos[0]] * 7*6) + (diag[pos[1]] - i) * 6 + (diag[pos[2]] - j);
+      idx = 6*63*62 + 4*28*62 + 4*7*28 + diag[pos[0]] * 7*6 + (diag[pos[1]] - i) * 6 + (diag[pos[2]] - j);
     i = 3;
     break;
 
