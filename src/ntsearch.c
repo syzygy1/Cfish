@@ -43,8 +43,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
     store_rlx(pos->resetCalls, 0);
-    pos->callsCnt = Limits.nodes ? min(4096, Limits.nodes / 1024)
-                                 : 4096;
+    pos->callsCnt = Limits.nodes ? min(4096, Limits.nodes / 1024) : 4096;
   }
   if (--pos->callsCnt <= 0) {
     for (int idx = 0; idx < Threads.num_threads; idx++)

@@ -125,7 +125,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
         && !givesCheck
         &&  futilityBase > -VALUE_KNOWN_WIN
         && !advanced_pawn_push(pos, move)) {
-      assert(type_of_m(move) != ENPASSANT); // Due to !pos.advanced_pawn_push
+      assert(type_of_m(move) != ENPASSANT); // Due to !advanced_pawn_push
 
       futilityValue = futilityBase + PieceValue[EG][piece_on(to_sq(move))];
 

@@ -156,7 +156,6 @@ static const Score TrappedRook           = S( 92,  0);
 static const Score WeakQueen             = S( 50, 10);
 static const Score CloseEnemies          = S(  7,  0);
 static const Score PawnlessFlank         = S( 20, 80);
-static const Score ThreatByHangingPawn   = S( 71, 61);
 static const Score ThreatBySafePawn      = S(192,175);
 static const Score ThreatByRank          = S( 16,  3);
 static const Score Hanging               = S( 48, 27);
@@ -490,9 +489,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
     safeThreats = (shift_bb(Right, b) | shift_bb(Left, b)) & weak;
 
     score += ThreatBySafePawn * popcount(safeThreats);
-
-    if (weak != safeThreats)
-      score += ThreatByHangingPawn;
   }
 
   // Squares strongly protected by the opponent, either because they attack the

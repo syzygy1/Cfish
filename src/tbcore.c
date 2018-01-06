@@ -208,9 +208,6 @@ static void init_tb(char *str)
       color = 0x08;
       break;
     }
-  for (i = 0; i < 8; i++)
-    if (pcs[i] != pcs[i+8])
-      break;
   key = calc_key_from_pcs(pcs, 0);
   key2 = calc_key_from_pcs(pcs, 1);
   if (pcs[TB_WPAWN] + pcs[TB_BPAWN] == 0) {
@@ -318,7 +315,7 @@ void TB_init(char *path)
   const char *p = path;
   if (strlen(p) == 0 || !strcmp(p, "<empty>")) return;
 
-  path_string = (char *)malloc(strlen(p) + 1);
+  path_string = malloc(strlen(p) + 1);
   strcpy(path_string, p);
   num_paths = 0;
   for (i = 0;; i++) {
@@ -329,7 +326,7 @@ void TB_init(char *path)
     if (!path_string[i]) break;
     path_string[i] = 0;
   }
-  paths = (char **)malloc(num_paths * sizeof(char *));
+  paths = malloc(num_paths * sizeof(char *));
   for (i = j = 0; i < num_paths; i++) {
     while (!path_string[j]) j++;
     paths[i] = &path_string[j];
@@ -1156,7 +1153,7 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
 
   *flags = data[0];
   if (data[0] & 0x80) {
-    d = (struct PairsData *)malloc(sizeof(struct PairsData));
+    d = malloc(sizeof(struct PairsData));
     d->idxbits = 0;
     d->const_val[0] = wdl ? data[1] : 0;
     d->const_val[1] = 0;
@@ -1173,7 +1170,7 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
   int min_len = data[9];
   int h = max_len - min_len + 1;
   uint32_t num_syms = read_uint16_t(&data[10 + 2 * h]);
-  d = (struct PairsData *)malloc(sizeof(struct PairsData) + h * sizeof(base_t) + num_syms);
+  d = malloc(sizeof(struct PairsData) + h * sizeof(base_t) + num_syms);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
   d->offset = (uint16_t *)&data[10];
