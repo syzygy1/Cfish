@@ -98,7 +98,6 @@ INLINE int use_time_management(void)
                        | Limits.infinite);
 }
 
-void search_init();
 void search_clear();
 uint64_t perft(Pos *pos, Depth depth);
 void start_thinking(Pos *pos);

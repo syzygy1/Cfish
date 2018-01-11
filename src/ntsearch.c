@@ -27,9 +27,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue;
-  int ttHit, inCheck, givesCheck, singularExtensionNode, improving;
-  int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
-  int ttCapture, pvExact;
+  int ttHit, inCheck, givesCheck, singularExtensionNode;
+  int captureOrPromotion, skipQuiets;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
 
@@ -212,107 +211,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (ss->skipEarlyPruning || !pos_non_pawn_material(pos_stm()))
     goto moves_loop;
 
-  // Step 6. Razoring (skipped when in check)
-  if (   !PvNode
-      &&  depth < 4 * ONE_PLY
-      &&  eval + razor_margin[depth / ONE_PLY] <= alpha)
-  {
-    if (depth <= ONE_PLY)
-      return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
-
-    Value ralpha = alpha - razor_margin[depth / ONE_PLY];
-    Value v = qsearch_NonPV_false(pos, ss, ralpha, DEPTH_ZERO);
-    if (v <= ralpha)
-      return v;
-  }
-
-  // Step 7. Futility pruning: child node (skipped when in check)
-  if (   !rootNode
-      &&  depth < 7 * ONE_PLY
-      &&  eval - futility_margin(depth) >= beta
-      &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
-    return eval; // - futility_margin(depth); (do not do the right thing)
-
-  // Step 8. Null move search with verification search (is omitted in PV nodes)
-  if (   !PvNode
-      && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
-      && (ss->ply >= pos->nmp_ply || ss->ply % 2 == pos->pair))
-  {
-    assert(eval - beta >= 0);
-
-    // Null move dynamic reduction based on depth and value
-    Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
-
-    ss->currentMove = MOVE_NULL;
-    ss->history = &(*pos->counterMoveHistory)[0][0];
-
-    do_null_move(pos);
-    ss->endMoves = (ss-1)->endMoves;
-    (ss+1)->skipEarlyPruning = 1;
-    Value nullValue =   depth-R < ONE_PLY
-                     ? -qsearch_NonPV_false(pos, ss+1, -beta, DEPTH_ZERO)
-                     : - search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);
-    (ss+1)->skipEarlyPruning = 0;
-    undo_null_move(pos);
-
-    if (nullValue >= beta) {
-      // Do not return unproven mate scores
-      if (nullValue >= VALUE_MATE_IN_MAX_PLY)
-         nullValue = beta;
-
-      if (depth < 12 * ONE_PLY && abs(beta) < VALUE_KNOWN_WIN)
-         return nullValue;
-
-      // Do verification search at high depths
-      R += ONE_PLY;
-      // Disable null move pruning for side to move for the first part of
-      // the remaining search tree
-      int nmp_ply = pos->nmp_ply;
-      int pair = pos->pair;
-      pos->nmp_ply = ss->ply + 3 * (depth-R) / (4 * ONE_PLY);
-      pos->pair = ss->ply % 2 == 0;
-
-      ss->skipEarlyPruning = 1;
-      Value v =  depth-R < ONE_PLY
-               ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
-               : search_NonPV(pos, ss, beta-1, depth-R, 0);
-      ss->skipEarlyPruning = 0;
-      pos->pair = pair;
-      pos->nmp_ply = nmp_ply;
-
-      if (v >= beta)
-        return nullValue;
-    }
-  }
-
-  // Step 9. ProbCut (skipped when in check)
-  // If we have a good enough capture and a reduced search returns a value
-  // much above beta, we can (almost) safely prune the previous move.
-  if (   !PvNode
-      &&  depth >= 5 * ONE_PLY
-      &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
-  {
-    Value rbeta = min(beta + 200, VALUE_INFINITE);
-    Depth rdepth = depth - 4 * ONE_PLY;
-
-    assert(rdepth >= ONE_PLY);
-    assert(move_is_ok((ss-1)->currentMove));
-
-    mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
-
-    while ((move = next_move(pos, 0)))
-      if (is_legal(pos, move)) {
-        ss->currentMove = move;
-        ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
-        do_move(pos, move, gives_check(pos, ss, move));
-        value = -search_NonPV(pos, ss+1, -rbeta, rdepth, !cutNode);
-        undo_move(pos, move);
-        if (value >= rbeta)
-          return value;
-      }
-  }
-
   // Step 10. Internal iterative deepening (skipped when in check)
   if (    depth >= 6 * ONE_PLY
       && !ttMove
@@ -333,15 +231,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
 moves_loop: // When in check search starts from here.
   ;  // Avoid a compiler warning. A label must be followed by a statement.
-  PieceToHistory *cmh  = (ss-1)->history;
-  PieceToHistory *fmh  = (ss-2)->history;
-  PieceToHistory *fmh2 = (ss-4)->history;
-
   mp_init(pos, ttMove, depth);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
-  improving =   ss->staticEval >= (ss-2)->staticEval
-          /* || ss->staticEval == VALUE_NONE Already implicit in the previous condition */
-             ||(ss-2)->staticEval == VALUE_NONE;
 
   singularExtensionNode =   !rootNode
                          &&  depth >= 8 * ONE_PLY
@@ -350,8 +241,6 @@ moves_loop: // When in check search starts from here.
                          && (tte_bound(tte) & BOUND_LOWER)
                          &&  tte_depth(tte) >= depth - 3 * ONE_PLY;
   skipQuiets = 0;
-  ttCapture = 0;
-  pvExact = PvNode && ttHit && tte_bound(tte) == BOUND_EXACT;
 
   // Step 11. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
@@ -397,9 +286,6 @@ moves_loop: // When in check search starts from here.
 
     givesCheck = gives_check(pos, ss, move);
 
-    moveCountPruning = depth < 16 * ONE_PLY
-                && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
-
     // Step 12. Singular and Gives Check Extensions
 
     // Singular extension search. If all moves but one fail low on a search
@@ -434,58 +320,11 @@ moves_loop: // When in check search starts from here.
       ss->mp_killers[0] = k1; ss->mp_killers[1] = k2;
     }
     else if (    givesCheck
-             && !moveCountPruning
              &&  see_test(pos, move, 0))
       extension = ONE_PLY;
 
     // Calculate new depth for this move
     newDepth = depth - ONE_PLY + extension;
-
-    // Step 13. Pruning at shallow depth
-    if (  !rootNode
-        && pos_non_pawn_material(pos_stm())
-        && bestValue > VALUE_MATED_IN_MAX_PLY)
-    {
-      if (   !captureOrPromotion
-          && !givesCheck
-          && (  !advanced_pawn_push(pos, move)
-              || pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) >= 5000))
-      {
-        // Move count based pruning
-        if (moveCountPruning) {
-          skipQuiets = 1;
-          continue;
-        }
-
-        // Reduced depth of the next LMR search
-        int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
-
-        // Countermoves based pruning
-        if (   lmrDepth < 3
-            && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
-            && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
-          continue;
-
-        // Futility pruning: parent node
-        if (   lmrDepth < 7
-            && !inCheck
-            && ss->staticEval + 256 + 200 * lmrDepth <= alpha)
-          continue;
-
-        // Prune moves with negative SEE at low depths and below a decreasing
-        // threshold at higher depths.
-        if (   lmrDepth < 8
-            && !extension
-            && !see_test(pos, move, -35 * lmrDepth * lmrDepth))
-          continue;
-      }
-//      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
-//               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-      else if (    depth < 7 * ONE_PLY
-               && !extension
-               && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
-        continue;
-    }
 
     // Speculative prefetch as early as possible
     prefetch(tt_first_entry(key_after(pos, move)));
@@ -495,9 +334,6 @@ moves_loop: // When in check search starts from here.
       ss->moveCount = --moveCount;
       continue;
     }
-
-    if (move == ttMove && captureOrPromotion)
-      ttCapture = 1;
 
     // Update the current move (this must be done after singular extension
     // search)
@@ -509,69 +345,8 @@ moves_loop: // When in check search starts from here.
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
-    // Step 15. Reduced depth search (LMR). If the move fails high it will be
-    // re-searched at full depth.
-    if (    depth >= 3 * ONE_PLY
-        &&  moveCount > 1
-        && (!captureOrPromotion || moveCountPruning))
-    {
-      Depth r = reduction(improving, depth, moveCount, NT);
-
-      if (captureOrPromotion)
-        r -= r ? ONE_PLY : DEPTH_ZERO;
-      else {
-        // Decrease reduction if opponent's move count is high
-        if ((ss-1)->moveCount > 15)
-          r -= ONE_PLY;
-
-        // Decrease reduction for exact PV nodes
-        if (pvExact)
-          r -= ONE_PLY;
-
-        // Increase reduction if ttMove is a capture
-        if (ttCapture)
-          r += ONE_PLY;
-
-        // Increase reduction for cut nodes
-        if (cutNode)
-          r += 2 * ONE_PLY;
-
-        // Decrease reduction for moves that escape a capture. Filter out
-        // castling moves, because they are coded as "king captures rook" and
-        // hence break make_move(). Also use see() instead of see_sign(),
-        // because the destination square is empty.
-        else if (   type_of_m(move) == NORMAL
-                 && !see_test(pos, make_move(to_sq(move), from_sq(move)), 0))
-          r -= 2 * ONE_PLY;
-
-        ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
-                       + (*fmh )[movedPiece][to_sq(move)]
-                       + (*fmh2)[movedPiece][to_sq(move)]
-                       + (*pos->history)[pos_stm() ^ 1][from_to(move)]
-                       - 4000; // Correction factor.
-
-        // Decrease/increase reduction by comparing with opponent's stat score.
-        if (ss->statScore >= 0 && (ss-1)->statScore < 0)
-          r -= ONE_PLY;
-
-        else if ((ss-1)->statScore >= 0 && ss->statScore < 0)
-          r += ONE_PLY;
-
-        // Decrease/increase reduction for moves with a good/bad history.
-        r = max(DEPTH_ZERO, (r / ONE_PLY - ss->statScore / 20000) * ONE_PLY);
-      }
-
-      Depth d = max(newDepth - r, ONE_PLY);
-
-      value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
-
-      doFullDepthSearch = (value > alpha && d != newDepth);
-
-    } else
-      doFullDepthSearch = !PvNode || moveCount > 1;
-
-    // Step 16. Full depth search when LMR is skipped or fails high.
-    if (doFullDepthSearch)
+    // Step 16. Full depth search.
+    if (!PvNode || moveCount > 1)
         value =  newDepth <   ONE_PLY
                ?   givesCheck
                  ? -qsearch_NonPV_true(pos, ss+1, -(alpha+1), DEPTH_ZERO)

@@ -25,14 +25,14 @@
 UNAME = $(shell uname)
 
 ### Executable name
-EXE = cfish
+EXE = cripplefish
 
 ### Installation dir definitions
 PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
 
 ### Built-in benchmark for pgo-builds
-PGOBENCH = ./$(EXE) bench 16 1 15
+PGOBENCH = ./$(EXE) bench 16 1 8
 
 ### Object files
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \

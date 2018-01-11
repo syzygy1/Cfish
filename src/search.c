@@ -58,21 +58,6 @@ Depth TB_ProbeDepth;
 static int skipSize[20]  = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
 static int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
 
-// Razoring and futility margin based on depth.
-// razor_margin[0] is unused as long as depth >= ONE_PLY in search.
-static const int razor_margin[4] = { 0, 570, 603, 554 };
-
-#define futility_margin(d) ((Value)(150 * (d) / ONE_PLY))
-
-// Futility and reductions lookup tables, initialized at startup
-static int FutilityMoveCounts[2][16]; // [improving][depth]
-static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
-
-INLINE Depth reduction(int i, Depth d, int mn, const int NT)
-{
-  return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
-}
-
 // History and stats update bonus, based on depth
 Value stat_bonus(Depth depth)
 {
@@ -116,30 +101,6 @@ static void check_time(void);
 static void stable_sort(RootMove *rm, int num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
 static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
-
-// search_init() is called during startup to initialize various lookup tables
-
-void search_init(void)
-{
-  for (int imp = 0; imp <= 1; imp++)
-    for (int d = 1; d < 64; ++d)
-      for (int mc = 1; mc < 64; ++mc) {
-        double r = log(d) * log(mc) / 1.95;
-
-        Reductions[NonPV][imp][d][mc] = ((int)lround(r));
-        Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);
-
-        // Increase reduction for non-PV nodes when eval is not improving
-        if (!imp && Reductions[NonPV][imp][d][mc] >= 2)
-          Reductions[NonPV][imp][d][mc]++;
-      }
-
-  for (int d = 0; d < 16; ++d) {
-    FutilityMoveCounts[0][d] = (int)(2.4 + 0.74 * pow(d, 1.78));
-    FutilityMoveCounts[1][d] = (int)(5.0 + 1.00 * pow(d, 2.00));
-  }
-}
-
 
 // search_clear() resets search state to zero, to obtain reproducible results
 
