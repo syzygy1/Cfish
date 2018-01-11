@@ -326,7 +326,7 @@ void TB_init(char *path)
     if (!path_string[i]) break;
     path_string[i] = 0;
   }
-  paths = malloc(num_paths * sizeof(char *));
+  paths = malloc(num_paths * sizeof(*paths));
   for (i = j = 0; i < num_paths; i++) {
     while (!path_string[j]) j++;
     paths[i] = &path_string[j];
@@ -1153,7 +1153,7 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
 
   *flags = data[0];
   if (data[0] & 0x80) {
-    d = malloc(sizeof(struct PairsData));
+    d = malloc(sizeof(*d));
     d->idxbits = 0;
     d->const_val[0] = wdl ? data[1] : 0;
     d->const_val[1] = 0;
@@ -1170,11 +1170,11 @@ static struct PairsData *setup_pairs(uint8_t *data, uint64_t tb_size, uint64_t *
   int min_len = data[9];
   int h = max_len - min_len + 1;
   uint32_t num_syms = read_uint16_t(&data[10 + 2 * h]);
-  d = malloc(sizeof(struct PairsData) + h * sizeof(base_t) + num_syms);
+  d = malloc(sizeof(*d) + h * sizeof(base_t) + num_syms);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
   d->offset = (uint16_t *)&data[10];
-  d->symlen = (uint8_t *)d + sizeof(struct PairsData) + h * sizeof(base_t);
+  d->symlen = (uint8_t *)d + sizeof(*d) + h * sizeof(base_t);
   d->sympat = &data[12 + 2 * h];
   d->min_len = min_len;
   *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
@@ -1512,7 +1512,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, uint64_t idx)
   uint32_t mainidx = idx >> d->idxbits;
   int litidx = (idx & ((1ULL << d->idxbits) - 1)) - (1ULL << (d->idxbits - 1));
   uint32_t block;
-  memcpy(&block, d->indextable + 6 * mainidx, sizeof(uint32_t));
+  memcpy(&block, d->indextable + 6 * mainidx, sizeof(block));
   if (!LittleEndian)
     block = BSWAP32(block);
 

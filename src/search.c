@@ -907,14 +907,14 @@ void TB_rank_root_moves(Pos *pos, RootMoves *rm)
                      : 0;
 
   if (TB_Cardinality >= popcount(pieces()) && !can_castle_any()) {
-    // Try ranking moves using DTZ tables.
+    // Try to rank moves using DTZ tables.
     TB_RootInTB = TB_root_probe_dtz(pos, rm);
 
     if (!TB_RootInTB) {
       // DTZ tables are missing.
       dtz_available = 0;
 
-      // Try ranking moves using WDL tables as fallback.
+      // Try to rank moves using WDL tables as fallback.
       TB_RootInTB = TB_root_probe_wdl(pos, rm);
     }
 
