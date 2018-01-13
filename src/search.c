@@ -975,8 +975,7 @@ void start_thinking(Pos *root)
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
     pos->selDepth = 0;
-    pos->nmp_ply = 0;
-    pos->pair = -1;
+    pos->nmp_ply = pos->nmp_odd = 0;
     pos->rootDepth = DEPTH_ZERO;
     pos->nodes = pos->tb_hits = 0;
     RootMoves *rm = pos->rootMoves;

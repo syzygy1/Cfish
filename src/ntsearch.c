@@ -237,7 +237,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (   !PvNode
       && eval >= beta
       && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
-      && (ss->ply >= pos->nmp_ply || ss->ply % 2 == pos->pair))
+      && (ss->ply >= pos->nmp_ply || ss->ply % 2 != pos->nmp_odd))
   {
     assert(eval - beta >= 0);
 
@@ -259,27 +259,25 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     if (nullValue >= beta) {
       // Do not return unproven mate scores
       if (nullValue >= VALUE_MATE_IN_MAX_PLY)
-         nullValue = beta;
+        nullValue = beta;
 
-      if (depth < 12 * ONE_PLY && abs(beta) < VALUE_KNOWN_WIN)
-         return nullValue;
+      if (   (depth < 12 * ONE_PLY || pos->nmp_ply)
+          && abs(beta) < VALUE_KNOWN_WIN)
+        return nullValue;
 
       // Do verification search at high depths
-      R += ONE_PLY;
       // Disable null move pruning for side to move for the first part of
       // the remaining search tree
-      int nmp_ply = pos->nmp_ply;
-      int pair = pos->pair;
       pos->nmp_ply = ss->ply + 3 * (depth-R) / (4 * ONE_PLY);
-      pos->pair = ss->ply % 2 == 0;
+      pos->nmp_odd = ss->ply & 1;
 
       ss->skipEarlyPruning = 1;
       Value v =  depth-R < ONE_PLY
                ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
                : search_NonPV(pos, ss, beta-1, depth-R, 0);
       ss->skipEarlyPruning = 0;
-      pos->pair = pair;
-      pos->nmp_ply = nmp_ply;
+
+      pos->nmp_odd = pos->nmp_ply = 0;
 
       if (v >= beta)
         return nullValue;
