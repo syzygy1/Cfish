@@ -229,10 +229,16 @@ void mainthread_search(void)
   char buf[16];
   int playBookMove = 0;
 
-  int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100; // From centipawns
+  int analyzing = Limits.infinite || option_value(OPT_ANALYSIS);
 
-  Contempt = us == WHITE ?  make_score(contempt, contempt / 2)
-                         : -make_score(contempt, contempt / 2);
+  // When analyzing, use contempt only if the user has said so
+  int contempt =  !analyzing || option_value(OPT_ANALYSIS_CONTEMPT)
+                ? option_value(OPT_CONTEMPT) * PawnValueEg / 100
+                : 0;
+
+  // When analyzing, contempt is always from white's point of view
+  Contempt = analyzing || us == WHITE ?  make_score(contempt, contempt / 2)
+                                      : -make_score(contempt, contempt / 2);
 
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
