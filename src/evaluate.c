@@ -359,7 +359,8 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility)
 
 // evaluate_king() assigns bonuses and penalties to a king of a given color.
 
-INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
+INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
+                           int Us)
 {
   const int Them = (Us == WHITE ? BLACK   : WHITE);
   const Bitboard Camp = (   Us == WHITE
@@ -437,8 +438,11 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, int Us)
 
     // Transform the kingDanger units into a Score, and subtract it from
     // the evaluation.
-    if (kingDanger > 0)
+    if (kingDanger > 0) {
+      int mobilityDanger = mg_value(mobility[Them] - mobility[Us]);
+      kingDanger = max(0, kingDanger + mobilityDanger);
       score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
+    }
   }
 
   // King tropism: firstly, find squares that we attack in the enemy king flank
@@ -787,8 +791,8 @@ Value evaluate(const Pos *pos)
 
   // Evaluate kings after all other pieces because we need full attack
   // information when computing the king safety evaluation.
-  score +=  evaluate_king(pos, &ei, WHITE)
-          - evaluate_king(pos, &ei, BLACK);
+  score +=  evaluate_king(pos, &ei, mobility, WHITE)
+          - evaluate_king(pos, &ei, mobility, BLACK);
 
   // Evaluate tactical threats, we need full attack information including king
   score +=  evaluate_threats(pos, &ei, WHITE)

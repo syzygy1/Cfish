@@ -190,10 +190,16 @@ void mainthread_search(void)
   char buf[16];
   int playBookMove = 0;
 
-  int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100; // From centipawns
+  int analyzing = Limits.infinite || option_value(OPT_ANALYSIS);
 
-  Contempt = us == WHITE ?  make_score(contempt, contempt / 2)
-                         : -make_score(contempt, contempt / 2);
+  // When analyzing, use contempt only if the user has said so
+  int contempt =  !analyzing || option_value(OPT_ANALYSIS_CONTEMPT)
+                ? option_value(OPT_CONTEMPT) * PawnValueEg / 100
+                : 0;
+
+  // When analyzing, contempt is always from white's point of view
+  Contempt = analyzing || us == WHITE ?  make_score(contempt, contempt / 2)
+                                      : -make_score(contempt, contempt / 2);
 
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
@@ -753,7 +759,7 @@ static void check_time(void)
   if (Limits.ponder)
     return;
 
-  if (   (use_time_management() && elapsed > time_maximum())
+  if (   (use_time_management() && elapsed > time_maximum() - 10)
       || (Limits.movetime && elapsed >= Limits.movetime)
       || (Limits.nodes && threads_nodes_searched() >= Limits.nodes))
         Signals.stop = 1;
@@ -936,8 +942,7 @@ void start_thinking(Pos *root)
   for (int idx = 0; idx < Threads.num_threads; idx++) {
     Pos *pos = Threads.pos[idx];
     pos->selDepth = 0;
-    pos->nmp_ply = 0;
-    pos->pair = -1;
+    pos->nmp_ply = pos->nmp_odd = 0;
     pos->rootDepth = DEPTH_ZERO;
     pos->nodes = pos->tb_hits = 0;
     RootMoves *rm = pos->rootMoves;
