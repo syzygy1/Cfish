@@ -61,7 +61,7 @@ INLINE void prefetch2(void *addr)
   prefetch((uint8_t *)addr + 64);
 }
 
-typedef uint64_t TimePoint; // A value in milliseconds
+typedef int64_t TimePoint; // A value in milliseconds
 
 INLINE TimePoint now() {
   struct timeval tv;

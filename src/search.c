@@ -792,7 +792,7 @@ static int pv_is_draw(Pos *pos)
 
 static void check_time(void)
 {
-  int elapsed = time_elapsed();
+  TimePoint elapsed = time_elapsed();
 
   // An engine may not stop pondering until told so by the GUI
   if (Limits.ponder)
@@ -810,7 +810,7 @@ static void check_time(void)
 
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 {
-  int elapsed = time_elapsed() + 1;
+  TimePoint elapsed = time_elapsed() + 1;
   RootMoves *rm = pos->rootMoves;
   int PVIdx = pos->PVIdx;
   int multiPV = min(option_value(OPT_MULTI_PV), rm->size);
@@ -852,7 +852,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     if (elapsed > 1000)
       printf(" hashfull %d", tt_hashfull());
 
-    printf(" tbhits %"PRIu64" time %d pv", tbhits, elapsed);
+    printf(" tbhits %"PRIu64" time %"PRIi64" pv", tbhits, elapsed);
 
     for (int idx = 0; idx < rm->move[i].pv_size; idx++)
       printf(" %s", uci_move(buf, rm->move[i].pv[idx], is_chess960()));
