@@ -110,6 +110,7 @@ void position(Pos *pos, char *str)
         (pos->st - k)->key = 0ULL;
     }
   }
+  pos->rootKeyFlip = pos->st->key;
   (pos->st-1)->endMoves = pos->moveList;
 }
 

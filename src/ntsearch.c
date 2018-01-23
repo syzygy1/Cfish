@@ -215,12 +215,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Razoring (skipped when in check)
   if (   !PvNode
       &&  depth < 4 * ONE_PLY
-      &&  eval + razor_margin[depth / ONE_PLY] <= alpha)
+      &&  eval + razor_margin <= alpha)
   {
     if (depth <= ONE_PLY)
       return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
 
-    Value ralpha = alpha - razor_margin[depth / ONE_PLY];
+    Value ralpha = alpha - razor_margin;
     Value v = qsearch_NonPV_false(pos, ss, ralpha, DEPTH_ZERO);
     if (v <= ralpha)
       return v;
