@@ -49,7 +49,7 @@ typedef void (*OnChange)(Option *);
 #define OPT_MIN_THINK_TIME    9
 #define OPT_SLOW_MOVER        10
 #define OPT_NODES_TIME        11
-#define OPT_ANALYSIS          12
+#define OPT_ANALYSE_MODE      12
 #define OPT_CHESS960          13
 #define OPT_SYZ_PATH          14
 #define OPT_SYZ_PROBE_DEPTH   15

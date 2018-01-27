@@ -227,7 +227,7 @@ void mainthread_search(void)
   char buf[16];
   int playBookMove = 0;
 
-  int analyzing = Limits.infinite || option_value(OPT_ANALYSIS);
+  int analyzing = Limits.infinite || option_value(OPT_ANALYSE_MODE);
 
   // When analyzing, use contempt only if the user has said so
   int contempt =  !analyzing || option_value(OPT_ANALYSIS_CONTEMPT)
