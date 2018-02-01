@@ -35,7 +35,8 @@ typedef void (*OnChange)(Option *);
 #define OPT_TYPE_SPIN     1
 #define OPT_TYPE_BUTTON   2
 #define OPT_TYPE_STRING   3
-#define OPT_TYPE_DISABLED 4
+#define OPT_TYPE_COMBO    4
+#define OPT_TYPE_DISABLED 5
 
 #define OPT_CONTEMPT          0
 #define OPT_ANALYSIS_CONTEMPT 1
@@ -76,7 +77,7 @@ void options_init(void);
 void options_free(void);
 void print_options(void);
 int option_value(int opt);
-char *option_string_value(int opt);
+const char *option_string_value(int opt);
 void option_set_value(int opt, int value);
 int option_set_by_name(char *name, char *value);
 

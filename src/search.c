@@ -227,16 +227,16 @@ void mainthread_search(void)
   char buf[16];
   int playBookMove = 0;
 
-  int analyzing = Limits.infinite || option_value(OPT_ANALYSE_MODE);
+  int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
-  // When analyzing, use contempt only if the user has said so
-  int contempt =  !analyzing || option_value(OPT_ANALYSIS_CONTEMPT)
-                ? option_value(OPT_CONTEMPT) * PawnValueEg / 100
-                : 0;
+  const char *s = option_string_value(OPT_ANALYSIS_CONTEMPT);
+  contempt =  !(Limits.infinite || option_value(OPT_ANALYSE_MODE))
+            ? (us == WHITE ? contempt : -contempt)
+            : strcmp(s, "Off") == 0 ? 0
+            : strcmp(s, "White") == 0 ? contempt
+            : -contempt;
 
-  // When analyzing, contempt is always from white's point of view
-  Contempt = analyzing || us == WHITE ?  make_score(contempt, contempt / 2)
-                                      : -make_score(contempt, contempt / 2);
+  Contempt = make_score(contempt, contempt / 2);
 
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
