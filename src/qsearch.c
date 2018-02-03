@@ -148,7 +148,6 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
 
     // Don't search moves with negative SEE values
     if (  (!InCheck || evasionPrunable)
-        &&  type_of_m(move) != PROMOTION
         &&  !see_test(pos, move, 0))
       continue;
 

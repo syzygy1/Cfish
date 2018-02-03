@@ -134,8 +134,8 @@ static const Score ThreatByKing[2] = { S(3, 62), S(9, 138) };
 // Passed[mg/eg][Rank] contains midgame and endgame bonuses for passed pawns.
 // We don't use a Score because we process the two components independently.
 static const Value Passed[][8] = {
-  { V(5), V( 5), V(31), V(73), V(166), V(252) },
-  { V(7), V(14), V(38), V(73), V(166), V(252) }
+  { V(0), V(5), V( 5), V(31), V(73), V(166), V(252) },
+  { V(0), V(7), V(14), V(38), V(73), V(166), V(252) }
 };
 
 // PassedFile[File] contains a bonus according to the file of a passed pawn
@@ -143,6 +143,9 @@ static const Score PassedFile[8] = {
   S(  9, 10), S( 2, 10), S( 1, -8), S(-20,-12),
   S(-20,-12), S( 1, -8), S( 2, 10), S(  9, 10)
 };
+
+// Rank-dependent factor for a passed-pawn bonus
+const int RankFactor[8] = { 0, 0, 0, 2, 6, 11, 16 };
 
 // KingProtector[PieceType-2] contains a bonus according to distance from king
 const Score KingProtector[] = { S(-3, -5), S(-4, -3), S(-3, 0), S(-1, 1) };
@@ -565,6 +568,12 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 }
 
 
+// Helper function
+INLINE int capped_distance(Square s1, Square s2)
+{
+  return min(distance(s1, s2), 5);
+}
+
 // evaluate_passed_pawns() evaluates the passed pawns and candidate passed
 // pawns of the given color.
 
@@ -586,8 +595,8 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
     bb = forward_file_bb(Us, s) & (ei->attackedBy[Them][0] | pieces_c(Them));
     score -= HinderPassedPawn * popcount(bb);
 
-    int r = relative_rank_s(Us, s) - RANK_2;
-    int rr = r * (r - 1);
+    int r = relative_rank_s(Us, s);
+    int rr = RankFactor[r];
 
     Value mbonus = Passed[MG][r], ebonus = Passed[EG][r];
 
@@ -595,12 +604,12 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
       Square blockSq = s + Up;
 
       // Adjust bonus based on the king's proximity
-      ebonus +=  distance(square_of(Them, KING), blockSq) * 5 * rr
-               - distance(square_of(Us, KING), blockSq) * 2 * rr;
+      ebonus +=  capped_distance(square_of(Them, KING), blockSq) * 5 * rr
+               - capped_distance(square_of(Us, KING), blockSq) * 2 *rr;
 
       // If blockSq is not the queening square then consider also a second push
-      if (relative_rank_s(Us, blockSq) != RANK_8)
-        ebonus -= distance(square_of(Us, KING), blockSq + Up) * rr;
+      if (r != RANK_7)
+        ebonus -= capped_distance(square_of(Us, KING), blockSq + Up) * rr;
 
       // If the pawn is free to advance, then increase the bonus
       if (is_empty(blockSq)) {

@@ -40,12 +40,6 @@ static Score Connected[2][2][3][8];
 // Doubled pawn penalty
 static const Score Doubled = S(18,38);
 
-// Lever bonus by rank
-static const Score Lever[8] = {
-  S( 0,  0), S( 0,  0), S(0, 0), S(0, 0),
-  S(17, 16), S(33, 32), S(0, 0), S(0, 0)
-};
-
 // Weakness of our pawn shelter in front of the king by
 // [isKingFile][distance from edge][rank]. RANK_1 = 0 is used for
 // files where we have no pawns or our pawn is behind our king.
@@ -182,9 +176,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
     if (doubled && !supported)
       score -= Doubled;
-
-    if (lever)
-      score += Lever[relative_rank_s(Us, s)];
   }
 
   return score;

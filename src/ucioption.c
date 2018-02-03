@@ -102,8 +102,9 @@ static void on_book_depth(Option *opt)
 #endif
 
 static Option options_map[] = {
-  { "Contempt", OPT_TYPE_SPIN, 0, -100, 100, NULL, NULL, 0, NULL },
-  { "Analysis Contempt", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
+  { "Contempt", OPT_TYPE_SPIN, 20, -100, 100, NULL, NULL, 0, NULL },
+  { "Analysis Contempt", OPT_TYPE_COMBO, 0, 0, 0,
+    "Off var Off var White var Black", NULL, 0, NULL },
   { "Threads", OPT_TYPE_SPIN, 1, 1, MAX_THREADS, NULL, on_threads, 0, NULL },
   { "Hash", OPT_TYPE_SPIN, 16, 1, MAXHASHMB, NULL, on_hash_size, 0, NULL },
   { "Clear Hash", OPT_TYPE_BUTTON, 0, 0, 0, NULL, on_clear_hash, 0, NULL },
@@ -114,7 +115,7 @@ static Option options_map[] = {
   { "Minimum Thinking Time", OPT_TYPE_SPIN, 20, 0, 5000, NULL, NULL, 0, NULL },
   { "Slow Mover", OPT_TYPE_SPIN, 89, 10, 1000, NULL, NULL, 0, NULL },
   { "nodestime", OPT_TYPE_SPIN, 0, 0, 10000, NULL, NULL, 0, NULL },
-  { "UCI_Analysis", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
+  { "UCI_AnalyseMode", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "UCI_Chess960", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
   { "SyzygyPath", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_tb_path, 0, NULL },
   { "SyzygyProbeDepth", OPT_TYPE_SPIN, 1, 1, 100, NULL, NULL, 0, NULL },
@@ -135,6 +136,9 @@ static Option options_map[] = {
 
 void options_init()
 {
+  char *s;
+  size_t len;
+
 #ifdef NUMA
   // On a non-NUMA machine, disable the NUMA option to diminish confusion.
   if (!numa_avail)
@@ -165,6 +169,13 @@ void options_init()
       opt->val_string = malloc(strlen(opt->def_string) + 1);
       strcpy(opt->val_string, opt->def_string);
       break;
+    case OPT_TYPE_COMBO:
+      s = strstr(opt->def_string, " var");
+      len = strlen(opt->def_string) - strlen(s);
+      opt->val_string = malloc(len + 1);
+      strncpy(opt->val_string, opt->def_string, len);
+      opt->val_string[len] = 0;
+      break;
     }
     if (opt->on_change)
       opt->on_change(opt);
@@ -180,7 +191,7 @@ void options_free(void)
 
 static char *opt_type_str[] =
 {
-  "check", "spin", "button", "string"
+  "check", "spin", "button", "string", "combo"
 };
 
 // print_options() prints all options in the format required by the
@@ -201,6 +212,7 @@ void print_options(void)
     case OPT_TYPE_BUTTON:
       break;
     case OPT_TYPE_STRING:
+    case OPT_TYPE_COMBO:
       printf(" default %s", opt->def_string);
       break;
     }
@@ -214,7 +226,7 @@ int option_value(int opt_idx)
   return options_map[opt_idx].value;
 }
 
-char *option_string_value(int opt_idx)
+const char *option_string_value(int opt_idx)
 {
   return options_map[opt_idx].val_string;
 }
@@ -256,6 +268,19 @@ int option_set_by_name(char *name, char *value)
         opt->val_string = malloc(strlen(value) + 1);
         strcpy(opt->val_string, value);
         break;
+      case OPT_TYPE_COMBO:
+        for (char *s1 = strstr(opt->def_string, " var"); s1; ) {
+          char *s2 = strstr(s1 + 4, " var");
+          s1 += 5;
+          size_t len = strlen(s1) - (s2 ? strlen(s2) : 0);
+          if (strncmp(s1, value, len) == 0 && strlen(value) == len) {
+            free(opt->val_string);
+            opt->val_string = malloc(len + 1);
+            strcpy(opt->val_string, value);
+            return 1;
+          }
+          s1 = s2;
+        }
       }
       if (opt->on_change)
         opt->on_change(opt);

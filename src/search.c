@@ -190,16 +190,16 @@ void mainthread_search(void)
   char buf[16];
   int playBookMove = 0;
 
-  int analyzing = Limits.infinite || option_value(OPT_ANALYSIS);
+  int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
-  // When analyzing, use contempt only if the user has said so
-  int contempt =  !analyzing || option_value(OPT_ANALYSIS_CONTEMPT)
-                ? option_value(OPT_CONTEMPT) * PawnValueEg / 100
-                : 0;
+  const char *s = option_string_value(OPT_ANALYSIS_CONTEMPT);
+  contempt =  !(Limits.infinite || option_value(OPT_ANALYSE_MODE))
+            ? (us == WHITE ? contempt : -contempt)
+            : strcmp(s, "Off") == 0 ? 0
+            : strcmp(s, "White") == 0 ? contempt
+            : -contempt;
 
-  // When analyzing, contempt is always from white's point of view
-  Contempt = analyzing || us == WHITE ?  make_score(contempt, contempt / 2)
-                                      : -make_score(contempt, contempt / 2);
+  Contempt = make_score(contempt, contempt / 2);
 
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
@@ -753,7 +753,7 @@ static int pv_is_draw(Pos *pos)
 
 static void check_time(void)
 {
-  int elapsed = time_elapsed();
+  TimePoint elapsed = time_elapsed();
 
   // An engine may not stop pondering until told so by the GUI
   if (Limits.ponder)
@@ -771,7 +771,7 @@ static void check_time(void)
 
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 {
-  int elapsed = time_elapsed() + 1;
+  TimePoint elapsed = time_elapsed() + 1;
   RootMoves *rm = pos->rootMoves;
   int PVIdx = pos->PVIdx;
   int multiPV = min(option_value(OPT_MULTI_PV), rm->size);
@@ -813,7 +813,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     if (elapsed > 1000)
       printf(" hashfull %d", tt_hashfull());
 
-    printf(" tbhits %"PRIu64" time %d pv", tbhits, elapsed);
+    printf(" tbhits %"PRIu64" time %"PRIi64" pv", tbhits, elapsed);
 
     for (int idx = 0; idx < rm->move[i].pv_size; idx++)
       printf(" %s", uci_move(buf, rm->move[i].pv[idx], is_chess960()));

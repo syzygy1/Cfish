@@ -206,11 +206,6 @@ void benchmark(Pos *current, char *str)
 
     position(&pos, buf);
 
-    // HACK: Clear root history position key to keep the right bench
-    // after the 2-fold rep MultiPV fix in Stockfish, which in my view is
-    // incorrect.
-    pos.rootKeyFlip = pos.st->key;
-
     fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", ++j, num_fens - num_opts);
 
     if (strcmp(limitType, "perft") == 0)

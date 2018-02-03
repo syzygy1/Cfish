@@ -42,9 +42,10 @@ void time_init(int us, int ply);
 #define time_optimum() Time.optimumTime
 #define time_maximum() Time.maximumTime
 
-INLINE int time_elapsed(void)
+INLINE TimePoint time_elapsed(void)
 {
-  return Limits.npmsec ? threads_nodes_searched() : now() - Time.startTime;
+  return Limits.npmsec ? (int64_t)threads_nodes_searched()
+                       : now() - Time.startTime;
 }
 
 #endif
