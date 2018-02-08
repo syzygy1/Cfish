@@ -183,13 +183,13 @@ Move next_move(const Pos *pos, int skipQuiets)
     /* fallthrough */
 
   case ST_QUIET:
-    while (    st->cur < st->endMoves
-           && (!skipQuiets || st->cur->value >= 0)) {
-      move = (st->cur++)->move;
-      if (   move != st->ttMove && move != st->mp_killers[0]
-          && move != st->mp_killers[1] && move != st->countermove)
-        return move;
-    }
+    if (!skipQuiets)
+      while (st->cur < st->endMoves) {
+        move = (st->cur++)->move;
+        if (   move != st->ttMove && move != st->mp_killers[0]
+            && move != st->mp_killers[1] && move != st->countermove)
+          return move;
+      }
     st->stage++;
     st->cur = (st-1)->endMoves; // Return to bad captures.
     /* fallthrough */
