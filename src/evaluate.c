@@ -19,6 +19,7 @@
 */
 
 #include <assert.h>
+#include <stdatomic.h>
 #include <string.h>   // For std::memset
 
 #include "bitboard.h"
@@ -184,8 +185,7 @@ static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 #define LazyThreshold 1500
 #define SpaceThreshold 12222
 
-Score Contempt = SCORE_ZERO;
-
+_Atomic Score Contempt = SCORE_ZERO;
 
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
@@ -779,7 +779,8 @@ Value evaluate(const Pos *pos)
   // in the position struct (material + piece square tables) and the
   // material imbalance. Score is computed internally from the white point
   // of view.
-  Score score = pos_psq_score() + material_imbalance(ei.me) + Contempt;
+  Score score =  pos_psq_score() + material_imbalance(ei.me)
+               + atomic_load_explicit(&Contempt, memory_order_relaxed);
 
   // Probe the pawn hash table
   ei.pe = pawn_probe(pos);

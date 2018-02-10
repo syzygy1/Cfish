@@ -21,8 +21,6 @@
 #ifndef SEARCH_H
 #define SEARCH_H
 
-#include <stdatomic.h>
-
 #include "misc.h"
 #include "position.h"
 #include "thread.h"

@@ -19,10 +19,10 @@
 */
 
 #include <assert.h>
-#include <math.h>
-#include <string.h>   // For std::memset
-#include <stdio.h>
 #include <inttypes.h>
+#include <math.h>
+#include <stdio.h>
+#include <string.h>   // For std::memset
 
 #include "evaluate.h"
 #include "misc.h"
@@ -31,11 +31,11 @@
 #include "polybook.h"
 #include "search.h"
 #include "settings.h"
+#include "tbprobe.h"
 #include "timeman.h"
 #include "thread.h"
 #include "tt.h"
 #include "uci.h"
-#include "tbprobe.h"
 
 #define load_rlx(x) atomic_load_explicit(&(x), memory_order_relaxed)
 #define store_rlx(x,y) atomic_store_explicit(&(x), y, memory_order_relaxed)
@@ -48,6 +48,8 @@ int TB_RootInTB;
 int TB_UseRule50;
 Depth TB_ProbeDepth;
 
+static Score base_ct;
+
 // Different node types, used as a template parameter
 
 #define NonPV 0
@@ -55,8 +57,8 @@ Depth TB_ProbeDepth;
 
 // Sizes and phases of the skip blocks, used for distributing search depths
 // across the threads
-static int skipSize[20]  = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
-static int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
+static const int skipSize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
+static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
 
 static const int razor_margin = 600;
 
@@ -109,7 +111,6 @@ static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus);
 static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, int bonus);
 static void update_capture_stats(const Pos *pos, Move move, Move *captures, int captureCnt, int bonus);
-static int pv_is_draw(Pos *pos);
 static void check_time(void);
 static void stable_sort(RootMove *rm, int num);
 static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
@@ -227,16 +228,17 @@ void mainthread_search(void)
   char buf[16];
   int playBookMove = 0;
 
-  int contempt = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
+  base_ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
   const char *s = option_string_value(OPT_ANALYSIS_CONTEMPT);
-  contempt =  !(Limits.infinite || option_value(OPT_ANALYSE_MODE))
-            ? (us == WHITE ? contempt : -contempt)
-            : strcmp(s, "Off") == 0 ? 0
-            : strcmp(s, "White") == 0 ? contempt
-            : -contempt;
+  if (Limits.infinite || option_value(OPT_ANALYSE_MODE))
+    base_ct =  strcmp(s, "off") == 0 ? 0
+             : strcmp(s, "white") == 0 && us == BLACK ? -base_ct
+             : strcmp(s, "black") == 0 && us == WHITE ? -base_ct
+             : base_ct;
 
-  Contempt = make_score(contempt, contempt / 2);
+  store_rlx(Contempt, us == WHITE ?  make_score(base_ct, base_ct / 2)
+                                  : -make_score(base_ct, base_ct / 2));
 
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
@@ -382,8 +384,6 @@ void thread_search(Pos *pos)
   RootMoves *rm = pos->rootMoves;
   multiPV = min(multiPV, rm->size);
 
-  int hIdx = (pos->thread_idx - 1) % 20;
-
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.
   while (   (pos->rootDepth += ONE_PLY) < DEPTH_MAX
@@ -395,7 +395,7 @@ void thread_search(Pos *pos)
     // Distribute search depths across the threads
     if (pos->thread_idx) {
       int i = (pos->thread_idx - 1) % 20;
-      if (((pos->rootDepth / ONE_PLY + pos_game_ply() + skipPhase[i]) / skipSize[hIdx]) % 2)
+      if (((pos->rootDepth / ONE_PLY + pos_game_ply() + skipPhase[i]) / skipSize[i]) % 2)
         continue;
     }
 
@@ -438,6 +438,13 @@ void thread_search(Pos *pos)
         delta = (Value)18;
         alpha = max(rm->move[PVIdx].previousScore - delta,-VALUE_INFINITE);
         beta  = min(rm->move[PVIdx].previousScore + delta, VALUE_INFINITE);
+
+        // Adjust contempt based on current situation
+        int ct = base_ct + (  bestValue >  500 ?  50
+                            : bestValue < -500 ? -50
+                            : bestValue / 10);
+        store_rlx(Contempt, pos_stm() == WHITE ?  make_score(ct, ct / 2)
+                                               : -make_score(ct, ct / 2));
       }
 
       // Start with a small aspiration window and, in the case of a fail
@@ -539,12 +546,7 @@ skip_search:
 
         int improvingFactor = max(229, min(715, 357 + 119 * F[0] - 6 * F[1]));
 
-        int us = pos_stm();
-        int thinkHard =   bestValue == VALUE_DRAW
-                       && Limits.time[us] - time_elapsed() > Limits.time[us ^ 1]
-                       && pv_is_draw(pos);
-
-        double unstablePvFactor = 1 + mainThread.bestMoveChanges + thinkHard;
+        double unstablePvFactor = 1 + mainThread.bestMoveChanges;
 
         // If the best move is stable over several iterations, reduce time
         // for this move, the longer the move has been stable, the more.
@@ -552,12 +554,12 @@ skip_search:
         // current move.
         timeReduction = 1;
         for (int i = 3; i < 6; i++)
-          if (lastBestMoveDepth * i < pos->completedDepth && !thinkHard)
+          if (lastBestMoveDepth * i < pos->completedDepth)
             timeReduction *= 1.3;
         unstablePvFactor *= pow(mainThread.previousTimeReduction, 0.51) / timeReduction;
 
         if (   rm->size == 1
-            || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 628)
+            || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 605)
         {
           // If we are allowed to ponder do not stop the search now but
           // keep pondering until the GUI sends "ponderhit" or "stop".
@@ -730,23 +732,6 @@ void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
     history_update(*pos->history, c, quiets[i], -bonus);
     update_cm_stats(ss, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
   }
-}
-
-static int pv_is_draw(Pos *pos)
-{
-  RootMove *rm = &pos->rootMoves->move[0];
-
-  pos->st->endMoves = (pos->st-1)->endMoves;
-
-  for (int i = 0; i < rm->pv_size; i++)
-    do_move(pos, rm->pv[i], gives_check(pos, pos->st, rm->pv[i]));
-
-  int isDraw = is_draw(pos);
-
-  for (int i = rm->pv_size; i > 0; i--)
-    undo_move(pos, rm->pv[i - 1]);
-
-  return isDraw;
 }
 
 #if 0
