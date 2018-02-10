@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2011-2013 Ronald de Man
+  Copyright (c) 2011-2018 Ronald de Man
 */
 
 #ifndef TBCORE_H
@@ -94,7 +94,7 @@ struct TBEntry_piece {
   uint8_t symmetric;
   uint8_t has_pawns;
   uint8_t loss_only;
-  uint8_t enc_type;
+  uint8_t kk_enc;
   struct PairsData *precomp[2];
   int factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];
@@ -146,7 +146,7 @@ struct DTZEntry_piece {
   uint8_t symmetric;
   uint8_t has_pawns;
   uint8_t loss_only;
-  uint8_t enc_type;
+  uint8_t kk_enc;
   struct PairsData *precomp;
   int factor[TBPIECES];
   uint8_t pieces[TBPIECES];
@@ -186,7 +186,7 @@ struct DTMEntry_piece {
   uint8_t symmetric;
   uint8_t has_pawns;
   uint8_t loss_only;
-  uint8_t enc_type;
+  uint8_t kk_enc;
   struct PairsData *precomp[2];
   int factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];

@@ -92,7 +92,7 @@ static int probe_wdl_table(Pos *pos, int *success)
 {
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
-  uint64_t idx;
+  size_t idx;
   int i;
   uint8_t res;
   int p[TBPIECES];
@@ -189,7 +189,7 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
 {
   struct TBEntry *ptr;
   struct TBHashEntry *ptr2;
-  uint64_t idx;
+  size_t idx;
   int i;
   int res;
   int p[TBPIECES];
@@ -299,7 +299,7 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
 static int probe_dtz_table(Pos *pos, int wdl, int *success)
 {
   struct TBEntry *ptr;
-  uint64_t idx;
+  size_t idx;
   int i;
   uint32_t res;
   int p[TBPIECES];
