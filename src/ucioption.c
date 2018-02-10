@@ -21,6 +21,7 @@
 #define _GNU_SOURCE
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -175,6 +176,8 @@ void options_init()
       opt->val_string = malloc(len + 1);
       strncpy(opt->val_string, opt->def_string, len);
       opt->val_string[len] = 0;
+      for (s = opt->val_string; *s; s++)
+        *s = tolower(*s);
       break;
     }
     if (opt->on_change)
@@ -269,18 +272,11 @@ int option_set_by_name(char *name, char *value)
         strcpy(opt->val_string, value);
         break;
       case OPT_TYPE_COMBO:
-        for (char *s1 = strstr(opt->def_string, " var"); s1; ) {
-          char *s2 = strstr(s1 + 4, " var");
-          s1 += 5;
-          size_t len = strlen(s1) - (s2 ? strlen(s2) : 0);
-          if (strncmp(s1, value, len) == 0 && strlen(value) == len) {
-            free(opt->val_string);
-            opt->val_string = malloc(len + 1);
-            strcpy(opt->val_string, value);
-            return 1;
-          }
-          s1 = s2;
-        }
+        free(opt->val_string);
+        opt->val_string = malloc(strlen(value) + 1);
+        strcpy(opt->val_string, value);
+        for (char *s = opt->val_string; *s; s++)
+          *s = tolower(*s);
       }
       if (opt->on_change)
         opt->on_change(opt);
