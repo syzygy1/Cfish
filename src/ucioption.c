@@ -157,6 +157,10 @@ void options_init()
   options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
 #endif
+  if (sizeof(size_t) < 8) {
+    options_map[OPT_SYZ_PROBE_LIMIT].def = 5;
+    options_map[OPT_SYZ_PROBE_LIMIT].max_val = 5;
+  }
   for (Option *opt = options_map; opt->name != NULL; opt++) {
     if (opt->type == OPT_TYPE_DISABLED)
       continue;
