@@ -104,32 +104,13 @@ void benchmark(Pos *current, char *str)
   char **fens;
   size_t num_fens;
 
-  Limits.time[0] = Limits.time[1] = Limits.inc[0] = Limits.inc[1] = 0;
-  Limits.npmsec = Limits.movestogo = Limits.depth = Limits.movetime = 0;
-  Limits.mate = Limits.infinite = Limits.ponder = Limits.num_searchmoves = 0;
-  Limits.nodes = 0;
+  Limits = (struct LimitsType){ 0 };
 
-  int ttSize = 16, threads = 1;
-  int64_t limit = 13;
-  char *fenFile = NULL, *limitType = "";
-
-  token = strtok(str, " ");
-  if (token) {
-    ttSize = atoi(token);
-    token = strtok(NULL, " ");
-    if (token) {
-      threads = atoi(token);
-      token = strtok(NULL, " ");
-      if (token) {
-        limit = atoll(token);
-        fenFile = strtok(NULL, " ");
-        if (fenFile) {
-          token = strtok(NULL, " ");
-          if (token) limitType = token;
-        }
-      }
-    }
-  }
+  int ttSize      = (token = strtok(str , " ")) ? atoi(token)  : 16;
+  int threads     = (token = strtok(NULL, " ")) ? atoi(token)  : 1;
+  int64_t limit   = (token = strtok(NULL, " ")) ? atoll(token) : 13;
+  char *fenFile   = (token = strtok(NULL, " ")) ? token        : NULL;
+  char *limitType = (token = strtok(NULL, " ")) ? token        : "";
 
   delayed_settings.tt_size = ttSize;
   delayed_settings.num_threads = threads;
@@ -234,4 +215,3 @@ void benchmark(Pos *current, char *str)
   free(pos.stack);
   free(pos.moveList);
 }
-
