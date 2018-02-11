@@ -180,7 +180,7 @@ ifeq ($(COMP),mingw)
 		CC=gcc
 	endif
 
-	CFLAGS += -Wextra -Wshadow
+	CFLAGS += -Wextra -Wshadow -D__USE_MINGW_ANSI_STDIO=1
 	LDFLAGS += #-static
 endif
 

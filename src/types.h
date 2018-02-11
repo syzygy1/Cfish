@@ -434,12 +434,6 @@ extern struct PSQT psqt;
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
-#ifndef __WIN32__
-#define FMT_Z "z"
-#else
-#define FMT_Z "I"
-#endif
-
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
 #else
