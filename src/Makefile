@@ -142,7 +142,7 @@ endif
 
 ### 3.1 Selecting compiler (default = gcc)
 
-CFLAGS += -Wall -std=c11 $(EXTRACFLAGS)
+CFLAGS += -Wall -std=c11 $(EXTRACFLAGS) -D__USE_MINGW_ANSI_STDIO=1
 DEPENDFLAGS += -std=c11
 LDFLAGS += $(EXTRALDFLAGS) -lm
 
@@ -180,7 +180,7 @@ ifeq ($(COMP),mingw)
 		CC=gcc
 	endif
 
-	CFLAGS += -Wextra -Wshadow -D__USE_MINGW_ANSI_STDIO=1
+	CFLAGS += -Wextra -Wshadow
 	LDFLAGS += #-static
 endif
 
