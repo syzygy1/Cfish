@@ -67,7 +67,7 @@ typedef struct MainThread MainThread;
 
 extern MainThread mainThread;
 
-void mainthread_search();
+void mainthread_search(void);
 
 
 // ThreadPool struct handles all the threads-related stuff like init,
@@ -106,4 +106,3 @@ CounterMoveHistoryStat **cmh_tables;
 int num_cmh_tables;
 
 #endif
-

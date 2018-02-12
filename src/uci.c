@@ -164,12 +164,8 @@ void go(Pos *pos, char *str)
 
   process_delayed_settings();
 
+  Limits = (struct LimitsType){ 0 };
   Limits.startTime = now(); // As early as possible!
-
-  Limits.time[0] = Limits.time[1] = Limits.inc[0] = Limits.inc[1] = 0;
-  Limits.npmsec = Limits.movestogo = Limits.depth = Limits.movetime = 0;
-  Limits.mate = Limits.infinite = Limits.ponder = Limits.num_searchmoves = 0;
-  Limits.nodes = 0;
 
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
     if (strcmp(token, "searchmoves") == 0)
@@ -441,4 +437,3 @@ Move uci_to_move(const Pos *pos, char *str)
 
   return 0;
 }
-

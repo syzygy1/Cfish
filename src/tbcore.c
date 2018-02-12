@@ -1106,14 +1106,6 @@ static void calc_symlen(struct PairsData *d, uint32_t s, char *tmp)
   tmp[s] = 1;
 }
 
-INLINE uint16_t read_uint16_t(uint8_t *d) {
-  return d[0] | (d[1] << 8);
-}
-
-INLINE uint32_t read_uint32_t(uint8_t *d) {
-  return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24);
-}
-
 static struct PairsData *setup_pairs(uint8_t *data, size_t tb_size, size_t *size, uint8_t **next, uint8_t *flags, int wdl)
 {
   struct PairsData *d;
@@ -1131,12 +1123,12 @@ static struct PairsData *setup_pairs(uint8_t *data, size_t tb_size, size_t *size
 
   uint32_t blocksize = data[1];
   uint32_t idxbits = data[2];
-  uint32_t real_num_blocks = read_uint32_t(&data[4]);
+  uint32_t real_num_blocks = read_le_u32(&data[4]);
   uint32_t num_blocks = real_num_blocks + data[3];
   int max_len = data[8];
   int min_len = data[9];
   int h = max_len - min_len + 1;
-  uint32_t num_syms = read_uint16_t(&data[10 + 2 * h]);
+  uint32_t num_syms = read_le_u16(&data[10 + 2 * h]);
   d = malloc(sizeof(*d) + h * sizeof(base_t) + num_syms);
   d->blocksize = blocksize;
   d->idxbits = idxbits;
@@ -1159,7 +1151,7 @@ static struct PairsData *setup_pairs(uint8_t *data, size_t tb_size, size_t *size
 
   d->base[h - 1] = 0;
   for (int i = h - 2; i >= 0; i--)
-    d->base[i] = (d->base[i + 1] + read_uint16_t((uint8_t *)(d->offset + i)) - read_uint16_t((uint8_t *)(d->offset + i + 1))) / 2;
+    d->base[i] = (d->base[i + 1] + read_le_u16((uint8_t *)(d->offset + i)) - read_le_u16((uint8_t *)(d->offset + i + 1))) / 2;
   for (int i = 0; i < h; i++)
     d->base[i] <<= 64 - (min_len + i);
 
@@ -1186,7 +1178,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
   }
 
   uint8_t *data = entry->data;
-  if (read_uint32_t(data) != (!dtm ? WDL_MAGIC : DTM_MAGIC)) {
+  if (read_le_u32(data) != (!dtm ? WDL_MAGIC : DTM_MAGIC)) {
     fprintf(stderr, "Corrupted table.\n");
     unmap_file(entry->data, entry->mapping);
     entry->data = NULL;
@@ -1218,12 +1210,12 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       dtm_ptr->map = (uint16_t *)data;
       for (int i = 0; i < 2; i++) {
         dtm_ptr->map_idx[0][i] = (uint16_t *)data + 1 - dtm_ptr->map;
-        data += 2 + 2 * read_uint16_t(data);
+        data += 2 + 2 * read_le_u16(data);
       }
       if (split) {
         for (int i = 0; i < 2; i++) {
           dtm_ptr->map_idx[1][i] = (uint16_t *)data + 1 - dtm_ptr->map;
-          data += 2 + 2 * read_uint16_t(data);
+          data += 2 + 2 * read_le_u16(data);
         }
       }
     }
@@ -1322,12 +1314,12 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
       for (r = 0; r < 6; r++) {
         for (int i = 0; i < 2; i++) {
           dtm_ptr->map_idx[r][0][i] = (uint16_t *)data + 1 - dtm_ptr->map;
-          data += 2 + 2 * read_uint16_t(data);
+          data += 2 + 2 * read_le_u16(data);
         }
         if (split) {
           for (int i = 0; i < 2; i++) {
             dtm_ptr->map_idx[r][1][i] = (uint16_t *)data + 1 - dtm_ptr->map;
-            data += 2 + 2 * read_uint16_t(data);
+            data += 2 + 2 * read_le_u16(data);
           }
         }
       }
@@ -1379,7 +1371,7 @@ static int init_table_dtz(struct TBEntry *entry)
   if (!data)
     return 0;
 
-  if (read_uint32_t(data) != DTZ_MAGIC) {
+  if (read_le_u32(data) != DTZ_MAGIC) {
     fprintf(stderr, "Corrupted table.\n");
     return 0;
   }
@@ -1460,19 +1452,8 @@ static int init_table_dtz(struct TBEntry *entry)
   return 1;
 }
 
-INLINE int is_little_endian() {
-  union {
-    int i;
-    char c[sizeof(int)];
-  } x;
-  x.i = 1;
-  return x.c[0] == 1;
-}
-
 static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
 {
-  const int LittleEndian = is_little_endian();
-
   if (!d->idxbits)
     return d->const_val;
 
@@ -1480,12 +1461,10 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
   int litidx = (idx & (((size_t)1 << d->idxbits) - 1)) - ((size_t)1 << (d->idxbits - 1));
   uint32_t block;
   memcpy(&block, d->indextable + 6 * mainidx, sizeof(block));
-  if (!LittleEndian)
-    block = BSWAP32(block);
+  block = from_le_u32(block);
 
   uint16_t idxOffset = *(uint16_t *)(d->indextable + 6 * mainidx + 4);
-  if (!LittleEndian)
-    idxOffset = (idxOffset << 8) | (idxOffset >> 8);
+  idxOffset = from_le_u16(idxOffset);
   litidx += idxOffset;
 
   if (litidx < 0) {
@@ -1505,18 +1484,14 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
   uint8_t *symlen = d->symlen;
   int sym, bitcnt;
 
-  uint64_t code = *(uint64_t *)ptr;
-  if (LittleEndian)
-    code = BSWAP64(code);
+  uint64_t code = from_be_u64(*(uint64_t *)ptr);
 
   ptr += 2;
   bitcnt = 0; // number of "empty bits" in code
   for (;;) {
     int l = m;
     while (code < base[l]) l++;
-    sym = offset[l];
-    if (!LittleEndian)
-      sym = ((sym & 0xff) << 8) | (sym >> 8);
+    sym = from_le_u16(offset[l]);
     sym += (code - base[l]) >> (64 - l);
     if (litidx < (int)symlen[sym] + 1) break;
     litidx -= (int)symlen[sym] + 1;
@@ -1524,9 +1499,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
     bitcnt += l;
     if (bitcnt >= 32) {
       bitcnt -= 32;
-      uint32_t tmp = *ptr++;
-      if (LittleEndian)
-        tmp = BSWAP32(tmp);
+      uint32_t tmp = from_be_u32(*ptr++);
       code |= (uint64_t)tmp << bitcnt;
      }
    }
@@ -1639,4 +1612,3 @@ static void free_dtz_entry(struct TBEntry *entry)
 
 static int wdl_to_map[5] = { 1, 3, 0, 2, 0 };
 static uint8_t pa_flags[5] = { 8, 0, 0, 0, 4 };
-

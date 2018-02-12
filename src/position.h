@@ -401,4 +401,3 @@ INLINE Bitboard pos_attackers_to_occ(const Pos *pos, Square s,
 }
 
 #endif
-

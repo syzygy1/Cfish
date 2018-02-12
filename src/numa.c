@@ -21,7 +21,7 @@ int numa_avail;
 static int *num_logical_cores;
 static struct bitmask **nodemask;
 
-// Override libnuma's numa_warn().
+// Override libnuma's numa_warn()
 void numa_warn(int num, char *fmt, ...)
 {
   (void)num, (void)fmt;
@@ -48,7 +48,7 @@ void numa_init(void)
       printf("node %d is absent.\n", node);
 #endif
 
-  // Determine number of logical and physical cores per node.
+  // Determine number of logical and physical cores per node
   num_physical_cores = malloc(num_nodes * sizeof(int));
   num_logical_cores = malloc(num_nodes * sizeof(int));
   nodemask = malloc(num_nodes * sizeof(struct bitmask *));
@@ -66,7 +66,7 @@ void numa_init(void)
     for (int cpu = 0; cpu < num_cpus; cpu++)
       if (numa_bitmask_isbitset(cpu_mask, cpu)) {
         num_logical_cores[node]++;
-        // Find out about the thread_siblings of this cpu.
+        // Find out about the thread_siblings of this cpu
         sprintf(name,
                 "/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list",
                 cpu);
@@ -154,7 +154,7 @@ int bind_thread_to_numa_node(int thread_idx)
       k++;
     }
 
-  // Then assign threads round-robin.
+  // Then assign threads round-robin
   if (node == num_nodes) {
     idx %= k;
     for (node = 0; node < num_nodes; node++)
@@ -211,9 +211,9 @@ void numa_init(void)
                                      "VirtualAllocExNuma");
 
   if (imp_GetLogicalProcessorInformationEx && imp_SetThreadGroupAffinity) {
-    // use windows processor groups
+    // Use windows processor groups
 
-    // get array of node and core data
+    // Get array of node and core data
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *buffer = NULL;
     while (1) {
       if (imp_GetLogicalProcessorInformationEx(RelationAll, buffer, &len))
@@ -231,7 +231,7 @@ void numa_init(void)
       }
     }
 
-    // First get nodes.
+    // First get nodes
     node_group_mask = malloc(max_nodes * sizeof(GROUP_AFFINITY));
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *ptr = buffer;
     while (ptr->Size > 0 && offset + ptr->Size <= len) {
@@ -250,7 +250,7 @@ void numa_init(void)
       ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)(((char *)ptr) + ptr->Size);        
     }
 
-    // Then count cores in each node.
+    // Then count cores in each node
     num_physical_cores = calloc(num_nodes, sizeof(int));
 //    num_logical_cores = calloc(num_nodes, sizeof(int));
     ptr = buffer;
@@ -258,7 +258,7 @@ void numa_init(void)
     while (ptr->Size > 0 && offset + ptr->Size <= len) {
       if (ptr->Relationship == RelationProcessorCore) {
         // Loop through nodes to find one with matching group number
-        // and intersecting mask.
+        // and intersecting mask
         for (int i = 0; i < num_nodes; i++)
           if (   node_group_mask[i].Group == ptr->Processor.GroupMask[0].Group
               && (node_group_mask[i].Mask & ptr->Processor.GroupMask[0].Mask))
@@ -270,9 +270,9 @@ void numa_init(void)
     free(buffer);
 
   } else {
-    // Use windows but not its processor groups.
+    // Use windows but not its processor groups
 
-    // Get array of node and core data.
+    // Get array of node and core data
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer = NULL;
     while (1) {
       if (GetLogicalProcessorInformation(buffer, &len))
@@ -290,7 +290,7 @@ void numa_init(void)
       }
     }
 
-    // First get nodes.
+    // First get nodes
     node_mask = malloc(max_nodes * sizeof(ULONGLONG));
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION *ptr = buffer;
     while (offset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= len) {
@@ -308,12 +308,12 @@ void numa_init(void)
       ptr++;
     }
 
-    // Then count cores in each node.
+    // Then count cores in each node
     ptr = buffer;
     offset = 0;
     while (offset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= len) {
       if (ptr->Relationship == RelationProcessorCore) {
-        // Loop through nodes to find one with intersecting mask.
+        // Loop through nodes to find one with intersecting mask
         for (int i = 0; i < num_nodes; i++)
           if (node_mask[i] & ptr->ProcessorMask)
             num_physical_cores[i]++;
@@ -390,7 +390,7 @@ int bind_thread_to_numa_node(int thread_idx)
     idx -= num_physical_cores[node];
   }
 
-  // Then assign threads round-robin.
+  // Then assign threads round-robin
   if (node == num_nodes)
     node = idx % num_nodes;
 
@@ -446,4 +446,3 @@ void numa_interleave_memory(void *ptr, size_t size, ULONGLONG mask)
 typedef int make_iso_compilers_happy;
 
 #endif
-

@@ -24,13 +24,7 @@ static int get_key_data(void);
 static int check_do_search(const Pos *pos);
 static int check_draw(Pos *pos, Move m);
 
-static void byteswap_polyhash(struct PolyHash *ph);
-static uint64_t rand64(void);
-
-static int is_little_endian(void);
-static uint64_t swap_uint64(uint64_t d);
-static uint32_t swap_uint32(uint32_t d);
-static uint16_t swap_uint16(uint16_t d);
+static void from_be_polyhash(struct PolyHash *ph);
 
 // Random numbers from PolyGlot, used to compute book hash keys
 static const union {
@@ -318,7 +312,7 @@ static int index_best;
 static int index_rand;
 static int index_weight_count;
 
-static uint64_t sr;
+static PRNG sr;
 
 static Bitboard last_position;
 static Bitboard akt_position;
@@ -328,7 +322,7 @@ static int search_counter;
 
 static int enabled = 0, do_search = 1;
 
-void pb_exit()
+void pb_free(void)
 {
   if (polyhash)
     free(polyhash);
@@ -336,9 +330,7 @@ void pb_exit()
 
 void pb_init(const char *bookfile)
 {
-  if (!bookfile || strlen(bookfile) == 0) return;
-
-  if (strcmp(bookfile, "<empty>") == 0) {
+  if (!bookfile || strlen(bookfile) == 0 || strcmp(bookfile, "<empty>") == 0) {
     enabled = 0;
     return;
   }
@@ -360,17 +352,17 @@ void pb_init(const char *bookfile)
   fseek(F, 0L, SEEK_SET);
 
   keycount = filesize / 16;
-  polyhash = malloc(keycount * sizeof(struct PolyHash));
+  polyhash = malloc(keycount * sizeof(*polyhash));
 
   fread(polyhash, 1, filesize, F);
   fclose(F);
 
   for (int i = 0; i < keycount; i++)
-    byteswap_polyhash(&polyhash[i]);
+    from_be_polyhash(&polyhash[i]);
 
-  sr = time(NULL);
+  prng_init(&sr, time(NULL));
   for (int i = 0; i < 10; i++)
-    rand64();
+    prng_rand(&sr);
 
   printf("info string Book loaded: %s\n", bookfile);
 
@@ -382,12 +374,10 @@ void pb_set_best_book_move(int best_book_move)
   use_best_book_move = best_book_move;
 }
 
-
 void pb_set_book_depth(int book_depth)
 {
   max_book_depth = book_depth;
 }
-
 
 Move pb_probe(Pos *pos)
 {
@@ -406,7 +396,7 @@ Move pb_probe(Pos *pos)
   if (n < 1) {
     search_counter++;
     if (search_counter > 4) {
-      // stop searching after 4 times not in the book till position changes
+      // Stop searching after 4 times not in the book till position changes
       // according to check_do_search()
       do_search = 0;
       search_counter = 0;
@@ -425,7 +415,7 @@ Move pb_probe(Pos *pos)
   if (!is_draw(pos)) return m1; // 64
   if (n == 1) return m1;
 
-  // special case draw position and 2 moves available
+  // Special case draw position and 2 moves available
 
   if (!check_draw(pos, m1))
     return m1;
@@ -440,7 +430,6 @@ Move pb_probe(Pos *pos)
 
   return 0;
 }
-
 
 static Key polyglot_key(const Pos *pos)
 {
@@ -497,7 +486,7 @@ static Move pg_move_to_sf_move(const Pos *pos, uint16_t pg_move)
   ExtMove *m = (pos->st-1)->endMoves;
   ExtMove *end = generate_legal(pos, m);
   for (; m < end; m++)
-    if (move == (m->move & (~(3 << 14)))) //  compare with MoveType (bit 14-15)  masked out
+    if (move == (m->move & (~(3 << 14)))) //  Compare with MoveType (bit 14-15)  masked out
       return m->move;
 
   return 0;
@@ -561,7 +550,7 @@ static int get_key_data(void)
     }
   }
 
-  int rand_pos = rand64() % index_weight_count;
+  int rand_pos = prng_rand(&sr) % index_weight_count;
   int weight_count = 0;
   index_rand = index_best;
 
@@ -592,8 +581,8 @@ static int check_do_search(const Pos *pos)
                    || akt_anz_pieces < last_anz_pieces - 2
                    || pos_key() == 0xB4D30CD15A43432D;
 
-  // reset do_search and book depth counter if
-  // postion changed more than one move can do or in initial position
+  // Reset do_search and book depth counter if postion changed more
+  // than one move can do or in initial position
   if (pos_changed) {
     book_depth_count = 0;
     do_search = 1;
@@ -614,69 +603,10 @@ static int check_draw(Pos *pos, Move m)
   return draw;
 }
 
-static void byteswap_polyhash(struct PolyHash *ph)
+static void from_be_polyhash(struct PolyHash *ph)
 {
-  if (is_little_endian()) {
-    ph->key = swap_uint64(ph->key);
-    ph->move = swap_uint16(ph->move);
-    ph->weight = swap_uint16(ph->weight);
-    ph->learn = swap_uint32(ph->learn);
-  }
+  ph->key = from_be_u64(ph->key);
+  ph->move = from_be_u16(ph->move);
+  ph->weight = from_be_u16(ph->weight);
+  ph->learn = from_be_u32(ph->learn);
 }
-
-static uint64_t rand64()
-{
-  sr ^= sr >> 12, sr ^= sr << 25, sr ^= sr >> 27;
-  return sr * 2685821657736338717LL;
-}
-
-static int is_little_endian()
-{
-  int num = 1;
-  return *(uint8_t *)&num == 1;
-}
-
-uint64_t swap_uint64(uint64_t d)
-{
-  uint64_t a;
-  uint8_t *dst = (uint8_t *)&a;
-  uint8_t *src = (uint8_t *)&d;
-
-  dst[0] = src[7];
-  dst[1] = src[6];
-  dst[2] = src[5];
-  dst[3] = src[4];
-  dst[4] = src[3];
-  dst[5] = src[2];
-  dst[6] = src[1];
-  dst[7] = src[0];
-
-  return a;
-}
-
-uint32_t swap_uint32(uint32_t d)
-{
-  uint32_t a;
-  uint8_t *dst = (uint8_t *)&a;
-  uint8_t *src = (uint8_t *)&d;
-
-  dst[0] = src[3];
-  dst[1] = src[2];
-  dst[2] = src[1];
-  dst[3] = src[0];
-
-  return a;
-}
-
-uint16_t swap_uint16(uint16_t d)
-{
-  uint16_t a;
-  uint8_t *dst = (uint8_t *)&a;
-  uint8_t *src = (uint8_t *)&d;
-
-  dst[0] = src[1];
-  dst[1] = src[0];
-
-  return a;
-}
-

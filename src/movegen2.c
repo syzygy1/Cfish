@@ -413,4 +413,3 @@ ExtMove *generate_legal(const Pos *pos, ExtMove *list)
 
   return list;
 }
-

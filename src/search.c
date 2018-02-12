@@ -142,7 +142,7 @@ void search_init(void)
 
 // search_clear() resets search state to zero, to obtain reproducible results
 
-void search_clear()
+void search_clear(void)
 {
   if (!settings.tt_size) {
     delayed_settings.clear = 1;
@@ -994,4 +994,3 @@ void start_thinking(Pos *root)
   Signals.searching = 1;
   thread_start_searching(threads_main(), 0);
 }
-

@@ -25,10 +25,10 @@
 
 #include "types.h"
 
-void bitbases_init();
+void bitbases_init(void);
 unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us);
 
-void bitboards_init();
+void bitboards_init(void);
 void print_pretty(Bitboard b);
 
 #define AllSquares (~0ULL)
@@ -366,4 +366,3 @@ INLINE Square  backmost_sq(unsigned c, Bitboard b)
 }
 
 #endif
-

@@ -20,7 +20,6 @@
 
 #include <assert.h>
 #include <stdatomic.h>
-#include <string.h>   // For std::memset
 
 #include "bitboard.h"
 #include "evaluate.h"

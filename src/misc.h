@@ -63,7 +63,7 @@ INLINE void prefetch2(void *addr)
 
 typedef int64_t TimePoint; // A value in milliseconds
 
-INLINE TimePoint now() {
+INLINE TimePoint now(void) {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return 1000 * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec / 1000;
@@ -93,5 +93,45 @@ void prng_init(PRNG *rng, uint64_t seed);
 uint64_t prng_rand(PRNG *rng);
 uint64_t prng_sparse_rand(PRNG *rng);
 
-#endif
+INLINE int is_little_endian(void)
+{
+  int num = 1;
+  return *(uint8_t *)&num == 1;
+}
 
+INLINE uint32_t from_le_u32(uint32_t v)
+{
+  return is_little_endian() ? v : __builtin_bswap32(v);
+}
+
+INLINE uint16_t from_le_u16(uint16_t v)
+{
+  return is_little_endian() ? v : __builtin_bswap16(v);
+}
+
+INLINE uint64_t from_be_u64(uint64_t v)
+{
+  return is_little_endian() ? __builtin_bswap64(v) : v;
+}
+
+INLINE uint32_t from_be_u32(uint32_t v)
+{
+  return is_little_endian() ? __builtin_bswap32(v) : v;
+}
+
+INLINE uint16_t from_be_u16(uint16_t v)
+{
+  return is_little_endian() ? __builtin_bswap16(v) : v;
+}
+
+INLINE uint32_t read_le_u32(void *p)
+{
+  return from_le_u32(*(uint32_t *)p);
+}
+
+INLINE uint16_t read_le_u16(void *p)
+{
+  return from_le_u16(*(uint16_t *)p);
+}
+
+#endif

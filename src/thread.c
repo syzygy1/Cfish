@@ -390,4 +390,3 @@ uint64_t threads_tb_hits(void)
     hits += Threads.pos[idx]->tb_hits;
   return hits;
 }
-

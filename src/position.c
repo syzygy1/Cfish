@@ -1570,4 +1570,3 @@ static int check_pos(Pos *pos)
 }
 #endif
 #endif
-

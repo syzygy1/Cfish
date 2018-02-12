@@ -131,7 +131,7 @@ void benchmark(Pos *current, char *str)
     num_fens = sizeof(Defaults) / sizeof(char *);
   }
   else if (strcmp(fenFile, "current") == 0) {
-    fens = malloc(sizeof(char *));
+    fens = malloc(sizeof(*fens));
     fens[0] = malloc(128);
     pos_fen(current, fens[0]);
     num_fens = 1;
@@ -144,14 +144,14 @@ void benchmark(Pos *current, char *str)
       fprintf(stderr, "Unable to open file %s\n", fenFile);
       return;
     }
-    fens = malloc(max_fens * sizeof(char *));
+    fens = malloc(max_fens * sizeof(*fens));
     fens[0] = NULL;
     size_t length = 0;
     while (getline(&fens[num_fens], &length, F) > 0) {
       num_fens++;
       if (num_fens == max_fens) {
         max_fens += 100;
-        fens = realloc(fens, max_fens * sizeof(char *));
+        fens = realloc(fens, max_fens * sizeof(*fens));
       }
       fens[num_fens] = NULL;
       length = 0;
@@ -161,9 +161,9 @@ void benchmark(Pos *current, char *str)
 
   uint64_t nodes = 0;
   Pos pos;
-  pos.stack = malloc(215 * sizeof(Stack));
+  pos.stack = malloc(215 * sizeof(*pos.stack));
   pos.st = pos.stack + 5;
-  pos.moveList = malloc(10000 * sizeof(ExtMove));
+  pos.moveList = malloc(10000 * sizeof(*pos.moveList));
   TimePoint elapsed = now();
 
   int num_opts = 0;
