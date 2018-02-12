@@ -57,6 +57,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # pext = yes/no       --- -DUSE_PEXT       --- Use pext x86_64 asm-instruction
 # native = yes/no     --- -march=native    --- Optimize for local CPU
 # numa = yes/no       --- -DNUMA           --- Enable NUMA support
+# lto = yes/no        --- -flto            --- Enable link-time optimization
 #
 # Note that Makefile is space sensitive, so when adding new architectures
 # or modifying existing flags, you have to make sure there are no extra spaces
@@ -74,6 +75,7 @@ pext = no
 native = yes
 numa = yes
 lto = no
+extra = no
 
 ### 2.2 Architecture specific
 
@@ -250,7 +252,11 @@ endif
 ### 3.3 Optimization
 ifeq ($(optimize),yes)
 
-	CFLAGS += -O3 -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
+	CFLAGS += -O3
+
+	ifeq ($(extra),yes)
+		CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
+	endif
 
 	ifeq ($(comp),gcc)
 
