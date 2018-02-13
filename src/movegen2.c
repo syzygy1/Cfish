@@ -24,13 +24,7 @@
 #include "position.h"
 #include "types.h"
 
-#define CAPTURES     0
-#define QUIETS       1
-#define QUIET_CHECKS 2
-#define EVASIONS     3
-#define NON_EVASIONS 4
-#define LEGAL        5
-
+enum { CAPTURES, QUIETS, QUIET_CHECKS, EVASIONS, NON_EVASIONS, LEGAL };
 
 INLINE ExtMove *generate_castling(const Pos *pos, ExtMove *list, int us,
                                   const int Cr, const int Checks,

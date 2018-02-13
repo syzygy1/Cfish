@@ -175,14 +175,15 @@ static const Score TrappedBishopA1H1     = S( 50, 50);
 static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
 
 // Penalties for enemy's safe checks
-#define QueenSafeCheck    780
-#define RookSafeCheck     880
-#define BishopSafeCheck   435
-#define KnightSafeCheck   790
+enum {
+  QueenSafeCheck  = 780,
+  RookSafeCheck   = 880,
+  BishopSafeCheck = 435,
+  KnightSafeCheck = 790
+};
 
 // Thresholds for lazy and space evaluation
-#define LazyThreshold 1500
-#define SpaceThreshold 12222
+enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
 
 _Atomic Score Contempt = SCORE_ZERO;
 
@@ -835,4 +836,3 @@ Value evaluate(const Pos *pos)
 
   return (pos_stm() == WHITE ? v : -v) + Tempo; // Side to move point of view
 }
-

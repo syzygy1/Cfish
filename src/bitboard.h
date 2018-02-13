@@ -86,9 +86,6 @@ extern uint8_t CastlingRookTo[16];
 INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
 {
   return SquareBB[s];
-//  Bitboard b;
-//  __asm__("xor %0, %0\n\tbtsq %1, %0" : "=&r" (b) : "r" ((uint64_t)s) : "cc");
-//  return b;
 }
 
 #if __x86_64__

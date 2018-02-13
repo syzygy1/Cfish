@@ -55,33 +55,21 @@ INLINE void cpth_update(CapturePieceToHistory history, Piece pc, Square to,
   history[pc][to][captured] += v * 2 - history[pc][to][captured] * w / 324;
 }
 
-#define ST_MAIN_SEARCH             0
-#define ST_CAPTURES_GEN            1
-#define ST_GOOD_CAPTURES           2
-#define ST_KILLERS                 3
-#define ST_KILLERS_2               4
-#define ST_QUIET_GEN               5
-#define ST_QUIET                   6
-#define ST_BAD_CAPTURES            7
+enum {
+  ST_MAIN_SEARCH, ST_CAPTURES_GEN, ST_GOOD_CAPTURES, ST_KILLERS, ST_KILLERS_2,
+  ST_QUIET_GEN, ST_QUIET, ST_BAD_CAPTURES,
 
-#define ST_EVASIONS                8
-#define ST_ALL_EVASIONS            9
+  ST_EVASIONS, ST_ALL_EVASIONS,
 
-#define ST_QSEARCH_WITH_CHECKS     10
-#define ST_QCAPTURES_CHECKS_GEN    11
-#define ST_QCAPTURES_CHECKS        12
-#define ST_CHECKS                  13
+  ST_QSEARCH_WITH_CHECKS, ST_QCAPTURES_CHECKS_GEN, ST_QCAPTURES_CHECKS,
+  ST_CHECKS,
 
-#define ST_QSEARCH_WITHOUT_CHECKS  14
-#define ST_QCAPTURES_NO_CHECKS_GEN 15
-#define ST_REMAINING               16
+  ST_QSEARCH_WITHOUT_CHECKS, ST_QCAPTURES_NO_CHECKS_GEN, ST_REMAINING,
 
-#define ST_RECAPTURES_GEN          17
-#define ST_RECAPTURES              18
+  ST_RECAPTURES_GEN, ST_RECAPTURES,
 
-#define ST_PROBCUT                 19
-#define ST_PROBCUT_GEN             20
-#define ST_PROBCUT_2               21
+  ST_PROBCUT, ST_PROBCUT_GEN, ST_PROBCUT_2
+};
 
 Move next_move(const Pos *pos, int skipQuiets);
 
@@ -151,4 +139,3 @@ INLINE void mp_init_pc(const Pos *pos, Move ttm, Value threshold)
 }
 
 #endif
-

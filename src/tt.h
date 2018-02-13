@@ -98,8 +98,7 @@ INLINE int tte_bound(TTEntry *tte)
 // clusters never cross cache lines. This ensures best cache performance,
 // as the cacheline is prefetched, as soon as possible.
 
-#define CacheLineSize 64
-#define ClusterSize 3
+enum { CacheLineSize = 64, ClusterSize = 3 };
 
 struct Cluster {
   TTEntry entry[ClusterSize];

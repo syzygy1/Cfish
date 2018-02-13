@@ -24,7 +24,7 @@
 #include "types.h"
 
 // There are 24 possible pawn squares: the first 4 files and ranks from 2 to 7
-#define MAX_INDEX (2*24*64*64)
+enum { MAX_INDEX = 2*24*64*64 };
 
 // Each uint32_t stores results of 32 positions, one per bit
 static uint32_t KPKBitbase[MAX_INDEX / 32];
@@ -44,10 +44,7 @@ static unsigned index(unsigned us, Square bksq, Square wksq, Square psq)
   return wksq | (bksq << 6) | (us << 12) | (file_of(psq) << 13) | ((RANK_7 - rank_of(psq)) << 15);
 }
 
-#define RES_INVALID 0
-#define RES_UNKNOWN 1
-#define RES_DRAW    2
-#define RES_WIN     4
+enum { RES_INVALID = 0, RES_UNKNOWN = 1, RES_DRAW = 2, RES_WIN = 4 };
 
 unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us)
 {
@@ -150,4 +147,3 @@ void bitbases_init()
 
   free(db);
 }
-

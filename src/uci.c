@@ -288,8 +288,7 @@ void uci_loop(int argc, char **argv)
     // waiting for 'ponderhit' to stop the search (for instance because we
     // already ran out of time), otherwise we should continue searching but
     // switching from pondering to normal search.
-    if (   strcmp(token, "quit") == 0
-        || strcmp(token, "stop") == 0) {
+    if (strcmp(token, "quit") == 0 || strcmp(token, "stop") == 0) {
       if (Signals.searching) {
         Signals.stop = 1;
         LOCK(Signals.lock);

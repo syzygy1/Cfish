@@ -131,7 +131,6 @@ static Option options_map[] = {
   { NULL }
 };
 
-
 // options_init() initializes the UCI options to their hard-coded default
 // values.
 
@@ -152,10 +151,8 @@ void options_init()
   if (!large_pages_supported())
     options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
 #endif
-#ifdef __linux__
-#ifndef MADV_HUGEPAGE
+#if defined(__linux__) && !defined(MADV_HUGEPAGE)
   options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;
-#endif
 #endif
   if (sizeof(size_t) < 8) {
     options_map[OPT_SYZ_PROBE_LIMIT].def = 5;
@@ -290,4 +287,3 @@ int option_set_by_name(char *name, char *value)
 
   return 0;
 }
-

@@ -25,16 +25,6 @@
 
 #define Swap(a,b) {int tmp=a;a=b;b=tmp;}
 
-#define TB_PAWN 1
-#define TB_KNIGHT 2
-#define TB_BISHOP 3
-#define TB_ROOK 4
-#define TB_QUEEN 5
-#define TB_KING 6
-
-#define TB_WPAWN TB_PAWN
-#define TB_BPAWN (TB_PAWN | 8)
-
 static LOCK_T TB_mutex;
 
 static int initialized = 0;
@@ -187,22 +177,22 @@ static void init_tb(char *str)
   for (s = str; *s; s++)
     switch (*s) {
     case 'P':
-      pcs[TB_PAWN | color]++;
+      pcs[PAWN | color]++;
       break;
     case 'N':
-      pcs[TB_KNIGHT | color]++;
+      pcs[KNIGHT | color]++;
       break;
     case 'B':
-      pcs[TB_BISHOP | color]++;
+      pcs[BISHOP | color]++;
       break;
     case 'R':
-      pcs[TB_ROOK | color]++;
+      pcs[ROOK | color]++;
       break;
     case 'Q':
-      pcs[TB_QUEEN | color]++;
+      pcs[QUEEN | color]++;
       break;
     case 'K':
-      pcs[TB_KING | color]++;
+      pcs[KING | color]++;
       break;
     case 'v':
       color = 0x08;
@@ -210,7 +200,7 @@ static void init_tb(char *str)
     }
   key = calc_key_from_pcs(pcs, 0);
   key2 = calc_key_from_pcs(pcs, 1);
-  if (pcs[TB_WPAWN] + pcs[TB_BPAWN] == 0) {
+  if (pcs[W_PAWN] + pcs[B_PAWN] == 0) {
     if (TBnum_piece == TBMAX_PIECE) {
       fprintf(stderr, "TBMAX_PIECE limit too low!\n");
       exit(EXIT_FAILURE);
@@ -232,7 +222,7 @@ static void init_tb(char *str)
     entry->num += (uint8_t)pcs[i];
   dtm_entry->num = entry->num;
   dtm_entry->symmetric = entry->symmetric = (key == key2);
-  dtm_entry->has_pawns = entry->has_pawns = (pcs[TB_WPAWN] + pcs[TB_BPAWN] > 0);
+  dtm_entry->has_pawns = entry->has_pawns = (pcs[W_PAWN] + pcs[B_PAWN] > 0);
   if (entry->num > TB_MaxCardinality)
     TB_MaxCardinality = entry->num;
   if (dtm_present && entry->num > TB_MaxCardinalityDTM)
@@ -240,12 +230,12 @@ static void init_tb(char *str)
 
   if (entry->has_pawns) {
     struct TBEntry_pawn *ptr = (struct TBEntry_pawn *)entry;
-    ptr->pawns[0] = (uint8_t)pcs[TB_WPAWN];
-    ptr->pawns[1] = (uint8_t)pcs[TB_BPAWN];
-    if (pcs[TB_BPAWN] > 0
-              && (pcs[TB_WPAWN] == 0 || pcs[TB_BPAWN] < pcs[TB_WPAWN])) {
-      ptr->pawns[0] = (uint8_t)pcs[TB_BPAWN];
-      ptr->pawns[1] = (uint8_t)pcs[TB_WPAWN];
+    ptr->pawns[0] = (uint8_t)pcs[W_PAWN];
+    ptr->pawns[1] = (uint8_t)pcs[B_PAWN];
+    if (pcs[B_PAWN] > 0
+              && (pcs[W_PAWN] == 0 || pcs[B_PAWN] < pcs[W_PAWN])) {
+      ptr->pawns[0] = (uint8_t)pcs[B_PAWN];
+      ptr->pawns[1] = (uint8_t)pcs[W_PAWN];
     }
     struct DTMEntry_pawn *ptr2 = (struct DTMEntry_pawn *)dtm_entry;
     ptr2->pawns[0] = ptr->pawns[0];

@@ -51,9 +51,8 @@ Depth TB_ProbeDepth;
 static Score base_ct;
 
 // Different node types, used as a template parameter
-
 #define NonPV 0
-#define PV    1
+#define PV 1
 
 // Sizes and phases of the skip blocks, used for distributing search depths
 // across the threads
