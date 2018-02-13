@@ -143,12 +143,6 @@ INLINE Bitboard shift_bb(int Direction, Bitboard b)
         : 0;
 }
 
-#define shift_bb_N(b)  ((b) << 8)
-#define shift_bb_S(b)  ((b) >> 8)
-#define shift_bb_NE(b) (((b) & ~FileHBB) << 9)
-#define shift_bb_SE(b) (((b) & ~FileHBB) >> 7)
-#define shift_bb_NW(b) (((b) & ~FileABB) << 7)
-#define shift_bb_SW(b) (((b) & ~FileABB) >> 9)
 
 // adjacent_files_bb() returns a bitboard representing all the squares
 // on the adjacent files of the given one.
