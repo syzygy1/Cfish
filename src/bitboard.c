@@ -91,7 +91,6 @@ Square CastlingRookTo[16];
 #ifdef NO_BSF
 static int MSBTable[256];            // To implement software msb()
 static Square BSFTable[64];          // To implement software bitscan
-#endif
 
 // bsf_index() returns the index into BSFTable[] to look up the bitscan. Uses
 // Matt Taylor's folding for 32 bit case, extended to 64 bit by Kim Walisch.
@@ -103,7 +102,6 @@ INLINE unsigned bsf_index(Bitboard b)
                  : ((((unsigned)b) ^ (unsigned)(b >> 32)) * DeBruijn32) >> 26;
 }
 
-
 // popcount16() counts the non-zero bits using SWAR-Popcount algorithm.
 
 INLINE unsigned popcount16(unsigned u)
@@ -113,9 +111,6 @@ INLINE unsigned popcount16(unsigned u)
   u = ((u >> 4) + u) & 0x0F0FU;
   return (u * 0x0101U) >> 8;
 }
-
-
-#ifdef NO_BSF
 
 /// Software fall-back of lsb() and msb() for CPU lacking hardware support
 

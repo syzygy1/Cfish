@@ -195,7 +195,7 @@ endif
 ifeq ($(COMP),clang)
 	comp=clang
 	CC=clang
-	CFLAGS += -pedantic -Wextra -Wshadow -m$(bits)
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes -m$(bits)
 	LDFLAGS += -m$(bits)
 	ifeq ($(UNAME),Darwin)
 		CFLAGS += 
