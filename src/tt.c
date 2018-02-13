@@ -29,6 +29,7 @@
 #include "bitboard.h"
 #include "numa.h"
 #include "settings.h"
+#include "thread.h"
 #include "tt.h"
 #include "types.h"
 #include "uci.h"
@@ -109,6 +110,7 @@ void tt_allocate(size_t mbSize)
   if (!TT.mem)
     TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
 #else
 
   TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
@@ -122,16 +124,7 @@ void tt_allocate(size_t mbSize)
   if (!TT.mem)
     goto failed;
 
-#ifdef NUMA
-  // Interleave the shared transposition table across all nodes.
-  // Create an interleave mask of the nodes on which threads are
-  // actually running?
-  if (settings.numa_enabled)
-    numa_interleave_memory(TT.table, count * sizeof(Cluster), settings.mask);
-#endif
-
-#ifdef __linux__
-#ifdef MADV_HUGEPAGE
+#if defined(__linux__) && defined(MADV_HUGEPAGE)
 
   // Advise the kernel to allocate large pages.
   if (settings.large_pages)
@@ -140,10 +133,10 @@ void tt_allocate(size_t mbSize)
 #endif
 #endif
 
-#endif
-
+  // Clear the TT table to page in the memory immediately. This avoids
+  // an initial slow down during the first second or minutes of the search.
+  tt_clear();
   return;
-
 
 failed:
   fprintf(stderr, "Failed to allocate %zuMB for "
@@ -158,8 +151,32 @@ failed:
 
 void tt_clear(void)
 {
-  if (TT.table)
-    memset(TT.table, 0, (TT.mask + 1) * sizeof(Cluster));
+  // We let search threads clear the table in parallel. In NUMA mode,
+  // this has the beneficial effect of spreading the TT over all nodes.
+
+  if (TT.table) {
+    for (int idx = 0; idx < Threads.num_threads; idx++)
+      thread_wake_up(Threads.pos[idx], THREAD_TT_CLEAR);
+    for (int idx = 0; idx < Threads.num_threads; idx++)
+      thread_wait_until_sleeping(Threads.pos[idx]);
+  }
+}
+
+void tt_clear_worker(int idx)
+{
+  // Find out which part of the TT this thread should clear.
+  // To each thread we assign a number of 2MB blocks.
+
+  size_t total = (TT.mask + 1) * sizeof(Cluster);
+  size_t slice = (total + Threads.num_threads - 1) / Threads.num_threads;
+  size_t blocks = (slice + (2 * 1024 * 1024) - 1) / (2 * 1024 * 1024);
+  size_t begin = idx * blocks * (2 * 1024 * 1024);
+  size_t end = begin + blocks * (2 * 1024 * 1024);
+  begin = min(begin, total);
+  end = min(end, total);
+
+  // Now clear that part
+  memset((uint8_t *)TT.table + begin, 0, end - begin);
 }
 
 

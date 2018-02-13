@@ -28,6 +28,7 @@
 #include "search.h"
 #include "settings.h"
 #include "thread.h"
+#include "tt.h"
 #include "uci.h"
 #include "tbprobe.h"
 
@@ -93,7 +94,6 @@ void thread_init(void *arg)
   pos->counterMoveHistory = cmh_tables[node];
 
   atomic_store(&pos->resetCalls, 0);
-  pos->exit = 0;
   pos->selDepth = pos->callsCnt = 0;
 
 #ifndef __WIN32__  // linux
@@ -155,14 +155,14 @@ void thread_destroy(Pos *pos)
 {
 #ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
-  pos->exit = 1;
+  pos->action = THREAD_EXIT;
   pthread_cond_signal(&pos->sleepCondition);
   pthread_mutex_unlock(&pos->mutex);
   pthread_join(pos->nativeThread, NULL);
   pthread_cond_destroy(&pos->sleepCondition);
   pthread_mutex_destroy(&pos->mutex);
 #else
-  pos->exit = 1;
+  pos->action = THREAD_EXIT;
   SetEvent(pos->startEvent);
   WaitForSingleObject(pos->nativeThread, INFINITE);
   CloseHandle(pos->startEvent);
@@ -196,15 +196,21 @@ void thread_destroy(Pos *pos)
 // thread_wait_for_search_finished() waits on sleep condition until
 // not searching.
 
-void thread_wait_for_search_finished(Pos *pos)
+void thread_wait_until_sleeping(Pos *pos)
 {
 #ifndef __WIN32__
+
   pthread_mutex_lock(&pos->mutex);
-  while (pos->searching)
+
+  while (pos->action != THREAD_SLEEP)
     pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
+
   pthread_mutex_unlock(&pos->mutex);
+
 #else
+
   WaitForSingleObject(pos->stopEvent, INFINITE);
+
 #endif
 
   if (pos->thread_idx == 0)
@@ -217,32 +223,43 @@ void thread_wait_for_search_finished(Pos *pos)
 void thread_wait(Pos *pos, atomic_bool *condition)
 {
 #ifndef __WIN32__
+
   pthread_mutex_lock(&pos->mutex);
+
   while (!atomic_load(condition))
     pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
+
   pthread_mutex_unlock(&pos->mutex);
+
 #else
+
   (void)condition;
   WaitForSingleObject(pos->startEvent, INFINITE);
+
 #endif
 }
 
 
-// thread_start_searching() wakes up the thread that will start the search.
-
-void thread_start_searching(Pos *pos, int resume)
+void thread_wake_up(Pos *pos, int action)
 {
 #ifndef __WIN32__
+
   pthread_mutex_lock(&pos->mutex);
 
-  if (!resume)
-    pos->searching = 1;
+#endif
+
+  if (action != THREAD_RESUME)
+    pos->action = action;
+
+#ifndef __WIN32__
 
   pthread_cond_signal(&pos->sleepCondition);
   pthread_mutex_unlock(&pos->mutex);
+
 #else
-  (void)resume;
+
   SetEvent(pos->startEvent);
+
 #endif
 }
 
@@ -251,47 +268,49 @@ void thread_start_searching(Pos *pos, int resume)
 
 void thread_idle_loop(Pos *pos)
 {
+  while (1) {
 #ifndef __WIN32__
 
-  pthread_mutex_lock(&pos->mutex);
-  while (1) {
+    pthread_mutex_lock(&pos->mutex);
 
-    while (!pos->searching && !pos->exit) {
+    while (pos->action == THREAD_SLEEP) {
       pthread_cond_signal(&pos->sleepCondition); // Wake up any waiting thread
       pthread_cond_wait(&pos->sleepCondition, &pos->mutex);
     }
 
     pthread_mutex_unlock(&pos->mutex);
 
-    if (pos->exit)
-      break;
-
-    if (pos->thread_idx == 0)
-      mainthread_search();
-    else
-      thread_search(pos);
-
-    pthread_mutex_lock(&pos->mutex);
-    pos->searching = 0;
-  }
-
 #else
 
-  while (1) {
     WaitForSingleObject(pos->startEvent, INFINITE);
 
-    if (pos->exit)
+#endif
+
+    if (pos->action == THREAD_EXIT) {
+
       break;
 
-    if (pos->thread_idx == 0)
-      mainthread_search();
-    else
-      thread_search(pos);
+    } else if (pos->action == THREAD_TT_CLEAR) {
+
+      tt_clear_worker(pos->thread_idx);
+
+    } else {
+
+      if (pos->thread_idx == 0)
+        mainthread_search();
+      else
+        thread_search(pos);
+
+    }
+
+    pos->action = THREAD_SLEEP;
+
+#ifdef __WIN32__
 
     SetEvent(pos->stopEvent);
-  }
 
 #endif
+  }
 }
 
 
@@ -303,15 +322,21 @@ void thread_idle_loop(Pos *pos)
 void threads_init(void)
 {
 #ifndef __WIN32__
+
   pthread_mutex_init(&Threads.mutex, NULL);
   pthread_cond_init(&Threads.sleepCondition, NULL);
+
 #else
+
   io_mutex = CreateMutex(NULL, FALSE, NULL);
   Threads.event = CreateEvent(NULL, FALSE, FALSE, NULL);
+
 #endif
 
 #ifdef NUMA
+
   numa_init();
+
 #endif
 
   Threads.num_threads = 1;
@@ -328,15 +353,21 @@ void threads_exit(void)
   threads_set_number(0);
 
 #ifndef __WIN32__
+
   pthread_cond_destroy(&Threads.sleepCondition);
   pthread_mutex_destroy(&Threads.mutex);
+
 #else
+
   CloseHandle(io_mutex);
   CloseHandle(Threads.event);
+
 #endif
 
 #ifdef NUMA
+
   numa_exit();
+
 #endif
 }
 

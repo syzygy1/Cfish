@@ -194,7 +194,7 @@ void benchmark(Pos *current, char *str)
     else {
       Limits.startTime = now();
       start_thinking(&pos);
-      thread_wait_for_search_finished(threads_main());
+      thread_wait_until_sleeping(threads_main());
       nodes += threads_nodes_searched();
     }
   }

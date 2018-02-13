@@ -257,7 +257,7 @@ void mainthread_search(void)
 
     if (!playBookMove) {
       for (int idx = 1; idx < Threads.num_threads; idx++)
-        thread_start_searching(Threads.pos[idx], 0);
+        thread_wake_up(Threads.pos[idx], THREAD_SEARCH);
 
       thread_search(pos); // Let's start searching!
     }
@@ -284,7 +284,7 @@ void mainthread_search(void)
   if (pos->rootMoves->size > 0) {
     if (!playBookMove) {
       for (int idx = 1; idx < Threads.num_threads; idx++)
-        thread_wait_for_search_finished(Threads.pos[idx]);
+        thread_wait_until_sleeping(Threads.pos[idx]);
     }
   } else {
     pos->rootMoves->move[0].pv[0] = 0;
@@ -933,7 +933,7 @@ void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 void start_thinking(Pos *root)
 {
   if (Signals.searching)
-    thread_wait_for_search_finished(threads_main());
+    thread_wait_until_sleeping(threads_main());
 
   Signals.stopOnPonderhit = Signals.stop = 0;
 
@@ -992,5 +992,5 @@ void start_thinking(Pos *root)
     Threads.pos[0]->tb_hits = end - list;
 
   Signals.searching = 1;
-  thread_start_searching(threads_main(), 0);
+  thread_wake_up(threads_main(), THREAD_SEARCH);
 }

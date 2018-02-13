@@ -224,7 +224,7 @@ void uci_loop(int argc, char **argv)
 
   // Signals.searching is only read and set by the UI thread.
   // The UI thread uses it to know whether it must still call
-  // thread_wait_for_search_finished() on the main search thread.
+  // thread_wait_until_sleeping() on the main search thread.
   // (This is important for our native Windows threading implementation.)
   Signals.searching = 0;
 
@@ -294,7 +294,7 @@ void uci_loop(int argc, char **argv)
         Signals.stop = 1;
         LOCK(Signals.lock);
         if (Signals.sleeping)
-          thread_start_searching(threads_main(), 1); // Wake up main thread.
+          thread_wake_up(threads_main(), THREAD_RESUME);
         Signals.sleeping = 0;
         UNLOCK(Signals.lock);
       }
@@ -306,7 +306,7 @@ void uci_loop(int argc, char **argv)
       LOCK(Signals.lock);
       if (Signals.sleeping) {
         Signals.stop = 1;
-        thread_start_searching(threads_main(), 1); // Wake up main thread.
+        thread_wake_up(threads_main(), THREAD_RESUME);
         Signals.sleeping = 0;
       }
       UNLOCK(Signals.lock);
@@ -345,7 +345,7 @@ void uci_loop(int argc, char **argv)
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
   if (Signals.searching)
-    thread_wait_for_search_finished(threads_main());
+    thread_wait_until_sleeping(threads_main());
 
   free(cmd);
   free(pos.stack);

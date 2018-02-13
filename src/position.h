@@ -168,7 +168,7 @@ struct Pos {
   // Thread-control data.
   atomic_bool resetCalls;
   int callsCnt;
-  int exit, searching;
+  int action;
   int thread_idx;
 #ifndef __WIN32__
   pthread_t nativeThread;
