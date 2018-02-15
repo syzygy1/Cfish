@@ -75,11 +75,6 @@ INLINE int semiopen_file(PawnEntry *pe, int c, int f)
   return pe->semiopenFiles[c] & (1 << f);
 }
 
-INLINE int semiopen_side(PawnEntry *pe, int c, int f, int left)
-{
-  return pe->semiopenFiles[c] & (left ? (1 << f) - 1 : ~((1 << (f + 1)) - 1));
-}
-
 INLINE int pawns_on_same_color_squares(PawnEntry *pe, int c, Square s)
 {
   return pe->pawnsOnSquares[c][!!(DarkSquares & sq_bb(s))];

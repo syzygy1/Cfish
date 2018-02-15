@@ -324,10 +324,9 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 
       // Penalty when trapped by the king, even more if the king cannot castle
       else if (mob <= 3) {
-        Square ksq = square_of(Us, KING);
+        uint32_t kf = file_of(square_of(Us, KING));
 
-        if (   ((file_of(ksq) < FILE_E) == (file_of(s) < file_of(ksq)))
-            && !semiopen_side(ei->pe, Us, file_of(ksq), file_of(s) < file_of(ksq)))
+        if ((kf < FILE_E) == (file_of(s) < kf))
           score -= (TrappedRook - make_score(mob * 22, 0)) * (1 + !can_castle_c(Us));
       }
     }
