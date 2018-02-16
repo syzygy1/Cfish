@@ -102,16 +102,6 @@ INLINE unsigned bsf_index(Bitboard b)
                  : ((((unsigned)b) ^ (unsigned)(b >> 32)) * DeBruijn32) >> 26;
 }
 
-// popcount16() counts the non-zero bits using SWAR-Popcount algorithm.
-
-INLINE unsigned popcount16(unsigned u)
-{
-  u -= (u >> 1) & 0x5555U;
-  u = ((u >> 2) & 0x3333U) + (u & 0x3333U);
-  u = ((u >> 4) + u) & 0x0F0FU;
-  return (u * 0x0101U) >> 8;
-}
-
 /// Software fall-back of lsb() and msb() for CPU lacking hardware support
 
 Square lsb(Bitboard b)
@@ -147,6 +137,18 @@ Square msb(Bitboard b)
 }
 
 #endif // ifdef NO_BSF
+
+#ifndef USE_POPCNT
+// popcount16() counts the non-zero bits using SWAR-Popcount algorithm.
+
+INLINE unsigned popcount16(unsigned u)
+{
+  u -= (u >> 1) & 0x5555U;
+  u = ((u >> 2) & 0x3333U) + (u & 0x3333U);
+  u = ((u >> 4) + u) & 0x0F0FU;
+  return (u * 0x0101U) >> 8;
+}
+#endif
 
 
 // Bitboards::pretty() returns an ASCII representation of a bitboard suitable
