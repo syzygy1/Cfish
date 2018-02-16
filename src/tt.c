@@ -19,9 +19,9 @@
 */
 
 #define _GNU_SOURCE
-
-#include <string.h>   // For std::memset
+#include <inttypes.h>
 #include <stdio.h>
+#include <string.h>   // For std::memset
 #ifndef __WIN32__
 #include <sys/mman.h>
 #endif
@@ -139,8 +139,8 @@ void tt_allocate(size_t mbSize)
   return;
 
 failed:
-  fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for "
-                  "transposition table.\n", mbSize);
+  fprintf(stderr, "Failed to allocate %"PRIu64"MB for "
+                  "transposition table.\n", (uint64_t)mbSize);
   exit(EXIT_FAILURE);
 }
 

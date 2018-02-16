@@ -21,8 +21,8 @@
 #define _GNU_SOURCE
 #include <inttypes.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "misc.h"
 #include "position.h"
@@ -102,7 +102,7 @@ void benchmark(Pos *current, char *str)
 {
   char *token;
   char **fens;
-  size_t num_fens;
+  int num_fens;
 
   Limits = (struct LimitsType){ 0 };
 
@@ -137,7 +137,7 @@ void benchmark(Pos *current, char *str)
     num_fens = 1;
   }
   else {
-    size_t max_fens = 100;
+    int max_fens = 100;
     num_fens = 0;
     FILE *F = fopen(fenFile, "r");
     if (!F) {
@@ -167,11 +167,11 @@ void benchmark(Pos *current, char *str)
   TimePoint elapsed = now();
 
   int num_opts = 0;
-  for (size_t i = 0; i < num_fens; i++)
+  for (int i = 0; i < num_fens; i++)
     if (strncmp(fens[i], "setoption ", 9) == 0)
       num_opts++;
 
-  for (size_t i = 0, j = 0; i < num_fens; i++) {
+  for (int i = 0, j = 0; i < num_fens; i++) {
     char buf[128];
 
     if (strncmp(fens[i], "setoption ", 9) == 0) {
@@ -187,7 +187,7 @@ void benchmark(Pos *current, char *str)
 
     position(&pos, buf);
 
-    fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", ++j, num_fens - num_opts);
+    fprintf(stderr, "\nPosition: %d/%d\n", ++j, num_fens - num_opts);
 
     if (strcmp(limitType, "perft") == 0)
       nodes += perft(&pos, Limits.depth * ONE_PLY);
@@ -208,7 +208,7 @@ void benchmark(Pos *current, char *str)
                   elapsed, nodes, 1000 * nodes / elapsed);
 
   if (fens != Defaults) {
-    for (size_t i = 0; i < num_fens; i++)
+    for (int i = 0; i < num_fens; i++)
       free(fens[i]);
     free(fens);
   }
