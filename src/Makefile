@@ -144,7 +144,7 @@ endif
 
 ### 3.1 Selecting compiler (default = gcc)
 
-CFLAGS += -Wall -std=c11 $(EXTRACFLAGS) -D__USE_MINGW_ANSI_STDIO=1
+CFLAGS += -Wall -std=c11 $(EXTRACFLAGS)
 DEPENDFLAGS += -std=c11
 LDFLAGS += $(EXTRALDFLAGS) -lm
 

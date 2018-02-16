@@ -139,7 +139,7 @@ void tt_allocate(size_t mbSize)
   return;
 
 failed:
-  fprintf(stderr, "Failed to allocate %zuMB for "
+  fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for "
                   "transposition table.\n", mbSize);
   exit(EXIT_FAILURE);
 }

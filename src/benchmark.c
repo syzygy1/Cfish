@@ -187,7 +187,7 @@ void benchmark(Pos *current, char *str)
 
     position(&pos, buf);
 
-    fprintf(stderr, "\nPosition: %zu/%zu\n", ++j, num_fens - num_opts);
+    fprintf(stderr, "\nPosition: %" FMT_Z "u/%" FMT_Z "u\n", ++j, num_fens - num_opts);
 
     if (strcmp(limitType, "perft") == 0)
       nodes += perft(&pos, Limits.depth * ONE_PLY);
