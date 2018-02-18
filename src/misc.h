@@ -52,6 +52,8 @@ INLINE void prefetch(void *addr)
 #else
   __builtin_prefetch(addr);
 #endif
+#else
+  (void)addr;
 #endif
 }
 
