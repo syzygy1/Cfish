@@ -81,60 +81,67 @@ extra = no
 
 ifeq ($(ARCH),general-32)
 	arch = any
+	bits = 32
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-32-old)
 	arch = i386
+	bits = 32
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-32)
 	arch = i386
-	prefetch = yes
-	sse = yes
+	bits = 32
+	popcnt = no
 endif
 
 ifeq ($(ARCH),general-64)
 	arch = any
-	bits = 64
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-64)
 	arch = x86_64
-	bits = 64
-	prefetch = yes
-	sse = yes
 	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-64-modern)
 	arch = x86_64
-	bits = 64
-	prefetch = yes
-	popcnt = yes
-	sse = yes
 endif
 
 ifeq ($(ARCH),x86-64-bmi2)
 	arch = x86_64
-	bits = 64
-	prefetch = yes
-	popcnt = yes
-	sse = yes
 	pext = yes
 endif
 
 ifeq ($(ARCH),armv7)
 	arch = armv7
-	prefetch = yes
+	bits = 32
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),ppc-32)
 	arch = ppc
+	bits = 32
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),ppc-64)
 	arch = ppc64
-	bits = 64
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 
@@ -155,9 +162,19 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow -m$(bits)
+	CFLAGS += -pedantic -Wextra -Wshadow
+	ifeq ($(ARCH),armv7)
+		ifeq ($(OS),Android)
+			CFLAGS += -m$(bits)
+			LDFLAGS += -m$(bits)
+		endif
+	else
+		CFLAGS += -m$(bits)
+		LDFLAGS += -m$(bits)
+	endif
+
 	ifneq ($(UNAME),Darwin)
-	   LDFLAGS += -Wl,--no-as-needed
+		LDFLAGS += -Wl,--no-as-needed
 	endif
 endif
 
@@ -195,8 +212,17 @@ endif
 ifeq ($(COMP),clang)
 	comp=clang
 	CC=clang
-	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes -m$(bits)
-	LDFLAGS += -m$(bits)
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
+	ifeq ($(ARCH),armv7)
+		ifeq ($(OS),Android)
+			CFLAGS += -m$(bits)
+			LDFLAGS += -m$(bits)
+		endif
+	else
+		CFLAGS += -m$(bits)
+		LDFLAGS += -m$(bits)
+	endif
+
 	ifeq ($(UNAME),Darwin)
 		CFLAGS += 
 		DEPENDFLAGS += 
@@ -254,11 +280,10 @@ ifeq ($(optimize),yes)
 
 	CFLAGS += -O3
 
-	ifeq ($(extra),yes)
-		CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
-	endif
-
 	ifeq ($(comp),gcc)
+		ifeq ($(extra),yes)
+			CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
+		endif
 
 		ifeq ($(UNAME),Darwin)
 			ifeq ($(arch),i386)
@@ -269,7 +294,7 @@ ifeq ($(optimize),yes)
 			endif
 		endif
 
-		ifeq ($(arch),armv7)
+		ifeq ($(OS),Android)
 			CFLAGS += -fno-gcse -mthumb -march=armv7-a -mfloat-abi=softfp
 		endif
 	endif
@@ -282,8 +307,6 @@ ifeq ($(optimize),yes)
 
 	ifeq ($(comp),clang)
 		ifeq ($(UNAME),Darwin)
-			CFLAGS += -flto
-			LDFLAGS += $(CFLAGS)
 			ifeq ($(arch),i386)
 				CFLAGS += -mdynamic-no-pic
 			endif
@@ -344,39 +367,22 @@ endif
 ### 3.8 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.
 ### This is a mix of compile and link time options because the lto link phase
 ### needs access to the optimization flags.
-ifeq ($(comp),gcc)
-	ifeq ($(optimize),yes)
-	ifeq ($(lto),yes)
-	ifeq ($(debug),no)
+ifeq ($(lto),yes)
+ifeq ($(optimize),yes)
+ifeq ($(debug),no)
+	ifeq ($(comp),$(filter $(comp),gcc clang))
 		CFLAGS += -flto
 		LDFLAGS += $(CFLAGS)
 	endif
+
+	ifeq ($(comp),mingw)
+	ifeq ($(KERNEL),Linux)
+		CFLAGS += -flto
+		LDFLAGS += $(CFLAGS)
 	endif
 	endif
 endif
-
-ifeq ($(comp),clang)
-	ifeq ($(optimize),yes)
-	ifeq ($(lto),yes)
-	ifeq ($(debug),no)
-		CFLAGS += -flto
-		LDFLAGS += $(CFLAGS)
-	endif
-	endif
-	endif
 endif
-
-ifeq ($(comp),mingw)
-	ifeq ($(UNAME),Linux)
-	ifeq ($(optimize),yes)
-	ifeq ($(lto),yes)
-	ifeq ($(debug),no)
-		CFLAGS += -flto
-		LDFLAGS += $(CFLAGS)
-	endif
-	endif
-	endif
-	endif
 endif
 
 ### 3.9 Android 5 can only run position independent executables. Note that this
