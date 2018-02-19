@@ -22,7 +22,10 @@
 ### ==========================================================================
 
 ### Establish the operating system name
-UNAME = $(shell uname)
+UNAME = $(shell uname -s)
+ifeq ($(KERNEL),Linux)
+	OS = $(shell uname -o)
+endif
 
 ### Executable name
 EXE = cfish
@@ -162,7 +165,7 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format
 	ifeq ($(ARCH),armv7)
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
@@ -180,7 +183,8 @@ endif
 
 ifeq ($(COMP),mingw)
 	comp=mingw
-
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format -m$(bits)
+	LDFLAGS += -m$(bits)
 	ifeq ($(UNAME),Linux)
 		ifeq ($(bits),64)
 #			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
@@ -198,9 +202,6 @@ ifeq ($(COMP),mingw)
 	else
 		CC=gcc
 	endif
-
-	CFLAGS += -Wextra -Wshadow
-	LDFLAGS += #-static
 endif
 
 ifeq ($(COMP),icc)

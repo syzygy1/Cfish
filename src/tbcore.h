@@ -56,6 +56,12 @@ struct TBHashEntry;
 
 typedef uint64_t base_t;
 
+#ifdef _WIN32
+typedef HANDLE map_t;
+#else
+typedef size_t map_t;
+#endif
+
 struct PairsData {
   uint8_t *indextable;
   uint16_t *sizetable;
@@ -73,7 +79,7 @@ struct PairsData {
 struct TBEntry {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;
@@ -88,7 +94,7 @@ __attribute__((__may_alias__))
 struct TBEntry_piece {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;
@@ -104,7 +110,7 @@ struct TBEntry_piece {
 struct TBEntry_pawn {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;
@@ -122,7 +128,7 @@ struct TBEntry_pawn {
 struct TBEntry_pawn2 {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;
@@ -140,7 +146,7 @@ struct TBEntry_pawn2 {
 struct DTZEntry_piece {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;
@@ -159,7 +165,7 @@ struct DTZEntry_piece {
 struct DTZEntry_pawn {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;
@@ -180,7 +186,7 @@ struct DTZEntry_pawn {
 struct DTMEntry_piece {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;
@@ -198,7 +204,7 @@ struct DTMEntry_piece {
 struct DTMEntry_pawn {
   uint8_t *data;
   Key key;
-  uint64_t mapping;
+  map_t mapping;
   atomic_uchar ready;
   uint8_t num;
   uint8_t symmetric;

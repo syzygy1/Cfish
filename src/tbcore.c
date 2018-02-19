@@ -82,7 +82,7 @@ static void close_tb(FD fd)
 #endif
 }
 
-static void *map_file(const char *name, const char *suffix, uint64_t *mapping)
+static void *map_file(const char *name, const char *suffix, map_t *mapping)
 {
   FD fd = open_tb(name, suffix);
   if (fd == FD_ERR)
@@ -105,7 +105,7 @@ static void *map_file(const char *name, const char *suffix, uint64_t *mapping)
     fprintf(stderr, "CreateFileMapping() failed.\n");
     exit(EXIT_FAILURE);
   }
-  *mapping = (uint64_t)map;
+  *mapping = map;
   void *data = MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
   if (data == NULL) {
     fprintf(stderr, "MapViewOfFile() failed, name = %s%s, error = %lu.\n", name, suffix, GetLastError());
@@ -117,17 +117,17 @@ static void *map_file(const char *name, const char *suffix, uint64_t *mapping)
 }
 
 #ifndef _WIN32
-static void unmap_file(void *data, uint64_t size)
+static void unmap_file(void *data, map_t size)
 {
   if (!data) return;
   munmap(data, size);
 }
 #else
-static void unmap_file(void *data, uint64_t mapping)
+static void unmap_file(void *data, map_t mapping)
 {
   if (!data) return;
   UnmapViewOfFile(data);
-  CloseHandle((HANDLE)mapping);
+  CloseHandle(mapping);
 }
 #endif
 
