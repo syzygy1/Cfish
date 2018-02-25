@@ -26,7 +26,7 @@ Supported archs (default is `x86-64-modern`):
 <tr><td><code>x86-32-old</code></td><td>x86 32-bit fall back for old hardware</td></tr>
 <tr><td><code>ppc-64</code></td><td>PPC 64-bit</td></tr>
 <tr><td><code>ppc-32</code></td><td>PPC 32-bit</td></tr>
-<tr><td><code>armv7</code></td><td>ARMv& 32-bit</td></tr>
+<tr><td><code>armv7</code></td><td>ARMv7 32-bit</td></tr>
 <tr><td><code>general-64</code></td><td>unspecified 64-bit</td></tr>
 <tr><td><code>general-32</code></td><td>unspecified 32-bit</td></tr>
 </table>
@@ -65,7 +65,7 @@ By default, contempt is set to zero during analysis to ensure unbiased analysis.
 The number of CPU threads used for searching a position.
 
 #### Hash
-The size of the hash table.
+The size of the hash table in MB.
 
 #### Clear Hash
 Clear the hash table.
@@ -79,7 +79,7 @@ Output the N best lines when searching. Leave at 1 for best performance.
 #### Move Overhead
 Compensation for network and GUI delay (in ms).
 
-### SyzygyPath
+#### SyzygyPath
 Path to the folders/directories storing the Syzygy tablebase files. Multiple directories are to be separated by ";" on Windows and by ":" on Unix-based operating systems. Do not use spaces around the ";" or ":".
 
 Example: `C:\tablebases\wdl345;C:\tablebases\wdl6;D:\tablebases\dtz345;D:\tablebases\dtz6`
