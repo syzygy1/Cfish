@@ -59,7 +59,7 @@ static Score base_ct;
 static const int skipSize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
 static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
 
-static const int razor_margin = 600;
+static const int RazorMargin = 590;
 
 #define futility_margin(d) ((Value)(150 * (d) / ONE_PLY))
 
