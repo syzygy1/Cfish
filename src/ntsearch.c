@@ -36,7 +36,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
   moveCount = captureCount = quietCount =  ss->moveCount = 0;
-  ss->statScore = 0;
   bestValue = -VALUE_INFINITE;
   maxValue = VALUE_INFINITE;
 
@@ -87,6 +86,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   ss->history = &(*pos->counterMoveHistory)[0][0];
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
   Square prevSq = to_sq((ss-1)->currentMove);
+  (ss+2)->statScore = 0;
 
   // Step 4. Transposition table lookup. We don't want the score of a
   // partial search to overwrite a previous full search TT value, so we
@@ -132,7 +132,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     return ttValue;
   }
 
-  // Step 4a. Tablebase probe
+  // Step 5. Tablebase probe
   if (!rootNode && TB_Cardinality) {
     int piecesCnt = popcount(pieces());
 
@@ -187,7 +187,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     }
   }
 
-  // Step 5. Evaluate the position statically
+  // Step 6. Evaluate the position statically
   if (inCheck) {
     ss->staticEval = VALUE_NONE;
     goto moves_loop;
@@ -212,20 +212,31 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (ss->skipEarlyPruning || !pos_non_pawn_material(pos_stm()))
     goto moves_loop;
 
-  // Step 6. Razoring (skipped when in check)
+  // Step 7. Razoring (skipped when in check)
   if (   !PvNode
-      &&  depth <= ONE_PLY
-      &&  eval + RazorMargin <= alpha)
-    return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
+      && depth <= ONE_PLY)
+  {
+    if (eval + RazorMargin1 <= alpha)
+      return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
+  }
+  else if (   !PvNode
+           && depth <= 2 * ONE_PLY
+           && eval + RazorMargin2 <= alpha)
+  {
+    Value ralpha = alpha - RazorMargin2;
+    Value v = qsearch_NonPV_false(pos, ss, ralpha, DEPTH_ZERO);
+    if (v <= ralpha)
+      return v;
+  }
 
-  // Step 7. Futility pruning: child node (skipped when in check)
+  // Step 8. Futility pruning: child node (skipped when in check)
   if (   !rootNode
       &&  depth < 7 * ONE_PLY
       &&  eval - futility_margin(depth) >= beta
       &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
     return eval; // - futility_margin(depth); (do not do the right thing)
 
-  // Step 8. Null move search with verification search (is omitted in PV nodes)
+  // Step 9. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && eval >= beta
       && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
@@ -276,7 +287,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     }
   }
 
-  // Step 9. ProbCut (skipped when in check)
+  // Step 10. ProbCut (skipped when in check)
   // If we have a good enough capture and a reduced search returns a value
   // much above beta, we can (almost) safely prune the previous move.
   if (   !PvNode
@@ -296,25 +307,38 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
         ss->currentMove = move;
         ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
         do_move(pos, move, gives_check(pos, ss, move));
-        value = -search_NonPV(pos, ss+1, -rbeta, rdepth, !cutNode);
+
+        // Perform a preliminary search at depth 1 to verify that the move
+        // holds. We will only do this search if the depth is not 5, thus
+        // avoiding two searches at depth 1 in a row.
+        if (depth != 5 * ONE_PLY) {
+          (ss+1)->skipEarlyPruning = 1;
+          value = -search_NonPV(pos, ss+1, -rbeta, ONE_PLY, !cutNode);
+          (ss+1)->skipEarlyPruning = 0;
+        }
+
+        // If the first search was skipped or was performed and held, perform
+        // the regular search.
+        if (depth == 5 * ONE_PLY || value >= rbeta)
+          value = -search_NonPV(pos, ss+1, -rbeta, rdepth, !cutNode);
+
         undo_move(pos, move);
         if (value >= rbeta)
           return value;
       }
   }
 
-  // Step 10. Internal iterative deepening (skipped when in check)
+  // Step 11. Internal iterative deepening (skipped when in check)
   if (    depth >= 6 * ONE_PLY
       && !ttMove
       && (PvNode || ss->staticEval + 256 >= beta))
   {
     Depth d = (3 * depth / (4 * ONE_PLY) - 2) * ONE_PLY;
     ss->skipEarlyPruning = 1;
-#if PvNode
-    search_PV(pos, ss, alpha, beta, d);
-#else
-    search_NonPV(pos, ss, alpha, d, cutNode);
-#endif
+    if (PvNode)
+      search_PV(pos, ss, alpha, beta, d);
+    else
+      search_NonPV(pos, ss, alpha, d, cutNode);
     ss->skipEarlyPruning = 0;
 
     tte = tt_probe(posKey, &ttHit);
@@ -344,7 +368,7 @@ moves_loop: // When in check search starts from here.
   ttCapture = 0;
   pvExact = PvNode && ttHit && tte_bound(tte) == BOUND_EXACT;
 
-  // Step 11. Loop through moves
+  // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
   // cutoff occurs
   while ((move = next_move(pos, skipQuiets))) {
@@ -391,7 +415,7 @@ moves_loop: // When in check search starts from here.
     moveCountPruning = depth < 16 * ONE_PLY
                 && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
-    // Step 12. Singular and Gives Check Extensions
+    // Step 13. Singular and Gives Check Extensions
 
     // Singular extension search. If all moves but one fail low on a search
     // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
@@ -432,7 +456,7 @@ moves_loop: // When in check search starts from here.
     // Calculate new depth for this move
     newDepth = depth - ONE_PLY + extension;
 
-    // Step 13. Pruning at shallow depth
+    // Step 14. Pruning at shallow depth
     if (  !rootNode
         && pos_non_pawn_material(pos_stm())
         && bestValue > VALUE_MATED_IN_MAX_PLY)
@@ -495,12 +519,12 @@ moves_loop: // When in check search starts from here.
     ss->currentMove = move;
     ss->history = &(*pos->counterMoveHistory)[movedPiece][to_sq(move)];
 
-    // Step 14. Make the move.
+    // Step 15. Make the move.
     do_move(pos, move, givesCheck);
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
-    // Step 15. Reduced depth search (LMR). If the move fails high it will be
+    // Step 16. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3 * ONE_PLY
         &&  moveCount > 1
@@ -561,7 +585,7 @@ moves_loop: // When in check search starts from here.
     } else
       doFullDepthSearch = !PvNode || moveCount > 1;
 
-    // Step 16. Full depth search when LMR is skipped or fails high.
+    // Step 17. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch)
         value =  newDepth <   ONE_PLY
                ?   givesCheck
@@ -585,14 +609,14 @@ moves_loop: // When in check search starts from here.
              : -search_PV(pos, ss+1, -beta, -alpha, newDepth);
     }
 
-    // Step 17. Undo move
+    // Step 18. Undo move
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
     undo_move(pos, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
 
-    // Step 18. Check for a new best move
+    // Step 19. Check for a new best move
     // Finished searching the move. If a stop occurred, the return value of
     // the search cannot be trusted, and we return immediately without
     // updating best move, PV and TT.

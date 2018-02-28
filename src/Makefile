@@ -22,7 +22,7 @@
 ### ==========================================================================
 
 ### Establish the operating system name
-UNAME = $(shell uname -s)
+KERNEL = $(shell uname -s)
 ifeq ($(KERNEL),Linux)
 	OS = $(shell uname -o)
 endif
@@ -176,7 +176,7 @@ ifeq ($(COMP),gcc)
 		LDFLAGS += -m$(bits)
 	endif
 
-	ifneq ($(UNAME),Darwin)
+	ifneq ($(KERNEL),Darwin)
 		LDFLAGS += -Wl,--no-as-needed
 	endif
 endif
@@ -185,7 +185,7 @@ ifeq ($(COMP),mingw)
 	comp=mingw
 	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format -m$(bits)
 	LDFLAGS += -m$(bits)
-	ifeq ($(UNAME),Linux)
+	ifeq ($(KERNEL),Linux)
 		ifeq ($(bits),64)
 #			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
 				CC=x86_64-w64-mingw32-gcc
@@ -224,7 +224,7 @@ ifeq ($(COMP),clang)
 		LDFLAGS += -m$(bits)
 	endif
 
-	ifeq ($(UNAME),Darwin)
+	ifeq ($(KERNEL),Darwin)
 		CFLAGS += 
 		DEPENDFLAGS += 
 	endif
@@ -243,7 +243,7 @@ else
 endif
 endif
 
-ifeq ($(UNAME),Darwin)
+ifeq ($(KERNEL),Darwin)
 	CFLAGS += -arch $(arch) -mmacosx-version-min=10.9
 	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.9
 endif
@@ -263,7 +263,7 @@ ifneq ($(comp),mingw)
 	# On Android Bionic's C library comes with its own pthread implementation bundled in
 	ifneq ($(arch),armv7)
 		# Haiku has pthreads in its libroot, so only link it in on other platforms
-		ifneq ($(UNAME),Haiku)
+		ifneq ($(KERNEL),Haiku)
 			LDFLAGS += -lpthread
 		endif
 	endif
@@ -286,34 +286,14 @@ ifeq ($(optimize),yes)
 			CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
 		endif
 
-		ifeq ($(UNAME),Darwin)
-			ifeq ($(arch),i386)
-				CFLAGS += -mdynamic-no-pic
-			endif
-			ifeq ($(arch),x86_64)
-				CFLAGS += -mdynamic-no-pic
-			endif
-		endif
-
 		ifeq ($(OS),Android)
 			CFLAGS += -fno-gcse -mthumb -march=armv7-a -mfloat-abi=softfp
 		endif
 	endif
 
-	ifeq ($(comp),icc)
-		ifeq ($(UNAME),Darwin)
+	ifeq ($(comp),$(filter $(comp),gcc clang icc))
+		ifeq ($(KERNEL),Darwin)
 			CFLAGS += -mdynamic-no-pic
-		endif
-	endif
-
-	ifeq ($(comp),clang)
-		ifeq ($(UNAME),Darwin)
-			ifeq ($(arch),i386)
-				CFLAGS += -mdynamic-no-pic
-			endif
-			ifeq ($(arch),x86_64)
-				CFLAGS += -mdynamic-no-pic
-			endif
 		endif
 	endif
 endif
@@ -358,7 +338,7 @@ endif
 ### numa
 ifeq ($(numa),yes)
 	CFLAGS += -DNUMA
-        ifeq ($(UNAME),Linux)
+        ifeq ($(KERNEL),Linux)
         ifneq ($(comp),mingw)
 		LDFLAGS += -lnuma
         endif

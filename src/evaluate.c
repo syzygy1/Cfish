@@ -250,7 +250,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
                               pieces() ^ pieces_p(QUEEN) ^ pieces_cp(Us, ROOK))
                    : attacks_from(Pt, s);
 
-    if (pinned_pieces(pos, Us) & sq_bb(s))
+    if (blockers_for_king(pos, Us) & sq_bb(s))
       b &= LineBB[square_of(Us, KING)][s];
 
     ei->attackedBy2[Us] |= ei->attackedBy[Us][0] & b;
@@ -370,7 +370,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
   const Square ksq = square_of(Us, KING);
-  Bitboard weak, b, b1, b2, safe, unsafeChecks;
+  Bitboard weak, b, b1, b2, safe, unsafeChecks, pinned;
   int kingDanger;
 
   // King shelter and enemy pawns storm
@@ -429,11 +429,12 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     // Unsafe or occupied checking squares will also be considered, as long
     // the square is in the attacker's mobility area.
     unsafeChecks &= ei->mobilityArea[Them];
+    pinned = blockers_for_king(pos, Us) & pieces_c(Us);
 
     kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                  + 102 * ei->kingAdjacentZoneAttacksCount[Them]
                  + 191 * popcount(ei->kingRing[Us] & weak)
-                 + 143 * popcount(pinned_pieces(pos, Us) | unsafeChecks)
+                 + 143 * popcount(pinned | unsafeChecks)
                  - 848 * !pieces_cp(Them, QUEEN)
                  -   9 * mg_value(score) / 8
                  + 40;
@@ -772,7 +773,7 @@ Value evaluate(const Pos *pos)
   // If we have a specialized evaluation function for the current material
   // configuration, call it and return.
   if (material_specialized_eval_exists(ei.me))
-    return material_evaluate(ei.me, pos) + Tempo;
+    return material_evaluate(ei.me, pos);
 
   // Initialize score by reading the incrementally updated scores included
   // in the position struct (material + piece square tables) and the
@@ -788,7 +789,7 @@ Value evaluate(const Pos *pos)
   // Early exit if score is high
   v = (mg_value(score) + eg_value(score)) / 2;
   if (abs(v) > LazyThreshold)
-    return (pos_stm() == WHITE ? v : -v) + Tempo;
+    return pos_stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);

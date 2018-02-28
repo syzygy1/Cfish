@@ -206,8 +206,9 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 {
   e->key = key;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
-  e->asymmetry = popcount(e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]);
   e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
+  e->asymmetry = popcount(e->passedPawns[WHITE] | e->passedPawns[BLACK]
+                        | (e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]));
 }
 
 
@@ -217,14 +218,22 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
+  const Bitboard ShelterMask = Us == WHITE
+    ? 1ULL << SQ_A2 | 1ULL << SQ_B3 | 1ULL << SQ_C2 | 1ULL << SQ_F2 | 1ULL << SQ_G3 | 1ULL << SQ_H2
+    : 1ULL << SQ_A7 | 1ULL << SQ_B6 | 1ULL << SQ_C7 | 1ULL << SQ_F7 | 1ULL << SQ_G6 | 1ULL << SQ_H7;
+  const Bitboard StormMask = Us == WHITE
+    ? 1ULL << SQ_A3 | 1ULL << SQ_C3 | 1ULL << SQ_F3 | 1ULL << SQ_H3
+    : 1ULL << SQ_A6 | 1ULL << SQ_C6 | 1ULL << SQ_F6 | 1ULL << SQ_H6;
   
   enum { BlockedByKing, Unopposed, BlockedByPawn, Unblocked };
 
-  Bitboard b = pieces_p(PAWN) & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
+  uint32_t center = max(FILE_B, min(FILE_G, file_of(ksq)));
+  Bitboard b =  pieces_p(PAWN)
+              & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq))
+              & (adjacent_files_bb(center) | file_bb(center));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
   Value safety = MaxSafetyBonus;
-  uint32_t center = max(FILE_B, min(FILE_G, file_of(ksq)));
 
   for (uint32_t f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
@@ -241,6 +250,9 @@ INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
                 rkThem == rkUs + 1                                          ? BlockedByPawn  : Unblocked]
                [d][rkThem];
   }
+
+  if (popcount((ourPawns & ShelterMask) | (theirPawns & StormMask)) == 5)
+    safety += 300;
 
   return safety;
 }

@@ -277,19 +277,9 @@ PURE int is_draw(const Pos *pos);
 #define pos_non_pawn_material(c) (pos->st->nonPawnMaterial[c])
 #define pos_pawns_only() (!pos->st->nonPawn)
 
-INLINE Bitboard discovered_check_candidates(const Pos *pos)
-{
-  return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
-}
-
 INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
 {
   return pos->st->blockersForKing[c];
-}
-
-INLINE Bitboard pinned_pieces(const Pos *pos, uint32_t c)
-{
-  return pos->st->blockersForKing[c] & pieces_c(c);
 }
 
 INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
@@ -336,7 +326,7 @@ INLINE int is_capture(const Pos *pos, Move m)
 
 INLINE int gives_check(const Pos *pos, Stack *st, Move m)
 {
-  return  type_of_m(m) == NORMAL && !discovered_check_candidates(pos)
+  return  type_of_m(m) == NORMAL && !(blockers_for_king(pos, pos_stm() ^ 1) & pieces_c(pos_stm()))
         ? !!(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
         : gives_check_special(pos, st, m);
 }

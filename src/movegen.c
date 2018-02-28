@@ -328,7 +328,7 @@ ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
   assert(!pos_checkers());
 
   uint32_t us = pos_stm();
-  Bitboard dc = discovered_check_candidates(pos);
+  Bitboard dc = blockers_for_king(pos, us ^ 1) & pieces_c(us);
 
   while (dc) {
     Square from = pop_lsb(&dc);
@@ -391,8 +391,9 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 SMALL
 ExtMove *generate_legal(const Pos *pos, ExtMove *list)
 {
-  Bitboard pinned = pinned_pieces(pos, pos_stm());
-  Square ksq = square_of(pos_stm(), KING);
+  uint32_t us = pos_stm();
+  Bitboard pinned = blockers_for_king(pos, us) & pieces_c(us);
+  Square ksq = square_of(us, KING);
   ExtMove *cur = list;
 
   list = pos_checkers() ? generate_evasions(pos, list)

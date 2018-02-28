@@ -59,7 +59,8 @@ static Score base_ct;
 static const int skipSize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
 static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
 
-static const int RazorMargin = 590;
+static const int RazorMargin1 = 590;
+static const int RazorMargin2 = 604;
 
 #define futility_margin(d) ((Value)(150 * (d) / ONE_PLY))
 
@@ -400,7 +401,7 @@ void thread_search(Pos *pos)
 
     // Age out PV variability metric
     if (pos->thread_idx == 0) {
-      mainThread.bestMoveChanges *= 0.505;
+      mainThread.bestMoveChanges *= 0.517;
       mainThread.failedLow = 0;
     }
 
@@ -543,7 +544,7 @@ skip_search:
         const int F[] = { mainThread.failedLow,
                           bestValue - mainThread.previousScore };
 
-        int improvingFactor = max(229, min(715, 357 + 119 * F[0] - 6 * F[1]));
+        int improvingFactor = max(246, min(832, 306 + 119 * F[0] - 6 * F[1]));
 
         double unstablePvFactor = 1 + mainThread.bestMoveChanges;
 
@@ -554,11 +555,11 @@ skip_search:
         timeReduction = 1;
         for (int i = 3; i < 6; i++)
           if (lastBestMoveDepth * i < pos->completedDepth)
-            timeReduction *= 1.3;
-        unstablePvFactor *= pow(mainThread.previousTimeReduction, 0.51) / timeReduction;
+            timeReduction *= 1.25;
+        unstablePvFactor *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
         if (   rm->size == 1
-            || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 605)
+            || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 581)
         {
           // If we are allowed to ponder do not stop the search now but
           // keep pondering until the GUI sends "ponderhit" or "stop".

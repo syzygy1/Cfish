@@ -32,9 +32,9 @@ typedef enum { OptimumTime, MaxTime } TimeType;
 // Plan time management at most this many moves ahead
 static const int MoveHorizon = 50;
 // When in trouble, we can step over reserved time with this ratio
-static const double MaxRatio = 7.09;
+static const double MaxRatio = 7.3;
 // But we must not steal time from remaining moves over this ratio
-static const double StealRatio = 0.35;
+static const double StealRatio = 0.34;
 
 // move_importance() is a skew-logistic function based on naive statistical
 // analysis of "how many games are still undecided after n half moves".
@@ -43,9 +43,9 @@ static const double StealRatio = 0.35;
 // simple filtering criteria.
 
 static double move_importance(int ply) {
-  const double XScale = 7.64;
-  const double XShift = 58.4;
-  const double Skew   = 0.183;
+  const double XScale = 6.85;
+  const double XShift = 64.5;
+  const double Skew   = 0.171;
 
   return pow((1 + exp((ply - XShift) / XScale)), -Skew) + DBL_MIN;
 }
