@@ -56,39 +56,34 @@ INLINE void cpth_update(CapturePieceToHistory history, Piece pc, Square to,
 }
 
 enum {
-  ST_MAIN_SEARCH, ST_CAPTURES_GEN, ST_GOOD_CAPTURES, ST_KILLERS, ST_KILLERS_2,
-  ST_QUIET_GEN, ST_QUIET, ST_BAD_CAPTURES,
+  ST_MAIN_SEARCH, ST_CAPTURES_INIT, ST_GOOD_CAPTURES, ST_KILLERS, ST_KILLERS_2,
+  ST_QUIET_INIT, ST_QUIET, ST_BAD_CAPTURES,
 
-  ST_EVASIONS, ST_ALL_EVASIONS,
+  ST_EVASION, ST_EVASIONS_INIT, ST_ALL_EVASIONS,
 
-  ST_QSEARCH_WITH_CHECKS, ST_QCAPTURES_CHECKS_GEN, ST_QCAPTURES_CHECKS,
-  ST_CHECKS,
+  ST_QSEARCH, ST_QCAPTURES_INIT, ST_QCAPTURES, ST_QCHECKS,
 
-  ST_QSEARCH_WITHOUT_CHECKS, ST_QCAPTURES_NO_CHECKS_GEN, ST_REMAINING,
-
-  ST_RECAPTURES_GEN, ST_RECAPTURES,
-
-  ST_PROBCUT, ST_PROBCUT_GEN, ST_PROBCUT_2
+  ST_PROBCUT, ST_PROBCUT_INIT, ST_PROBCUT_2
 };
 
 Move next_move(const Pos *pos, int skipQuiets);
 
 // Initialisation of move picker data.
 
-INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
+INLINE void mp_init(const Pos *pos, Move ttm, Depth d)
 {
-  assert(depth > DEPTH_ZERO);
+  assert(d > DEPTH_ZERO);
 
   Stack *st = pos->st;
 
-  st->depth = depth;
+  st->depth = d;
 
   Square prevSq = to_sq((st-1)->currentMove);
   st->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
   st->mp_killers[0] = st->killers[0];
   st->mp_killers[1] = st->killers[1];
 
-  st->stage = pos_checkers() ? ST_EVASIONS : ST_MAIN_SEARCH;
+  st->stage = pos_checkers() ? ST_EVASION : ST_MAIN_SEARCH;
   st->ttMove = ttm;
   if (!ttm || !is_pseudo_legal(pos, ttm)) {
     st->stage++;
@@ -96,45 +91,36 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
   }
 }
 
-INLINE void mp_init_q(const Pos *pos, Move ttm, Depth depth, Square s)
+INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 {
-  assert(depth <= DEPTH_ZERO);
+  assert(d <= DEPTH_ZERO);
 
   Stack *st = pos->st;
 
-  if (pos_checkers())
-    st->stage = ST_EVASIONS;
-  else if (depth > DEPTH_QS_NO_CHECKS)
-    st->stage = ST_QSEARCH_WITH_CHECKS;
-  else if (depth > DEPTH_QS_RECAPTURES)
-    st->stage = ST_QSEARCH_WITHOUT_CHECKS;
-  else {
-    st->stage = ST_RECAPTURES_GEN;
-    st->recaptureSquare = s;
-    return;
-  }
+  st->stage = pos_checkers() ? ST_EVASION : ST_QSEARCH;
+  st->ttMove =   ttm
+              && is_pseudo_legal(pos, ttm)
+              && (d > DEPTH_QS_RECAPTURES || to_sq(ttm) == s) ? ttm : 0;
+  st->stage += (st->ttMove == 0);
 
-  st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm)) {
-    st->stage++;
-    st->ttMove = 0;
-  }
+  st->depth = d;
+  st->recaptureSquare = s;
 }
 
-INLINE void mp_init_pc(const Pos *pos, Move ttm, Value threshold)
+INLINE void mp_init_pc(const Pos *pos, Move ttm, Value th)
 {
   assert(!pos_checkers());
 
   Stack *st = pos->st;
 
-  st->threshold = threshold;
+  st->threshold = th;
 
   st->stage = ST_PROBCUT;
 
   // In ProbCut we generate captures with SEE higher than the given
   // threshold.
   st->ttMove =   ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-              && see_test(pos, ttm, threshold) ? ttm : 0;
+              && see_test(pos, ttm, th) ? ttm : 0;
   if (st->ttMove == 0) st->stage++;
 }
 

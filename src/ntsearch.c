@@ -302,8 +302,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
-    while ((move = next_move(pos, 0)))
+    int probCutCount = depth / ONE_PLY - 3;
+    while ((move = next_move(pos, 0)) && probCutCount)
       if (is_legal(pos, move)) {
+        probCutCount--;
         ss->currentMove = move;
         ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
         do_move(pos, move, gives_check(pos, ss, move));

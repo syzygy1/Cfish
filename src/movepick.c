@@ -124,13 +124,12 @@ Move next_move(const Pos *pos, int skipQuiets)
 
   switch (st->stage) {
 
-  case ST_MAIN_SEARCH: case ST_EVASIONS: case ST_QSEARCH_WITH_CHECKS:
-  case ST_QSEARCH_WITHOUT_CHECKS: case ST_PROBCUT:
+  case ST_MAIN_SEARCH: case ST_EVASION: case ST_QSEARCH: case ST_PROBCUT:
     st->endMoves = (st-1)->endMoves;
     st->stage++;
     return st->ttMove;
 
-  case ST_CAPTURES_GEN:
+  case ST_CAPTURES_INIT:
     st->endBadCaptures = st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
@@ -174,7 +173,7 @@ Move next_move(const Pos *pos, int skipQuiets)
       return move;
     /* fallthrough */
 
-  case ST_QUIET_GEN:
+  case ST_QUIET_INIT:
     st->cur = st->endBadCaptures;
     st->endMoves = generate_quiets(pos, st->cur);
     score_quiets(pos);
@@ -199,36 +198,41 @@ Move next_move(const Pos *pos, int skipQuiets)
       return (st->cur++)->move;
     break;
 
-  case ST_ALL_EVASIONS:
+  case ST_EVASIONS_INIT:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_evasions(pos, st->cur);
     score_evasions(pos);
-    st->stage = ST_REMAINING;
+    st->stage++;
 
-    if (st->stage != ST_REMAINING) {
-    /* fallthrough */
-  case ST_QCAPTURES_CHECKS_GEN: case ST_QCAPTURES_NO_CHECKS_GEN:
-      st->cur = (st-1)->endMoves;
-      st->endMoves = generate_captures(pos, st->cur);
-      score_captures(pos);
-      st->stage++;
-    }
-    /* fallthrough */
-
-  case ST_QCAPTURES_CHECKS: case ST_REMAINING:
+  case ST_ALL_EVASIONS:
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
       if (move != st->ttMove)
         return move;
     }
-    if (st->stage != ST_QCAPTURES_CHECKS)
+    break;
+
+  case ST_QCAPTURES_INIT:
+    st->cur = (st-1)->endMoves;
+    st->endMoves = generate_captures(pos, st->cur);
+    score_captures(pos);
+    st->stage++;
+
+  case ST_QCAPTURES:
+    while (st->cur < st->endMoves) {
+      move = pick_best(st->cur++, st->endMoves);
+      if (move != st->ttMove && (st->depth > DEPTH_QS_RECAPTURES
+              || to_sq(move) == st->recaptureSquare))
+        return move;
+    }
+    if (st->depth <= DEPTH_QS_NO_CHECKS)
       break;
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_quiet_checks(pos, st->cur);
     st->stage++;
     /* fallthrough */
 
-  case ST_CHECKS:
+  case ST_QCHECKS:
     while (st->cur < st->endMoves) {
       move = (st->cur++)->move;
       if (move != st->ttMove)
@@ -236,21 +240,7 @@ Move next_move(const Pos *pos, int skipQuiets)
     }
     break;
 
-  case ST_RECAPTURES_GEN:
-    st->cur = (st-1)->endMoves;
-    st->endMoves = generate_captures(pos, st->cur);
-    st->stage++;
-    /* fallthrough */
-
-  case ST_RECAPTURES:
-    while (st->cur < st->endMoves) {
-      move = (st->cur++)->move;
-      if (to_sq(move) == st->recaptureSquare)
-        return move;
-    }
-    break;
-
-  case ST_PROBCUT_GEN:
+  case ST_PROBCUT_INIT:
     st->cur = (st-1)->endMoves;
     st->endMoves = generate_captures(pos, st->cur);
     score_captures(pos);
