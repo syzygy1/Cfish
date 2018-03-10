@@ -184,7 +184,7 @@ enum {
   MidgameLimit = 15258, EndgameLimit = 3915
 };
 
-enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING, QUEEN_DIAGONAL };
+enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING };
 
 enum {
   W_PAWN = 1, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING,

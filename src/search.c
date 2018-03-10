@@ -62,7 +62,9 @@ static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3
 static const int RazorMargin1 = 590;
 static const int RazorMargin2 = 604;
 
-#define futility_margin(d) ((Value)(150 * (d) / ONE_PLY))
+INLINE int futility_margin(Depth d, int improving) {
+  return (175 - 50 * improving) * d / ONE_PLY;
+}
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
@@ -440,9 +442,7 @@ void thread_search(Pos *pos)
         beta  = min(rm->move[PVIdx].previousScore + delta, VALUE_INFINITE);
 
         // Adjust contempt based on current situation
-        int ct = base_ct + (  bestValue >  500 ?  50
-                            : bestValue < -500 ? -50
-                            : bestValue / 10);
+        int ct = base_ct + round(48 * atan((float)bestValue / 128));
         store_rlx(Contempt, pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                                : -make_score(ct, ct / 2));
       }
