@@ -83,61 +83,6 @@ Square CastlingRookFrom[16];
 Square CastlingRookTo[16];
 #endif
 
-// De Bruijn sequences. See chessprogramming.wikispaces.com/BitScan.
-
-#define DeBruijn64 0x3F79D71B4CB0A89ULL
-#define DeBruijn32 0x783A9B23
-
-#ifdef NO_BSF
-static int MSBTable[256];            // To implement software msb()
-static Square BSFTable[64];          // To implement software bitscan
-
-// bsf_index() returns the index into BSFTable[] to look up the bitscan. Uses
-// Matt Taylor's folding for 32 bit case, extended to 64 bit by Kim Walisch.
-
-INLINE unsigned bsf_index(Bitboard b)
-{
-  b ^= b - 1;
-  return Is64Bit ? (b * DeBruijn64) >> 58
-                 : ((((unsigned)b) ^ (unsigned)(b >> 32)) * DeBruijn32) >> 26;
-}
-
-/// Software fall-back of lsb() and msb() for CPU lacking hardware support
-
-Square lsb(Bitboard b)
-{
-  assert(b);
-  return BSFTable[bsf_index(b)];
-}
-
-Square msb(Bitboard b)
-{
-  assert(b);
-  unsigned b32;
-  int result = 0;
-
-  if (b > 0xFFFFFFFF) {
-    b >>= 32;
-    result = 32;
-  }
-
-  b32 = (unsigned)b;
-
-  if (b32 > 0xFFFF) {
-    b32 >>= 16;
-    result += 16;
-  }
-
-  if (b32 > 0xFF) {
-    b32 >>= 8;
-    result += 8;
-  }
-
-  return (Square)(result + MSBTable[b32]);
-}
-
-#endif // ifdef NO_BSF
-
 #ifndef USE_POPCNT
 // popcount16() counts the non-zero bits using SWAR-Popcount algorithm.
 
@@ -174,21 +119,11 @@ void bitboards_init(void)
 {
 #ifndef USE_POPCNT
   for (unsigned i = 0; i < (1 << 16); ++i)
-    PopCnt16[i] = (uint8_t) popcount16(i);
+    PopCnt16[i] = popcount16(i);
 #endif
 
-#ifdef NO_BSF
-  for (Square s = 0; s < 64; s++) {
-    SquareBB[s] = 1ULL << s;
-    BSFTable[bsf_index(SquareBB[s])] = s;
-  }
-
-  for (Bitboard b = 2; b < 256; b++)
-    MSBTable[b] = MSBTable[b - 1] + !more_than_one(b);
-#else
   for (Square s = 0; s < 64; s++)
     SquareBB[s] = 1ULL << s;
-#endif
 
   for (int f = 0; f < 8; f++)
     FileBB[f] = f > FILE_A ? FileBB[f - 1] << 1 : FileABB;

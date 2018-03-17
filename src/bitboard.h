@@ -304,7 +304,9 @@ INLINE int msb(Bitboard b)
   return 63 ^ __builtin_clzll(b);
 }
 
-#elif defined(_WIN64) && defined(_MSC_VER)
+#elif defined(_MSC_VER)
+
+#if defined(_WIN64)
 
 INLINE Square lsb(Bitboard b)
 {
@@ -324,10 +326,37 @@ INLINE Square msb(Bitboard b)
 
 #else
 
-#define NO_BSF // Fallback on software implementation for other cases
+INLINE Square lsb(Bitboard b)
+{
+  assert(b);
+  unsigned long idx;
+  if ((uint32_t)b) {
+    _BitScanForward(&idx, (uint32_t)b);
+    return idx;
+  } else {
+    _BitScanForward(&idx, (uint32_t)(b >> 32));
+    return idx + 32;
+  }
+}
 
-Square lsb(Bitboard b);
-Square msb(Bitboard b);
+INLINE Square msb(Bitboard b)
+{
+  assert(b);
+  unsigned long idx;
+  if (b >> 32) {
+    _BitScanReverse(&idx, (uint32_t)(b >> 32));
+    return idx + 32;
+  } else {
+    _BitScanReverse(&idx, (uint32_t)b);
+    return idx;
+  }
+}
+
+#endif
+
+#else
+
+#error "Compiler not supported."
 
 #endif
 

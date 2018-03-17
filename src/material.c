@@ -55,7 +55,7 @@ static int is_KXK(const Pos *pos, int us)
         && pos_non_pawn_material(us) >= RookValueMg;
 }
 
-static int is_KBPsKs(const Pos *pos, int us)
+static int is_KBPsK(const Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
         && pieces_cp(us, BISHOP)
@@ -144,7 +144,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   // generic ones that refer to more than one material distribution. Note
   // that in this case we do not return after setting the function.
   for (int c = 0; c < 2; c++) {
-    if (is_KBPsKs(pos, c))
+    if (is_KBPsK(pos, c))
       e->scal_func[c] = 18; // ScaleKBPsK
 
     else if (is_KQKRPs(pos, c))

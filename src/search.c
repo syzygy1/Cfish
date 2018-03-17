@@ -546,7 +546,7 @@ skip_search:
 
         int improvingFactor = max(246, min(832, 306 + 119 * F[0] - 6 * F[1]));
 
-        double unstablePvFactor = 1 + mainThread.bestMoveChanges;
+        double bestMoveInstability = 1 + mainThread.bestMoveChanges;
 
         // If the best move is stable over several iterations, reduce time
         // for this move, the longer the move has been stable, the more.
@@ -556,10 +556,10 @@ skip_search:
         for (int i = 3; i < 6; i++)
           if (lastBestMoveDepth * i < pos->completedDepth)
             timeReduction *= 1.25;
-        unstablePvFactor *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
+        bestMoveInstability *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
         if (   rm->size == 1
-            || time_elapsed() > time_optimum() * unstablePvFactor * improvingFactor / 581)
+            || time_elapsed() > time_optimum() * bestMoveInstability * improvingFactor / 581)
         {
           // If we are allowed to ponder do not stop the search now but
           // keep pondering until the GUI sends "ponderhit" or "stop".

@@ -42,7 +42,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
     store_rlx(pos->resetCalls, 0);
-    pos->callsCnt = Limits.nodes ? min(4096, Limits.nodes / 1024) : 4096;
+    pos->callsCnt = Limits.nodes ? min(1024, Limits.nodes / 1024) : 1024;
   }
   if (--pos->callsCnt <= 0) {
     for (int idx = 0; idx < Threads.num_threads; idx++)
@@ -190,7 +190,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Evaluate the position statically
   if (inCheck) {
     ss->staticEval = VALUE_NONE;
-    improving = 1;
+    improving = 0;
     goto moves_loop;
   } else if (ttHit) {
     // Never assume anything on values stored in TT
@@ -298,7 +298,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       &&  depth >= 5 * ONE_PLY
       &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
   {
-    Value rbeta = min(beta + 200, VALUE_INFINITE);
+    Value rbeta = min(beta + 216 - 48 * improving, VALUE_INFINITE);
     Depth rdepth = depth - 4 * ONE_PLY;
 
     assert(rdepth >= ONE_PLY);
@@ -306,26 +306,22 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
-    int probCutCount = depth / ONE_PLY - 3;
+    int probCutCount = 3;
     while ((move = next_move(pos, 0)) && probCutCount)
       if (is_legal(pos, move)) {
         probCutCount--;
         ss->currentMove = move;
         ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
-        do_move(pos, move, gives_check(pos, ss, move));
+        givesCheck = gives_check(pos, ss, move);
+        do_move(pos, move, givesCheck);
 
-        // Perform a preliminary search at depth 1 to verify that the move
-        // holds. We will only do this search if the depth is not 5, thus
-        // avoiding two searches at depth 1 in a row.
-        if (depth != 5 * ONE_PLY) {
-          (ss+1)->skipEarlyPruning = 1;
-          value = -search_NonPV(pos, ss+1, -rbeta, ONE_PLY, !cutNode);
-          (ss+1)->skipEarlyPruning = 0;
-        }
+        // Perform a preliminary qsearch to verify that the move holds
+        value =   givesCheck
+               ? -qsearch_NonPV_true(pos, ss+1, -rbeta, DEPTH_ZERO)
+               : -qsearch_NonPV_false(pos, ss+1, -rbeta, DEPTH_ZERO);
 
-        // If the first search was skipped or was performed and held, perform
-        // the regular search.
-        if (depth == 5 * ONE_PLY || value >= rbeta)
+        // If the qsearch holds perform the regular search
+        if (value >= rbeta)
           value = -search_NonPV(pos, ss+1, -rbeta, rdepth, !cutNode);
 
         undo_move(pos, move);
@@ -590,7 +586,7 @@ moves_loop: // When in check search starts from here.
 
     // Step 17. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch)
-        value =  newDepth <   ONE_PLY
+        value =  newDepth < ONE_PLY
                ?   givesCheck
                  ? -qsearch_NonPV_true(pos, ss+1, -(alpha+1), DEPTH_ZERO)
                  : -qsearch_NonPV_false(pos, ss+1, -(alpha+1), DEPTH_ZERO)
@@ -605,7 +601,7 @@ moves_loop: // When in check search starts from here.
       (ss+1)->pv = pv;
       (ss+1)->pv[0] = 0;
 
-      value =  newDepth <   ONE_PLY
+      value =  newDepth < ONE_PLY
              ?   givesCheck
                ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
                : -qsearch_PV_false(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
