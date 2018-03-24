@@ -14,7 +14,7 @@
 #include "uci.h"
 #include "tbprobe.h"
 
-static void set_castling_right(Pos *pos, uint32_t c, Square rfrom);
+static void set_castling_right(Pos *pos, Color c, Square rfrom);
 static void set_state(Pos *pos, Stack *st);
 
 #ifndef NDEBUG
@@ -50,7 +50,7 @@ const char *PieceToChar = " PNBRQK  pnbrqk";
 int failed_step;
 
 #ifdef PEDANTIC
-INLINE void put_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
+INLINE void put_piece(Pos *pos, Color c, Piece piece, Square s)
 {
   pos->board[s] = piece;
   pos->byTypeBB[0] |= sq_bb(s);
@@ -60,7 +60,7 @@ INLINE void put_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
   pos->pieceList[pos->index[s]] = s;
 }
 
-INLINE void remove_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
+INLINE void remove_piece(Pos *pos, Color c, Piece piece, Square s)
 {
   // WARNING: This is not a reversible operation.
   pos->byTypeBB[0] ^= sq_bb(s);
@@ -73,7 +73,7 @@ INLINE void remove_piece(Pos *pos, uint32_t c, uint32_t piece, Square s)
   pos->pieceList[pos->pieceCount[piece]] = SQ_NONE;
 }
 
-INLINE void move_piece(Pos *pos, uint32_t c, uint32_t piece, Square from, Square to)
+INLINE void move_piece(Pos *pos, Color c, Piece piece, Square from, Square to)
 {
   // index[from] is not updated and becomes stale. This works as long as
   // index[] is accessed just by known occupied squares.
@@ -98,7 +98,7 @@ INLINE void set_check_info(Pos *pos)
   st->blockersForKing[WHITE] = slider_blockers(pos, pieces_c(BLACK), square_of(WHITE, KING), &st->pinnersForKing[WHITE]);
   st->blockersForKing[BLACK] = slider_blockers(pos, pieces_c(WHITE), square_of(BLACK, KING), &st->pinnersForKing[BLACK]);
 
-  uint32_t them = pos_stm() ^ 1;
+  Color them = pos_stm() ^ 1;
   st->ksq = square_of(them, KING);
 
   st->checkSquares[PAWN]   = attacks_from_pawn(st->ksq, them);
@@ -282,7 +282,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
 // set_castling_right() is a helper function used to set castling rights
 // given the corresponding color and the rook starting square.
 
-static void set_castling_right(Pos *pos, uint32_t c, Square rfrom)
+static void set_castling_right(Pos *pos, Color c, Square rfrom)
 {
   Square kfrom = square_of(c, KING);
   int cs = kfrom < rfrom ? KING_SIDE : QUEEN_SIDE;
@@ -309,7 +309,7 @@ static void set_castling_right(Pos *pos, uint32_t c, Square rfrom)
   CastlingRightsMask[kfrom] &= ~cr;
   CastlingRightsMask[rfrom] &= ~cr;
 //  CastlingToSquare[rfrom & 0x0f] = kto;
-  uint32_t rook = make_piece(c, ROOK);
+  Piece rook = make_piece(c, ROOK);
   CastlingHash[kto & 0x0f] = zob.psq[rook][rto] ^ zob.psq[rook][rfrom];
   CastlingPSQ[kto & 0x0f] = psqt.psq[rook][rto] - psqt.psq[rook][rfrom];
   CastlingBits[kto & 0x0f] = sq_bb(rto) ^ sq_bb(rfrom);
@@ -365,12 +365,12 @@ static void set_state(Pos *pos, Stack *st)
     st->pawnKey ^= zob.psq[piece_on(s)][s];
   }
 
-  for (uint32_t c = 0; c < 2; c++)
-    for (uint32_t pt = PAWN; pt <= KING; pt++)
+  for (Color c = 0; c < 2; c++)
+    for (PieceType pt = PAWN; pt <= KING; pt++)
       st->materialKey += piece_count(c, pt) * mat_key[8 * c + pt];
 
-  for (uint32_t c = 0; c < 2; c++)
-    for (uint32_t pt = KNIGHT; pt <= QUEEN; pt++)
+  for (Color c = 0; c < 2; c++)
+    for (PieceType pt = KNIGHT; pt <= QUEEN; pt++)
       st->nonPawn += piece_count(c, pt) * NonPawnPieceValue[make_piece(c, pt)];
 }
 
@@ -618,7 +618,7 @@ int is_pseudo_legal(const Pos *pos, Move m)
   if (pieces_c(us) & sq_bb(to))
     return 0;
 
-  uint32_t pt = type_of_p(piece_on(from));
+  PieceType pt = type_of_p(piece_on(from));
   if (pt != PAWN) {
     if (type_of_m(m) != NORMAL)
       return 0;
@@ -771,8 +771,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
                       & CastlingRightsMask[to];
   key ^= zob.castling[st->castlingRights ^ (st-1)->castlingRights];
 
-  uint32_t capt_piece = pos->board[to];
-  uint32_t us = pos->sideToMove;
+  Piece capt_piece = pos->board[to];
+  Color us = pos->sideToMove;
 
   // Clear en passant.
   st->epSquare = 0;
@@ -782,8 +782,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
       capt_piece = B_PAWN ^ (us << 3);
   }
 
-  uint32_t piece = piece_on(from);
-  uint32_t prom_piece;
+  Piece piece = piece_on(from);
+  Piece prom_piece;
 
   // Move the piece or carry out a promotion.
   if (likely(type_of_m(m) != PROMOTION)) {
@@ -865,12 +865,12 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
 void undo_move(Pos *pos, Move m)
 {
-  uint32_t from = from_sq(m);
-  uint32_t to = to_sq(m);
-  uint32_t piece = pos->board[to];
+  Square from = from_sq(m);
+  Square to = to_sq(m);
+  Piece piece = pos->board[to];
   Stack *st = pos->st--;
   pos->sideToMove ^= 1;
-  uint32_t us = pos->sideToMove;
+  Color us = pos->sideToMove;
  
   if (likely(type_of_m(m) != PROMOTION)) {
     pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
@@ -882,7 +882,7 @@ void undo_move(Pos *pos, Move m)
   pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
   pos->board[from] = piece;
 
-  uint32_t capt_piece = st->capturedPiece;
+  Piece capt_piece = st->capturedPiece;
   pos->board[to] = capt_piece;
   if (capt_piece) {
     if (type_of_m(m) == ENPASSANT) {
@@ -921,8 +921,8 @@ void do_move(Pos *pos, Move m, int givesCheck)
   // later on in case of a capture or a pawn move.
   st->plyCounters += 0x101; // Increment both rule50 and pliesFromNull.
 
-  uint32_t us = pos_stm();
-  uint32_t them = us ^ 1;
+  Color us = pos_stm();
+  Color them = us ^ 1;
   Square from = from_sq(m);
   Square to = to_sq(m);
   Piece piece = piece_on(from);
@@ -1027,7 +1027,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
       st->epSquare = to ^ 8;
       key ^= zob.enpassant[file_of(st->epSquare)];
     } else if (type_of_m(m) == PROMOTION) {
-      uint32_t promotion = promotion_type(m);
+      PieceType promotion = promotion_type(m);
 
       assert(relative_rank_s(us, to) == RANK_8);
       assert(promotion >= KNIGHT && promotion <= QUEEN);
@@ -1095,10 +1095,10 @@ void undo_move(Pos *pos, Move m)
 
   pos->sideToMove ^= 1;
 
-  uint32_t us = pos_stm();
+  Color us = pos_stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
-  uint32_t piece = piece_on(to);
+  Piece piece = piece_on(to);
 
   assert(is_empty(from) || type_of_m(m) == CASTLING);
   assert(type_of_p(pos->st->capturedPiece) != KING);
@@ -1121,8 +1121,8 @@ void undo_move(Pos *pos, Move m)
     to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
 
     // Remove both pieces first since squares could overlap in Chess960
-    uint32_t king = make_piece(us, KING);
-    uint32_t rook = make_piece(us, ROOK);
+    Piece king = make_piece(us, KING);
+    Piece rook = make_piece(us, ROOK);
     remove_piece(pos, us, king, to);
     remove_piece(pos, us, rook, rto);
     pos->board[to] = pos->board[rto] = 0;
@@ -1194,14 +1194,14 @@ Key key_after(const Pos *pos, Move m)
 {
   Square from = from_sq(m);
   Square to = to_sq(m);
-  uint32_t pt = piece_on(from);
-  uint32_t captured = piece_on(to);
+  Piece pc = piece_on(from);
+  Piece captured = piece_on(to);
   Key k = pos_key() ^ zob.side;
 
   if (captured)
     k ^= zob.psq[captured][to];
 
-  return k ^ zob.psq[pt][to] ^ zob.psq[pt][from];
+  return k ^ zob.psq[pc][to] ^ zob.psq[pc][from];
 }
 
 
@@ -1223,7 +1223,7 @@ int see_test(const Pos *pos, Move m, int value)
     return 1;
 
   occ = pieces() ^ sq_bb(from) ^ sq_bb(to);
-  uint32_t stm = color_of(piece_on(from));
+  Color stm = color_of(piece_on(from));
   Bitboard attackers = attackers_to_occ(to, occ), stmAttackers;
   int res = 1;
 

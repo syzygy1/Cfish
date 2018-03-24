@@ -333,7 +333,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 11. Internal iterative deepening (skipped when in check)
   if (    depth >= 6 * ONE_PLY
       && !ttMove
-      && (PvNode || ss->staticEval + 256 >= beta))
+      && (PvNode || ss->staticEval + 128 >= beta))
   {
     Depth d = (3 * depth / (4 * ONE_PLY) - 2) * ONE_PLY;
     ss->skipEarlyPruning = 1;

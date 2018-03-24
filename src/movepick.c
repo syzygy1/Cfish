@@ -84,12 +84,12 @@ static void score_quiets(const Pos *pos)
   PieceToHistory *fmh = (st-2)->history;
   PieceToHistory *fmh2 = (st-4)->history;
 
-  uint32_t c = pos_stm();
+  Color c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++) {
     uint32_t move = m->move & 4095;
-    uint32_t to = move & 63;
-    uint32_t from = move >> 6;
+    Square to = move & 63;
+    Square from = move >> 6;
     m->value =  (*cmh)[piece_on(from)][to]
               + (*fmh)[piece_on(from)][to]
               + (*fmh2)[piece_on(from)][to]
@@ -104,7 +104,7 @@ static void score_evasions(const Pos *pos)
   // stats heuristics.
 
   ButterflyHistory *history = pos->history;
-  uint32_t c = pos_stm();
+  Color c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
