@@ -67,10 +67,10 @@ static const Value StormDanger[4][4][8] = {
     { V( 1),  V(  64), V( 143), V(26), V(13) },
     { V( 1),  V(  47), V( 110), V(44), V(24) },
     { V( 0),  V(  72), V( 127), V(50), V(31) } },
-  { { V( 0),  V(   0), V(  79), V(23), V( 1) },  // BlockedByPawn
-    { V( 0),  V(   0), V( 148), V(27), V( 2) },
-    { V( 0),  V(   0), V( 161), V(16), V( 1) },
-    { V( 0),  V(   0), V( 171), V(22), V(15) } },
+  { { V( 0),  V(   0), V(  19), V(23), V( 1) },  // BlockedByPawn
+    { V( 0),  V(   0), V(  88), V(27), V( 2) },
+    { V( 0),  V(   0), V( 101), V(16), V( 1) },
+    { V( 0),  V(   0), V( 111), V(22), V(15) } },
   { { V(22),  V(  45), V( 104), V(62), V( 6) },  // Unblocked
     { V(31),  V(  30), V(  99), V(39), V(19) },
     { V(23),  V(  29), V(  96), V(41), V(15) },
@@ -218,12 +218,6 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
-  const Bitboard ShelterMask = Us == WHITE
-    ? 1ULL << SQ_A2 | 1ULL << SQ_B3 | 1ULL << SQ_C2 | 1ULL << SQ_F2 | 1ULL << SQ_G3 | 1ULL << SQ_H2
-    : 1ULL << SQ_A7 | 1ULL << SQ_B6 | 1ULL << SQ_C7 | 1ULL << SQ_F7 | 1ULL << SQ_G6 | 1ULL << SQ_H7;
-  const Bitboard StormMask = Us == WHITE
-    ? 1ULL << SQ_A3 | 1ULL << SQ_C3 | 1ULL << SQ_F3 | 1ULL << SQ_H3
-    : 1ULL << SQ_A6 | 1ULL << SQ_C6 | 1ULL << SQ_F6 | 1ULL << SQ_H6;
   
   enum { BlockedByKing, Unopposed, BlockedByPawn, Unblocked };
 
@@ -250,9 +244,6 @@ INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
                 rkThem == rkUs + 1                                          ? BlockedByPawn  : Unblocked]
                [d][rkThem];
   }
-
-  if (popcount((ourPawns & ShelterMask) | (theirPawns & StormMask)) == 5)
-    safety += 300;
 
   return safety;
 }

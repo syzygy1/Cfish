@@ -437,12 +437,13 @@ void thread_search(Pos *pos)
 
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
+        Value previousScore = rm->move[PVIdx].previousScore;
         delta = (Value)18;
-        alpha = max(rm->move[PVIdx].previousScore - delta,-VALUE_INFINITE);
-        beta  = min(rm->move[PVIdx].previousScore + delta, VALUE_INFINITE);
+        alpha = max(previousScore - delta, -VALUE_INFINITE);
+        beta  = min(previousScore + delta,  VALUE_INFINITE);
 
-        // Adjust contempt based on current situation
-        int ct = base_ct + round(48 * atan((float)bestValue / 128));
+        // Adjust contempt based on root move's previousScore
+        int ct = base_ct + round(48 * atan((float)previousScore / 128));
         store_rlx(Contempt, pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                                : -make_score(ct, ct / 2));
       }

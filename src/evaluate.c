@@ -217,8 +217,16 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // Init our king safety tables only if we are going to use them
   if (pos_non_pawn_material(Them) >= RookValueMg + KnightValueMg) {
     ei->kingRing[Us] = b;
+
     if (relative_rank_s(Us, square_of(Us, KING)) == RANK_1)
       ei->kingRing[Us] |= shift_bb(Up, b);
+
+    if (file_of(square_of(Us, KING)) == FILE_H)
+      ei->kingRing[Us] |= shift_bb(WEST, ei->kingRing[Us]);
+
+    else if (file_of(square_of(Us, KING)) == FILE_A)
+      ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
+
     ei->kingAttackersCount[Them] = popcount(b & ei->pe->pawnAttacks[Them]);
     ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
   }
