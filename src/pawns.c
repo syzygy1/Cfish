@@ -147,7 +147,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // are not attacked more times than defended.
     if (   !(stoppers ^ lever ^ leverPush)
         && !(ourPawns & forward_file_bb(Us, s))
-        && popcount(supported) >= popcount(lever)
+        && popcount(supported) >= popcount(lever) - 1
         && popcount(phalanx)   >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
 

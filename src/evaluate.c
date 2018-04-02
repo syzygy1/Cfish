@@ -19,7 +19,6 @@
 */
 
 #include <assert.h>
-#include <stdatomic.h>
 
 #include "bitboard.h"
 #include "evaluate.h"
@@ -186,8 +185,6 @@ enum {
 
 // Thresholds for lazy and space evaluation
 enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
-
-_Atomic Score Contempt = SCORE_ZERO;
 
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
@@ -795,8 +792,7 @@ Value evaluate(const Pos *pos)
   // in the position struct (material + piece square tables) and the
   // material imbalance. Score is computed internally from the white point
   // of view.
-  Score score =  pos_psq_score() + material_imbalance(ei.me)
-               + atomic_load_explicit(&Contempt, memory_order_relaxed);
+  Score score = pos_psq_score() + material_imbalance(ei.me) + pos->contempt;
 
   // Probe the pawn hash table
   ei.pe = pawn_probe(pos);
