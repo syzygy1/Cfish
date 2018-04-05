@@ -747,11 +747,10 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   if (sf == SCALE_FACTOR_NORMAL || sf == SCALE_FACTOR_ONEPAWN) {
     if (opposite_bishops(pos)) {
       // Endgame with opposite-colored bishops and no other pieces
-      // (ignoring pawns) is almost a draw, in case of KBP vs KB, it is
-      // even more a draw.
+      // (ignoring pawns) is almost a draw.
       if (   pos_non_pawn_material(WHITE) == BishopValueMg
           && pos_non_pawn_material(BLACK) == BishopValueMg)
-        return more_than_one(pieces_p(PAWN)) ? 31 : 9;
+        return 31;
 
       // Endgame with opposite-colored bishops, but also other pieces. Still
       // a bit drawish, but not as drawish as with only the two bishops.
