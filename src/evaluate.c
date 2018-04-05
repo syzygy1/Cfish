@@ -267,7 +267,9 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       ei->kingAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
     }
 
-    int mob = popcount(b & ei->mobilityArea[Us]);
+    int mob =  (Pt == KNIGHT || Pt == BISHOP)
+             ? popcount(b & ei->mobilityArea[Us] & ~pieces_cp(Us, QUEEN))
+             : popcount(b & ei->mobilityArea[Us]);
 
     mobility[Us] += MobilityBonus[Pt - 2][mob];
 

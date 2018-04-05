@@ -27,7 +27,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue;
-  int ttHit, inCheck, givesCheck, singularExtensionNode, improving;
+  int ttHit, inCheck, givesCheck, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
   int ttCapture, pvExact;
   Piece movedPiece;
@@ -357,12 +357,6 @@ moves_loop: // When in check search starts from here.
   mp_init(pos, ttMove, depth);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
 
-  singularExtensionNode =   !rootNode
-                         &&  depth >= 8 * ONE_PLY
-                         &&  ttMove
-                         && !excludedMove // No recursive singular search
-                         && (tte_bound(tte) & BOUND_LOWER)
-                         &&  tte_depth(tte) >= depth - 3 * ONE_PLY;
   skipQuiets = 0;
   ttCapture = 0;
   pvExact = PvNode && ttHit && tte_bound(tte) == BOUND_EXACT;
@@ -421,9 +415,13 @@ moves_loop: // When in check search starts from here.
     // that move is singular and should be extended. To verify this we do a
     // reduced search on all the other moves but the ttMove and if the
     // result is lower than ttValue minus a margin then we extend the ttMove.
-    if (    singularExtensionNode
+    if (    depth >= 8 * ONE_PLY
         &&  move == ttMove
-        && !extension
+        && !rootNode
+        && !excludedMove // No recursive singular search
+        &&  ttValue != VALUE_NONE
+        && (tte_bound(tte) & BOUND_LOWER)
+        &&  tte_depth(tte) >= depth - 3 * ONE_PLY
         &&  is_legal(pos, move))
     {
       Value rBeta = max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
