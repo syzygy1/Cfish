@@ -44,7 +44,7 @@
 #define WDLSUFFIX ".rtbw"
 #define DTZSUFFIX ".rtbz"
 #define DTMSUFFIX ".rtbm"
-#define TBPIECES 6
+#define TBPIECES 7
 
 const uint32_t WDL_MAGIC = 0x5d23e871;
 const uint32_t DTZ_MAGIC = 0xa50c66d7;
@@ -102,7 +102,7 @@ struct TBEntry_piece {
   uint8_t loss_only;
   uint8_t kk_enc;
   struct PairsData *precomp[2];
-  int factor[2][TBPIECES];
+  size_t factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];
   uint8_t norm[2][TBPIECES];
 };
@@ -119,7 +119,7 @@ struct TBEntry_pawn {
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    size_t factor[2][TBPIECES];
     uint8_t pieces[2][TBPIECES];
     uint8_t norm[2][TBPIECES];
   } file[4];
@@ -137,7 +137,7 @@ struct TBEntry_pawn2 {
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    size_t factor[2][TBPIECES];
     uint8_t pieces[2][TBPIECES];
     uint8_t norm[2][TBPIECES];
   } rank[6];
@@ -154,7 +154,7 @@ struct DTZEntry_piece {
   uint8_t loss_only;
   uint8_t kk_enc;
   struct PairsData *precomp;
-  int factor[TBPIECES];
+  size_t factor[TBPIECES];
   uint8_t pieces[TBPIECES];
   uint8_t norm[TBPIECES];
   uint8_t flags; // accurate, mapped, side
@@ -174,7 +174,7 @@ struct DTZEntry_pawn {
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp;
-    int factor[TBPIECES];
+    size_t factor[TBPIECES];
     uint8_t pieces[TBPIECES];
     uint8_t norm[TBPIECES];
   } file[4];
@@ -194,7 +194,7 @@ struct DTMEntry_piece {
   uint8_t loss_only;
   uint8_t kk_enc;
   struct PairsData *precomp[2];
-  int factor[2][TBPIECES];
+  size_t factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];
   uint8_t norm[2][TBPIECES];
   uint16_t map_idx[2][2];
@@ -213,7 +213,7 @@ struct DTMEntry_pawn {
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
-    int factor[2][TBPIECES];
+    size_t factor[2][TBPIECES];
     uint8_t pieces[2][TBPIECES];
     uint8_t norm[2][TBPIECES];
   } rank[6];
