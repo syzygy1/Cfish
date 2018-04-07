@@ -159,6 +159,7 @@ static const Score HinderPassedPawn   = S(  8,  1);
 static const Score KnightOnQueen      = S( 21, 11);
 static const Score LongDiagonalBishop = S( 22,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
+static const Score Overload           = S( 10,  5);
 static const Score PawnlessFlank      = S( 20, 80);
 static const Score RookOnPawn         = S(  8, 24);
 static const Score SliderOnQueen      = S( 42, 21);
@@ -489,17 +490,14 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   Bitboard b, weak, defended, stronglyProtected, safeThreats;
   Score score = SCORE_ZERO;
 
-  // Non-pawn enemies attacked by a pawn
-  weak = pieces_c(Them) & ~pieces_p(PAWN) & ei->attackedBy[Us][PAWN];
+  // Non-pawn enemies
+  Bitboard nonPawnEnemies = pieces_c(Them) & ~pieces_p(PAWN);
 
-  if (weak) {
-    b = pieces_cp(Us, PAWN) & ( ~ei->attackedBy[Them][0]
-                               | ei->attackedBy[Us][0]);
+  // Our safe or protected pawns
+  b = pieces_cp(Us, PAWN) & (~ei->attackedBy[Them][0] | ei->attackedBy[Us][0]);
 
-    safeThreats = (shift_bb(Right, b) | shift_bb(Left, b)) & weak;
-
-    score += ThreatBySafePawn * popcount(safeThreats);
-  }
+  safeThreats = (shift_bb(Right, b) | shift_bb(Left, b)) & nonPawnEnemies;
+  score += ThreatBySafePawn * popcount(safeThreats);
 
   // Squares strongly protected by the opponent, either because they attack the
   // square with a pawn or because they attack the square twice and we don't.
@@ -533,11 +531,17 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
         score += ThreatByRank * relative_rank_s(Them, s);
     }
 
-    score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
-
     b = weak & ei->attackedBy[Us][KING];
     if (b)
       score += ThreatByKing[!!more_than_one(b)];
+
+    // Bonus for overload (non-pawn enemies attacked and defended exactly once)
+    b =  nonPawnEnemies
+       & ei->attackedBy[Us][0]   & ~ei->attackedBy2[Us]
+       & ei->attackedBy[Them][0] & ~ei->attackedBy2[Them];
+    score += Overload * popcount(b);
+
+    score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
   }
 
   // Bonus for opponent unopposed weak pawns
