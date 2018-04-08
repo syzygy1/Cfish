@@ -1,7 +1,5 @@
 #ifdef NUMA
 
-#define _GNU_SOURCE
-
 #ifndef __WIN32__
 #include <numa.h>
 #else
@@ -10,6 +8,7 @@
 #endif
 #include <stdio.h>
 
+#include "misc.h"
 #include "settings.h"
 #include "types.h"
 

@@ -115,7 +115,6 @@ uint64_t prng_sparse_rand(PRNG *rng)
   return r1 & r2 & r3;
 }
 
-#ifdef __WIN32__
 ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
   if (*n == 0)
@@ -132,7 +131,6 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
   (*lineptr)[i] = 0;
   return i;
 }
-#endif
 
 #ifdef __WIN32__
 typedef SIZE_T (WINAPI *GLPM)(void);
