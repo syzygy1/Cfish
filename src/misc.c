@@ -120,7 +120,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
   if (*n == 0)
     *lineptr = malloc(*n = 100);
 
-  char c = 0;
+  int c = 0;
   size_t i = 0;
   while ((c = getc(stream)) != EOF) {
     (*lineptr)[i++] = c;
