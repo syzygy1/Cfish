@@ -869,15 +869,19 @@ int TB_probe_dtz(Pos *pos, int *success)
       continue;
     do_move(pos, move, gives_check(pos, pos->st, move));
     int v = -TB_probe_dtz(pos, success);
-    undo_move(pos, move);
-    if (*success == 0) return 0;
     if (wdl > 0) {
-      if (v > 0 && v + 1 < best)
+      if (v > 0 && v + 1 < best) {
+        if (v == 1 && pos_checkers())
+          if (generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
+            v = 0;
         best = v + 1;
+      }
     } else {
       if (v - 1 < best)
         best = v - 1;
     }
+    undo_move(pos, move);
+    if (*success == 0) return 0;
   }
   return best;
 }
