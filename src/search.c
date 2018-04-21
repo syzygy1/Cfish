@@ -250,9 +250,6 @@ void mainthread_search(void)
              : strcmp(s, "black") == 0 && us == WHITE ? -base_ct
              : base_ct;
 
-  pos->contempt = us == WHITE ?  make_score(base_ct, base_ct / 2)
-                              : -make_score(base_ct, base_ct / 2);
-
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
 
@@ -423,6 +420,9 @@ void thread_search(Pos *pos)
     for (int idx = 0; idx < rm->size; idx++)
       rm->move[idx].previousScore = rm->move[idx].score;
 
+    pos->contempt = pos_stm() == WHITE ?  make_score(base_ct, base_ct / 2)
+                                       : -make_score(base_ct, base_ct / 2);
+
     int PVFirst = 0, PVLast = 0;
 
     // MultiPV loop. We perform a full root search for each PV line
@@ -454,7 +454,7 @@ void thread_search(Pos *pos)
         beta  = min(previousScore + delta,  VALUE_INFINITE);
 
         // Adjust contempt based on root move's previousScore
-        int ct = base_ct + round(48 * atan((float)previousScore / 128));
+        int ct = base_ct + (int)roundf(48 * atanf((float)previousScore / 128));
         pos->contempt = pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                            : -make_score(ct, ct / 2);
       }
