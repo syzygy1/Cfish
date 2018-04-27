@@ -698,8 +698,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
   // pawn, or if it is undefended and attacked by an enemy piece.
   Bitboard safe =   SpaceMask
                  & ~pieces_cp(Us, PAWN)
-                 & ~ei->attackedBy[Them][PAWN]
-                 & (ei->attackedBy[Us][0] | ~ei->attackedBy[Them][0]);
+                 & ~ei->attackedBy[Them][PAWN];
 
   // Find all squares which are at most three squares behind some friendly pawn
   Bitboard behind = pieces_cp(Us, PAWN);

@@ -1408,12 +1408,19 @@ static int init_table_dtz(struct TBEntry *entry)
 
     ptr->map = data;
     if (ptr->flags & 2) {
-      for (int i = 0; i < 4; i++) {
-        ptr->map_idx[i] = data + 1 - ptr->map;
-        data += 1 + data[0];
+      if (!(ptr->flags & 16)) {
+        for (int i = 0; i < 4; i++) {
+          ptr->map_idx[i] = data + 1 - ptr->map;
+          data += 1 + data[0];
+        }
+      } else {
+        for (int i = 0; i < 4; i++) {
+          ptr->map_idx[i] = (uint16_t *)data + 1 - (uint16_t *)ptr->map;
+          data += 2 + 2 * read_le_u16(data);
+        }
       }
-      data += (uintptr_t)data & 0x01;
     }
+    data += (uintptr_t)data & 0x01;
 
     ptr->precomp->indextable = data;
     data += size[0];
@@ -1441,9 +1448,17 @@ static int init_table_dtz(struct TBEntry *entry)
     ptr->map = data;
     for (f = 0; f < files; f++) {
       if (ptr->flags[f] & 2) {
-        for (int i = 0; i < 4; i++) {
-          ptr->map_idx[f][i] = data + 1 - ptr->map;
-          data += 1 + data[0];
+        if (!(ptr->flags[f] & 16)) {
+          for (int i = 0; i < 4; i++) {
+            ptr->map_idx[f][i] = data + 1 - ptr->map;
+            data += 1 + data[0];
+          }
+        } else {
+          data += (uintptr_t)data & 0x01;
+          for (int i = 0; i < 4; i++) {
+            ptr->map_idx[f][i] = (uint16_t *)data + 1 - (uint16_t *)ptr->map;
+            data += 2 + 2 * read_le_u16(data);
+          }
         }
       }
     }

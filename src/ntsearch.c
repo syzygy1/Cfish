@@ -95,7 +95,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 #ifdef BIG_TT
   posKey = pos_key() ^ (Key)excludedMove;
 #else
-  posKey = pos_key() ^ (Key)(excludedMove << 16);
+  posKey = pos_key() ^ (Key)((int32_t)excludedMove << 16);
 #endif
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
@@ -664,6 +664,7 @@ moves_loop: // When in check search starts from here.
           alpha = value;
         else {
           assert(value >= beta); // Fail high
+          ss->statScore = max(ss->statScore, 0);
           break;
         }
       }

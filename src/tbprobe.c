@@ -371,10 +371,15 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       } while (bb);
     }
     idx = encode_piece((struct TBEntry_piece *)entry, entry->norm, p, entry->factor);
-    res = *decompress_pairs(entry->precomp, idx);
+    uint8_t *w = decompress_pairs(entry->precomp, idx);
+    res = ((w[1] & 0x0f) << 8) | w[0];
 
-    if (entry->flags & 2)
-      res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
+    if (entry->flags & 2) {
+      if (!(entry->flags & 16))
+        res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
+      else
+        res = ((uint16_t *)entry->map)[entry->map_idx[wdl_to_map[wdl + 2]] + res];
+    }
 
     if (!(entry->flags & pa_flags[wdl + 2]) || (wdl & 1))
       res *= 2;
@@ -400,10 +405,15 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
       } while (bb);
     }
     idx = encode_pawn((struct TBEntry_pawn *)entry, entry->file[f].norm, p, entry->file[f].factor);
-    res = *decompress_pairs(entry->file[f].precomp, idx);
+    uint8_t *w = decompress_pairs(entry->file[f].precomp, idx);
+    res = ((w[1] & 0x0f) << 8) | w[0];
 
-    if (entry->flags[f] & 2)
-      res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
+    if (entry->flags[f] & 2) {
+      if (!(entry->flags[f] & 16))
+        res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
+      else
+        res = ((uint16_t *)entry->map)[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
+    }
 
     if (!(entry->flags[f] & pa_flags[wdl + 2]) || (wdl & 1))
       res *= 2;
@@ -869,15 +879,19 @@ int TB_probe_dtz(Pos *pos, int *success)
       continue;
     do_move(pos, move, gives_check(pos, pos->st, move));
     int v = -TB_probe_dtz(pos, success);
-    undo_move(pos, move);
-    if (*success == 0) return 0;
-    if (wdl > 0) {
+    if (   v == 1
+        && pos_checkers()
+        && generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
+      best = 1;
+    else if (wdl > 0) {
       if (v > 0 && v + 1 < best)
         best = v + 1;
     } else {
       if (v - 1 < best)
         best = v - 1;
     }
+    undo_move(pos, move);
+    if (*success == 0) return 0;
   }
   return best;
 }

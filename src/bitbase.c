@@ -39,7 +39,7 @@ static uint32_t KPKBitbase[MAX_INDEX / 32];
 // bit 13-14: white pawn file (from FILE_A to FILE_D)
 // bit 15-17: white pawn RANK_7 - rank
 //            (from RANK_7 - RANK_7 to RANK_7 - RANK_2)
-static unsigned index(unsigned us, Square bksq, Square wksq, Square psq)
+static unsigned bb_index(unsigned us, Square bksq, Square wksq, Square psq)
 {
   return wksq | (bksq << 6) | (us << 12) | (file_of(psq) << 13) | ((RANK_7 - rank_of(psq)) << 15);
 }
@@ -50,7 +50,7 @@ unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us)
 {
   assert(file_of(wpsq) <= FILE_D);
 
-  unsigned idx = index(us, bksq, wksq, wpsq);
+  unsigned idx = bb_index(us, bksq, wksq, wpsq);
   return KPKBitbase[idx / 32] & (1 << (idx & 0x1F));
 }
 
@@ -109,17 +109,17 @@ static uint8_t classify(uint8_t *db, unsigned idx)
   Bitboard b = PseudoAttacks[KING][ksq[us]];
 
   while (b)
-    r |= us == WHITE ? db[index(them, ksq[them]  , pop_lsb(&b), psq)]
-                     : db[index(them, pop_lsb(&b), ksq[them]  , psq)];
+    r |= us == WHITE ? db[bb_index(them, ksq[them]  , pop_lsb(&b), psq)]
+                     : db[bb_index(them, pop_lsb(&b), ksq[them]  , psq)];
 
   if (us == WHITE) {
     if (rank_of(psq) < RANK_7)      // Single push
-      r |= db[index(them, ksq[them], ksq[us], psq + NORTH)];
+      r |= db[bb_index(them, ksq[them], ksq[us], psq + NORTH)];
 
     if (   rank_of(psq) == RANK_2   // Double push
         && psq + NORTH != ksq[us]
         && psq + NORTH != ksq[them])
-      r |= db[index(them, ksq[them], ksq[us], psq + NORTH + NORTH)];
+      r |= db[bb_index(them, ksq[them], ksq[us], psq + NORTH + NORTH)];
   }
 
   return db[idx] = r & good  ? good  : r & RES_UNKNOWN ? RES_UNKNOWN : bad;

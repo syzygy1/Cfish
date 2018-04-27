@@ -19,6 +19,7 @@
 */
 
 #define _GNU_SOURCE
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>   // For std::memset
