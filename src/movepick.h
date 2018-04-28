@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -34,25 +34,19 @@ static const int CounterMovePruneThreshold = 0;
 
 INLINE void cms_update(PieceToHistory cms, Piece pc, Square to, int v)
 {
-  int w = v >= 0 ? v : -v;
-
-  cms[pc][to] += v * 32 - cms[pc][to] * w / 936;
+  cms[pc][to] += v - cms[pc][to] * abs(v) / 29952;
 }
 
 INLINE void history_update(ButterflyHistory history, int c, Move m, int v)
 {
-  int w = v >= 0 ? v : -v;
-
   m &= 4095;
-  history[c][m] += v * 32 - history[c][m] * w / 324;
+  history[c][m] += v - history[c][m] * abs(v) / 10368;
 }
 
 INLINE void cpth_update(CapturePieceToHistory history, Piece pc, Square to,
                         int captured, int v)
 {
-  int w = v >= 0 ? v : -v;
-
-  history[pc][to][captured] += v * 2 - history[pc][to][captured] * w / 324;
+  history[pc][to][captured] += v - history[pc][to][captured] * abs(v) / 10368;
 }
 
 enum {

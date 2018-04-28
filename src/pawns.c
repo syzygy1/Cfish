@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -40,18 +40,14 @@ static Score Connected[2][2][3][8];
 // Doubled pawn penalty
 static const Score Doubled = S(18,38);
 
-// Weakness of our pawn shelter in front of the king by
-// [isKingFile][distance from edge][rank]. RANK_1 = 0 is used for
-// files where we have no pawns or our pawn is behind our king.
-const Value ShelterWeakness[2][4][8] = {
-  { { V( 98), V(20), V(11), V(42), V( 83), V( 84), V(101) }, // Not On King file
-    { V(103), V( 8), V(33), V(86), V( 87), V(105), V(113) },
-    { V(100), V( 2), V(65), V(95), V( 59), V( 89), V(115) },
-    { V( 72), V( 6), V(52), V(74), V( 83), V( 84), V(112) } },
-  { { V(105), V(19), V( 3), V(27), V( 85), V( 93), V( 84) }, // On King file
-    { V(121), V( 7), V(33), V(95), V(112), V( 86), V( 72) },
-    { V(121), V(26), V(65), V(90), V( 65), V( 76), V(117) },
-    { V( 79), V( 0), V(45), V(65), V( 94), V( 92), V(105) } }
+// Strength of pawn shelter for our king by [distance from edge][rank].
+// RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
+// our king.
+const Value ShelterStrength[4][8] = {
+    { V( -9), V(64), V(77), V( 44), V( 4), V( -1), V(-11) },
+    { V(-15), V(83), V(51), V(-10), V( 1), V(-10), V(-28) },
+    { V(-18), V(84), V(27), V(-12), V(21), V( -7), V(-36) },
+    { V( 12), V(79), V(25), V( 19), V( 9), V( -6), V(-33) }
 };
 
 // Danger of enemy pawns moving toward our king by
@@ -76,10 +72,6 @@ static const Value StormDanger[4][4][8] = {
     { V(23),  V(  29), V(  96), V(41), V(15) },
     { V(21),  V(  23), V( 116), V(41), V(15) } }
 };
-
-// Max bonus for king safety. Corresponds to start position with all the pawns
-// in front of the king and no enemy pawn on the horizon.
-static const Value MaxSafetyBonus = V(258);
 
 #undef S
 #undef V
@@ -212,36 +204,37 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 }
 
 
-// shelter_storm() calculates shelter and storm penalties for the file
-// the king is on, as well as the two closest files.
+// evaluate_shelter() calculates the shelter bonus and the storm penalty
+// for a king, by looking at the king file and the two closest files.
 
-INLINE Value shelter_storm(const Pos *pos, Square ksq, const int Us)
+INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
+  const int Down = (Us == WHITE ? SOUTH : NORTH);
   
   enum { BlockedByKing, Unopposed, BlockedByPawn, Unblocked };
 
-  uint32_t center = max(FILE_B, min(FILE_G, file_of(ksq)));
+  File center = max(FILE_B, min(FILE_G, file_of(ksq)));
   Bitboard b =  pieces_p(PAWN)
               & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq))
               & (adjacent_files_bb(center) | file_bb(center));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
-  Value safety = MaxSafetyBonus;
+  Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;
 
-  for (uint32_t f = center - 1; f <= center + 1; f++) {
+  for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
-    uint32_t rkUs = b ? relative_rank_s(Us, backmost_sq(Us, b)) : RANK_1;
+    Rank rkUs = b ? relative_rank_s(Us, backmost_sq(Us, b)) : RANK_1;
 
     b = theirPawns & file_bb(f);
-    uint32_t rkThem = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : RANK_1;
+    Rank rkThem = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : RANK_1;
 
     int d = min(f, FILE_H - f);
-    safety -=  ShelterWeakness[f == file_of(ksq)][d][rkUs]
-             + StormDanger
-               [f == file_of(ksq) && rkThem == relative_rank_s(Us, ksq) + 1 ? BlockedByKing  :
-                rkUs   == RANK_1                                            ? Unopposed :
-                rkThem == rkUs + 1                                          ? BlockedByPawn  : Unblocked]
+    safety +=  ShelterStrength[d][rkUs]
+             - StormDanger
+               [(shift_bb(Down, b) & sq_bb(ksq)) ? BlockedByKing :
+                rkUs   == RANK_1                 ? Unopposed :
+                rkThem == rkUs + 1               ? BlockedByPawn  : Unblocked]
                [d][rkThem];
   }
 
@@ -263,14 +256,18 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
   if (pawns)
     while (!(DistanceRingBB[ksq][minKingPawnDistance++] & pawns)) {}
 
-  Value bonus = shelter_storm(pos, ksq, Us);
+  Value bonus = evaluate_shelter(pos, ksq, Us);
 
   // If we can castle use the bonus after the castling if it is bigger
-  if (can_castle_cr(make_castling_right(Us, KING_SIDE)))
-    bonus = max(bonus, shelter_storm(pos, relative_square(Us, SQ_G1), Us));
+  if (can_castle_cr(make_castling_right(Us, KING_SIDE))) {
+    Value v = evaluate_shelter(pos, relative_square(Us, SQ_G1), Us);
+    bonus = max(bonus, v);
+  }
 
-  if (can_castle_cr(make_castling_right(Us, QUEEN_SIDE)))
-    bonus = max(bonus, shelter_storm(pos, relative_square(Us, SQ_C1), Us));
+  if (can_castle_cr(make_castling_right(Us, QUEEN_SIDE))) {
+    Value v = evaluate_shelter(pos, relative_square(Us, SQ_C1), Us);
+    bonus = max(bonus, v);
+  }
 
   return make_score(bonus, -16 * minKingPawnDistance);
 }
@@ -285,4 +282,3 @@ Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   return do_king_safety(pe, pos, ksq, BLACK);
 }
-

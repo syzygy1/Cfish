@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -110,7 +110,7 @@ INLINE uint64_t more_than_one(Bitboard b)
 // rank_bb() and file_bb() return a bitboard representing all the squares on
 // the given file or rank.
 
-INLINE Bitboard rank_bb(unsigned r)
+INLINE Bitboard rank_bb(Rank r)
 {
   return RankBB[r];
 }
@@ -120,7 +120,7 @@ INLINE Bitboard rank_bb_s(Square s)
   return RankBB[rank_of(s)];
 }
 
-INLINE Bitboard file_bb(unsigned f)
+INLINE Bitboard file_bb(File f)
 {
   return FileBB[f];
 }

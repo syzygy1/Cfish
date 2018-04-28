@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -201,9 +201,9 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // Find our pawns on the first two ranks, and those which are blocked
   Bitboard b = pieces_cp(Us, PAWN) & (shift_bb(Down, pieces()) | LowRanks);
 
-  // Squares occupied by those pawns, by our king, or controlled by enemy
-  // pawns are excluded from the mobility area.
-  ei->mobilityArea[Us] = ~(b | pieces_cp(Us, KING) | ei->pe->pawnAttacks[Them]);
+  // Squares occupied by those pawns, by our king or queen, or controlled by
+  // enemy pawns are excluded from the mobility area
+  ei->mobilityArea[Us] = ~(b | pieces_cpp(Us, KING, QUEEN) | ei->pe->pawnAttacks[Them]);
 
   // Initialise the attack bitboards with the king and pawn information
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
@@ -268,9 +268,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       ei->kingAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
     }
 
-    int mob =  (Pt == KNIGHT || Pt == BISHOP)
-             ? popcount(b & ei->mobilityArea[Us] & ~pieces_cp(Us, QUEEN))
-             : popcount(b & ei->mobilityArea[Us]);
+    int mob = popcount(b & ei->mobilityArea[Us]);
 
     mobility[Us] += MobilityBonus[Pt - 2][mob];
 

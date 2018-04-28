@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013-2017 Ronald de Man
+  Copyright (c) 2013-2018 Ronald de Man
   This file may be redistributed and/or modified without restrictions.
 
   tbprobe.cpp contains the Stockfish-specific routines of the
@@ -1088,4 +1088,3 @@ void TB_expand_mate(Pos *pos, RootMove *move)
   for (int i = move->pv_size - 1; i >= 0; i--)
     undo_move(pos, move->pv[i]);
 }
-

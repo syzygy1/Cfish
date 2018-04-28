@@ -231,6 +231,8 @@ typedef uint32_t Piece;
 typedef uint32_t PieceType;
 typedef int32_t Depth;
 typedef uint32_t Square;
+typedef uint32_t File;
+typedef uint32_t Rank;
 
 // Score type stores a middlegame and an endgame value in a single integer.
 // The endgame value goes in the upper 16 bits, the middlegame value in
