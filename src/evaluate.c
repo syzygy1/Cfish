@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -201,9 +201,9 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // Find our pawns on the first two ranks, and those which are blocked
   Bitboard b = pieces_cp(Us, PAWN) & (shift_bb(Down, pieces()) | LowRanks);
 
-  // Squares occupied by those pawns, by our king, or controlled by enemy
-  // pawns are excluded from the mobility area.
-  ei->mobilityArea[Us] = ~(b | pieces_cp(Us, KING) | ei->pe->pawnAttacks[Them]);
+  // Squares occupied by those pawns, by our king or queen, or controlled by
+  // enemy pawns are excluded from the mobility area
+  ei->mobilityArea[Us] = ~(b | pieces_cpp(Us, KING, QUEEN) | ei->pe->pawnAttacks[Them]);
 
   // Initialise the attack bitboards with the king and pawn information
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
@@ -268,9 +268,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       ei->kingAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
     }
 
-    int mob =  (Pt == KNIGHT || Pt == BISHOP)
-             ? popcount(b & ei->mobilityArea[Us] & ~pieces_cp(Us, QUEEN))
-             : popcount(b & ei->mobilityArea[Us]);
+    int mob = popcount(b & ei->mobilityArea[Us]);
 
     mobility[Us] += MobilityBonus[Pt - 2][mob];
 
@@ -693,9 +691,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
     Us == WHITE ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)
                 : (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB);
 
-  // Find the safe squares for our pieces inside the area defined by
-  // SpaceMask. A square is unsafe if it is attacked by an enemy
-  // pawn, or if it is undefended and attacked by an enemy piece.
+  // Find the available squares for our pieces inside the SpaceMask area
   Bitboard safe =   SpaceMask
                  & ~pieces_cp(Us, PAWN)
                  & ~ei->attackedBy[Them][PAWN];
@@ -747,9 +743,8 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   int strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
   int sf = material_scale_factor(ei->me, pos, strongSide);
 
-  // If we don't already have an unusual scale factor, check for certain
-  // types of endgames, and use a lower scale for those.
-  if (sf == SCALE_FACTOR_NORMAL || sf == SCALE_FACTOR_ONEPAWN) {
+  // If scale is not already specific, scale down via general heuristics
+  if (sf == SCALE_FACTOR_NORMAL) {
     if (opposite_bishops(pos)) {
       // Endgame with opposite-colored bishops and no other pieces
       // (ignoring pawns) is almost a draw.
@@ -761,12 +756,8 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
       // a bit drawish, but not as drawish as with only the two bishops.
       return 46;
     }
-    // Endings where weaker side can place his king in front of the opponent's
-    // pawns are drawish.
-    else if (    abs(eg) <= BishopValueEg
-             &&  piece_count(strongSide, PAWN) <= 2
-             && !pawn_passed(pos, strongSide ^ 1, square_of(strongSide ^ 1, KING)))
-      return 37 + 7 * piece_count(strongSide, PAWN);
+    else
+      return min(40 + 7 * piece_count(strongSide, PAWN), sf);
   }
 
   return sf;

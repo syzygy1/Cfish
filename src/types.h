@@ -150,9 +150,8 @@ enum { PHASE_ENDGAME = 0, PHASE_MIDGAME = 128 };
 enum { MG, EG };
 
 enum {
-  SCALE_FACTOR_DRAW = 0, SCALE_FACTOR_ONEPAWN = 48,
-  SCALE_FACTOR_NORMAL = 64, SCALE_FACTOR_MAX = 128,
-  SCALE_FACTOR_NONE = 255
+  SCALE_FACTOR_DRAW = 0, SCALE_FACTOR_NORMAL = 64,
+  SCALE_FACTOR_MAX = 128, SCALE_FACTOR_NONE = 255
 };
 
 enum { BOUND_NONE, BOUND_UPPER, BOUND_LOWER, BOUND_EXACT };
@@ -231,6 +230,8 @@ typedef uint32_t Piece;
 typedef uint32_t PieceType;
 typedef int32_t Depth;
 typedef uint32_t Square;
+typedef uint32_t File;
+typedef uint32_t Rank;
 
 // Score type stores a middlegame and an endgame value in a single integer.
 // The endgame value goes in the upper 16 bits, the middlegame value in
