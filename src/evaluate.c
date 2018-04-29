@@ -691,9 +691,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
     Us == WHITE ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)
                 : (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB);
 
-  // Find the safe squares for our pieces inside the area defined by
-  // SpaceMask. A square is unsafe if it is attacked by an enemy
-  // pawn, or if it is undefended and attacked by an enemy piece.
+  // Find the available squares for our pieces inside the SpaceMask area
   Bitboard safe =   SpaceMask
                  & ~pieces_cp(Us, PAWN)
                  & ~ei->attackedBy[Them][PAWN];
@@ -745,9 +743,8 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   int strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
   int sf = material_scale_factor(ei->me, pos, strongSide);
 
-  // If we don't already have an unusual scale factor, check for certain
-  // types of endgames, and use a lower scale for those.
-  if (sf == SCALE_FACTOR_NORMAL || sf == SCALE_FACTOR_ONEPAWN) {
+  // If scale is not already specific, scale down via general heuristics
+  if (sf == SCALE_FACTOR_NORMAL) {
     if (opposite_bishops(pos)) {
       // Endgame with opposite-colored bishops and no other pieces
       // (ignoring pawns) is almost a draw.
@@ -759,12 +756,8 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
       // a bit drawish, but not as drawish as with only the two bishops.
       return 46;
     }
-    // Endings where weaker side can place his king in front of the opponent's
-    // pawns are drawish.
-    else if (    abs(eg) <= BishopValueEg
-             &&  piece_count(strongSide, PAWN) <= 2
-             && !pawn_passed(pos, strongSide ^ 1, square_of(strongSide ^ 1, KING)))
-      return 37 + 7 * piece_count(strongSide, PAWN);
+    else
+      return min(40 + 7 * piece_count(strongSide, PAWN), sf);
   }
 
   return sf;
