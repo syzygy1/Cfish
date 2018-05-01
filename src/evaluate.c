@@ -150,7 +150,7 @@ const int RankFactor[8] = { 0, 0, 0, 2, 7, 12, 19 };
 const Score KingProtector[] = { S(-3, -5), S(-4, -3), S(-3, 0), S(-1, 1) };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BishopPawns        = S(  8, 12);
+static const Score BishopPawns        = S(  3,  5);
 static const Score CloseEnemies       = S(  7,  0);
 static const Score Connectivity       = S(  3,  1);
 static const Score CorneredBishop     = S( 50, 50);
@@ -239,6 +239,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
                             const int Us, const int Pt)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
+  const int Down = (Us == WHITE ? SOUTH : NORTH);
   const Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
                                              : Rank5BB | Rank4BB | Rank3BB);
 
@@ -292,8 +293,12 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
         score += MinorBehindPawn;
 
       if (Pt == BISHOP) {
-        // Penalty for pawns on the same color square as the bishop
-        score -= BishopPawns * pawns_on_same_color_squares(ei->pe, Us, s);
+        // Penalty according to number of pawns on the same color square as
+        // the bishop, bigger when the center files are blocked with pawns
+        Bitboard blocked = pieces_cp(Us, PAWN) & shift_bb(Down, pieces());
+
+        score -= BishopPawns * pawns_on_same_color_squares(ei->pe, Us, s)
+                             * (1 + popcount(blocked & CenterFiles));
 
         // Bonus for bishop on a long diagonal which can "see" both center
         // squares
