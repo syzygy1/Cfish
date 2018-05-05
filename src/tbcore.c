@@ -360,7 +360,7 @@ void TB_init(char *path)
         init_tb(str);
       }
 
-  // 6-piece TBs make sense only with a 64-bit address space
+  // 6- and 7-piece TBs make sense only with a 64-bit address space
   if (sizeof(size_t) < 8)
     goto finished;
 
@@ -622,21 +622,21 @@ static const int16_t KK_idx[10][64] = {
     -1, -1, -1, -1, -1, -1, -1,461 }
 };
 
-static int binomial[5][64];
-static int pawnidx[5][24];
-static int pfactor[5][4];
-static int pawnidx2[5][24];
-static int pfactor2[5][6];
+static size_t binomial[6][64];
+static size_t pawnidx[6][24];
+static size_t pfactor[6][4];
+static size_t pawnidx2[6][24];
+static size_t pfactor2[6][6];
 
 static void init_indices(void)
 {
   int i, j, k;
 
 // binomial[k-1][n] = Bin(n, k)
-  for (i = 0; i < 5; i++)
+  for (i = 0; i < 6; i++)
     for (j = 0; j < 64; j++) {
-      int f = j;
-      int l = 1;
+      size_t f = j;
+      size_t l = 1;
       for (k = 1; k <= i; k++) {
         f *= (j - k);
         l *= (k + 1);
@@ -644,8 +644,8 @@ static void init_indices(void)
       binomial[i][j] = f / l;
     }
 
-  for (i = 0; i < 5; i++) {
-    int s = 0;
+  for (i = 0; i < 6; i++) {
+    size_t s = 0;
     for (j = 0; j < 6; j++) {
       pawnidx[i][j] = s;
       s += (i == 0) ? 1 : binomial[i - 1][ptwist[invflap[j]]];
@@ -671,8 +671,8 @@ static void init_indices(void)
     pfactor[i][3] = s;
   }
 
-  for (i = 0; i < 5; i++) {
-    int s = 0;
+  for (i = 0; i < 6; i++) {
+    size_t s = 0;
     for (j = 0; j < 4; j++) {
       pawnidx2[i][j] = s;
       s += (i == 0) ? 1 : binomial[i - 1][ptwist2[invflap2[j]]];
@@ -1508,7 +1508,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
       litidx -= d->sizetable[block++] + 1;
   }
 
-  uint32_t *ptr = (uint32_t *)(d->data + ((uint64_t)block << d->blocksize));
+  uint32_t *ptr = (uint32_t *)(d->data + ((size_t)block << d->blocksize));
 
   int m = d->min_len;
   uint16_t *offset = d->offset;
