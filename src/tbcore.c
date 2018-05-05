@@ -19,9 +19,9 @@
 #endif
 #include "tbcore.h"
 
-#define TBMAX_PIECE 254
-#define TBMAX_PAWN 256
-#define HSHMAX 5
+#define TBMAX_PIECE 650
+#define TBMAX_PAWN 861
+#define HSHMAX 10
 
 #define Swap(a,b) {int tmp=a;a=b;b=tmp;}
 
@@ -262,7 +262,7 @@ void TB_free(void)
 void TB_init(char *path)
 {
   char str[16];
-  int i, j, k, l;
+  int i, j, k, l, m;
 
   if (!initialized) {
     init_indices();
@@ -387,6 +387,33 @@ void TB_init(char *path)
           sprintf(str, "K%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l]);
           init_tb(str);
         }
+
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = l; m < 6; m++) {
+            sprintf(str, "K%c%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+            init_tb(str);
+          }
+
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = k; l < 6; l++)
+          for (m = 1; m < 6; m++) {
+            sprintf(str, "K%c%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+            init_tb(str);
+          }
+
+  for (i = 1; i < 6; i++)
+    for (j = i; j < 6; j++)
+      for (k = j; k < 6; k++)
+        for (l = 1; l < 6; l++)
+          for (m = l; m < 6; m++) {
+            sprintf(str, "K%c%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+            init_tb(str);
+          }
 
 finished:
   printf("info string Found %d tablebases.\n", TBnum_piece + TBnum_pawn);
@@ -684,7 +711,7 @@ static void init_indices(void)
   }
 }
 
-static size_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos, int *factor)
+static size_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos, size_t *factor)
 {
   size_t idx;
   int i, j, k, m, l, p;
@@ -736,7 +763,7 @@ static size_t encode_piece(struct TBEntry_piece *ptr, uint8_t *norm, int *pos, i
         j += (p > pos[l]);
       s += binomial[m - i][p - j];
     }
-    idx += s * (size_t)factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -755,7 +782,7 @@ static int pawn_file(struct TBEntry_pawn *ptr, int *pos)
   return file_to_file[pos[0] & 0x07];
 }
 
-static size_t encode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, int *factor)
+static size_t encode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, size_t *factor)
 {
   size_t idx;
   int i, j, k, m, t;
@@ -790,7 +817,7 @@ static size_t encode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, int
         j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += s * (size_t)factor[i];
+    idx += s * factor[i];
     i = t;
   }
 
@@ -806,7 +833,7 @@ static size_t encode_pawn(struct TBEntry_pawn *ptr, uint8_t *norm, int *pos, int
         j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += s * (size_t)factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -825,7 +852,7 @@ int pawn_rank(struct TBEntry_pawn2 *ptr, int *pos)
   return (pos[0] - 8) >> 3;
 }
 
-size_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *factor)
+size_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, size_t *factor)
 {
   size_t idx;
   int i, j, k, m, t;
@@ -860,7 +887,7 @@ size_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *fac
         j += (p > pos[k]);
       s += binomial[m - i][p - j - 8];
     }
-    idx += s * (size_t)factor[i];
+    idx += s * factor[i];
     i = t;
   }
 
@@ -876,7 +903,7 @@ size_t encode_pawn2(struct TBEntry_pawn2 *ptr, uint8_t *norm, int *pos, int *fac
         j += (p > pos[k]);
       s += binomial[m - i][p - j];
     }
-    idx += s * (size_t)factor[i];
+    idx += s * factor[i];
     i += t;
   }
 
@@ -898,7 +925,7 @@ static int subfactor(int k, int n)
   return f / l;
 }
 
-static size_t calc_factors_piece(int *factor, int num, int order, uint8_t *norm, uint8_t kk_enc)
+static size_t calc_factors_piece(size_t *factor, int num, int order, uint8_t *norm, uint8_t kk_enc)
 {
   int i, k, n;
   size_t f;
@@ -921,7 +948,7 @@ static size_t calc_factors_piece(int *factor, int num, int order, uint8_t *norm,
   return f;
 }
 
-static size_t calc_factors_pawn(int *factor, int num, int order, int order2, uint8_t *norm, int file)
+static size_t calc_factors_pawn(size_t *factor, int num, int order, int order2, uint8_t *norm, int file)
 {
   int i = norm[0];
   if (order2 < 0x0f) i += norm[i];
@@ -946,7 +973,7 @@ static size_t calc_factors_pawn(int *factor, int num, int order, int order2, uin
   return f;
 }
 
-static size_t calc_factors_pawn2(int *factor, int num, int order, int order2, uint8_t *norm, int rank)
+static size_t calc_factors_pawn2(size_t *factor, int num, int order, int order2, uint8_t *norm, int rank)
 {
   int i, k, n;
   size_t f;
