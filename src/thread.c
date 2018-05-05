@@ -32,6 +32,8 @@
 #include "uci.h"
 #include "tbprobe.h"
 
+static void thread_idle_loop(Pos *pos);
+
 // Global objects
 ThreadPool Threads;
 MainThread mainThread;
@@ -40,7 +42,7 @@ int num_cmh_tables = 0;
 
 // thread_init() is where a search thread starts and initialises itself.
 
-void thread_init(void *arg)
+static void *thread_init(void *arg)
 {
   int idx = (intptr_t)arg;
 
@@ -120,11 +122,13 @@ void thread_init(void *arg)
 #endif
 
   thread_idle_loop(pos);
+
+  return 0;
 }
 
 // thread_create() launches a new thread.
 
-void thread_create(int idx)
+static void thread_create(int idx)
 {
 #ifndef __WIN32__
 
@@ -132,8 +136,7 @@ void thread_create(int idx)
 
   Threads.initializing = 1;
   pthread_mutex_lock(&Threads.mutex);
-  pthread_create(&thread, NULL, (void*(*)(void*))thread_init,
-                 (void *)(intptr_t)idx);
+  pthread_create(&thread, NULL, thread_init, (void *)(intptr_t)idx);
   while (Threads.initializing)
     pthread_cond_wait(&Threads.sleepCondition, &Threads.mutex);
   pthread_mutex_unlock(&Threads.mutex);
@@ -151,7 +154,7 @@ void thread_create(int idx)
 
 // thread_destroy() waits for thread termination before returning.
 
-void thread_destroy(Pos *pos)
+static void thread_destroy(Pos *pos)
 {
 #ifndef __WIN32__
   pthread_mutex_lock(&pos->mutex);
@@ -266,7 +269,7 @@ void thread_wake_up(Pos *pos, int action)
 
 // thread_idle_loop() is where the thread is parked when it has no work to do.
 
-void thread_idle_loop(Pos *pos)
+static void thread_idle_loop(Pos *pos)
 {
   while (1) {
 #ifndef __WIN32__
