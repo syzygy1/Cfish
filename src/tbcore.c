@@ -7,16 +7,11 @@
   a particular engine, provided the engine is written in C or C++.
 */
 
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#ifndef _WIN32
-#include <unistd.h>
-#include <sys/mman.h>
-#endif
+
 #include "tbcore.h"
 
 #define TBMAX_PIECE 650
@@ -53,83 +48,35 @@ static void free_dtz_entry(struct TBEntry *entry);
 
 static FD open_tb(const char *str, const char *suffix)
 {
-  int i;
-  FD fd;
-  char file[256];
+  char name[256];
 
-  for (i = 0; i < num_paths; i++) {
-    strcpy(file, paths[i]);
-    strcat(file, "/");
-    strcat(file, str);
-    strcat(file, suffix);
-#ifndef _WIN32
-    fd = open(file, O_RDONLY);
-#else
-    fd = CreateFile(file, GENERIC_READ, FILE_SHARE_READ, NULL,
-                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-#endif
+  for (int i = 0; i < num_paths; i++) {
+    strcpy(name, paths[i]);
+    strcat(name, "/");
+    strcat(name, str);
+    strcat(name, suffix);
+    FD fd = open_file(name);
     if (fd != FD_ERR) return fd;
   }
   return FD_ERR;
 }
 
-static void close_tb(FD fd)
-{
-#ifndef _WIN32
-  close(fd);
-#else
-  CloseHandle(fd);
-#endif
-}
-
-static void *map_file(const char *name, const char *suffix, map_t *mapping)
+static void *map_tb(const char *name, const char *suffix, map_t *mapping)
 {
   FD fd = open_tb(name, suffix);
   if (fd == FD_ERR)
     return NULL;
-#ifndef _WIN32
-  struct stat statbuf;
-  fstat(fd, &statbuf);
-  *mapping = statbuf.st_size;
-  void *data = mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  if (data == MAP_FAILED) {
-    fprintf(stderr, "Could not mmap() %s.\n", name);
-    exit(EXIT_FAILURE);
-  }
-#else
-  DWORD size_low, size_high;
-  size_low = GetFileSize(fd, &size_high);
-  HANDLE map = CreateFileMapping(fd, NULL, PAGE_READONLY, size_high, size_low,
-                                  NULL);
-  if (map == NULL) {
-    fprintf(stderr, "CreateFileMapping() failed.\n");
-    exit(EXIT_FAILURE);
-  }
-  *mapping = map;
-  void *data = MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
+
+  void *data = map_file(fd, mapping);
   if (data == NULL) {
-    fprintf(stderr, "MapViewOfFile() failed, name = %s%s, error = %lu.\n", name, suffix, GetLastError());
+    fprintf(stderr, "Could not map %s%s into memory.\n", name, suffix);
     exit(EXIT_FAILURE);
   }
-#endif
-  close_tb(fd);
+
+  close_file(fd);
+
   return data;
 }
-
-#ifndef _WIN32
-static void unmap_file(void *data, map_t size)
-{
-  if (!data) return;
-  munmap(data, size);
-}
-#else
-static void unmap_file(void *data, map_t mapping)
-{
-  if (!data) return;
-  UnmapViewOfFile(data);
-  CloseHandle(mapping);
-}
-#endif
 
 static void add_to_hash(struct TBEntry *ptr, struct TBEntry *dtm_ptr, Key key)
 {
@@ -162,13 +109,13 @@ static void init_tb(char *str)
 
   fd = open_tb(str, WDLSUFFIX);
   if (fd == FD_ERR) return;
-  close_tb(fd);
+  close_file(fd);
 
   int dtm_present = 0;
   fd = open_tb(str, DTMSUFFIX);
   if (fd != FD_ERR) {
     dtm_present = 1;
-    close_tb(fd);
+    close_file(fd);
   }
 
   for (i = 0; i < 16; i++)
@@ -1187,7 +1134,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
 
   // first mmap the table into memory
 
-  entry->data = map_file(str, !dtm ? WDLSUFFIX : DTMSUFFIX, &entry->mapping);
+  entry->data = map_tb(str, !dtm ? WDLSUFFIX : DTMSUFFIX, &entry->mapping);
   if (!entry->data) {
     if (!dtm)
       fprintf(stderr, "Could not find %s" WDLSUFFIX, str);
@@ -1571,7 +1518,7 @@ void load_dtz_table(char *str, uint64_t key1, uint64_t key2)
   ptr3 = malloc(ptr->has_pawns ? sizeof(struct DTZEntry_pawn)
                                : sizeof(struct DTZEntry_piece));
 
-  ptr3->data = map_file(str, DTZSUFFIX, &ptr3->mapping);
+  ptr3->data = map_tb(str, DTZSUFFIX, &ptr3->mapping);
   ptr3->key = ptr->key;
   ptr3->num = ptr->num;
   ptr3->symmetric = ptr->symmetric;

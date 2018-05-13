@@ -10,13 +10,9 @@
 #ifndef _WIN32
 #include <pthread.h>
 #define SEP_CHAR ':'
-#define FD int
-#define FD_ERR -1
 #else
 #include <windows.h>
 #define SEP_CHAR ';'
-#define FD HANDLE
-#define FD_ERR INVALID_HANDLE_VALUE
 #endif
 
 #ifndef _WIN32
@@ -234,4 +230,3 @@ struct DTZTableEntry {
 };
 
 #endif
-

@@ -86,6 +86,22 @@ extern size_t large_page_minimum;
 
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
+#ifndef __WIN32__
+typedef int FD;
+#define FD_ERR -1
+typedef size_t map_t;
+#else
+typedef HANDLE FD;
+#define FD_ERR INVALID_HANDLE_VALUE
+typedef HANDLE map_t;
+#endif
+
+FD open_file(const char *name);
+void close_file(FD fd);
+size_t file_size(FD fd);
+void *map_file(FD fd, map_t *map);
+void unmap_file(void *data, map_t map);
+
 struct PRNG
 {
   uint64_t s;

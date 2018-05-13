@@ -1,5 +1,6 @@
 /* polybook.c from BrainFish, Copyright (C) 2016-2017 Thomas Zipproth */
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "misc.h"
@@ -21,10 +22,8 @@ static Move pg_move_to_sf_move(const Pos *pos, uint16_t pg_move);
 static int find_first_key(uint64_t key);
 static int get_key_data(void);
 
-static int check_do_search(const Pos *pos);
-static int check_draw(Pos *pos, Move m);
-
-static void from_be_polyhash(struct PolyHash *ph);
+static bool check_do_search(const Pos *pos);
+static bool check_draw(Pos *pos, Move m);
 
 // Random numbers from PolyGlot, used to compute book hash keys
 static const union {
@@ -299,17 +298,18 @@ static const union {
   0xF8D626AAAF278509ULL
 } };
 
-static int keycount;
+static ssize_t keycount;
 static struct PolyHash *polyhash;
+static map_t mapping;
 
 static int use_best_book_move = 1;
 static int max_book_depth = 255;
 static int book_depth_count;
 
-static int index_first;
+static ssize_t index_first;
 static int index_count;
-static int index_best;
-static int index_rand;
+static ssize_t index_best;
+static ssize_t index_rand;
 static int index_weight_count;
 
 static PRNG sr;
@@ -320,7 +320,7 @@ static int last_anz_pieces;
 static int akt_anz_pieces;
 static int search_counter;
 
-static int enabled = 0, do_search = 1;
+static bool enabled = false, do_search = true;
 
 void pb_free(void)
 {
@@ -331,34 +331,27 @@ void pb_free(void)
 void pb_init(const char *bookfile)
 {
   if (!bookfile || strlen(bookfile) == 0 || strcmp(bookfile, "<empty>") == 0) {
-    enabled = 0;
-    return;
-  }
-
-  FILE *F = fopen(bookfile, "rb");
-  if (F == NULL) {
-    printf("info string Could not open %s\n", bookfile);
-    enabled = 0;
+    enabled = false;
     return;
   }
 
   if (polyhash) {
-    free(polyhash);
+    unmap_file(polyhash, mapping);
     polyhash = NULL;
   }
 
-  fseek(F, 0L, SEEK_END);
-  int filesize = ftell(F);
-  fseek(F, 0L, SEEK_SET);
+  FD fd = open_file(bookfile);
+  if (fd != FD_ERR) {
+    keycount = file_size(fd) / 16;
+    polyhash = map_file(fd, &mapping);
+  }
+  close_file(fd);
 
-  keycount = filesize / 16;
-  polyhash = malloc(keycount * sizeof(*polyhash));
-
-  fread(polyhash, 1, filesize, F);
-  fclose(F);
-
-  for (int i = 0; i < keycount; i++)
-    from_be_polyhash(&polyhash[i]);
+  if (!polyhash) {
+    printf("info string Could not open %s\n", bookfile);
+    enabled = false;
+    return;
+  }
 
   prng_init(&sr, time(NULL));
   for (int i = 0; i < 10; i++)
@@ -366,7 +359,7 @@ void pb_init(const char *bookfile)
 
   printf("info string Book loaded: %s\n", bookfile);
 
-  enabled = 1;
+  enabled = true;
 }
 
 void pb_set_best_book_move(int best_book_move)
@@ -398,7 +391,7 @@ Move pb_probe(Pos *pos)
     if (search_counter > 4) {
       // Stop searching after 4 times not in the book till position changes
       // according to check_do_search()
-      do_search = 0;
+      do_search = false;
       search_counter = 0;
       book_depth_count = 0;
     }
@@ -408,9 +401,9 @@ Move pb_probe(Pos *pos)
 
   book_depth_count++;
 
-  int idx1 = use_best_book_move ? index_best : index_rand;
+  ssize_t idx1 = use_best_book_move ? index_best : index_rand;
 
-  m1 = pg_move_to_sf_move(pos, polyhash[idx1].move);
+  m1 = pg_move_to_sf_move(pos, from_be_u16(polyhash[idx1].move));
 
   if (!is_draw(pos)) return m1; // 64
   if (n == 1) return m1;
@@ -420,10 +413,10 @@ Move pb_probe(Pos *pos)
   if (!check_draw(pos, m1))
     return m1;
 
-  int idx2 = index_first;
+  ssize_t idx2 = index_first;
   if (idx1 == idx2) idx2++;
 
-  Move m2 = pg_move_to_sf_move(pos, polyhash[idx2].move);
+  Move m2 = pg_move_to_sf_move(pos, from_be_u16(polyhash[idx2].move));
 
   if (!check_draw(pos, m2))
     return m2;
@@ -500,16 +493,16 @@ static int find_first_key(uint64_t key)
   index_best = -1;
   index_rand = -1;
 
-  int start = 0;
-  int end = keycount;
+  ssize_t start = 0;
+  ssize_t end = keycount;
 
   do {
-    int mid = (end + start) / 2;
+    ssize_t mid = (end + start) / 2;
 
-    if (polyhash[mid].key < key)
+    if (from_be_u64(polyhash[mid].key) < key)
       start = mid;
     else {
-      if (polyhash[mid].key > key)
+      if (from_be_u64(polyhash[mid].key) > key)
         end = mid;
       else {
         start = max(mid - 4, 0);
@@ -518,10 +511,11 @@ static int find_first_key(uint64_t key)
     }
   } while (end - start > 8);
 
-  for (int i = start; i < end; i++)
-    if (key == polyhash[i].key) {
+  for (ssize_t i = start; i < end; i++)
+    if (key == from_be_u64(polyhash[i].key)) {
       index_first = i;
-      while (index_first > 0 && key == polyhash[index_first - 1].key)
+      while (   index_first > 0
+             && key == from_be_u64(polyhash[index_first - 1].key))
         index_first--;
       return get_key_data();
     }
@@ -531,21 +525,21 @@ static int find_first_key(uint64_t key)
 
 static int get_key_data(void)
 {
-  int best_weight = polyhash[index_first].weight;
+  int best_weight = from_be_u16(polyhash[index_first].weight);
   index_weight_count = best_weight;
   uint64_t key = polyhash[index_first].key;
 
   index_count = 1;
   index_best = index_first;
 
-  for (int i = index_first + 1; i < keycount; i++) {
+  for (ssize_t i = index_first + 1; i < keycount; i++) {
     if (polyhash[i].key != key)
       break;
 
     index_count++;
-    index_weight_count += polyhash[i].weight;
-    if (polyhash[i].weight > best_weight) {
-      best_weight = polyhash[i].weight;
+    index_weight_count += from_be_u16(polyhash[i].weight);
+    if (from_be_u16(polyhash[i].weight) > best_weight) {
+      best_weight = from_be_u16(polyhash[i].weight);
       index_best = i;
     }
   }
@@ -554,20 +548,20 @@ static int get_key_data(void)
   int weight_count = 0;
   index_rand = index_best;
 
-  for (int i = index_first; i < index_first + index_count; i++) {
+  for (ssize_t i = index_first; i < index_first + index_count; i++) {
     if (   rand_pos >= weight_count
-        && rand_pos < weight_count + polyhash[i].weight)
+        && rand_pos < weight_count + from_be_u16(polyhash[i].weight))
     {
       index_rand = i;
       break;
     }
-    weight_count += polyhash[i].weight;
+    weight_count += from_be_u16(polyhash[i].weight);
   }
 
   return index_count;
 }
 
-static int check_do_search(const Pos *pos)
+static bool check_do_search(const Pos *pos)
 {
   akt_position = pieces();
   akt_anz_pieces = popcount(akt_position);
@@ -575,17 +569,17 @@ static int check_do_search(const Pos *pos)
   Bitboard b = akt_position ^ last_position;
   int n2 = popcount(b);
 
-  int pos_changed =   n2 > 6
-                   || akt_position == last_position
-                   || akt_anz_pieces > last_anz_pieces
-                   || akt_anz_pieces < last_anz_pieces - 2
-                   || pos_key() == 0xB4D30CD15A43432D;
+  bool pos_changed =   n2 > 6
+                    || akt_position == last_position
+                    || akt_anz_pieces > last_anz_pieces
+                    || akt_anz_pieces < last_anz_pieces - 2
+                    || pos_key() == 0xB4D30CD15A43432D;
 
   // Reset do_search and book depth counter if postion changed more
   // than one move can do or in initial position
   if (pos_changed) {
     book_depth_count = 0;
-    do_search = 1;
+    do_search = true;
   }
 
   last_position = akt_position;
@@ -594,19 +588,11 @@ static int check_do_search(const Pos *pos)
   return do_search;
 }
 
-static int check_draw(Pos *pos, Move m)
+static bool check_draw(Pos *pos, Move m)
 {
   do_move(pos, m, gives_check(pos, pos->st, m));
-  int draw = is_draw(pos); // 64
+  bool draw = is_draw(pos); // 64
   undo_move(pos, m);
 
   return draw;
-}
-
-static void from_be_polyhash(struct PolyHash *ph)
-{
-  ph->key = from_be_u64(ph->key);
-  ph->move = from_be_u16(ph->move);
-  ph->weight = from_be_u16(ph->weight);
-  ph->learn = from_be_u32(ph->learn);
 }
