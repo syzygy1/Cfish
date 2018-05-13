@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#ifdef __WIN32__
+#ifdef _WIN32
 #include <windows.h>
 #else
 #include <sys/mman.h>
@@ -36,7 +36,7 @@
 // DD-MM-YY and show in engine_info.
 char Version[] = "";
 
-#ifndef __WIN32__
+#ifndef _WIN32
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 #else
 HANDLE io_mutex;
@@ -136,7 +136,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
   return i;
 }
 
-#ifdef __WIN32__
+#ifdef _WIN32
 typedef SIZE_T (WINAPI *GLPM)(void);
 size_t large_page_minimum;
 

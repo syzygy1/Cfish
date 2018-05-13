@@ -59,7 +59,7 @@ const int PushAway [8] = { 0, 5, 20, 40, 60, 80, 90, 100 };
 const int KRPPKRPScaleFactors[8] = { 0, 9, 10, 14, 21, 44, 0, 0 };
 
 #ifndef NDEBUG
-static int verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
+static bool verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
 {
   return   pos_non_pawn_material(c) == npm
         && piece_count(c, PAWN) == pawnsCnt;
@@ -106,28 +106,28 @@ static Key calc_key(const char *code, int c)
 EgFunc *endgame_funcs[22] = {
   NULL,
 // Entries 1-9 are evaluation functions.
- &EvaluateKPK,    // 1
- &EvaluateKNNK,   // 2
- &EvaluateKBNK,   // 3
- &EvaluateKRKP,   // 4
- &EvaluateKRKB,   // 5
- &EvaluateKRKN,   // 6
- &EvaluateKQKP,   // 7
- &EvaluateKQKR,   // 8
- &EvaluateKXK,    // 9
+  &EvaluateKPK,    // 1
+  &EvaluateKNNK,   // 2
+  &EvaluateKBNK,   // 3
+  &EvaluateKRKP,   // 4
+  &EvaluateKRKB,   // 5
+  &EvaluateKRKN,   // 6
+  &EvaluateKQKP,   // 7
+  &EvaluateKQKR,   // 8
+  &EvaluateKXK,    // 9
 // Entries 10-21 are scaling functions.
- &ScaleKNPK,      // 10
- &ScaleKNPKB,     // 11
- &ScaleKRPKR,     // 12
- &ScaleKRPKB,     // 13
- &ScaleKBPKB,     // 14
- &ScaleKBPKN,     // 15
- &ScaleKBPPKB,    // 16
- &ScaleKRPPKRP,   // 17
- &ScaleKBPsK,     // 18
- &ScaleKQKRPs,    // 19
- &ScaleKPsK,      // 20
- &ScaleKPKP       // 21
+  &ScaleKNPK,      // 10
+  &ScaleKNPKB,     // 11
+  &ScaleKRPKR,     // 12
+  &ScaleKRPKB,     // 13
+  &ScaleKBPKB,     // 14
+  &ScaleKBPKN,     // 15
+  &ScaleKBPPKB,    // 16
+  &ScaleKRPPKRP,   // 17
+  &ScaleKBPsK,     // 18
+  &ScaleKQKRPs,    // 19
+  &ScaleKPsK,      // 20
+  &ScaleKPKP       // 21
 };
 
 Key endgame_keys[16][2];
@@ -389,7 +389,7 @@ int ScaleKBPsK(const Pos *pos, unsigned strongSide)
   // be detected even when the weaker side has some pawns.
 
   Bitboard pawns = pieces_cp(strongSide, PAWN);
-  unsigned pawnsFile = file_of(lsb(pawns));
+  File pawnsFile = file_of(lsb(pawns));
 
   // All pawns are on a single rook file?
   if (    (pawnsFile == FILE_A || pawnsFile == FILE_H)
@@ -488,8 +488,8 @@ int ScaleKRPKR(const Pos *pos, unsigned strongSide)
   Square wpsq = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
   Square brsq = normalize(pos, strongSide, square_of(weakSide, ROOK));
 
-  unsigned f = file_of(wpsq);
-  unsigned r = rank_of(wpsq);
+  File f = file_of(wpsq);
+  Rank r = rank_of(wpsq);
   Square queeningSq = make_square(f, RANK_8);
   signed tempo = (pos_stm() == strongSide);
 
@@ -581,7 +581,7 @@ int ScaleKRPKB(const Pos *pos, unsigned strongSide)
     Square ksq = square_of(weakSide, KING);
     Square bsq = lsb(pieces_p(BISHOP));
     Square psq = lsb(pieces_p(PAWN));
-    unsigned rk = relative_rank_s(strongSide, psq);
+    Rank rk = relative_rank_s(strongSide, psq);
     Square push = pawn_push(strongSide);
 
     // If the pawn is on the 5th rank and the pawn (currently) is on
@@ -635,7 +635,7 @@ int ScaleKRPPKRP(const Pos *pos, unsigned strongSide)
   if (pawn_passed(pos, strongSide, wpsq1) || pawn_passed(pos, strongSide, wpsq2))
     return SCALE_FACTOR_NONE;
 
-  unsigned r = max(relative_rank_s(strongSide, wpsq1), relative_rank_s(strongSide, wpsq2));
+  Rank r = max(relative_rank_s(strongSide, wpsq1), relative_rank_s(strongSide, wpsq2));
 
   if (   distance_f(bksq, wpsq1) <= 1
       && distance_f(bksq, wpsq2) <= 1
@@ -868,4 +868,3 @@ int ScaleKPKP(const Pos *pos, unsigned strongSide)
   // a draw, it is probably at least a draw even with the pawn.
   return bitbases_probe(wksq, psq, bksq, us) ? SCALE_FACTOR_NONE : SCALE_FACTOR_DRAW;
 }
-

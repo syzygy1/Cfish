@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <sys/mman.h>
 #endif
 
@@ -144,7 +144,7 @@ void options_init()
 #else
   options_map[OPT_NUMA].type = OPT_TYPE_DISABLED;
 #endif
-#ifdef __WIN32__
+#ifdef _WIN32
   // Disable the LargePages option if the machine does not support it.
   if (!large_pages_supported())
     options_map[OPT_LARGE_PAGES].type = OPT_TYPE_DISABLED;

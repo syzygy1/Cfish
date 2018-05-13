@@ -46,9 +46,10 @@
 #include <assert.h>
 #endif
 #include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#ifdef __WIN32__
+#ifdef _WIN32
 #include <windows.h>
 #endif
 
@@ -324,7 +325,7 @@ struct PSQT {
 
 extern struct PSQT psqt;
 
-#ifndef __WIN32__
+#ifndef _WIN32
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif

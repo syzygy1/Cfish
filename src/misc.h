@@ -23,7 +23,7 @@
 
 #include <assert.h>
 #include <stdio.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <pthread.h>
 #endif
 #include <stdatomic.h>
@@ -72,7 +72,7 @@ INLINE TimePoint now(void) {
   return 1000 * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec / 1000;
 }
 
-#ifndef __WIN32__
+#ifndef _WIN32
 extern pthread_mutex_t io_mutex;
 #define IO_LOCK   pthread_mutex_lock(&io_mutex)
 #define IO_UNLOCK pthread_mutex_unlock(&io_mutex)
@@ -86,7 +86,7 @@ extern size_t large_page_minimum;
 
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
-#ifndef __WIN32__
+#ifndef _WIN32
 typedef int FD;
 #define FD_ERR -1
 typedef size_t map_t;

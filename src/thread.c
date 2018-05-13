@@ -98,7 +98,7 @@ static void *thread_init(void *arg)
   atomic_store(&pos->resetCalls, 0);
   pos->selDepth = pos->callsCnt = 0;
 
-#ifndef __WIN32__  // linux
+#ifndef _WIN32  // linux
 
   pthread_mutex_init(&pos->mutex, NULL);
   pthread_cond_init(&pos->sleepCondition, NULL);
@@ -130,7 +130,7 @@ static void *thread_init(void *arg)
 
 static void thread_create(int idx)
 {
-#ifndef __WIN32__
+#ifndef _WIN32
 
   pthread_t thread;
 
@@ -156,7 +156,7 @@ static void thread_create(int idx)
 
 static void thread_destroy(Pos *pos)
 {
-#ifndef __WIN32__
+#ifndef _WIN32
   pthread_mutex_lock(&pos->mutex);
   pos->action = THREAD_EXIT;
   pthread_cond_signal(&pos->sleepCondition);
@@ -201,7 +201,7 @@ static void thread_destroy(Pos *pos)
 
 void thread_wait_until_sleeping(Pos *pos)
 {
-#ifndef __WIN32__
+#ifndef _WIN32
 
   pthread_mutex_lock(&pos->mutex);
 
@@ -225,7 +225,7 @@ void thread_wait_until_sleeping(Pos *pos)
 
 void thread_wait(Pos *pos, atomic_bool *condition)
 {
-#ifndef __WIN32__
+#ifndef _WIN32
 
   pthread_mutex_lock(&pos->mutex);
 
@@ -245,7 +245,7 @@ void thread_wait(Pos *pos, atomic_bool *condition)
 
 void thread_wake_up(Pos *pos, int action)
 {
-#ifndef __WIN32__
+#ifndef _WIN32
 
   pthread_mutex_lock(&pos->mutex);
 
@@ -254,7 +254,7 @@ void thread_wake_up(Pos *pos, int action)
   if (action != THREAD_RESUME)
     pos->action = action;
 
-#ifndef __WIN32__
+#ifndef _WIN32
 
   pthread_cond_signal(&pos->sleepCondition);
   pthread_mutex_unlock(&pos->mutex);
@@ -272,7 +272,7 @@ void thread_wake_up(Pos *pos, int action)
 static void thread_idle_loop(Pos *pos)
 {
   while (1) {
-#ifndef __WIN32__
+#ifndef _WIN32
 
     pthread_mutex_lock(&pos->mutex);
 
@@ -308,7 +308,7 @@ static void thread_idle_loop(Pos *pos)
 
     pos->action = THREAD_SLEEP;
 
-#ifdef __WIN32__
+#ifdef _WIN32
 
     SetEvent(pos->stopEvent);
 
@@ -324,7 +324,7 @@ static void thread_idle_loop(Pos *pos)
 
 void threads_init(void)
 {
-#ifndef __WIN32__
+#ifndef _WIN32
 
   pthread_mutex_init(&Threads.mutex, NULL);
   pthread_cond_init(&Threads.sleepCondition, NULL);
@@ -355,7 +355,7 @@ void threads_exit(void)
 {
   threads_set_number(0);
 
-#ifndef __WIN32__
+#ifndef _WIN32
 
   pthread_cond_destroy(&Threads.sleepCondition);
   pthread_mutex_destroy(&Threads.mutex);

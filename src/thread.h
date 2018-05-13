@@ -22,7 +22,7 @@
 #define THREAD_H
 
 #include <stdatomic.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <pthread.h>
 #else
 #include <windows.h>
@@ -32,7 +32,7 @@
 
 #define MAX_THREADS 512
 
-#ifndef __WIN32__
+#ifndef _WIN32
 #define LOCK_T pthread_mutex_t
 #define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
 #define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
@@ -78,7 +78,7 @@ void mainthread_search(void);
 struct ThreadPool {
   Pos *pos[MAX_THREADS];
   int num_threads;
-#ifndef __WIN32__
+#ifndef _WIN32
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;
   int initializing;

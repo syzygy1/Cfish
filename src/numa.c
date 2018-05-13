@@ -1,6 +1,6 @@
 #ifdef NUMA
 
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <numa.h>
 #else
 #define _WIN32_WINNT 0x0600
@@ -16,7 +16,7 @@ static int num_nodes;
 static int *num_physical_cores;
 int numa_avail;
 
-#ifndef __WIN32__
+#ifndef _WIN32
 static int *num_logical_cores;
 static struct bitmask **nodemask;
 

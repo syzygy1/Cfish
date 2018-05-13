@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -49,20 +49,20 @@ static const int QuadraticTheirs[][8] = {
 };
 
 // Helper used to detect a given material distribution.
-static int is_KXK(const Pos *pos, int us)
+static bool is_KXK(const Pos *pos, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
         && pos_non_pawn_material(us) >= RookValueMg;
 }
 
-static int is_KBPsK(const Pos *pos, int us)
+static bool is_KBPsK(const Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
         && pieces_cp(us, BISHOP)
         && pieces_cp(us, PAWN);
 }
 
-static int is_KQKRPs(const Pos *pos, int us) {
+static bool is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
         && pieces_cp(us, QUEEN)
@@ -198,4 +198,3 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
 #undef pc
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
 }
-

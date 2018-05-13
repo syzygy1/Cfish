@@ -335,7 +335,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 
       // Penalty when trapped by the king, even more if the king cannot castle
       else if (mob <= 3) {
-        uint32_t kf = file_of(square_of(Us, KING));
+        File kf = file_of(square_of(Us, KING));
 
         if ((kf < FILE_E) == (file_of(s) < kf))
           score -= (TrappedRook - make_score(mob * 22, 0)) * (1 + !can_castle_c(Us));
@@ -375,7 +375,7 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility)
 INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                            int Us)
 {
-  const int Them = (Us == WHITE ? BLACK   : WHITE);
+  const int Them = (Us == WHITE ? BLACK : WHITE);
   const Bitboard Camp = (   Us == WHITE
                          ? AllSquares ^ Rank6BB ^ Rank7BB ^ Rank8BB
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
@@ -459,7 +459,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   }
 
   // King tropism: firstly, find squares that we attack in the enemy king flank
-  uint32_t kf = file_of(ksq);
+  File kf = file_of(ksq);
   b = ei->attackedBy[Them][0] & KingFlank[kf] & Camp;
 
   assert(((Us == WHITE ? b << 4 : b >> 4) & b) == 0);
@@ -572,7 +572,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
   // Bonus for impending threats against enemy queen
   if (piece_count(Them, QUEEN) == 1) {
-    uint32_t s = square_of(Them, QUEEN);
+    Square s = square_of(Them, QUEEN);
     safeThreats = ei->mobilityArea[Us] & ~stronglyProtected;
 
     b = ei->attackedBy[Us][KNIGHT] & attacks_from_knight(s);
@@ -730,7 +730,7 @@ INLINE Value evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
   int kingDistance =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                     - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
   int pawns = popcount(pieces_p(PAWN));
-  int bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
+  bool bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
 
   // Compute the initiative bonus for the attacking side
   int initiative = 8 * (asymmetry + kingDistance - 17) + 12 * pawns + 16 * bothFlanks + 48 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK));

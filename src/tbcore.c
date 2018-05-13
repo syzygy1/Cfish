@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "tbcore.h"
+#include "thread.h"
 
 #define TBMAX_PIECE 650
 #define TBMAX_PAWN 861
