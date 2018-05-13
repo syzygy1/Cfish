@@ -80,7 +80,6 @@ struct Stack {
   Move* pv;
   PieceToHistory *history;
   uint8_t ply;
-  uint8_t skipEarlyPruning;
   Move currentMove;
   Move excludedMove;
   Move killers[2];

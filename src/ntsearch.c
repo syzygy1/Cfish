@@ -187,11 +187,11 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     }
   }
 
-  // Step 6. Evaluate the position statically
+  // Step 6. Static evaluation of the position
   if (inCheck) {
     ss->staticEval = VALUE_NONE;
     improving = 0;
-    goto moves_loop;
+    goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
     // Never assume anything on values stored in TT
     if ((ss->staticEval = eval = tte_eval(tte)) == VALUE_NONE)
@@ -210,13 +210,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
              ss->staticEval, tt_generation());
   }
 
-  improving =   ss->staticEval >= (ss-2)->staticEval
-             || (ss-2)->staticEval == VALUE_NONE;
-
-  if (ss->skipEarlyPruning || !pos_non_pawn_material(pos_stm()))
-    goto moves_loop;
-
-  // Step 7. Razoring (skipped when in check)
+  // Step 7. Razoring
   if (   !PvNode
       && depth <= ONE_PLY)
   {
@@ -233,7 +227,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       return v;
   }
 
-  // Step 8. Futility pruning: child node (skipped when in check)
+  improving =   ss->staticEval >= (ss-2)->staticEval
+             || (ss-2)->staticEval == VALUE_NONE;
+
+  // Step 8. Futility pruning: child node
   if (   !rootNode
       &&  depth < 7 * ONE_PLY
       &&  eval - futility_margin(depth, improving) >= beta
@@ -242,8 +239,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Step 9. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
+      && (ss-1)->currentMove != MOVE_NULL
+      && (ss-1)->statScore < 30000
       && eval >= beta
       && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && !ss->excludedMove
+      && pos_non_pawn_material(pos_stm())
       && (ss->ply >= pos->nmp_ply || ss->ply % 2 != pos->nmp_odd))
   {
     assert(eval - beta >= 0);
@@ -256,11 +257,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
-    (ss+1)->skipEarlyPruning = 1;
     Value nullValue =   depth-R < ONE_PLY
                      ? -qsearch_NonPV_false(pos, ss+1, -beta, DEPTH_ZERO)
                      : - search_NonPV(pos, ss+1, -beta, depth-R, !cutNode);
-    (ss+1)->skipEarlyPruning = 0;
     undo_null_move(pos);
 
     if (nullValue >= beta) {
@@ -278,11 +277,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       pos->nmp_ply = ss->ply + 3 * (depth-R) / (4 * ONE_PLY);
       pos->nmp_odd = ss->ply & 1;
 
-      ss->skipEarlyPruning = 1;
       Value v =  depth-R < ONE_PLY
                ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
                : search_NonPV(pos, ss, beta-1, depth-R, 0);
-      ss->skipEarlyPruning = 0;
 
       pos->nmp_odd = pos->nmp_ply = 0;
 
@@ -291,7 +288,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     }
   }
 
-  // Step 10. ProbCut (skipped when in check)
+  // Step 10. ProbCut
   // If we have a good enough capture and a reduced search returns a value
   // much above beta, we can (almost) safely prune the previous move.
   if (   !PvNode
@@ -302,7 +299,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     Depth rdepth = depth - 4 * ONE_PLY;
 
     assert(rdepth >= ONE_PLY);
-    assert(move_is_ok((ss-1)->currentMove));
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
@@ -330,17 +326,15 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       }
   }
 
-  // Step 11. Internal iterative deepening (skipped when in check)
+  // Step 11. Internal iterative deepening
   if (    depth >= 8 * ONE_PLY
       && !ttMove)
   {
     Depth d = (3 * depth / (4 * ONE_PLY) - 2) * ONE_PLY;
-    ss->skipEarlyPruning = 1;
     if (PvNode)
       search_PV(pos, ss, alpha, beta, d);
     else
       search_NonPV(pos, ss, alpha, d, cutNode);
-    ss->skipEarlyPruning = 0;
 
     tte = tt_probe(posKey, &ttHit);
     // ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
@@ -427,11 +421,9 @@ moves_loop: // When in check search starts from here.
 //      Value rBeta = min(max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE), VALUE_KNOWN_WIN);
       Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
       ss->excludedMove = move;
-      ss->skipEarlyPruning = 1;
       Move cm = ss->countermove;
       Move k1 = ss->mp_killers[0], k2 = ss->mp_killers[1];
       value = search_NonPV(pos, ss, rBeta - 1, d, cutNode);
-      ss->skipEarlyPruning = 0;
       ss->excludedMove = 0;
 
       if (value < rBeta)

@@ -54,11 +54,7 @@ const Value ShelterStrength[4][8] = {
 // [type][distance from edge][rank]. For the unopposed and unblocked cases,
 // RANK_1 = 0 is used when opponent has no pawn on the given file or
 // their pawn is behind our king.
-static const Value StormDanger[4][4][8] = {
-  { { V( 0),  V(-290), V(-274), V(57), V(41) },  // BlockedByKing
-    { V( 0),  V(  60), V( 144), V(39), V(13) },
-    { V( 0),  V(  65), V( 141), V(41), V(34) },
-    { V( 0),  V(  53), V( 127), V(56), V(14) } },
+static const Value StormDanger[3][4][8] = {
   { { V( 4),  V(  73), V( 132), V(46), V(31) },  // Unopposed
     { V( 1),  V(  64), V( 143), V(26), V(13) },
     { V( 1),  V(  47), V( 110), V(44), V(24) },
@@ -78,6 +74,7 @@ static const Value StormDanger[4][4][8] = {
 
 INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 {
+  const int Them  = (Us == WHITE ? BLACK      : WHITE);
   const int Up    = (Us == WHITE ? NORTH      : SOUTH);
   const int Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
   const int Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
@@ -117,21 +114,10 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     phalanx    = neighbours & rank_bb_s(s);
     supported  = neighbours & rank_bb_s(s - Up);
 
-    // A pawn is backward when it is behind all pawns of the same color on the
-    // adjacent files and cannot be safely advanced.
-    if (!neighbours || lever || relative_rank_s(Us, s) >= RANK_5)
-      backward = 0;
-    else {
-      // Find the backmost rank with neighbours or stoppers
-      b = rank_bb_s(backmost_sq(Us, neighbours | stoppers));
-
-      // The pawn is backward when it cannot safely progress to that rank:
-      // either there is a stopper in the way on this rank, or there is a
-      // stopper on adjacent file which controls the way to that rank.
-      backward = !!((b | shift_bb(Up, b & adjacent_files_bb(f))) & stoppers);
-
-      assert(!(backward && (forward_ranks_bb(Us ^ 1, rank_of(s + Up)) & neighbours)));
-    }
+    // A pawn is backward when it is behind all pawns of the same color on
+    // the adjacent files and cannot be safely advanced.
+    backward =   !(ourPawns & pawn_attack_span(Them, s + Up))
+              &&  (stoppers & (leverPush | sq_bb(s + Up)));
 
     // Passed pawns will be properly scored in evaluation because we need
     // full attack info to evaluate them. Include also not passed pawns
@@ -178,7 +164,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
 void pawn_init(void)
 {
-  static const int Seed[8] = { 0, 13, 24, 18, 76, 100, 175, 330 };
+  static const int Seed[8] = { 0, 13, 24, 18, 65, 100, 175, 330 };
 
   for (int opposed = 0; opposed < 2; opposed++)
     for (int phalanx = 0; phalanx < 2; phalanx++)
@@ -211,16 +197,20 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const int Down = (Us == WHITE ? SOUTH : NORTH);
+  const Bitboard BlockRanks =
+                   (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
   
-  enum { BlockedByKing, Unopposed, BlockedByPawn, Unblocked };
+  enum { Unopposed, BlockedByPawn, Unblocked };
 
-  File center = max(FILE_B, min(FILE_G, file_of(ksq)));
   Bitboard b =  pieces_p(PAWN)
-              & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq))
-              & (adjacent_files_bb(center) | file_bb(center));
+              & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
   Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;
+
+  File center = max(FILE_B, min(FILE_G, file_of(ksq)));
+  if (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq))
+    safety += 374;
 
   for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
@@ -232,9 +222,8 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
     int d = min(f, FILE_H - f);
     safety +=  ShelterStrength[d][rkUs]
              - StormDanger
-               [(shift_bb(Down, b) & sq_bb(ksq)) ? BlockedByKing :
-                rkUs   == RANK_1                 ? Unopposed :
-                rkThem == rkUs + 1               ? BlockedByPawn  : Unblocked]
+               [rkUs   == RANK_1   ? Unopposed :
+                rkThem == rkUs + 1 ? BlockedByPawn  : Unblocked]
                [d][rkThem];
   }
 

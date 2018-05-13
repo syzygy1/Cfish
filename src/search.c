@@ -367,10 +367,8 @@ void thread_search(Pos *pos)
   for (int i = -4; i < 0; i++)
     ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
 
-  for (int i = 0; i <= MAX_PLY; i++) {
+  for (int i = 0; i <= MAX_PLY; i++)
     ss[i].ply = i;
-    ss[i].skipEarlyPruning = 0;
-  }
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
