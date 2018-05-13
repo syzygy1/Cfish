@@ -164,7 +164,8 @@ static void init_tb(char *str)
     entry = (struct TBEntry *)&TB_pawn[TBnum_pawn++];
   }
   dtm_entry->key = entry->key = key;
-  dtm_entry->ready = entry->ready = 0;
+  atomic_init(&entry->ready, false);
+  atomic_init(&dtm_entry->ready, false);
   entry->num = 0;
   for (i = 0; i < 16; i++)
     entry->num += (uint8_t)pcs[i];
@@ -873,7 +874,7 @@ static int subfactor(int k, int n)
   return f / l;
 }
 
-static size_t calc_factors_piece(size_t *factor, int num, int order, uint8_t *norm, uint8_t kk_enc)
+static size_t calc_factors_piece(size_t *factor, int num, int order, uint8_t *norm, bool kk_enc)
 {
   int i, k, n;
   size_t f;
@@ -1152,7 +1153,7 @@ static int init_table(struct TBEntry *entry, char *str, int dtm)
 
   int split = data[4] & 0x01;
   int files = data[4] & 0x02 ? (dtm ? 6 : 4) : 1;
-  entry->loss_only = data[4] & 0x04 ? 1 : 0;
+  entry->loss_only = data[4] & 0x04;
 
   data += 5;
 
@@ -1540,7 +1541,7 @@ void load_dtz_table(char *str, uint64_t key1, uint64_t key2)
 
 static void free_wdl_entry(struct TBEntry *entry)
 {
-  if (!entry->ready) return;
+  if (!atomic_load_explicit(&entry->ready, memory_order_relaxed)) return;
   unmap_file(entry->data, entry->mapping);
   if (!entry->has_pawns) {
     struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;
@@ -1559,7 +1560,7 @@ static void free_wdl_entry(struct TBEntry *entry)
 
 static void free_dtm_entry(struct TBEntry *entry)
 {
-  if (!entry->ready) return;
+  if (!atomic_load_explicit(&entry->ready, memory_order_relaxed)) return;
   unmap_file(entry->data, entry->mapping);
   if (!entry->has_pawns) {
     struct TBEntry_piece *ptr = (struct TBEntry_piece *)entry;

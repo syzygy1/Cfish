@@ -126,7 +126,7 @@ static int probe_wdl_table(Pos *pos, int *success)
         UNLOCK(TB_mutex);
         return 0;
       }
-      atomic_store_explicit(&ptr->ready, 1, memory_order_release);
+      atomic_store_explicit(&ptr->ready, true, memory_order_release);
     }
     UNLOCK(TB_mutex);
   }
@@ -229,7 +229,7 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
         UNLOCK(TB_mutex);
         return 0;
       }
-      atomic_store_explicit(&ptr->ready, 1, memory_order_release);
+      atomic_store_explicit(&ptr->ready, true, memory_order_release);
     }
     UNLOCK(TB_mutex);
   }

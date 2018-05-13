@@ -62,11 +62,11 @@ struct TBEntry {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
 }
 #ifndef _WIN32
 __attribute__((__may_alias__))
@@ -77,12 +77,12 @@ struct TBEntry_piece {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
-  uint8_t kk_enc;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
+  bool kk_enc;
   struct PairsData *precomp[2];
   size_t factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];
@@ -93,11 +93,11 @@ struct TBEntry_pawn {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
@@ -111,11 +111,11 @@ struct TBEntry_pawn2 {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];
@@ -129,12 +129,12 @@ struct DTZEntry_piece {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
-  uint8_t kk_enc;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
+  bool kk_enc;
   struct PairsData *precomp;
   size_t factor[TBPIECES];
   uint8_t pieces[TBPIECES];
@@ -148,11 +148,11 @@ struct DTZEntry_pawn {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp;
@@ -169,12 +169,12 @@ struct DTMEntry_piece {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
-  uint8_t kk_enc;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
+  bool kk_enc;
   struct PairsData *precomp[2];
   size_t factor[2][TBPIECES];
   uint8_t pieces[2][TBPIECES];
@@ -187,11 +187,11 @@ struct DTMEntry_pawn {
   uint8_t *data;
   Key key;
   map_t mapping;
-  atomic_uchar ready;
+  atomic_bool ready;
   uint8_t num;
-  uint8_t symmetric;
-  uint8_t has_pawns;
-  uint8_t loss_only;
+  bool symmetric;
+  bool has_pawns;
+  bool loss_only;
   uint8_t pawns[2];
   struct {
     struct PairsData *precomp[2];

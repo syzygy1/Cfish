@@ -14,7 +14,7 @@
 
 static int num_nodes;
 static int *num_physical_cores;
-int numa_avail;
+bool numa_avail;
 
 #ifndef _WIN32
 static int *num_logical_cores;
@@ -31,12 +31,12 @@ void numa_init(void)
   FILE *F;
 
   if (numa_available() == -1 || numa_max_node() == 0) {
-    numa_avail = 0;
+    numa_avail = false;
     settings.numa_enabled = delayed_settings.numa_enabled = 0;
     return;
   }
 
-  numa_avail = 1;
+  numa_avail = true;
   num_nodes = numa_max_node() + 1;
 #if 0
   printf("numa nodes = %d\n", num_nodes);
@@ -190,7 +190,7 @@ static int *num_physical_cores;
 
 void numa_init(void)
 {
-  numa_avail = 1;
+  numa_avail = true;
   num_nodes = 0;
   int max_nodes = 16;
   node_number = malloc(max_nodes * sizeof(int));
@@ -324,7 +324,7 @@ void numa_init(void)
   }
 
   if (num_nodes <= 1) {
-    numa_avail = 0;
+    numa_avail = false;
     settings.numa_enabled = delayed_settings.numa_enabled = 0;
   }
 }
