@@ -55,22 +55,18 @@ const Value ShelterStrength[4][8] = {
 // RANK_1 = 0 is used when opponent has no pawn on the given file or
 // their pawn is behind our king.
 static const Value StormDanger[4][4][8] = {
-  { { V( 0),  V(-290), V(-274), V(57), V(41) },  // BlockedByKing
-    { V( 0),  V(  60), V( 144), V(39), V(13) },
-    { V( 0),  V(  65), V( 141), V(41), V(34) },
-    { V( 0),  V(  53), V( 127), V(56), V(14) } },
-  { { V( 4),  V(  73), V( 132), V(46), V(31) },  // Unopposed
-    { V( 1),  V(  64), V( 143), V(26), V(13) },
-    { V( 1),  V(  47), V( 110), V(44), V(24) },
-    { V( 0),  V(  72), V( 127), V(50), V(31) } },
-  { { V( 0),  V(   0), V(  19), V(23), V( 1) },  // BlockedByPawn
-    { V( 0),  V(   0), V(  88), V(27), V( 2) },
-    { V( 0),  V(   0), V( 101), V(16), V( 1) },
-    { V( 0),  V(   0), V( 111), V(22), V(15) } },
-  { { V(22),  V(  45), V( 104), V(62), V( 6) },  // Unblocked
-    { V(31),  V(  30), V(  99), V(39), V(19) },
-    { V(23),  V(  29), V(  96), V(41), V(15) },
-    { V(21),  V(  23), V( 116), V(41), V(15) } }
+{ { V(4),  V(73), V(132), V(46), V(31) },  // Unopposed
+{ V(1),  V(64), V(143), V(26), V(13) },
+{ V(1),  V(47), V(110), V(44), V(24) },
+{ V(0),  V(72), V(127), V(50), V(31) } },
+{ { V(0),  V(0), V(19), V(23), V(1) },  // BlockedByPawn
+{ V(0),  V(0), V(88), V(27), V(2) },
+{ V(0),  V(0), V(101), V(16), V(1) },
+{ V(0),  V(0), V(111), V(22), V(15) } },
+{ { V(22),  V(45), V(104), V(62), V(6) },  // Unblocked
+{ V(31),  V(30), V(99), V(39), V(19) },
+{ V(23),  V(29), V(96), V(41), V(15) },
+{ V(21),  V(23), V(116), V(41), V(15) } }
 };
 
 #undef S
@@ -178,7 +174,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
 void pawn_init(void)
 {
-  static const int Seed[8] = { 0, 13, 24, 18, 76, 100, 175, 330 };
+  static const int Seed[8] = { 0, 13, 24, 18, 65, 100, 175, 330 };
 
   for (int opposed = 0; opposed < 2; opposed++)
     for (int phalanx = 0; phalanx < 2; phalanx++)
@@ -211,17 +207,21 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const int Down = (Us == WHITE ? SOUTH : NORTH);
+  const Bitboard BlockRanks = (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
   
-  enum { BlockedByKing, Unopposed, BlockedByPawn, Unblocked };
+  enum { Unopposed, BlockedByPawn, Unblocked };
 
+	Bitboard b = pieces_p(PAWN)
+		& (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
+
+	Bitboard ourPawns = b & pieces_c(Us);
+	Bitboard theirPawns = b & pieces_c(Them);
+
+	Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;
+
+	if ((shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks) & sq_bb(ksq))
+		safety += 374;
   File center = max(FILE_B, min(FILE_G, file_of(ksq)));
-  Bitboard b =  pieces_p(PAWN)
-              & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq))
-              & (adjacent_files_bb(center) | file_bb(center));
-  Bitboard ourPawns = b & pieces_c(Us);
-  Bitboard theirPawns = b & pieces_c(Them);
-  Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;
-
   for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
     Rank rkUs = b ? relative_rank_s(Us, backmost_sq(Us, b)) : RANK_1;
@@ -232,10 +232,9 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
     int d = min(f, FILE_H - f);
     safety +=  ShelterStrength[d][rkUs]
              - StormDanger
-               [(shift_bb(Down, b) & sq_bb(ksq)) ? BlockedByKing :
-                rkUs   == RANK_1                 ? Unopposed :
-                rkThem == rkUs + 1               ? BlockedByPawn  : Unblocked]
-               [d][rkThem];
+                [rkUs == RANK_1                 ? Unopposed :
+                rkUs  == rkThem - 1             ? BlockedByPawn  : Unblocked]
+                [d][rkThem];
   }
 
   return safety;
