@@ -54,19 +54,15 @@ const Value ShelterStrength[4][8] = {
 // [type][distance from edge][rank]. For the unopposed and unblocked cases,
 // RANK_1 = 0 is used when opponent has no pawn on the given file or
 // their pawn is behind our king.
-static const Value StormDanger[3][4][8] = {
-  { { V(11),  V( 79), V(132), V( 68), V( 33) },  // Unopposed
-    { V( 4),  V(104), V(155), V(  4), V( 21) },
-    { V(-7),  V( 59), V(142), V( 45), V( 30) },
-    { V( 0),  V( 62), V(113), V( 43), V( 13) } },
+static const Value StormDanger[2][4][8] = {
+  { { V(25),  V( 79), V(107), V( 51), V( 27) },  // UnBlocked
+    { V(15),  V( 45), V(131), V(  8), V( 25) },
+    { V( 0),  V( 42), V(118), V( 56), V( 27) },
+    { V( 3),  V( 54), V(110), V( 55), V( 26) } },
   { { V( 0),  V(  0), V( 37), V(  5), V(-48) },  // BlockedByPawn
     { V( 0),  V(  0), V( 68), V(-12), V( 13) },
     { V( 0),  V(  0), V(111), V(-25), V( -3) },
-    { V( 0),  V(  0), V(108), V( 14), V( 21) } },
-  { { V(38),  V( 78), V( 83), V( 35), V( 22) },  // Unblocked
-    { V(33),  V(-15), V(108), V( 12), V( 28) },
-    { V( 8),  V( 25), V( 94), V( 68), V( 25) },
-    { V( 6),  V( 48), V(120), V( 68), V( 40) } }
+    { V( 0),  V(  0), V(108), V( 14), V( 21) } }
 };
 
 #undef S
@@ -200,7 +196,7 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
   const Bitboard BlockRanks =
                    (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
   
-  enum { Unopposed, BlockedByPawn, Unblocked };
+  enum { Unblocked, BlockedByPawn };
 
   Bitboard b =  pieces_p(PAWN)
               & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
@@ -214,17 +210,18 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 
   for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
-    Rank rkUs = b ? relative_rank_s(Us, backmost_sq(Us, b)) : RANK_1;
+    int ourRank = b ? relative_rank_s(Us, backmost_sq(Us, b)) : 0;
 
     b = theirPawns & file_bb(f);
-    Rank rkThem = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : RANK_1;
+    int theirRank = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : 0;
 
     int d = min(f, FILE_H - f);
-    safety +=  ShelterStrength[d][rkUs]
-             - StormDanger
-               [rkUs   == RANK_1   ? Unopposed :
-                rkThem == rkUs + 1 ? BlockedByPawn  : Unblocked]
-               [d][rkThem];
+    safety +=  ShelterStrength[d][ourRank];
+    if (ourRank || theirRank)
+      safety -= StormDanger
+                [  ourRank && (ourRank == theirRank - 1)
+                 ? BlockedByPawn : Unblocked]
+                [d][theirRank];
   }
 
   return safety;

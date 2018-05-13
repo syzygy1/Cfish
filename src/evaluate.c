@@ -85,7 +85,7 @@ static const Bitboard KingFlank[8] = {
 enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
-static const int KingAttackWeights[8] = { 0, 0, 78, 56, 45, 11 };
+static const int KingAttackWeights[8] = { 0, 0, 77, 55, 44, 10 };
 
 // Penalties for enemy's safe checks
 enum {
@@ -210,12 +210,11 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // enemy pawns are excluded from the mobility area
   ei->mobilityArea[Us] = ~(b | pieces_cpp(Us, KING, QUEEN) | ei->pe->pawnAttacks[Them]);
 
-  // Initialise the attack bitboards with the king and pawn information
+  // Initialise the attackedBy bitboards for kings and pawns
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
   ei->attackedBy[Us][PAWN] = ei->pe->pawnAttacks[Us];
-
-  ei->attackedBy2[Us]   = b & ei->attackedBy[Us][PAWN];
   ei->attackedBy[Us][0] = b | ei->attackedBy[Us][PAWN];
+  ei->attackedBy2[Us]   = b & ei->attackedBy[Us][PAWN];
 
   // Init our king safety tables only if we are going to use them
   if (pos_non_pawn_material(Them) >= RookValueMg + KnightValueMg) {
@@ -230,7 +229,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
     else if (file_of(square_of(Us, KING)) == FILE_A)
       ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
 
-    ei->kingAttackersCount[Them] = popcount(b & ei->pe->pawnAttacks[Them]);
+    ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
     ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
   }
   else
@@ -382,7 +381,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
   const Square ksq = square_of(Us, KING);
-  Bitboard weak, b, b1, b2, safe, unsafeChecks, pinned;
+  Bitboard weak, b, b1, b2, safe, unsafeChecks;
 
   // King shelter and enemy pawns storm
   Score score = Us == WHITE ? king_safety_white(ei->pe, pos, ksq)
@@ -441,12 +440,11 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     // Unsafe or occupied checking squares will also be considered, as long
     // the square is in the attacker's mobility area.
     unsafeChecks &= ei->mobilityArea[Them];
-    pinned = blockers_for_king(pos, Us) & pieces_c(Us);
 
     kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                  + 102 * ei->kingAttacksCount[Them]
                  + 191 * popcount(ei->kingRing[Us] & weak)
-                 + 143 * popcount(pinned | unsafeChecks)
+                 + 143 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
                  - 848 * !pieces_cp(Them, QUEEN)
                  -   9 * mg_value(score) / 8
                  + 40;
