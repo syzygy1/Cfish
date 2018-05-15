@@ -243,7 +243,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss-1)->statScore < 22500
       && eval >= beta
       && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
-      && !ss->excludedMove
+      && !excludedMove
       && pos_non_pawn_material(pos_stm())
       && (ss->ply >= pos->nmp_ply || ss->ply % 2 != pos->nmp_odd))
   {
@@ -697,7 +697,7 @@ moves_loop: // When in check search starts from here.
                       -stat_bonus(depth + ONE_PLY));
   }
   // Bonus for prior countermove that caused the fail low.
-  else if (    depth >= 3 * ONE_PLY
+  else if (   (depth >= 3 * ONE_PLY || PvNode)
            && !captured_piece()
            && move_is_ok((ss-1)->currentMove))
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
