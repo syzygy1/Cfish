@@ -95,7 +95,7 @@ static int probe_wdl_table(Pos *pos, int *success)
   size_t idx;
   int i;
   uint8_t res;
-  int p[TBPIECES];
+  int p[TB_PIECES];
 
   // Obtain the position's material signature key.
   Key key = pos_material_key();
@@ -174,7 +174,7 @@ static int probe_wdl_table(Pos *pos, int *success)
     for (; i < entry->num;) {
       bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
-        assume(i < TBPIECES); // Suppress a bogus warning.
+        assume(i < TB_PIECES); // Suppress a bogus warning.
         p[i++] = pop_lsb(&bb) ^ mirror;
       } while (bb);
     }
@@ -192,7 +192,7 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
   size_t idx;
   int i;
   int res;
-  int p[TBPIECES];
+  int p[TB_PIECES];
 
   // Obtain the position's material signature key.
   Key key = pos_material_key();
@@ -280,7 +280,7 @@ static int probe_dtm_table(Pos *pos, int won, int *success)
     for (; i < entry->num;) {
       bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
-        assume(i < TBPIECES); // Suppress a bogus warning.
+        assume(i < TB_PIECES); // Suppress a bogus warning.
         p[i++] = pop_lsb(&bb) ^ mirror;
       } while (bb);
     }
@@ -302,7 +302,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
   size_t idx;
   int i;
   uint32_t res;
-  int p[TBPIECES];
+  int p[TB_PIECES];
 
   // Obtain the position's material signature key.
   Key key = pos_material_key();
@@ -400,7 +400,7 @@ static int probe_dtz_table(Pos *pos, int wdl, int *success)
     for (; i < entry->num;) {
       bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
       do {
-        assume(i < TBPIECES); // Suppress a bogus warning.
+        assume(i < TB_PIECES); // Suppress a bogus warning.
         p[i++] = pop_lsb(&bb) ^ mirror;
       } while (bb);
     }

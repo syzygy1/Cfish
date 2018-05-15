@@ -23,14 +23,16 @@
 #define BSWAP64(v) _byteswap_uint64(v)
 #endif
 
-#define WDLSUFFIX ".rtbw"
-#define DTZSUFFIX ".rtbz"
-#define DTMSUFFIX ".rtbm"
-#define TBPIECES 7
+#define TB_PIECES 7
+
+#define WDL_SUFFIX ".rtbw"
+#define DTZ_SUFFIX ".rtbz"
+#define DTM_SUFFIX ".rtbm"
 
 const uint32_t WDL_MAGIC = 0x5d23e871;
 const uint32_t DTZ_MAGIC = 0xa50c66d7;
 const uint32_t DTM_MAGIC = 0x88ac504b;
+
 
 #define TBHASHBITS 10
 
@@ -43,6 +45,10 @@ typedef HANDLE map_t;
 #else
 typedef size_t map_t;
 #endif
+
+enum { WDL, DTM, DTZ };
+
+enum { PIECE_ENC, FILE_ENC, RANK_ENC };
 
 struct PairsData {
   uint8_t *indextable;
@@ -58,161 +64,60 @@ struct PairsData {
   base_t base[]; // must be base[1] in C++
 };
 
-struct TBEntry {
-  uint8_t *data;
-  Key key;
-  map_t mapping;
-  atomic_bool ready;
-  uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-}
-#ifndef _WIN32
-__attribute__((__may_alias__))
-#endif
-;
-
-struct TBEntry_piece {
-  uint8_t *data;
-  Key key;
-  map_t mapping;
-  atomic_bool ready;
-  uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-  bool kk_enc;
-  struct PairsData *precomp[2];
-  size_t factor[2][TBPIECES];
-  uint8_t pieces[2][TBPIECES];
-  uint8_t norm[2][TBPIECES];
-};
-
-struct TBEntry_pawn {
-  uint8_t *data;
-  Key key;
-  map_t mapping;
-  atomic_bool ready;
-  uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-  uint8_t pawns[2];
-  struct {
-    struct PairsData *precomp[2];
-    size_t factor[2][TBPIECES];
-    uint8_t pieces[2][TBPIECES];
-    uint8_t norm[2][TBPIECES];
-  } file[4];
-};
-
-struct TBEntry_pawn2 {
-  uint8_t *data;
-  Key key;
-  map_t mapping;
-  atomic_bool ready;
-  uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-  uint8_t pawns[2];
-  struct {
-    struct PairsData *precomp[2];
-    size_t factor[2][TBPIECES];
-    uint8_t pieces[2][TBPIECES];
-    uint8_t norm[2][TBPIECES];
-  } rank[6];
-};
-
-struct DTZEntry_piece {
-  uint8_t *data;
-  Key key;
-  map_t mapping;
-  atomic_bool ready;
-  uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-  bool kk_enc;
+struct EncInfo {
   struct PairsData *precomp;
-  size_t factor[TBPIECES];
-  uint8_t pieces[TBPIECES];
-  uint8_t norm[TBPIECES];
-  uint8_t flags; // accurate, mapped, side
-  uint16_t map_idx[4];
-  uint8_t *map;
+  uint32_t factor[TB_PIECES];
+  uint8_t pieces[TB_PIECES];
+  uint8_t norm[TB_PIECES];
 };
 
-struct DTZEntry_pawn {
-  uint8_t *data;
+struct BaseEntry {
   Key key;
-  map_t mapping;
-  atomic_bool ready;
+  uint8_t *data[3];
+  map_t mapping[3];
+  atomic_bool ready[3];
   uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-  uint8_t pawns[2];
+  bool symmetric, has_pawns, has_dtm, has_dtz;
+  union {
+    bool kk_enc;
+    uint8_t pawns[2];
+  };
+  bool dtm_loss_only;
+};
+
+struct PieceEntry {
+  struct BaseEntry be;
   struct {
-    struct PairsData *precomp;
-    size_t factor[TBPIECES];
-    uint8_t pieces[TBPIECES];
-    uint8_t norm[TBPIECES];
-  } file[4];
-  uint8_t flags[4];
-  uint16_t map_idx[4][4];
-  uint8_t *map;
-};
-
-struct DTMEntry_piece {
-  uint8_t *data;
-  Key key;
-  map_t mapping;
-  atomic_bool ready;
-  uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-  bool kk_enc;
-  struct PairsData *precomp[2];
-  size_t factor[2][TBPIECES];
-  uint8_t pieces[2][TBPIECES];
-  uint8_t norm[2][TBPIECES];
-  uint16_t map_idx[2][2];
-  uint16_t *map;
-};
-
-struct DTMEntry_pawn {
-  uint8_t *data;
-  Key key;
-  map_t mapping;
-  atomic_bool ready;
-  uint8_t num;
-  bool symmetric;
-  bool has_pawns;
-  bool loss_only;
-  uint8_t pawns[2];
+    uint16_t *map;
+    uint16_t map_idx[2][2];
+  } dtm;
   struct {
-    struct PairsData *precomp[2];
-    size_t factor[2][TBPIECES];
-    uint8_t pieces[2][TBPIECES];
-    uint8_t norm[2][TBPIECES];
-  } rank[6];
-  uint16_t map_idx[6][2][2];
-  uint16_t *map;
+    void *map;
+    uint16_t map_idx[4];
+    uint8_t flags;
+  } dtz;
+  struct EncInfo ei[5]; // 2 + 2 + 1
+};
+
+struct PawnEntry {
+  struct BaseEntry be;
+  struct EncInfo ei[24]; // 4 * 2 + 6 * 2 + 4
+  struct {
+    uint16_t *map;
+    uint16_t map_idx[6][2][2];
+  } dtm;
+  struct {
+    void *map;
+    uint16_t map_idx[4][4];
+    uint8_t flags[4];
+  } dtz;
+  uint8_t dtz_flags[4];
+  bool dtm_switched;
 };
 
 struct TBHashEntry {
   Key key;
-  struct TBEntry *ptr;
-  struct TBEntry *dtm_ptr;
-};
-
-struct DTZTableEntry {
-  Key key1;
-  Key key2;
-  struct TBEntry *entry;
+  struct BaseEntry *ptr;
 };
 
 #endif
