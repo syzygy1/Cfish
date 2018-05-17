@@ -25,10 +25,10 @@ extern int TB_CardinalityDTM;
 
 // Given a position with 6 or fewer pieces, produce a text string
 // of the form KQPvKRP, where "KQP" represents the white pieces if
-// mirror == 0 and the black pieces if mirror == 1.
-static void prt_str(Pos *pos, char *str, int mirror)
+// flip == 0 and the black pieces if flip == 1.
+static void prt_str(Pos *pos, char *str, int flip)
 {
-  int color = !mirror ? WHITE : BLACK;
+  int color = !flip ? WHITE : BLACK;
 
   for (int pt = KING; pt >= PAWN; pt--)
     for (int i = popcount(pieces_cp(color, pt)); i > 0; i--)
@@ -41,31 +41,15 @@ static void prt_str(Pos *pos, char *str, int mirror)
   *str++ = 0;
 }
 
-// Given a position, produce a 64-bit material signature key.
-// If the engine supports such a key, it should equal the engine's key.
-static Key calc_key(Pos *pos, int mirror)
-{
-  Key key = 0;
-
-  int color = !mirror ? WHITE : BLACK;
-  for (int pt = PAWN; pt <= KING; pt++)
-    key += mat_key[pt] * popcount(pieces_cp(color, pt));
-  color ^= 1;
-  for (int pt = PAWN; pt <= KING; pt++)
-    key += mat_key[pt + 8] * popcount(pieces_cp(color, pt));
-
-  return key;
-}
-
 // Produce a 64-bit material key corresponding to the material combination
-// defined by pcs[16], where pcs[1], ..., pcs[6] is the number of white
-// pawns, ..., kings and pcs[9], ..., pcs[14] is the number of black
+// defined by pcs[16], where pcs[1], ..., pcs[6] are the number of white
+// pawns, ..., kings and pcs[9], ..., pcs[14] are the number of black
 // pawns, ..., kings.
-static Key calc_key_from_pcs(int *pcs, int mirror)
+static Key calc_key_from_pcs(int *pcs, int flip)
 {
   Key key = 0;
 
-  int color = !mirror ? 0 : 8;
+  int color = !flip ? 0 : 8;
   for (int i = W_PAWN; i <= B_KING; i++)
     key += mat_key[i] * pcs[i ^ color];
 
@@ -75,351 +59,166 @@ static Key calc_key_from_pcs(int *pcs, int mirror)
 // Produce a 64-bit material key corresponding to the material combination
 // piece[0], ..., piece[num - 1], where each value corresponds to a piece
 // (1-6 for white pawn-king, 9-14 for black pawn-king).
-static Key calc_key_from_pieces(uint8_t *piece, int num, int mirror)
+static Key calc_key_from_pieces(uint8_t *piece, int num)
 {
   Key key = 0;
 
-  int color = !mirror ? 0 : 8;
   for (int i = 0; i < num; i++)
     if (piece[i])
-      key += mat_key[piece[i] ^ color];
+      key += mat_key[piece[i]];
 
   return key;
 }
 
-// probe_wdl_table and probe_dtz_table require similar adaptations.
-static int probe_wdl_table(Pos *pos, int *success)
+// p[i] is to contain the square 0-63 (A1-H8) for a piece of type
+// pc[i] ^ flip, where 1 = white pawn, ..., 14 = black king and pc ^ flip
+// flips between white and black if flip == true.
+// Pieces of the same type are guaranteed to be consecutive.
+INLINE void fill_squares(Pos *pos, uint8_t *pc, int num, bool flip, int *p)
 {
-  struct TBEntry *ptr;
-  struct TBHashEntry *ptr2;
-  size_t idx;
-  int i;
-  uint8_t res;
-  int p[TB_PIECES];
-
-  // Obtain the position's material signature key.
+  for (int i = 0; i < num;) {
+    Bitboard bb = pieces_cp((pc[i] >> 3) ^ flip, pc[i] & 0x07);
+    do {
+      p[i++] = pop_lsb(&bb);
+    } while (bb);
+  }
+}
+ 
+INLINE int probe_table(Pos *pos, int s, int *success, const int type)
+{
+  // Obtain the position's material-signature key
   Key key = pos_material_key();
 
-  // Test for KvK.
-  if (key == 2ULL)
+  // Test for KvK
+  if (type == WDL && key == 2ULL)
     return 0;
 
-  ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
+  struct TBHashEntry *ptr = TB_hash[key >> (64 - TBHASHBITS)];
+  int i;
   for (i = 0; i < HSHMAX; i++)
-    if (ptr2[i].key == key) break;
+    if (ptr[i].key == key) break;
   if (i == HSHMAX) {
     *success = 0;
     return 0;
   }
 
-  ptr = ptr2[i].ptr;
-  // With the help of C11 atomics, we implement double-checked locking
-  // correctly.
-  if (!atomic_load_explicit(&ptr->ready, memory_order_acquire)) {
+  struct BaseEntry *be = ptr[i].ptr;
+  if ((type == DTM && !be->has_dtm) || (type == DTZ && !be->has_dtz)) {
+    *success = 0;
+    return 0;
+  }
+
+  // Use double-checked locking to reduce locking overhead
+  if (!atomic_load_explicit(&be->ready[type], memory_order_acquire)) {
     LOCK(TB_mutex);
-    if (!atomic_load_explicit(&ptr->ready, memory_order_relaxed)) {
+    if (!atomic_load_explicit(&be->ready[type], memory_order_relaxed)) {
       char str[16];
-      prt_str(pos, str, ptr->key != key);
-      if (!init_table(ptr, str, 0)) {
-        ptr2[i].key = 0ULL;
+      prt_str(pos, str, be->key != key);
+      if (!init_table(be, str, type)) {
+        ptr[i].key = 0ULL;
         *success = 0;
         UNLOCK(TB_mutex);
         return 0;
       }
-      atomic_store_explicit(&ptr->ready, true, memory_order_release);
+      atomic_store_explicit(&be->ready[type], true, memory_order_release);
     }
     UNLOCK(TB_mutex);
   }
 
-  int bside, mirror, cmirror;
-  if (!ptr->symmetric) {
-    if (key != ptr->key) {
-      cmirror = 8;
-      mirror = 0x38;
-      bside = (pos_stm() == WHITE);
-    } else {
-      cmirror = mirror = 0;
-      bside = !(pos_stm() == WHITE);
+  bool bside, flip;
+  if (!be->symmetric) {
+    flip = key != be->key;
+    bside = (pos_stm() == WHITE) == flip;
+    if (type == DTM && be->has_pawns && PAWN(be)->dtm_switched) {
+      flip = !flip;
+      bside = !bside;
     }
   } else {
-    cmirror = pos_stm() == WHITE ? 0 : 8;
-    mirror = pos_stm() == WHITE ? 0 : 0x38;
-    bside = 0;
+    flip = pos_stm() != WHITE;
+    bside = false;
   }
 
-  // p[i] is to contain the square 0-63 (A1-H8) for a piece of type
-  // pc[i] ^ cmirror, where 1 = white pawn, ..., 14 = black king.
-  // Pieces of the same type are guaranteed to be consecutive.
-  if (!ptr->has_pawns) {
-    struct TBEntry_piece *entry = (struct TBEntry_piece *)ptr;
-    uint8_t *pc = entry->pieces[bside];
-    for (i = 0; i < entry->num;) {
-      Bitboard bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
-      do {
-        p[i++] = pop_lsb(&bb);
-      } while (bb);
+  struct EncInfo *ei = first_ei(be, type);
+  int p[TB_PIECES];
+  size_t idx;
+  int t = 0;
+  uint8_t flags;
+
+  if (!be->has_pawns) {
+    if (type == DTZ) {
+      flags = PIECE(be)->dtz_flags;
+      if ((flags & 1) != bside && !be->symmetric) {
+        *success = -1;
+        return 0;
+      }
     }
-    idx = encode_piece(entry, entry->norm[bside], p, entry->factor[bside]);
-    res = *decompress_pairs(entry->precomp[bside], idx);
+    ei = type != DTZ ? &ei[bside] : ei;
+    fill_squares(pos, ei->pieces, be->num, flip, p);
+    idx = encode_piece(p, ei, be);
   } else {
-    struct TBEntry_pawn *entry = (struct TBEntry_pawn *)ptr;
-    int k = entry->file[0].pieces[0][0] ^ cmirror;
-    Bitboard bb = pieces_cp(k >> 3, k & 0x07);
-    i = 0;
-    do {
-      p[i++] = pop_lsb(&bb) ^ mirror;
-    } while (bb);
-    int f = pawn_file(entry, p);
-    uint8_t *pc = entry->file[f].pieces[bside];
-    for (; i < entry->num;) {
-      bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
-      do {
-        assume(i < TB_PIECES); // Suppress a bogus warning.
-        p[i++] = pop_lsb(&bb) ^ mirror;
-      } while (bb);
+    int color = ei->pieces[0] >> 3;
+    Bitboard bb = pieces_cp(color ^ flip, PAWN);
+    t = type != DTM ? leading_pawn_file(bb) : leading_pawn_rank(bb, flip);
+    if (type == DTZ) {
+      flags = PAWN(be)->dtz_flags[t];
+      if ((flags & 1) != bside) {
+        *success = -1;
+        return 0;
+      }
     }
-    idx = encode_pawn(entry, entry->file[f].norm[bside], p, entry->file[f].factor[bside]);
-    res = *decompress_pairs(entry->file[f].precomp[bside], idx);
+    ei =  type == WDL ? &ei[t + 4 * bside]
+        : type == DTM ? &ei[t + 6 * bside] : &ei[t];
+    fill_squares(pos, ei->pieces, be->num, flip, p);
+    if (flip)
+      for (i = 0; i < be->num; i++)
+        p[i] ^= 0x38;
+    idx = type != DTM ? encode_pawn(p, ei, be) : encode_pawn2(p, ei, be);
   }
 
-  return res - 2;
+  uint8_t *w = decompress_pairs(ei->precomp, idx);
+
+  if (type == WDL)
+    return (int)w[0] - 2;
+
+  int res = w[0] + ((w[1] & 0x0f) << 8);
+
+  if (type == DTM) {
+    if (!be->dtm_loss_only)
+      res = !be->has_pawns
+           ? PIECE(be)->dtm_map[PIECE(be)->dtm_map_idx[bside][s] + res]
+           : PAWN(be)->dtm_map[PAWN(be)->dtm_map_idx[t][bside][s] + res];
+  } else {
+    if (flags & 2) {
+      int m = wdl_to_map[s + 2];
+      if (!(flags & 16))
+        res = !be->has_pawns
+             ? ((uint8_t *)PIECE(be)->dtz_map)[PIECE(be)->dtz_map_idx[m] + res]
+             : ((uint8_t *)PAWN(be)->dtz_map)[PAWN(be)->dtz_map_idx[t][m] + res];
+      else
+        res = !be->has_pawns
+             ? ((uint16_t *)PIECE(be)->dtz_map)[PIECE(be)->dtz_map_idx[m] + res]
+             : ((uint16_t *)PAWN(be)->dtz_map)[PAWN(be)->dtz_map_idx[t][m] + res];
+    }
+    if (!(flags & pa_flags[s + 2]) || (s & 1))
+      res *= 2;
+  }
+
+  return res;
+}
+
+static int probe_wdl_table(Pos *pos, int *success)
+{
+  return probe_table(pos, 0, success, WDL);
 }
 
 static int probe_dtm_table(Pos *pos, int won, int *success)
 {
-  struct TBEntry *ptr;
-  struct TBHashEntry *ptr2;
-  size_t idx;
-  int i;
-  int res;
-  int p[TB_PIECES];
-
-  // Obtain the position's material signature key.
-  Key key = pos_material_key();
-
-  // Test for KvK.
-  if (key == 2ULL)
-    return 0;
-
-  ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
-  for (i = 0; i < HSHMAX; i++)
-    if (ptr2[i].key == key) break;
-  if (i == HSHMAX) {
-    *success = 0;
-    return 0;
-  }
-
-  ptr = ptr2[i].dtm_ptr;
-  if (!ptr) {
-    *success = 0;
-    return 0;
-  }
-
-  // With the help of C11 atomics, we implement double-checked locking
-  // correctly.
-  if (!atomic_load_explicit(&ptr->ready, memory_order_acquire)) {
-    LOCK(TB_mutex);
-    if (!atomic_load_explicit(&ptr->ready, memory_order_relaxed)) {
-      char str[16];
-      prt_str(pos, str, ptr->key != key);
-      if (!init_table(ptr, str, 1)) {
-        ptr->data = NULL;
-        ptr2[i].dtm_ptr = NULL;
-        *success = 0;
-        UNLOCK(TB_mutex);
-        return 0;
-      }
-      atomic_store_explicit(&ptr->ready, true, memory_order_release);
-    }
-    UNLOCK(TB_mutex);
-  }
-
-  int bside, mirror, cmirror;
-  if (!ptr->symmetric) {
-    if (key != ptr->key) {
-      cmirror = 8;
-      mirror = 0x38;
-      bside = (pos_stm() == WHITE);
-    } else {
-      cmirror = mirror = 0;
-      bside = !(pos_stm() == WHITE);
-    }
-  } else {
-    cmirror = pos_stm() == WHITE ? 0 : 8;
-    mirror = pos_stm() == WHITE ? 0 : 0x38;
-    bside = 0;
-  }
-
-  // p[i] is to contain the square 0-63 (A1-H8) for a piece of type
-  // pc[i] ^ cmirror, where 1 = white pawn, ..., 14 = black king.
-  // Pieces of the same type are guaranteed to be consecutive.
-  if (!ptr->has_pawns) {
-    struct DTMEntry_piece *entry = (struct DTMEntry_piece *)ptr;
-    uint8_t *pc = entry->pieces[bside];
-    for (i = 0; i < entry->num;) {
-      Bitboard bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
-      do {
-        p[i++] = pop_lsb(&bb);
-      } while (bb);
-    }
-    idx = encode_piece((struct TBEntry_piece *)entry, entry->norm[bside], p, entry->factor[bside]);
-    uint8_t *w = decompress_pairs(entry->precomp[bside], idx);
-    res = ((w[1] & 0x0f) << 8) | w[0];
-    if (!entry->loss_only)
-      res = entry->map[entry->map_idx[bside][won] + res];
-  } else {
-    struct DTMEntry_pawn *entry = (struct DTMEntry_pawn *)ptr;
-    int k = entry->rank[0].pieces[0][0] ^ cmirror;
-    Bitboard bb = pieces_cp(k >> 3, k & 0x07);
-    i = 0;
-    do {
-      p[i++] = pop_lsb(&bb) ^ mirror;
-    } while (bb);
-    int r = pawn_rank((struct TBEntry_pawn2 *)entry, p);
-    uint8_t *pc = entry->rank[r].pieces[bside];
-    for (; i < entry->num;) {
-      bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
-      do {
-        assume(i < TB_PIECES); // Suppress a bogus warning.
-        p[i++] = pop_lsb(&bb) ^ mirror;
-      } while (bb);
-    }
-    idx = encode_pawn2((struct TBEntry_pawn2 *)entry, entry->rank[r].norm[bside], p, entry->rank[r].factor[bside]);
-    uint8_t *w = decompress_pairs(entry->rank[r].precomp[bside], idx);
-    res = ((w[1] & 0x0f) << 8) | w[0];
-    if (!entry->loss_only)
-      res = entry->map[entry->map_idx[r][bside][won] + res];
-  }
-
-  return res;
+  return probe_table(pos, won, success, DTM);
 }
 
-// The value of wdl MUST correspond to the WDL value of the position without
-// en passant rights.
 static int probe_dtz_table(Pos *pos, int wdl, int *success)
 {
-  struct TBEntry *ptr;
-  size_t idx;
-  int i;
-  uint32_t res;
-  int p[TB_PIECES];
-
-  // Obtain the position's material signature key.
-  Key key = pos_material_key();
-
-  if (DTZ_table[0].key1 != key && DTZ_table[0].key2 != key) {
-    for (i = 1; i < DTZ_ENTRIES; i++)
-      if (DTZ_table[i].key1 == key || DTZ_table[i].key2 == key) break;
-    if (i < DTZ_ENTRIES) {
-      struct DTZTableEntry table_entry = DTZ_table[i];
-      for (; i > 0; i--)
-        DTZ_table[i] = DTZ_table[i - 1];
-      DTZ_table[0] = table_entry;
-    } else {
-      struct TBHashEntry *ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
-      for (i = 0; i < HSHMAX; i++)
-        if (ptr2[i].key == key) break;
-      if (i == HSHMAX) {
-        *success = 0;
-        return 0;
-      }
-      ptr = ptr2[i].ptr;
-      char str[16];
-      int mirror = (ptr->key != key);
-      prt_str(pos, str, mirror);
-      if (DTZ_table[DTZ_ENTRIES - 1].entry)
-        free_dtz_entry(DTZ_table[DTZ_ENTRIES-1].entry);
-      for (i = DTZ_ENTRIES - 1; i > 0; i--)
-        DTZ_table[i] = DTZ_table[i - 1];
-      load_dtz_table(str, calc_key(pos, mirror), calc_key(pos, !mirror));
-    }
-  }
-
-  ptr = DTZ_table[0].entry;
-  if (!ptr) {
-    *success = 0;
-    return 0;
-  }
-
-  int bside, mirror, cmirror;
-  if (!ptr->symmetric) {
-    if (key != ptr->key) {
-      cmirror = 8;
-      mirror = 0x38;
-      bside = (pos_stm() == WHITE);
-    } else {
-      cmirror = mirror = 0;
-      bside = !(pos_stm() == WHITE);
-    }
-  } else {
-    cmirror = pos_stm() == WHITE ? 0 : 8;
-    mirror = pos_stm() == WHITE ? 0 : 0x38;
-    bside = 0;
-  }
-
-  if (!ptr->has_pawns) {
-    struct DTZEntry_piece *entry = (struct DTZEntry_piece *)ptr;
-    if ((entry->flags & 1) != bside && !entry->symmetric) {
-      *success = -1;
-      return 0;
-    }
-    uint8_t *pc = entry->pieces;
-    for (i = 0; i < entry->num;) {
-      Bitboard bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
-      do {
-        p[i++] = pop_lsb(&bb);
-      } while (bb);
-    }
-    idx = encode_piece((struct TBEntry_piece *)entry, entry->norm, p, entry->factor);
-    uint8_t *w = decompress_pairs(entry->precomp, idx);
-    res = ((w[1] & 0x0f) << 8) | w[0];
-
-    if (entry->flags & 2) {
-      if (!(entry->flags & 16))
-        res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
-      else
-        res = ((uint16_t *)entry->map)[entry->map_idx[wdl_to_map[wdl + 2]] + res];
-    }
-
-    if (!(entry->flags & pa_flags[wdl + 2]) || (wdl & 1))
-      res *= 2;
-  } else {
-    struct DTZEntry_pawn *entry = (struct DTZEntry_pawn *)ptr;
-    int k = entry->file[0].pieces[0] ^ cmirror;
-    Bitboard bb = pieces_cp(k >> 3, k & 0x07);
-    i = 0;
-    do {
-      p[i++] = pop_lsb(&bb) ^ mirror;
-    } while (bb);
-    int f = pawn_file((struct TBEntry_pawn *)entry, p);
-    if ((entry->flags[f] & 1) != bside) {
-      *success = -1;
-      return 0;
-    }
-    uint8_t *pc = entry->file[f].pieces;
-    for (; i < entry->num;) {
-      bb = pieces_cp((pc[i] ^ cmirror) >> 3, pc[i] & 0x07);
-      do {
-        assume(i < TB_PIECES); // Suppress a bogus warning.
-        p[i++] = pop_lsb(&bb) ^ mirror;
-      } while (bb);
-    }
-    idx = encode_pawn((struct TBEntry_pawn *)entry, entry->file[f].norm, p, entry->file[f].factor);
-    uint8_t *w = decompress_pairs(entry->file[f].precomp, idx);
-    res = ((w[1] & 0x0f) << 8) | w[0];
-
-    if (entry->flags[f] & 2) {
-      if (!(entry->flags[f] & 16))
-        res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
-      else
-        res = ((uint16_t *)entry->map)[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
-    }
-
-    if (!(entry->flags[f] & pa_flags[wdl + 2]) || (wdl & 1))
-      res *= 2;
-  }
-
-  return res;
+  return probe_table(pos, wdl, success, DTZ);
 }
 
 // Add underpromotion captures to list of captures.

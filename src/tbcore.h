@@ -87,30 +87,21 @@ struct BaseEntry {
 
 struct PieceEntry {
   struct BaseEntry be;
-  struct {
-    uint16_t *map;
-    uint16_t map_idx[2][2];
-  } dtm;
-  struct {
-    void *map;
-    uint16_t map_idx[4];
-    uint8_t flags;
-  } dtz;
   struct EncInfo ei[5]; // 2 + 2 + 1
+  uint16_t *dtm_map;
+  uint16_t dtm_map_idx[2][2];
+  void *dtz_map;
+  uint16_t dtz_map_idx[4];
+  uint8_t dtz_flags;
 };
 
 struct PawnEntry {
   struct BaseEntry be;
   struct EncInfo ei[24]; // 4 * 2 + 6 * 2 + 4
-  struct {
-    uint16_t *map;
-    uint16_t map_idx[6][2][2];
-  } dtm;
-  struct {
-    void *map;
-    uint16_t map_idx[4][4];
-    uint8_t flags[4];
-  } dtz;
+  uint16_t *dtm_map;
+  uint16_t dtm_map_idx[6][2][2];
+  void *dtz_map;
+  uint16_t dtz_map_idx[4][4];
   uint8_t dtz_flags[4];
   bool dtm_switched;
 };

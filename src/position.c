@@ -137,7 +137,7 @@ void print_pos(Pos *pos)
     int wdl = TB_probe_wdl(pos, &s1);
     int dtz = TB_probe_dtz(pos, &s2);
     printf("\nTablebases WDL: %4d (%d)\nTablebases DTZ: %4d (%d)", wdl, s1, dtz, s2);
-    if (s1) {
+    if (s1 && wdl != 0) {
       Value dtm = TB_probe_dtm(pos, wdl, &s1);
       printf("\nTablebases DTM: %s (%d)", uci_value(buf, dtm), s1);
     }
