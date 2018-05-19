@@ -35,7 +35,7 @@
 extern void benchmark(Pos *pos, char *str);
 
 // FEN string of the initial position, normal chess
-const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const char StartFEN[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 // position() is called when the engine receives the "position" UCI
 // command. The function sets up the position described in the given FEN

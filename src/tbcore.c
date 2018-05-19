@@ -31,6 +31,8 @@ static char **paths = NULL;
 
 static int TBnum_piece, TBnum_pawn;
 static int num_wdl, num_dtm, num_dtz;
+
+// TODO: allocate new pieceEntry[] stuff for
 static struct PieceEntry pieceEntry[TBMAX_PIECE];
 static struct PawnEntry pawnEntry[TBMAX_PAWN];
 
@@ -101,7 +103,7 @@ static void add_to_hash(void *ptr, Key key)
   }
 }
 
-static char pchr[] = {'K', 'Q', 'R', 'B', 'N', 'P'};
+#define pchr(i) PieceToChar[QUEEN - (i)]
 
 static void init_tb(char *str)
 {
@@ -113,29 +115,14 @@ static void init_tb(char *str)
     pcs[i] = 0;
   int color = 0;
   for (char *s = str; *s; s++)
-    switch (*s) {
-    case 'P':
-      pcs[PAWN | color]++;
-      break;
-    case 'N':
-      pcs[KNIGHT | color]++;
-      break;
-    case 'B':
-      pcs[BISHOP | color]++;
-      break;
-    case 'R':
-      pcs[ROOK | color]++;
-      break;
-    case 'Q':
-      pcs[QUEEN | color]++;
-      break;
-    case 'K':
-      pcs[KING | color]++;
-      break;
-    case 'v':
+    if (*s == 'v')
       color = 0x08;
-      break;
-    }
+    else
+      for (int i = PAWN; i <= KING; i++)
+        if (*s == PieceToChar[i]) {
+          pcs[i | color]++;
+          break;
+        }
 
   bool has_pawns = pcs[W_PAWN] || pcs[B_PAWN];
 
@@ -266,34 +253,34 @@ void TB_init(char *path)
   char str[16];
   int i, j, k, l, m;
 
-  for (i = 1; i < 6; i++) {
-    sprintf(str, "K%cvK", pchr[i]);
+  for (i = 0; i < 5; i++) {
+    sprintf(str, "K%cvK", pchr(i));
     init_tb(str);
   }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++) {
-      sprintf(str, "K%cvK%c", pchr[i], pchr[j]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++) {
+      sprintf(str, "K%cvK%c", pchr(i), pchr(j));
       init_tb(str);
     }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++) {
-      sprintf(str, "K%c%cvK", pchr[i], pchr[j]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++) {
+      sprintf(str, "K%c%cvK", pchr(i), pchr(j));
       init_tb(str);
     }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = 1; k < 6; k++) {
-        sprintf(str, "K%c%cvK%c", pchr[i], pchr[j], pchr[k]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = 0; k < 5; k++) {
+        sprintf(str, "K%c%cvK%c", pchr(i), pchr(j), pchr(k));
         init_tb(str);
       }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++) {
-        sprintf(str, "K%c%c%cvK", pchr[i], pchr[j], pchr[k]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = j; k < 5; k++) {
+        sprintf(str, "K%c%c%cvK", pchr(i), pchr(j), pchr(k));
         init_tb(str);
       }
 
@@ -301,54 +288,54 @@ void TB_init(char *path)
   if (sizeof(size_t) < 8)
     goto finished;
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = i; k < 6; k++)
-        for (l = (i == k) ? j : k; l < 6; l++) {
-          sprintf(str, "K%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = i; k < 5; k++)
+        for (l = (i == k) ? j : k; l < 5; l++) {
+          sprintf(str, "K%c%cvK%c%c", pchr(i), pchr(j), pchr(k), pchr(l));
           init_tb(str);
         }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = 1; l < 6; l++) {
-          sprintf(str, "K%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = j; k < 5; k++)
+        for (l = 0; l < 5; l++) {
+          sprintf(str, "K%c%c%cvK%c", pchr(i), pchr(j), pchr(k), pchr(l));
           init_tb(str);
         }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = k; l < 6; l++) {
-          sprintf(str, "K%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = j; k < 5; k++)
+        for (l = k; l < 5; l++) {
+          sprintf(str, "K%c%c%c%cvK", pchr(i), pchr(j), pchr(k), pchr(l));
           init_tb(str);
         }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = k; l < 6; l++)
-          for (m = l; m < 6; m++) {
-            sprintf(str, "K%c%c%c%c%cvK", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = j; k < 5; k++)
+        for (l = k; l < 5; l++)
+          for (m = l; m < 5; m++) {
+            sprintf(str, "K%c%c%c%c%cvK", pchr(i), pchr(j), pchr(k), pchr(l), pchr(m));
             init_tb(str);
           }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = k; l < 6; l++)
-          for (m = 1; m < 6; m++) {
-            sprintf(str, "K%c%c%c%cvK%c", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = j; k < 5; k++)
+        for (l = k; l < 5; l++)
+          for (m = 0; m < 5; m++) {
+            sprintf(str, "K%c%c%c%cvK%c", pchr(i), pchr(j), pchr(k), pchr(l), pchr(m));
             init_tb(str);
           }
 
-  for (i = 1; i < 6; i++)
-    for (j = i; j < 6; j++)
-      for (k = j; k < 6; k++)
-        for (l = 1; l < 6; l++)
-          for (m = l; m < 6; m++) {
-            sprintf(str, "K%c%c%cvK%c%c", pchr[i], pchr[j], pchr[k], pchr[l], pchr[m]);
+  for (i = 0; i < 5; i++)
+    for (j = i; j < 5; j++)
+      for (k = j; k < 5; k++)
+        for (l = 0; l < 5; l++)
+          for (m = l; m < 5; m++) {
+            sprintf(str, "K%c%c%cvK%c%c", pchr(i), pchr(j), pchr(k), pchr(l), pchr(m));
             init_tb(str);
           }
 
@@ -449,22 +436,6 @@ static const uint8_t ptwist[2][64] = {
     15, 13, 11,  9,  8, 10, 12, 14,
      7,  5,  3,  1,  0,  2,  4,  6,
      0,  0,  0,  0,  0,  0,  0,  0 }
-};
-
-static const uint8_t invflap[] = {
-  8, 16, 24, 32, 40, 48,
-  9, 17, 25, 33, 41, 49,
-  10, 18, 26, 34, 42, 50,
-  11, 19, 27, 35, 43, 51
-};
-
-static const uint8_t invflap2[] = {
-  8, 9, 10, 11,
-  16, 17, 18, 19,
-  24, 25, 26, 27,
-  32, 33, 34, 35,
-  40, 41, 42, 43,
-  48, 49, 50, 51
 };
 
 static const uint8_t file_to_file[] = {
@@ -579,7 +550,7 @@ static void init_indices(void)
     size_t s = 0;
     for (j = 0; j < 24; j++) {
       pawnidx[0][i][j] = s;
-      s += binomial[i][ptwist[0][(1 + (j % 6)) * 8 + (j  /6)]];
+      s += binomial[i][ptwist[0][(1 + (j % 6)) * 8 + (j / 6)]];
       if ((j + 1) % 6 == 0) {
         pfactor_file[i][j / 6] = s;
         s = 0;
@@ -600,17 +571,13 @@ static void init_indices(void)
   }
 }
 
-static int leading_pawn_file(Bitboard pawns)
+INLINE int leading_pawn(int *p, struct BaseEntry *be, const int enc)
 {
-  return  (pawns & (FileABB | FileBBB | FileGBB | FileHBB))
-        ? (pawns & (FileABB | FileHBB)) ? FILE_A : FILE_B
-        : (pawns & (FileCBB | FileFBB)) ? FILE_C : FILE_D;
-}
+  for (int i = 1; i < be->pawns[0]; i++)
+    if (flap[enc-1][p[0]] > flap[enc-1][p[i]])
+      Swap(p[0], p[i]);
 
-static int leading_pawn_rank(Bitboard pawns, bool flip)
-{
-  Bitboard b = flip ? BSWAP64(pawns) : pawns;
-  return (lsb(b) >> 3) - 1;
+  return enc == FILE_ENC ? file_to_file[p[0] & 7] : (p[0] - 8) >> 3;
 }
 
 INLINE size_t encode(int *p, struct EncInfo *ei, struct BaseEntry *be,
@@ -656,7 +623,7 @@ INLINE size_t encode(int *p, struct EncInfo *ei, struct BaseEntry *be,
     }
     idx *= ei->factor[0];
   } else {
-    for (int i = 0; i < be->pawns[0]; i++)
+    for (int i = 1; i < be->pawns[0]; i++)
       for (int j = i + 1; j < be->pawns[0]; j++)
         if (ptwist[enc-1][p[i]] < ptwist[enc-1][p[j]])
           Swap(p[i], p[j]);
@@ -1014,7 +981,7 @@ static bool init_table(struct BaseEntry *be, const char *str, int type)
 
   if (type == DTM && be->has_pawns)
     PAWN(be)->dtm_switched =
-      calc_key_from_pieces(PAWN(be)->ei[0].pieces, be->num) != be->key;
+      calc_key_from_pieces(ei[0].pieces, be->num) != be->key;
 
   return true;
 }
@@ -1034,14 +1001,12 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
   idxOffset = from_le_u16(idxOffset);
   litidx += idxOffset;
 
-  if (litidx < 0) {
-    do {
+  if (litidx < 0)
+    while (litidx < 0)
       litidx += d->sizetable[--block] + 1;
-    } while (litidx < 0);
-  } else {
+  else
     while (litidx > d->sizetable[block])
       litidx -= d->sizetable[block++] + 1;
-  }
 
   uint32_t *ptr = (uint32_t *)(d->data + ((size_t)block << d->blocksize));
 

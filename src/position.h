@@ -32,6 +32,8 @@
 #include "bitboard.h"
 #include "types.h"
 
+extern const char PieceToChar[];
+
 struct Zob {
   Key psq[16][64];
   Key enpassant[8];

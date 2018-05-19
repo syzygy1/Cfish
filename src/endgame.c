@@ -81,8 +81,6 @@ static Square normalize(const Pos *pos, unsigned strongSide, Square sq)
   return sq;
 }
 
-extern char *PieceToChar;
-
 
 // Compute material key from an endgame code string.
 

@@ -45,7 +45,7 @@ Key mat_key[16] = {
   0ULL
 };
 
-const char *PieceToChar = " PNBRQK  pnbrqk";
+const char PieceToChar[] = " PNBRQK  pnbrqk";
 
 int failed_step;
 

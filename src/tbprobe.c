@@ -32,12 +32,12 @@ static void prt_str(Pos *pos, char *str, int flip)
 
   for (int pt = KING; pt >= PAWN; pt--)
     for (int i = popcount(pieces_cp(color, pt)); i > 0; i--)
-      *str++ = pchr[6 - pt];
+      *str++ = PieceToChar[pt];
   *str++ = 'v';
   color ^= 1;
   for (int pt = KING; pt >= PAWN; pt--)
     for (int i = popcount(pieces_cp(color, pt)); i > 0; i--)
-      *str++ = pchr[6 - pt];
+      *str++ = PieceToChar[pt];
   *str++ = 0;
 }
 
@@ -74,14 +74,14 @@ static Key calc_key_from_pieces(uint8_t *piece, int num)
 // pc[i] ^ flip, where 1 = white pawn, ..., 14 = black king and pc ^ flip
 // flips between white and black if flip == true.
 // Pieces of the same type are guaranteed to be consecutive.
-INLINE void fill_squares(Pos *pos, uint8_t *pc, int num, bool flip, int *p)
+INLINE int fill_squares(Pos *pos, uint8_t *pc, bool flip, int mirror, int *p,
+    int i)
 {
-  for (int i = 0; i < num;) {
-    Bitboard bb = pieces_cp((pc[i] >> 3) ^ flip, pc[i] & 0x07);
-    do {
-      p[i++] = pop_lsb(&bb);
-    } while (bb);
-  }
+  Bitboard bb = pieces_cp((pc[i] >> 3) ^ flip, pc[i] & 7);
+  do {
+    p[i++] = pop_lsb(&bb) ^ mirror;
+  } while (bb);
+  return i;
 }
  
 INLINE int probe_table(Pos *pos, int s, int *success, const int type)
@@ -153,25 +153,23 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
       }
     }
     ei = type != DTZ ? &ei[bside] : ei;
-    fill_squares(pos, ei->pieces, be->num, flip, p);
+    for (i = 0; i < be->num;)
+      i = fill_squares(pos, ei->pieces, flip, 0, p, i);
     idx = encode_piece(p, ei, be);
   } else {
-    int color = ei->pieces[0] >> 3;
-    Bitboard bb = pieces_cp(color ^ flip, PAWN);
-    t = type != DTM ? leading_pawn_file(bb) : leading_pawn_rank(bb, flip);
+    i = fill_squares(pos, ei->pieces, flip, flip ? 0x38 : 0, p, 0);
+    t = leading_pawn(p, be, type != DTM ? FILE_ENC : RANK_ENC);
     if (type == DTZ) {
       flags = PAWN(be)->dtz_flags[t];
-      if ((flags & 1) != bside) {
+      if ((flags & 1) != bside && !be->symmetric) {
         *success = -1;
         return 0;
       }
     }
     ei =  type == WDL ? &ei[t + 4 * bside]
         : type == DTM ? &ei[t + 6 * bside] : &ei[t];
-    fill_squares(pos, ei->pieces, be->num, flip, p);
-    if (flip)
-      for (i = 0; i < be->num; i++)
-        p[i] ^= 0x38;
+    while (i < be->num)
+      i = fill_squares(pos, ei->pieces, flip, flip ? 0x38 : 0, p, i);
     idx = type != DTM ? encode_pawn(p, ei, be) : encode_pawn2(p, ei, be);
   }
 

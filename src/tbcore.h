@@ -15,14 +15,6 @@
 #define SEP_CHAR ';'
 #endif
 
-#ifndef _MSC_VER
-#define BSWAP32(v) __builtin_bswap32(v)
-#define BSWAP64(v) __builtin_bswap64(v)
-#else
-#define BSWAP32(v) _byteswap_ulong(v)
-#define BSWAP64(v) _byteswap_uint64(v)
-#endif
-
 #define TB_PIECES 7
 
 #define WDL_SUFFIX ".rtbw"
