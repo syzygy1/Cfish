@@ -37,9 +37,9 @@
 char Version[] = "";
 
 #ifndef _WIN32
-pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t ioMutex = PTHREAD_MUTEX_INITIALIZER;
 #else
-HANDLE io_mutex;
+HANDLE ioMutex;
 #endif
 
 static char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
@@ -138,32 +138,32 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 
 #ifdef _WIN32
 typedef SIZE_T (WINAPI *GLPM)(void);
-size_t large_page_minimum;
+size_t largePageMinimum;
 
-int large_pages_supported(void)
+bool large_pages_supported(void)
 {
-  GLPM imp_GetLargePageMinimum =
+  GLPM impGetLargePageMinimum =
              (GLPM)GetProcAddress(GetModuleHandle("kernel32.dll"),
                                   "GetLargePageMinimum");
-  if (!imp_GetLargePageMinimum)
+  if (!impGetLargePageMinimum)
     return 0;
 
-  if ((large_page_minimum = imp_GetLargePageMinimum()) == 0)
+  if ((largePageMinimum = impGetLargePageMinimum()) == 0)
     return 0;
 
-  LUID priv_luid;
-  if (!LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &priv_luid))
+  LUID privLuid;
+  if (!LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &privLuid))
     return 0;
 
   HANDLE token;
   if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &token))
     return 0;
 
-  TOKEN_PRIVILEGES token_privs;
-  token_privs.PrivilegeCount = 1;
-  token_privs.Privileges[0].Luid = priv_luid;
-  token_privs.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-  if (!AdjustTokenPrivileges(token, FALSE, &token_privs, 0, NULL, NULL))
+  TOKEN_PRIVILEGES tokenPrivs;
+  tokenPrivs.PrivilegeCount = 1;
+  tokenPrivs.Privileges[0].Luid = privLuid;
+  tokenPrivs.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+  if (!AdjustTokenPrivileges(token, FALSE, &tokenPrivs, 0, NULL, NULL))
     return 0;
 
   return 1;
@@ -196,9 +196,9 @@ size_t file_size(FD fd)
   fstat(fd, &statbuf);
   return statbuf.st_size;
 #else
-  DWORD size_low, size_high;
-  size_low = GetFileSize(fd, &size_high);
-  return ((size_t)size_high << 32) | (size_t)size_low;
+  DWORD sizeLow, sizeHigh;
+  size_low = GetFileSize(fd, &sizeHigh);
+  return ((size_t)sizeHigh << 32) | (size_t)sizeLow;
 #endif
 }
 
@@ -212,9 +212,9 @@ void *map_file(FD fd, map_t *map)
 
 #else
 
-  DWORD size_low, size_high;
-  size_low = GetFileSize(fd, &size_high);
-  *map = CreateFileMapping(fd, NULL, PAGE_READONLY, size_high, size_low, NULL);
+  DWORD sizeLow, sizeHigh;
+  sizeLow = GetFileSize(fd, &sizeHigh);
+  *map = CreateFileMapping(fd, NULL, PAGE_READONLY, sizeHigh, sizeLow, NULL);
   if (*map == NULL)
     return NULL;
   return MapViewOfFile(*map, FILE_MAP_READ, 0, 0, 0);

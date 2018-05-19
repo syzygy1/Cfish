@@ -26,7 +26,7 @@ static int check_pos(Pos *pos);
 
 struct Zob zob;
 
-Key mat_key[16] = {
+Key matKey[16] = {
   0ULL,
   0x5ced000000000101ULL,
   0xe173000000001001ULL,
@@ -77,10 +77,10 @@ INLINE void move_piece(Pos *pos, Color c, Piece piece, Square from, Square to)
 {
   // index[from] is not updated and becomes stale. This works as long as
   // index[] is accessed just by known occupied squares.
-  Bitboard from_to_bb = sq_bb(from) ^ sq_bb(to);
-  pos->byTypeBB[0] ^= from_to_bb;
-  pos->byTypeBB[type_of_p(piece)] ^= from_to_bb;
-  pos->byColorBB[c] ^= from_to_bb;
+  Bitboard fromToBB = sq_bb(from) ^ sq_bb(to);
+  pos->byTypeBB[0] ^= fromToBB;
+  pos->byTypeBB[type_of_p(piece)] ^= fromToBB;
+  pos->byColorBB[c] ^= fromToBB;
   pos->board[from] = 0;
   pos->board[to] = piece;
   pos->index[to] = pos->index[from];
@@ -367,7 +367,7 @@ static void set_state(Pos *pos, Stack *st)
 
   for (Color c = 0; c < 2; c++)
     for (PieceType pt = PAWN; pt <= KING; pt++)
-      st->materialKey += piece_count(c, pt) * mat_key[8 * c + pt];
+      st->materialKey += piece_count(c, pt) * matKey[8 * c + pt];
 
   for (Color c = 0; c < 2; c++)
     for (PieceType pt = KNIGHT; pt <= QUEEN; pt++)
@@ -771,7 +771,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
                       & CastlingRightsMask[to];
   key ^= zob.castling[st->castlingRights ^ (st-1)->castlingRights];
 
-  Piece capt_piece = pos->board[to];
+  Piece captPiece = pos->board[to];
   Color us = pos->sideToMove;
 
   // Clear en passant.
@@ -779,7 +779,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   if (unlikely((st-1)->epSquare)) {
     key ^= zob.enpassant[(st-1)->epSquare & 7];
     if (type_of_m(m) == ENPASSANT)
-      capt_piece = B_PAWN ^ (us << 3);
+      captPiece = B_PAWN ^ (us << 3);
   }
 
   Piece piece = piece_on(from);
@@ -789,7 +789,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   if (likely(type_of_m(m) != PROMOTION)) {
     // In Chess960, the king might seem to capture the friendly rook.
     if (type_of_m(m) == CASTLING)
-      capt_piece = 0;
+      captPiece = 0;
     pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from) ^ sq_bb(to);
     st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
     key ^= zob.psq[piece][from] ^ zob.psq[piece][to];
@@ -803,7 +803,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     prom_piece |= piece & 8;
     st->psq += psqt.psq[prom_piece][to] - psqt.psq[piece][to];
     st->nonPawn += NonPawnPieceValue[prom_piece];
-    st->materialKey += mat_key[prom_piece] - mat_key[piece];
+    st->materialKey += matKey[prom_piece] - matKey[piece];
     key ^= zob.psq[piece][from] ^ zob.psq[prom_piece][to];
     st->pawnKey ^= zob.psq[piece][from];
   }
@@ -811,22 +811,22 @@ void do_move(Pos *pos, Move m, int givesCheck)
   pos->board[from] = 0;
   pos->board[to] = prom_piece;
 
-  if (capt_piece) {
+  if (captPiece) {
     st->rule50 = 0;
-    if ((capt_piece & 7) == PAWN) {
+    if ((captPiece & 7) == PAWN) {
       if (type_of_m(m) == ENPASSANT) {
         to += (us == WHITE ? -8 : 8);
         pos->board[to] = 0;
       }
-      st->pawnKey ^= zob.psq[capt_piece][to];
+      st->pawnKey ^= zob.psq[captPiece][to];
     }
-    st->capturedPiece = capt_piece;
-    st->psq -= psqt.psq[capt_piece][to];
-    st->nonPawn -= NonPawnPieceValue[capt_piece];
-    st->materialKey -= mat_key[capt_piece];
-    pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
+    st->capturedPiece = captPiece;
+    st->psq -= psqt.psq[captPiece][to];
+    st->nonPawn -= NonPawnPieceValue[captPiece];
+    st->materialKey -= matKey[captPiece];
+    pos->byTypeBB[captPiece & 7] ^= sq_bb(to);
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
-    key ^= zob.psq[capt_piece][to];
+    key ^= zob.psq[captPiece][to];
   } else { // Not a capture.
     st->capturedPiece = 0;
     st->rule50 = (st-1)->rule50 + 1;
@@ -882,15 +882,15 @@ void undo_move(Pos *pos, Move m)
   pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
   pos->board[from] = piece;
 
-  Piece capt_piece = st->capturedPiece;
-  pos->board[to] = capt_piece;
-  if (capt_piece) {
+  Piece captPiece = st->capturedPiece;
+  pos->board[to] = captPiece;
+  if (captPiece) {
     if (type_of_m(m) == ENPASSANT) {
       pos->board[to] = 0;
       to = (st-1)->epSquare + (us == WHITE ? -8 : 8);
-      pos->board[to] = capt_piece;
+      pos->board[to] = captPiece;
     }
-    pos->byTypeBB[capt_piece & 7] ^= sq_bb(to);
+    pos->byTypeBB[captPiece & 7] ^= sq_bb(to);
     pos->byColorBB[us ^ 1] ^= sq_bb(to);
   }
   else if (type_of_m(m) == CASTLING) {
@@ -984,7 +984,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
 
     // Update material hash key and prefetch access to materialTable
     key ^= zob.psq[captured][capsq];
-    st->materialKey -= mat_key[captured];
+    st->materialKey -= matKey[captured];
     prefetch(&pos->materialTable[st->materialKey >> (64 - 13)]);
 
     // Update incremental scores
@@ -1040,7 +1040,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
       // Update hash keys
       key ^= zob.psq[piece][to] ^ zob.psq[promotion][to];
       st->pawnKey ^= zob.psq[piece][to];
-      st->materialKey += mat_key[promotion] - mat_key[piece];
+      st->materialKey += matKey[promotion] - matKey[piece];
 
       // Update incremental score
       st->psq += psqt.psq[promotion][to] - psqt.psq[piece][to];
@@ -1270,129 +1270,6 @@ int see_test(const Pos *pos, Move m, int value)
 }
 
 
-#if 0
-// see_ab() performs an exact SEE calculation within bounds alpha and beta.
-// Currently used only by see_sign(), so we force it to be inlined.
-INLINE int see_ab(const Pos *pos, Move m, int alpha, int beta)
-{
-  if (unlikely(type_of_m(m) == CASTLING))
-    return 0;
-
-  Square from = from_sq(m), to = to_sq(m);
-  Bitboard occ = pieces();
-
-  int swap = PieceValue[MG][piece_on(to)];
-  if (unlikely(type_of_m(m) == ENPASSANT)) {
-    assert(pos_stm() == color_of(piece_on(from)));
-    occ ^= sq_bb(to - pawn_push(pos_stm())); // Remove the captured pawn.
-    swap += PieceValue[MG][PAWN];
-  }
-
-  assume(swap >= 0);
-  // We know that SEE <= swap. Can the opponent stand pat?
-  if (swap <= alpha)
-    return alpha;
-
-  // Update beta.
-  if (swap < beta)
-    beta = swap;
-
-  swap -= PieceValue[MG][piece_on(from)];
-
-  // We know that SEE >= swap. Can we stand pat?
-  if (swap >= beta)
-    return beta;
-
-  // Alpha will be updated below.
-
-  occ ^= sq_bb(from) ^ sq_bb(to);
-  int stm = color_of(piece_on(from));
-  Bitboard attackers = attackers_to_occ(to, occ), stmAttackers;
-  beta = -beta;
-  int bound = beta;
-
-  while (1) {
-    attackers &= occ;
-    stm ^= 1;
-    if (!(stmAttackers = attackers & pieces_c(stm))) break;
-    if (    (stmAttackers & blockers_for_king(pos, stm))
-        && !(pos->st->pinnersForKing[stm] & ~occ))
-      stmAttackers &= ~blockers_for_king(pos, stm);
-    if (!stmAttackers) break;
-    // Update alpha or beta.
-    if (bound == beta) {
-      if (swap > alpha)
-        alpha = swap;  // We are sure to win at least alpha.
-      bound = alpha;
-    } else {
-      if (swap > beta)
-        beta = swap;  // Opponent is sure to lose at most (minus) beta.
-      bound = beta;
-    }
-    Bitboard bb;
-    if ((bb = stmAttackers & pieces_p(PAWN))) {
-      if ((swap += PawnValueMg) <= bound) break;
-      occ ^= bb & -bb;
-      attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
-    }
-    else if ((bb = stmAttackers & pieces_p(KNIGHT))) {
-      if ((swap += KnightValueMg) <= bound) break;
-      occ ^= bb & -bb;
-    }
-    else if ((bb = stmAttackers & pieces_p(BISHOP))) {
-      if ((swap += BishopValueMg) <= bound) break;
-      occ ^= bb & -bb;
-      attackers |= attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN);
-    }
-    else if ((bb = stmAttackers & pieces_p(ROOK))) {
-      if ((swap += RookValueMg) <= bound) break;
-      occ ^= bb & -bb;
-      attackers |= attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN);
-    }
-    else if ((bb = stmAttackers & pieces_p(QUEEN))) {
-      if ((swap += QueenValueMg) <= bound) break;
-      occ ^= bb & -bb;
-      attackers |=  (attacks_bb_bishop(to, occ) & pieces_pp(BISHOP, QUEEN))
-                  | (attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN));
-    }
-    else { // KING
-      if (attackers & ~pieces_c(stm))
-        return bound == alpha ? -beta : alpha;
-      else
-        break;
-    }
-    swap = -swap;
-  }
-
-  return bound == alpha ? alpha : -beta;
-}
-
-int see_sign(const Pos *pos, Move m)
-{
-  assert(move_is_ok(m));
-
-  return see_ab(pos, m, -VALUE_INFINITE, 0);
-}
-#endif
-
-#if 0
-// For debugging purposes.
-int see_test(Pos *pos, Move m, int value)
-{
-  int s1 = see_ab(pos, m, value - 1, value) >= value;
-  int s2 = see_test1(pos, m, value);
-  if (s1 != s2) {
-    printf("s1 = %d, s2 = %d\n", s1, s2);
-    print_pos(pos);
-    printf("from = %d, to = %d, value = %d\n", from_sq(m), to_sq(m), value);
-    s1 = see_ab(pos, m, value - 1, value) >= value;
-//    s1 = see_ab(pos, m, -VALUE_INFINITE, +VALUE_INFINITE) >= value;
-  }
-  return s1;
-//  return see(pos, m) >= value;
-}
-#endif
-
 // is_draw() tests whether the position is drawn by 50-move rule or by
 // repetition. It does not detect stalemates.
 
@@ -1515,31 +1392,31 @@ static int pos_is_ok(Pos *pos, int *failedStep)
 #ifndef NDEBUG
 static int check_pos(Pos *pos)
 {
-  Bitboard color_bb[2];
-  Bitboard piece_bb[8];
+  Bitboard colorBB[2];
+  Bitboard pieceBB[8];
 
-  color_bb[0] = color_bb[1] = 0;
+  colorBB[0] = colorBB[1] = 0;
   for (int i = 0; i < 8; i++)
-    piece_bb[i] = 0;
+    pieceBB[i] = 0;
 
   for (int sq = 0; sq < 64; sq++)
     if (pos->board[sq]) {
-      color_bb[pos->board[sq] >> 3] |= sq_bb(sq);
-      piece_bb[pos->board[sq] & 7] |= sq_bb(sq);
+      colorBB[pos->board[sq] >> 3] |= sq_bb(sq);
+      pieceBB[pos->board[sq] & 7] |= sq_bb(sq);
     }
 
   for (int i = PAWN; i <= KING; i++)
-    assert(pos->byTypeBB[i] == piece_bb[i]);
+    assert(pos->byTypeBB[i] == pieceBB[i]);
 
-  assert(pos->byColorBB[0] == color_bb[0]);
-  assert(pos->byColorBB[1] == color_bb[1]);
-  assert(pos->byTypeBB[0] == (color_bb[0] | color_bb[1]));
+  assert(pos->byColorBB[0] == colorBB[0]);
+  assert(pos->byColorBB[1] == colorBB[1]);
+  assert(pos->byTypeBB[0] == (colorBB[0] | colorBB[1]));
 
   Key key = 0, pawnKey = 0, matKey = 0;
 
   for (int c = 0; c < 2; c++)
     for (int i = PAWN; i <= KING; i++)
-       matKey += mat_key[8 * c + i] * piece_count(c, i);
+       matKey += matKey[8 * c + i] * piece_count(c, i);
 
   for (int sq = 0; sq < 64; sq++)
     if (pos->board[sq])

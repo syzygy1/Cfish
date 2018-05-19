@@ -65,11 +65,11 @@ enum {
 struct Option {
   char *name;
   int type;
-  int def, min_val, max_val;
-  char *def_string;
-  OnChange on_change;
+  int def, minVal, maxVal;
+  char *defString;
+  OnChange onChange;
   int value;
-  char *val_string;
+  char *valString;
 };
 
 void options_init(void);

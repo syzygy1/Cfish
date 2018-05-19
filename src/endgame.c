@@ -92,7 +92,7 @@ static Key calc_key(const char *code, int c)
   for (; *code; code++)
     for (int i = 1;; i++)
       if (*code == PieceToChar[i]) {
-        key += mat_key[i ^ color];
+        key += matKey[i ^ color];
         break;
       }
 

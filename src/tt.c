@@ -46,7 +46,7 @@ void tt_free(void)
     VirtualFree(TT.mem, 0, MEM_RELEASE);
 #else
   if (TT.mem)
-    munmap(TT.mem, TT.alloc_size);
+    munmap(TT.mem, TT.allocSize);
 #endif
   TT.mem = NULL;
 }
@@ -71,10 +71,10 @@ void tt_allocate(size_t mbSize)
 #ifdef _WIN32
 
   TT.mem = NULL;
-  if (settings.large_pages) {
-    size_t page_size = large_page_minimum;
-    size_t lp_size = (size + page_size - 1) & ~(page_size - 1);
-    TT.mem = VirtualAlloc(NULL, lp_size,
+  if (settings.largePages) {
+    size_t pageSize = largePageMinimum;
+    size_t lpSize = (size + pageSize - 1) & ~(pageSize - 1);
+    TT.mem = VirtualAlloc(NULL, lpSize,
                           MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES,
                           PAGE_READWRITE);
     if (!TT.mem)
@@ -93,12 +93,12 @@ void tt_allocate(size_t mbSize)
 
 #else /* Unix */
 
-  size_t alignment = settings.large_pages ? (1ULL << 21) : 1;
-  size_t alloc_size = size + alignment - 1;
+  size_t alignment = settings.largePages ? (1ULL << 21) : 1;
+  size_t allocSize = size + alignment - 1;
 
 #if defined(__APPLE__) && defined(VM_FLAGS_SUPERPAGE_SIZE_2MB)
 
-  if (settings.large_pages) {
+  if (settings.largePages) {
     TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
                   MAP_PRIVATE | MAP_ANONYMOUS, VM_FLAGS_SUPERPAGE_SIZE_2MB, 0);
     if (!TT.mem)
@@ -109,17 +109,17 @@ void tt_allocate(size_t mbSize)
     fflush(stdout);
   }
   if (!TT.mem)
-    TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
+    TT.mem = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 #else
 
-  TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
+  TT.mem = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 #endif
 
-  TT.alloc_size = alloc_size;
+  TT.allocSize = allocSize;
   TT.table = (Cluster *)(  (((uintptr_t)TT.mem) + alignment - 1)
                          & ~(alignment - 1));
   if (!TT.mem)
@@ -128,7 +128,7 @@ void tt_allocate(size_t mbSize)
 #if defined(__linux__) && defined(MADV_HUGEPAGE)
 
   // Advise the kernel to allocate large pages.
-  if (settings.large_pages)
+  if (settings.largePages)
     madvise(TT.table, count * sizeof(Cluster), MADV_HUGEPAGE);
 
 #endif
@@ -156,9 +156,9 @@ void tt_clear(void)
   // this has the beneficial effect of spreading the TT over all nodes.
 
   if (TT.table) {
-    for (int idx = 0; idx < Threads.num_threads; idx++)
+    for (int idx = 0; idx < Threads.numThreads; idx++)
       thread_wake_up(Threads.pos[idx], THREAD_TT_CLEAR);
-    for (int idx = 0; idx < Threads.num_threads; idx++)
+    for (int idx = 0; idx < Threads.numThreads; idx++)
       thread_wait_until_sleeping(Threads.pos[idx]);
   }
 }
@@ -169,7 +169,7 @@ void tt_clear_worker(int idx)
   // To each thread we assign a number of 2MB blocks.
 
   size_t total = (TT.mask + 1) * sizeof(Cluster);
-  size_t slice = (total + Threads.num_threads - 1) / Threads.num_threads;
+  size_t slice = (total + Threads.numThreads - 1) / Threads.numThreads;
   size_t blocks = (slice + (2 * 1024 * 1024) - 1) / (2 * 1024 * 1024);
   size_t begin = idx * blocks * (2 * 1024 * 1024);
   size_t end = begin + blocks * (2 * 1024 * 1024);

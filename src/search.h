@@ -32,7 +32,7 @@
 // moves.
 
 struct RootMove {
-  int pv_size;
+  int pvSize;
   Value score;
   Value previousScore;
   int selDepth;
@@ -66,7 +66,7 @@ struct LimitsType {
   int ponder;
   uint64_t nodes;
   TimePoint startTime;
-  int num_searchmoves;
+  int numSearchmoves;
   Move searchmoves[MAX_MOVES];
 };
 

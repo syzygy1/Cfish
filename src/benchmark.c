@@ -101,7 +101,7 @@ void benchmark(Pos *current, char *str)
 {
   char *token;
   char **fens;
-  int num_fens;
+  int numFens;
 
   Limits = (struct LimitsType){ 0 };
 
@@ -111,8 +111,8 @@ void benchmark(Pos *current, char *str)
   char *fenFile   = (token = strtok(NULL, " ")) ? token        : NULL;
   char *limitType = (token = strtok(NULL, " ")) ? token        : "";
 
-  delayed_settings.tt_size = ttSize;
-  delayed_settings.num_threads = threads;
+  delayedSettings.ttSize = ttSize;
+  delayedSettings.numThreads = threads;
   process_delayed_settings();
   search_clear();
 
@@ -127,32 +127,32 @@ void benchmark(Pos *current, char *str)
 
   if (!fenFile || strcmp(fenFile, "default") == 0) {
     fens = Defaults;
-    num_fens = sizeof(Defaults) / sizeof(char *);
+    numFens = sizeof(Defaults) / sizeof(char *);
   }
   else if (strcmp(fenFile, "current") == 0) {
     fens = malloc(sizeof(*fens));
     fens[0] = malloc(128);
     pos_fen(current, fens[0]);
-    num_fens = 1;
+    numFens = 1;
   }
   else {
-    int max_fens = 100;
-    num_fens = 0;
+    int maxFens = 100;
+    numFens = 0;
     FILE *F = fopen(fenFile, "r");
     if (!F) {
       fprintf(stderr, "Unable to open file %s\n", fenFile);
       return;
     }
-    fens = malloc(max_fens * sizeof(*fens));
+    fens = malloc(maxFens * sizeof(*fens));
     fens[0] = NULL;
     size_t length = 0;
-    while (getline(&fens[num_fens], &length, F) > 0) {
-      num_fens++;
-      if (num_fens == max_fens) {
-        max_fens += 100;
-        fens = realloc(fens, max_fens * sizeof(*fens));
+    while (getline(&fens[numFens], &length, F) > 0) {
+      numFens++;
+      if (numFens == maxFens) {
+        maxFens += 100;
+        fens = realloc(fens, maxFens * sizeof(*fens));
       }
-      fens[num_fens] = NULL;
+      fens[numFens] = NULL;
       length = 0;
     }
     fclose(F);
@@ -165,12 +165,12 @@ void benchmark(Pos *current, char *str)
   pos.moveList = malloc(10000 * sizeof(*pos.moveList));
   TimePoint elapsed = now();
 
-  int num_opts = 0;
-  for (int i = 0; i < num_fens; i++)
+  int numOpts = 0;
+  for (int i = 0; i < numFens; i++)
     if (strncmp(fens[i], "setoption ", 9) == 0)
-      num_opts++;
+      numOpts++;
 
-  for (int i = 0, j = 0; i < num_fens; i++) {
+  for (int i = 0, j = 0; i < numFens; i++) {
     char buf[128];
 
     if (strncmp(fens[i], "setoption ", 9) == 0) {
@@ -186,7 +186,7 @@ void benchmark(Pos *current, char *str)
 
     position(&pos, buf);
 
-    fprintf(stderr, "\nPosition: %d/%d\n", ++j, num_fens - num_opts);
+    fprintf(stderr, "\nPosition: %d/%d\n", ++j, numFens - numOpts);
 
     if (strcmp(limitType, "perft") == 0)
       nodes += perft(&pos, Limits.depth * ONE_PLY);
@@ -207,7 +207,7 @@ void benchmark(Pos *current, char *str)
                   elapsed, nodes, 1000 * nodes / elapsed);
 
   if (fens != Defaults) {
-    for (int i = 0; i < num_fens; i++)
+    for (int i = 0; i < numFens; i++)
       free(fens[i]);
     free(fens);
   }

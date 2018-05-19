@@ -150,7 +150,7 @@ Move next_move(const Pos *pos, int skipQuiets)
     st->stage++;
 
     // First killer move.
-    move = st->mp_killers[0];
+    move = st->mpKillers[0];
     if (move && move != st->ttMove && is_pseudo_legal(pos, move)
              && !is_capture(pos, move))
       return move;
@@ -158,7 +158,7 @@ Move next_move(const Pos *pos, int skipQuiets)
 
   case ST_KILLERS:
     st->stage++;
-    move = st->mp_killers[1]; // Second killer move.
+    move = st->mpKillers[1]; // Second killer move.
     if (move && move != st->ttMove && is_pseudo_legal(pos, move)
              && !is_capture(pos, move))
       return move;
@@ -167,8 +167,8 @@ Move next_move(const Pos *pos, int skipQuiets)
   case ST_KILLERS_2:
     st->stage++;
     move = st->countermove;
-    if (move && move != st->ttMove && move != st->mp_killers[0]
-             && move != st->mp_killers[1] && is_pseudo_legal(pos, move)
+    if (move && move != st->ttMove && move != st->mpKillers[0]
+             && move != st->mpKillers[1] && is_pseudo_legal(pos, move)
              && !is_capture(pos, move))
       return move;
     /* fallthrough */
@@ -185,8 +185,8 @@ Move next_move(const Pos *pos, int skipQuiets)
     if (!skipQuiets)
       while (st->cur < st->endMoves) {
         move = (st->cur++)->move;
-        if (   move != st->ttMove && move != st->mp_killers[0]
-            && move != st->mp_killers[1] && move != st->countermove)
+        if (   move != st->ttMove && move != st->mpKillers[0]
+            && move != st->mpKillers[1] && move != st->countermove)
           return move;
       }
     st->stage++;

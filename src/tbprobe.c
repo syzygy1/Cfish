@@ -143,7 +143,7 @@ static Key calc_key_from_pcs(int *pcs, bool flip)
 
   int color = !flip ? 0 : 8;
   for (int i = W_PAWN; i <= B_KING; i++)
-    key += mat_key[i] * pcs[i ^ color];
+    key += matKey[i] * pcs[i ^ color];
 
   return key;
 }
@@ -157,7 +157,7 @@ static Key calc_key_from_pieces(uint8_t *piece, int num)
 
   for (int i = 0; i < num; i++)
     if (piece[i])
-      key += mat_key[piece[i]];
+      key += matKey[piece[i]];
 
   return key;
 }
@@ -1907,11 +1907,11 @@ void TB_expand_mate(Pos *pos, RootMove *move)
   int wdl = v > 0 ? 2 : -2;
   ExtMove *m;
 
-  if (move->pv_size == MAX_PLY)
+  if (move->pvSize == MAX_PLY)
     return;
 
   // First get to the end of the incomplete PV.
-  for (int i = 0; i < move->pv_size; i++) {
+  for (int i = 0; i < move->pvSize; i++) {
     v = v > 0 ? -v - 1 : -v + 1;
     wdl = -wdl;
     pos->st->endMoves = (pos->st-1)->endMoves;
@@ -1920,7 +1920,7 @@ void TB_expand_mate(Pos *pos, RootMove *move)
 
   // Now try to expand until the actual mate.
   if (popcount(pieces()) <= TB_CardinalityDTM)
-    while (v != -VALUE_MATE && move->pv_size < MAX_PLY) {
+    while (v != -VALUE_MATE && move->pvSize < MAX_PLY) {
       v = v > 0 ? -v - 1 : -v + 1;
       wdl = -wdl;
       pos->st->endMoves = generate_legal(pos, (pos->st-1)->endMoves);
@@ -1936,11 +1936,11 @@ void TB_expand_mate(Pos *pos, RootMove *move)
       }
       if (!success || v != w)
         break;
-      move->pv[move->pv_size++] = m->move;
+      move->pv[move->pvSize++] = m->move;
       do_move(pos, m->move, gives_check(pos, pos->st, m->move));
     }
 
   // Get back to the root position.
-  for (int i = move->pv_size - 1; i >= 0; i--)
+  for (int i = move->pvSize - 1; i >= 0; i--)
     undo_move(pos, move->pv[i]);
 }

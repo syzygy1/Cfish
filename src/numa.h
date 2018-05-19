@@ -9,7 +9,7 @@
 #include <windows.h>
 #endif
 
-bool numa_avail;
+bool numaAvail;
 void numa_init(void);
 void numa_exit(void);
 void read_numa_nodes(char *str);

@@ -72,16 +72,9 @@ INLINE TimePoint now(void) {
   return 1000 * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec / 1000;
 }
 
-#ifndef _WIN32
-extern pthread_mutex_t io_mutex;
-#define IO_LOCK   pthread_mutex_lock(&io_mutex)
-#define IO_UNLOCK pthread_mutex_unlock(&io_mutex)
-#else
-extern HANDLE io_mutex;
-#define IO_LOCK WaitForSingleObject(io_mutex, INFINITE)
-#define IO_UNLOCK ReleaseMutex(io_mutex)
-int large_pages_supported(void);
-extern size_t large_page_minimum;
+#ifdef _WIN32
+bool large_pages_supported(void);
+extern size_t largePageMinimum;
 #endif
 
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);

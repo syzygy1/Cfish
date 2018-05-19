@@ -45,7 +45,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     pos->callsCnt = Limits.nodes ? min(1024, Limits.nodes / 1024) : 1024;
   }
   if (--pos->callsCnt <= 0) {
-    for (int idx = 0; idx < Threads.num_threads; idx++)
+    for (int idx = 0; idx < Threads.numThreads; idx++)
       store_rlx(Threads.pos[idx]->resetCalls, 1);
 
     check_time();
@@ -144,7 +144,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       int found, wdl = TB_probe_wdl(pos, &found);
 
       if (found) {
-        pos->tb_hits++;
+        pos->tbHits++;
 
         int drawScore = TB_UseRule50 ? 1 : 0;
 
@@ -245,7 +245,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
       && !excludedMove
       && pos_non_pawn_material(pos_stm())
-      && (ss->ply >= pos->nmp_ply || ss->ply % 2 != pos->nmp_odd))
+      && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
   {
     assert(eval - beta >= 0);
 
@@ -267,21 +267,21 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       if (nullValue >= VALUE_MATE_IN_MAX_PLY)
         nullValue = beta;
 
-      if (   (depth < 12 * ONE_PLY || pos->nmp_ply)
+      if (   (depth < 12 * ONE_PLY || pos->nmpPly)
           && abs(beta) < VALUE_KNOWN_WIN)
         return nullValue;
 
       // Do verification search at high depths
       // Disable null move pruning for side to move for the first part of
       // the remaining search tree
-      pos->nmp_ply = ss->ply + 3 * (depth-R) / (4 * ONE_PLY);
-      pos->nmp_odd = ss->ply & 1;
+      pos->nmpPly = ss->ply + 3 * (depth-R) / (4 * ONE_PLY);
+      pos->nmpOdd = ss->ply & 1;
 
       Value v =  depth-R < ONE_PLY
                ? qsearch_NonPV_false(pos, ss, beta-1, DEPTH_ZERO)
                : search_NonPV(pos, ss, beta-1, depth-R, 0);
 
-      pos->nmp_odd = pos->nmp_ply = 0;
+      pos->nmpOdd = pos->nmpPly = 0;
 
       if (v >= beta)
         return nullValue;
@@ -378,15 +378,13 @@ moves_loop: // When in check search starts from here.
 
     ss->moveCount = ++moveCount;
 
-    if (rootNode && pos->thread_idx == 0 && time_elapsed() > 3000) {
+    if (rootNode && pos->threadIdx == 0 && time_elapsed() > 3000) {
       char buf[16];
-      IO_LOCK;
       printf("info depth %d currmove %s currmovenumber %d\n",
              depth / ONE_PLY,
              uci_move(buf, move, is_chess960()),
              moveCount + pos->PVIdx);
       fflush(stdout);
-      IO_UNLOCK;
     }
 
     if (PvNode)
@@ -422,7 +420,7 @@ moves_loop: // When in check search starts from here.
       Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
       ss->excludedMove = move;
       Move cm = ss->countermove;
-      Move k1 = ss->mp_killers[0], k2 = ss->mp_killers[1];
+      Move k1 = ss->mpKillers[0], k2 = ss->mpKillers[1];
       value = search_NonPV(pos, ss, rBeta - 1, d, cutNode);
       ss->excludedMove = 0;
 
@@ -434,7 +432,7 @@ moves_loop: // When in check search starts from here.
       mp_init(pos, ttMove, depth);
       ss->stage++;
       ss->countermove = cm; // pedantic
-      ss->mp_killers[0] = k1; ss->mp_killers[1] = k2;
+      ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
     }
     else if (    givesCheck
              && !moveCountPruning
@@ -623,17 +621,17 @@ moves_loop: // When in check search starts from here.
       if (moveCount == 1 || value > alpha) {
         rm->score = value;
         rm->selDepth = pos->selDepth;
-        rm->pv_size = 1;
+        rm->pvSize = 1;
 
         assert((ss+1)->pv);
 
         for (Move *m = (ss+1)->pv; *m; ++m)
-          rm->pv[rm->pv_size++] = *m;
+          rm->pv[rm->pvSize++] = *m;
 
         // We record how often the best move has been changed in each
         // iteration. This information is used for time management: When
         // the best move changes frequently, we allocate some more time.
-        if (moveCount > 1 && pos->thread_idx == 0)
+        if (moveCount > 1 && pos->threadIdx == 0)
           mainThread.bestMoveChanges++;
       } else
         // All other moves but the PV are set to the lowest value: this is

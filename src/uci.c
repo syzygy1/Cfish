@@ -169,7 +169,7 @@ void go(Pos *pos, char *str)
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
     if (strcmp(token, "searchmoves") == 0)
       while ((token = strtok(NULL, " \t")))
-        Limits.searchmoves[Limits.num_searchmoves++] = uci_to_move(pos, token);
+        Limits.searchmoves[Limits.numSearchmoves++] = uci_to_move(pos, token);
     else if (strcmp(token, "wtime") == 0)
       Limits.time[WHITE] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "btime") == 0)

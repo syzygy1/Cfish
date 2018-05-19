@@ -77,7 +77,7 @@ void mainthread_search(void);
 
 struct ThreadPool {
   Pos *pos[MAX_THREADS];
-  int num_threads;
+  int numThreads;
 #ifndef _WIN32
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;
@@ -103,7 +103,7 @@ INLINE Pos *threads_main(void)
   return Threads.pos[0];
 }
 
-CounterMoveHistoryStat **cmh_tables;
-int num_cmh_tables;
+CounterMoveHistoryStat **cmhTables;
+int numCmhTables;
 
 #endif
