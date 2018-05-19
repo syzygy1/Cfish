@@ -84,8 +84,6 @@ static Square normalize(const Pos *pos, unsigned strongSide, Square sq)
 
 // Compute material key from an endgame code string.
 
-extern Key mat_key[16];
-
 static Key calc_key(const char *code, int c)
 {
   Key key = 0;

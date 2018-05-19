@@ -33,6 +33,7 @@
 #include "types.h"
 
 extern const char PieceToChar[];
+extern Key mat_key[16];
 
 struct Zob {
   Key psq[16][64];
