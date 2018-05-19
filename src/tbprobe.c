@@ -18,10 +18,9 @@
 #include "uci.h"
 
 #define TB_PIECES 7
-#define TBHASHBITS 10
-#define TBMAX_PIECE 650
-#define TBMAX_PAWN 861
-#define HSHMAX 10
+#define TB_HASHBITS  (TB_PIECES < 7 ?  11 : 12)
+#define TB_MAX_PIECE (TB_PIECES < 7 ? 254 : 650)
+#define TB_MAX_PAWN  (TB_PIECES < 7 ? 256 : 861)
 
 #ifdef _WIN32
 typedef HANDLE map_t;
@@ -34,8 +33,8 @@ typedef size_t map_t;
 int TB_MaxCardinality = 0, TB_MaxCardinalityDTM = 0;
 extern int TB_CardinalityDTM;
 
-static const char *tbSuffix[] = { ".rtbw", ".rtbz", ".rtbm" };
-static uint32_t tbMagic[] = { 0x5d23e871, 0xa50c66d7, 0x88ac504b };
+static const char *tbSuffix[] = { ".rtbw", ".rtbm", ".rtbz" };
+static uint32_t tbMagic[] = { 0x5d23e871, 0x88ac504b, 0xa50c66d7 };
 
 enum { WDL, DTM, DTZ };
 enum { PIECE_ENC, FILE_ENC, RANK_ENC };
@@ -47,8 +46,8 @@ struct PairsData {
   uint16_t *offset;
   uint8_t *symLen;
   uint8_t *symPat;
-  uint32_t blockSize;
-  uint32_t idxBits;
+  uint8_t blockSize;
+  uint8_t idxBits;
   uint8_t minLen;
   uint8_t constValue[2];
   uint64_t base[]; // must be base[1] in C++
@@ -56,7 +55,7 @@ struct PairsData {
 
 struct EncInfo {
   struct PairsData *precomp;
-  uint32_t factor[TB_PIECES];
+  size_t factor[TB_PIECES];
   uint8_t pieces[TB_PIECES];
   uint8_t norm[TB_PIECES];
 };
@@ -96,7 +95,7 @@ struct PawnEntry {
   bool dtmSwitched;
 };
 
-struct TBHashEntry {
+struct TbHashEntry {
   Key key;
   struct BaseEntry *ptr;
 };
@@ -107,13 +106,12 @@ static int numPaths = 0;
 static char *pathString = NULL;
 static char **paths = NULL;
 
-static int TBnum_piece, TBnum_pawn;
+static int tbNumPiece, tbNumPawn;
 static int numWdl, numDtm, numDtz;
 
-// TODO: allocate new pieceEntry[] stuff for
-static struct PieceEntry pieceEntry[TBMAX_PIECE];
-static struct PawnEntry pawnEntry[TBMAX_PAWN];
-static struct TBHashEntry TB_hash[1 << TBHASHBITS][HSHMAX];
+static struct PieceEntry *pieceEntry;
+static struct PawnEntry *pawnEntry;
+static struct TbHashEntry tbHash[1 << TB_HASHBITS];
 
 static void init_indices(void);
 
@@ -206,19 +204,14 @@ static void *map_tb(const char *name, const char *suffix, map_t *mapping)
 
 static void add_to_hash(void *ptr, Key key)
 {
-  int i, hshidx;
+  int idx;
 
-  hshidx = key >> (64 - TBHASHBITS);
-  i = 0;
-  while (i < HSHMAX && TB_hash[hshidx][i].ptr)
-    i++;
-  if (i == HSHMAX) {
-    fprintf(stderr, "HSHMAX too low!\n");
-    exit(EXIT_FAILURE);
-  } else {
-    TB_hash[hshidx][i].key = key;
-    TB_hash[hshidx][i].ptr = ptr;
-  }
+  idx = key >> (64 - TB_HASHBITS);
+  while (tbHash[idx].ptr)
+    idx = (idx + 1) & ((1 << TB_HASHBITS) - 1);
+
+  tbHash[idx].key = key;
+  tbHash[idx].ptr = ptr;
 }
 
 #define pchr(i) PieceToChar[QUEEN - (i)]
@@ -243,38 +236,23 @@ static void init_tb(char *str)
           break;
         }
 
+  Key key = calc_key_from_pcs(pcs, false);
+  Key key2 = calc_key_from_pcs(pcs, true);
+
   bool hasPawns = pcs[W_PAWN] || pcs[B_PAWN];
 
-  struct BaseEntry *be;
-  if (!hasPawns) {
-    if (TBnum_piece == TBMAX_PIECE) {
-      fprintf(stderr, "TBMAX_PIECE limit too low!\n");
-      exit(EXIT_FAILURE);
-    }
-    be = &pieceEntry[TBnum_piece++].be;
-  } else {
-    if (TBnum_pawn == TBMAX_PAWN) {
-      fprintf(stderr, "TBMAX_PAWN limit too low!\n");
-      exit(EXIT_FAILURE);
-    }
-    be = &pawnEntry[TBnum_pawn++].be;
-  }
-
+  struct BaseEntry *be = hasPawns ? &pawnEntry[tbNumPawn++].be
+                                  : &pieceEntry[tbNumPiece++].be;
   be->hasPawns = hasPawns;
+  be->key = key;
+  be->symmetric = key == key2;
+  be->num = 0;
+  for (int i = 0; i < 16; i++)
+    be->num += pcs[i];
 
   numWdl++;
   numDtm += be->hasDtm = test_tb(str, tbSuffix[DTM]);
   numDtz += be->hasDtz = test_tb(str, tbSuffix[DTZ]);
-
-  Key key = calc_key_from_pcs(pcs, false);
-  Key key2 = calc_key_from_pcs(pcs, true);
-
-  be->key = key;
-  be->symmetric = key == key2;
-
-  be->num = 0;
-  for (int i = 0; i < 16; i++)
-    be->num += pcs[i];
 
   TB_MaxCardinality = max(TB_MaxCardinality, be->num);
   if (be->hasDtm)
@@ -335,6 +313,8 @@ static void free_tb_entry(struct BaseEntry *be)
 void TB_free(void)
 {
   TB_init("");
+  free(pieceEntry);
+  free(pawnEntry);
 }
 
 void TB_init(char *path)
@@ -349,9 +329,9 @@ void TB_init(char *path)
     free(pathString);
     free(paths);
 
-    for (int i = 0; i < TBnum_piece; i++)
+    for (int i = 0; i < tbNumPiece; i++)
       free_tb_entry((struct BaseEntry *)&pieceEntry[i]);
-    for (int i = 0; i < TBnum_pawn; i++)
+    for (int i = 0; i < tbNumPawn; i++)
       free_tb_entry((struct BaseEntry *)&pawnEntry[i]);
 
     LOCK_DESTROY(tbMutex);
@@ -384,14 +364,20 @@ void TB_init(char *path)
 
   LOCK_INIT(tbMutex);
 
-  TBnum_piece = TBnum_pawn = 0;
+  tbNumPiece = tbNumPawn = 0;
   TB_MaxCardinality = TB_MaxCardinalityDTM = 0;
 
-  for (int i = 0; i < (1 << TBHASHBITS); i++)
-    for (int j = 0; j < HSHMAX; j++) {
-      TB_hash[i][j].key = 0;
-      TB_hash[i][j].ptr = NULL;
+  if (!pieceEntry) {
+    pieceEntry = malloc(TB_MAX_PIECE * sizeof(*pieceEntry));
+    pawnEntry = malloc(TB_MAX_PAWN * sizeof(*pawnEntry));
+    if (!pieceEntry || !pawnEntry) {
+      fprintf(stderr, "Out of memory.\n");
+      exit(EXIT_FAILURE);
     }
+  }
+
+  for (int i = 0; i < (1 << TB_HASHBITS); i++)
+    tbHash[i] = (struct TbHashEntry){ 0 };
 
   char str[16];
   int i, j, k, l, m;
@@ -428,7 +414,7 @@ void TB_init(char *path)
       }
 
   // 6- and 7-piece TBs make sense only with a 64-bit address space
-  if (sizeof(size_t) < 8)
+  if (sizeof(size_t) < 8 || TB_PIECES < 6)
     goto finished;
 
   for (i = 0; i < 5; i++)
@@ -454,6 +440,9 @@ void TB_init(char *path)
           sprintf(str, "K%c%c%c%cvK", pchr(i), pchr(j), pchr(k), pchr(l));
           init_tb(str);
         }
+
+  if (TB_PIECES < 7)
+    goto finished;
 
   for (i = 0; i < 5; i++)
     for (j = i; j < 5; j++)
@@ -924,8 +913,8 @@ static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
     return d;
   }
 
-  uint32_t blockSize = data[1];
-  uint32_t idxBits = data[2];
+  uint8_t blockSize = data[1];
+  uint8_t idxBits = data[2];
   uint32_t real_num_blocks = read_le_u32(&data[4]);
   uint32_t num_blocks = real_num_blocks + data[3];
   int maxLen = data[8];
@@ -1179,16 +1168,15 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
   if (type == WDL && key == 2ULL)
     return 0;
 
-  struct TBHashEntry *ptr = TB_hash[key >> (64 - TBHASHBITS)];
-  int i;
-  for (i = 0; i < HSHMAX; i++)
-    if (ptr[i].key == key) break;
-  if (i == HSHMAX) {
+  int hashIdx = key >> (64 - TB_HASHBITS);
+  while (tbHash[hashIdx].key && tbHash[hashIdx].key != key)
+    hashIdx = (hashIdx + 1) & ((1 << TB_HASHBITS) - 1);
+  if (!tbHash[hashIdx].ptr) {
     *success = 0;
     return 0;
   }
 
-  struct BaseEntry *be = ptr[i].ptr;
+  struct BaseEntry *be = tbHash[hashIdx].ptr;
   if ((type == DTM && !be->hasDtm) || (type == DTZ && !be->hasDtz)) {
     *success = 0;
     return 0;
@@ -1201,7 +1189,7 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
       char str[16];
       prt_str(pos, str, be->key != key);
       if (!init_table(be, str, type)) {
-        ptr[i].key = 0ULL;
+        tbHash[hashIdx].ptr = NULL; // mark as deleted
         *success = 0;
         UNLOCK(tbMutex);
         return 0;
@@ -1239,11 +1227,11 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
       }
     }
     ei = type != DTZ ? &ei[bside] : ei;
-    for (i = 0; i < be->num;)
+    for (int i = 0; i < be->num;)
       i = fill_squares(pos, ei->pieces, flip, 0, p, i);
     idx = encode_piece(p, ei, be);
   } else {
-    i = fill_squares(pos, ei->pieces, flip, flip ? 0x38 : 0, p, 0);
+    int i = fill_squares(pos, ei->pieces, flip, flip ? 0x38 : 0, p, 0);
     t = leading_pawn(p, be, type != DTM ? FILE_ENC : RANK_ENC);
     if (type == DTZ) {
       flags = PAWN(be)->dtzFlags[t];
