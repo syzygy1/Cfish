@@ -324,8 +324,10 @@ static bool enabled = false, do_search = true;
 
 void pb_free(void)
 {
-  if (polyhash)
-    free(polyhash);
+  if (polyhash) {
+    unmap_file(polyhash, mapping);
+    polyhash = NULL;
+  }
 }
 
 void pb_init(const char *bookfile)
@@ -335,10 +337,7 @@ void pb_init(const char *bookfile)
     return;
   }
 
-  if (polyhash) {
-    unmap_file(polyhash, mapping);
-    polyhash = NULL;
-  }
+  pb_free();
 
   FD fd = open_file(bookfile);
   if (fd != FD_ERR) {
