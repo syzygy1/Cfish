@@ -331,7 +331,6 @@ void threads_init(void)
 
 #else
 
-  io_mutex = CreateMutex(NULL, FALSE, NULL);
   Threads.event = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 #endif
@@ -362,7 +361,6 @@ void threads_exit(void)
 
 #else
 
-  CloseHandle(io_mutex);
   CloseHandle(Threads.event);
 
 #endif

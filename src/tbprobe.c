@@ -181,7 +181,7 @@ static bool test_tb(const char *str, const char *suffix)
 {
   FD fd = open_tb(str, suffix);
   if (fd != FD_ERR)
-    close (fd);
+    close_file(fd);
   return fd != FD_ERR;
 }
 
