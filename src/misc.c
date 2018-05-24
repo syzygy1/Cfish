@@ -143,8 +143,8 @@ size_t largePageMinimum;
 bool large_pages_supported(void)
 {
   GLPM impGetLargePageMinimum =
-             (GLPM)GetProcAddress(GetModuleHandle("kernel32.dll"),
-                                  "GetLargePageMinimum");
+    (GLPM)(void (*)(void))GetProcAddress(GetModuleHandle("kernel32.dll"),
+        "GetLargePageMinimum");
   if (!impGetLargePageMinimum)
     return 0;
 
