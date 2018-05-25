@@ -79,7 +79,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       return alpha;
 #endif
 
-    if (pos_rule50_count() >= 3 && alpha < VALUE_DRAW && has_game_cycle(pos)) {
+    if (pos->st->pliesFromNull >= 3 && alpha < VALUE_DRAW && has_game_cycle(pos)) {
 #if PvNode
       alpha = VALUE_DRAW;
       if (alpha >= beta)

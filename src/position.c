@@ -194,7 +194,8 @@ void zob_init(void) {
       for (Square s1 = 0; s1 < 64; s1++)
         for (Square s2 = s1 + 1; s2 < 64; s2++)
           if (PseudoAttacks[pt][s1] & sq_bb(s2)) {
-            Move move = make_move(s1, s2);
+            Move move = between_bb(s1, s2) ? make_move(s1, s2)
+                                           : make_move(SQ_C3, SQ_D5);
             Key key = zob.psq[pc][s1] ^ zob.psq[pc][s2] ^ zob.side;
             uint32_t i = H1(key);
             while (1) {
@@ -739,7 +740,7 @@ exit(1);
 
 
 // gives_check_special() is invoked by gives_check() if there are
-// discovered check candidates or the move is of a special type.
+// discovered check candidates or the move is of a special type
 
 int gives_check_special(const Pos *pos, Stack *st, Move m)
 {
@@ -803,7 +804,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   Square to = to_sq(m);
   Key key = (st-1)->key ^ zob.side;
 
-  // Update castling rights.
+  // Update castling rights
   st->castlingRights =  (st-1)->castlingRights
                       & CastlingRightsMask[from]
                       & CastlingRightsMask[to];
@@ -812,7 +813,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   Piece captPiece = pos->board[to];
   Color us = pos->sideToMove;
 
-  // Clear en passant.
+  // Clear en passant
   st->epSquare = 0;
   if (unlikely((st-1)->epSquare)) {
     key ^= zob.enpassant[(st-1)->epSquare & 7];
@@ -823,9 +824,9 @@ void do_move(Pos *pos, Move m, int givesCheck)
   Piece piece = piece_on(from);
   Piece prom_piece;
 
-  // Move the piece or carry out a promotion.
+  // Move the piece or carry out a promotion
   if (likely(type_of_m(m) != PROMOTION)) {
-    // In Chess960, the king might seem to capture the friendly rook.
+    // In Chess960, the king might seem to capture the friendly rook
     if (type_of_m(m) == CASTLING)
       captPiece = 0;
     pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from) ^ sq_bb(to);
@@ -955,9 +956,9 @@ void do_move(Pos *pos, Move m, int givesCheck)
   Stack *st = ++pos->st;
   memcpy(st, st - 1, (StateCopySize + 7) & ~7);
 
-  // Increment ply counters. In particular, rule50 will be reset to zero
-  // later on in case of a capture or a pawn move.
-  st->plyCounters += 0x101; // Increment both rule50 and pliesFromNull.
+  // Increment ply counters. Note that rule50 will be reset to zero later
+  // on in case of a capture or a pawn move.
+  st->plyCounters += 0x101; // Increment both rule50 and pliesFromNull
 
   Color us = pos_stm();
   Color them = us ^ 1;
@@ -998,7 +999,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
   else if (captured) {
     Square capsq = to;
 
-    // If the captured piece is a pawn, update pawn hash key, otherwise
+    // If the captured piece is a pawn, update pawn hash key. Otherwise,
     // update non-pawn material.
     if (type_of_p(captured) == PAWN) {
       if (unlikely(type_of_m(m) == ENPASSANT)) {
@@ -1028,7 +1029,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     // Update incremental scores
     st->psq -= psqt.psq[captured][capsq];
 
-    // Reset ply counters.
+    // Reset ply counters
     st->plyCounters = 0;
   }
 
@@ -1052,7 +1053,7 @@ void do_move(Pos *pos, Move m, int givesCheck)
     st->castlingRights &= ~cr;
   }
 
-  // Move the piece. The tricky Chess960 castling is handled earlier
+  // Move the piece. The tricky Chess960 castling is handled earlier.
   if (likely(type_of_m(m) != CASTLING))
     move_piece(pos, us, piece, from, to);
 
@@ -1186,7 +1187,7 @@ void undo_move(Pos *pos, Move m)
     }
   }
 
-  // Finally point our state pointer back to the previous state.
+  // Finally, point our state pointer back to the previous state
   pos->st--;
 
   assert(pos_is_ok(pos, &failed_step));
@@ -1194,7 +1195,7 @@ void undo_move(Pos *pos, Move m)
 #endif
 
 
-// do_null_move() is used to do a null move.
+// do_null_move() is used to do a null move
 
 void do_null_move(Pos *pos)
 {
@@ -1221,7 +1222,7 @@ void do_null_move(Pos *pos)
   assert(pos_is_ok(pos, &failed_step));
 }
 
-// See position.h for undo_null_move().
+// See position.h for undo_null_move()
 
 
 // key_after() computes the new hash key after the given move. Needed
@@ -1345,7 +1346,6 @@ bool has_game_cycle(const Pos *pos) {
   unsigned int j;
 
   int end = pos->st->pliesFromNull;
-  if (end < 3) return false;
 
   Key originalKey = pos->st->key;
   Stack *stp = pos->st - 1;
@@ -1357,8 +1357,7 @@ bool has_game_cycle(const Pos *pos) {
     if (   (j = H1(moveKey), cuckoo[j] == moveKey)
         || (j = H2(moveKey), cuckoo[j] == moveKey))
     {
-      Move m = cuckooMove[j];
-      if (!(between_bb(from_sq(m), to_sq(m)) & pieces()))
+      if (!(((Bitboard *)BetweenBB)[cuckooMove[j]] & pieces()))
         return true;
     }
   }
