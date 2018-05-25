@@ -528,9 +528,14 @@ moves_loop: // When in check search starts from here.
     {
       Depth r = reduction(improving, depth, moveCount, NT);
 
-      if (captureOrPromotion)
+      if (captureOrPromotion) {
+        // Increase reduction depending on opponent's stat score
+        if (  (ss-1)->statScore >= 0
+            && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(captured_piece())] < 0)
+          r += ONE_PLY;
+
         r -= r ? ONE_PLY : DEPTH_ZERO;
-      else {
+      } else {
         // Decrease reduction if opponent's move count is high
         if ((ss-1)->moveCount > 15)
           r -= ONE_PLY;
