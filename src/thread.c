@@ -34,6 +34,12 @@
 
 static void thread_idle_loop(Pos *pos);
 
+#ifndef _WIN32
+#define THREAD_FUNC void *
+#else
+#define THREAD_FUNC DWORD
+#endif
+
 // Global objects
 ThreadPool Threads;
 MainThread mainThread;
@@ -42,7 +48,7 @@ int num_cmh_tables = 0;
 
 // thread_init() is where a search thread starts and initialises itself.
 
-static void *thread_init(void *arg)
+static THREAD_FUNC thread_init(void *arg)
 {
   int idx = (intptr_t)arg;
 
@@ -55,7 +61,7 @@ static void *thread_init(void *arg)
     int old = num_cmh_tables;
     num_cmh_tables = node + 16;
     cmh_tables = realloc(cmh_tables,
-                         num_cmh_tables * sizeof(CounterMoveHistoryStat *));
+        num_cmh_tables * sizeof(CounterMoveHistoryStat *));
     while (old < num_cmh_tables)
       cmh_tables[old++] = NULL;
   }
@@ -143,7 +149,8 @@ static void thread_create(int idx)
 
 #else
 
-  HANDLE *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_init, (void *)(intptr_t)idx, 0 , NULL);
+  HANDLE thread = CreateThread(NULL, 0, thread_init, (void *)(intptr_t)idx,
+      0 , NULL);
   WaitForSingleObject(Threads.event, INFINITE);
 
 #endif

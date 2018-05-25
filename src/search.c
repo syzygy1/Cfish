@@ -86,7 +86,7 @@ INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 }
 
 // History and stats update bonus, based on depth
-Value stat_bonus(Depth depth)
+static Value stat_bonus(Depth depth)
 {
   int d = depth / ONE_PLY;
   return d > 17 ? 0 : 32 * d * d + 64 * d - 64;
@@ -643,11 +643,18 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta, Depth dep
       beta = min(mate_in(ss->ply+1), beta);
       if (alpha >= beta)
         return alpha;
+      if (pos_rule50_count() >= 3 && alpha < VALUE_DRAW && has_game_cycle(pos)) {
+        alpha = VALUE_DRAW;
+        if (alpha >= beta)
+          return alpha;
+      }
     } else {
       if (alpha < mated_in(ss->ply))
         return mated_in(ss->ply);
       if (alpha >= mate_in(ss->ply+1))
         return alpha;
+      if (pos_rule50_count() >= 3 && alpha < VALUE_DRAW && has_game_cycle(pos))
+        return VALUE_DRAW;
     }
   }
 
@@ -1087,9 +1094,14 @@ moves_loop: // When in check search starts from here.
     {
       Depth r = reduction(improving, depth, moveCount, NT);
 
-      if (captureOrPromotion)
+      if (captureOrPromotion) {
+        // Increase reduction depending on opponent's stat score
+        if (   (ss-1)->statScore >= 0
+            && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(captured_piece())] < 0)
+          r += ONE_PLY;
+
         r -= r ? ONE_PLY : DEPTH_ZERO;
-      else {
+      } else {
         // Decrease reduction if opponent's move count is high
         if ((ss-1)->moveCount > 15)
           r -= ONE_PLY;
@@ -1222,7 +1234,7 @@ moves_loop: // When in check search starts from here.
           alpha = value;
         else {
           assert(value >= beta); // Fail high
-          ss->statScore = max(ss->statScore, 0);
+          ss->statScore = 0;
           break;
         }
       }
@@ -1586,8 +1598,8 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus)
 // update_capture_stats() updates move sorting heuristics when a new capture
 // best move is found
 
-void update_capture_stats(const Pos *pos, Move move, Move *captures,
-                          int captureCnt, int bonus)
+static void update_capture_stats(const Pos *pos, Move move, Move *captures,
+    int captureCnt, int bonus)
 {
   Piece moved_piece = moved_piece(move);
   int captured = type_of_p(piece_on(to_sq(move)));
@@ -1604,8 +1616,8 @@ void update_capture_stats(const Pos *pos, Move move, Move *captures,
 // update_stats() updates killers, history, countermove and countermove
 // plus follow-up move history when a new quiet best move is found.
 
-void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
-                  int quietsCnt, int bonus)
+static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
+    int quietsCnt, int bonus)
 {
   if (ss->killers[0] != move) {
     ss->killers[1] = ss->killers[0];
@@ -1772,7 +1784,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
   return rm->pvSize > 1;
 }
 
-void TB_rank_root_moves(Pos *pos, RootMoves *rm)
+static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 {
   TB_RootInTB = 0;
   TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);

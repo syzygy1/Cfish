@@ -43,27 +43,26 @@ static const Score Doubled = S(13, 40);
 // Strength of pawn shelter for our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
 // our king.
-const Value ShelterStrength[4][8] = {
-    { V( 7), V(76), V(84), V( 38), V( 7), V( 30), V(-19) },
-    { V(-3), V(93), V(52), V(-17), V(12), V(-22), V(-35) },
-    { V(-6), V(83), V(25), V(-24), V(15), V( 22), V(-39) },
-    { V(11), V(83), V(19), V(  8), V(18), V(-21), V(-30) }
+static const Value ShelterStrength[4][8] = {
+  { V(  7), V(76), V( 84), V( 38), V(  7), V( 30), V(-19) },
+  { V(-13), V(83), V( 42), V(-27), V(  2), V(-32), V(-45) },
+  { V(-26), V(63), V(  5), V(-44), V( -5), V(  2), V(-59) },
+  { V(-19), V(53), V(-11), V(-22), V(-12), V(-51), V(-60) }
 };
 
-// Danger of enemy pawns moving toward our king by
-// [type][distance from edge][rank]. For the unopposed and unblocked cases,
-// RANK_1 = 0 is used when opponent has no pawn on the given file or
-// their pawn is behind our king.
-static const Value StormDanger[2][4][8] = {
-  { { V(25),  V( 79), V(107), V( 51), V( 27) },  // UnBlocked
-    { V(15),  V( 45), V(131), V(  8), V( 25) },
-    { V( 0),  V( 42), V(118), V( 56), V( 27) },
-    { V( 3),  V( 54), V(110), V( 55), V( 26) } },
-  { { V( 0),  V(  0), V( 37), V(  5), V(-48) },  // BlockedByPawn
-    { V( 0),  V(  0), V( 68), V(-12), V( 13) },
-    { V( 0),  V(  0), V(111), V(-25), V( -3) },
-    { V( 0),  V(  0), V(108), V( 14), V( 21) } }
+// Danger of enemry pawns moving toward our king by [distance from edge][rank].
+// RANK_1 = 0 is used for files where the enemy has no pawn or where their
+// pawn is behind our king
+static const Value UnblockedStorm[4][8] = {
+  { V( 25), V( 79), V(107), V( 51), V( 27), V(  0), V(  0) },
+  { V(  5), V( 35), V(121), V( -2), V( 15), V(-10), V(-10) },
+  { V(-20), V( 22), V( 98), V( 36), V(  7), V(-20), V(-20) },
+  { V(-27), V( 24), V( 80), V( 25), V( -4), V(-30), V(-30) }
 };
+
+// Danger of blocked enemy pawns storming our king, by rank
+static const Value BlockedStorm[8] =
+  { V(0), V(0), V(75), V(-10), V(-20), V(-20), V(-20) };
 
 #undef S
 #undef V
@@ -196,8 +195,6 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
   const Bitboard BlockRanks =
                    (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
   
-  enum { Unblocked, BlockedByPawn };
-
   Bitboard b =  pieces_p(PAWN)
               & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
@@ -216,12 +213,9 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
     int theirRank = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : 0;
 
     int d = min(f, FILE_H - f);
-    safety +=  ShelterStrength[d][ourRank];
-    if (ourRank || theirRank)
-      safety -= StormDanger
-                [  ourRank && (ourRank == theirRank - 1)
-                 ? BlockedByPawn : Unblocked]
-                [d][theirRank];
+    safety += ShelterStrength[d][ourRank];
+    safety -= (ourRank && (ourRank == theirRank - 1)) ? BlockedStorm[theirRank]
+                                               : UnblockedStorm[d][theirRank];
   }
 
   return safety;

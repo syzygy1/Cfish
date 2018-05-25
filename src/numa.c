@@ -17,7 +17,6 @@ static int *numPhysicalCores;
 bool numaAvail;
 
 #ifndef _WIN32
-static int *numLogicalCores;
 static struct bitmask **nodeMask;
 
 // Override libnuma's numa_warn()
@@ -49,7 +48,6 @@ void numa_init(void)
 
   // Determine number of logical and physical cores per node
   numPhysicalCores = malloc(numNodes * sizeof(int));
-  numLogicalCores = malloc(numNodes * sizeof(int));
   nodeMask = malloc(numNodes * sizeof(struct bitmask *));
   struct bitmask *cpuMask = numa_allocate_cpumask();
   int numCpus = numa_num_configured_cpus();
@@ -60,11 +58,9 @@ void numa_init(void)
     nodeMask[node] = numa_allocate_nodemask();
     numa_bitmask_setbit(nodeMask[node], node);
     numPhysicalCores[node] = 0;
-    numLogicalCores[node] = 0;
     numa_node_to_cpus(node, cpuMask);
     for (int cpu = 0; cpu < numCpus; cpu++)
       if (numa_bitmask_isbitset(cpuMask, cpu)) {
-        numLogicalCores[node]++;
         // Find out about the thread_siblings of this cpu
         sprintf(name,
                 "/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list",
@@ -78,11 +74,6 @@ void numa_init(void)
   }
   numa_bitmask_free(cpuMask);
   if (line) free(line);
-#if 0
-  for (int node = 0; node < numNodes; node++)
-    printf("node %d has %d logical and %d physical cpu cores.\n",
-           node, numLogicalCores[node], numPhysicalCores[node]);
-#endif
 
   delayedSettings.numaEnabled = true;
   settings.numaEnabled = false;
@@ -100,7 +91,6 @@ void numa_exit(void)
     free(nodeMask[node]);
   free(nodeMask);
   free(numPhysicalCores);
-  free(numLogicalCores);
   numa_bitmask_free(delayedSettings.mask);
   numa_bitmask_free(settings.mask);
 }
@@ -173,7 +163,8 @@ int bind_thread_to_numa_node(int threadIdx)
 
 #else /* NUMA on Windows */
 
-typedef BOOL (WINAPI *GLPIEX)(LOGICAL_PROCESSOR_RELATIONSHIP, PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, PDWORD);
+typedef BOOL (WINAPI *GLPIEX)(LOGICAL_PROCESSOR_RELATIONSHIP,
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, PDWORD);
 typedef BOOL (WINAPI *STGA)(HANDLE, const GROUP_AFFINITY *, PGROUP_AFFINITY);
 typedef LPVOID (WINAPI *VAEN)(HANDLE, LPVOID, SIZE_T, DWORD, DWORD, DWORD);
 
@@ -183,10 +174,9 @@ static VAEN   impVirtualAllocExNuma;
 
 static int numNodes;
 static int *nodeNumber;
-static GROUP_AFFINITY *node_group_mask;
+static GROUP_AFFINITY *nodeGroupMask;
 static ULONGLONG *nodeMask = NULL;
 static int *numPhysicalCores;
-//static int *numLogicalCores;
 
 void numa_init(void)
 {
@@ -199,15 +189,14 @@ void numa_init(void)
   DWORD offset = 0;
 
   impGetLogicalProcessorInformationEx =
-                (GLPIEX)GetProcAddress(GetModuleHandle("kernel32.dll"),
-                                       "GetLogicalProcessorInformationEx");
+    (GLPIEX)(void (*)(void))GetProcAddress(GetModuleHandle("kernel32.dll"),
+        "GetLogicalProcessorInformationEx");
   impSetThreadGroupAffinity =
-                (STGA)GetProcAddress(GetModuleHandle("kernel32.dll"),
-                                     "SetThreadGroupAffinity");
-
+    (STGA)(void (*)(void))GetProcAddress(GetModuleHandle("kernel32.dll"),
+        "SetThreadGroupAffinity");
   impVirtualAllocExNuma =
-                (VAEN)GetProcAddress(GetModuleHandle("kernel32.dll"),
-                                     "VirtualAllocExNuma");
+    (VAEN)(void (*)(void))GetProcAddress(GetModuleHandle("kernel32.dll"),
+        "VirtualAllocExNuma");
 
   if (impGetLogicalProcessorInformationEx && impSetThreadGroupAffinity) {
     // Use windows processor groups
@@ -231,18 +220,18 @@ void numa_init(void)
     }
 
     // First get nodes
-    node_group_mask = malloc(maxNodes * sizeof(GROUP_AFFINITY));
+    nodeGroupMask = malloc(maxNodes * sizeof(GROUP_AFFINITY));
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *ptr = buffer;
     while (ptr->Size > 0 && offset + ptr->Size <= len) {
       if (ptr->Relationship == RelationNumaNode) {
         if (numNodes == maxNodes) {
           maxNodes += 16;
           nodeNumber = realloc(nodeNumber, maxNodes * sizeof(int));
-          node_group_mask = realloc(node_group_mask,
+          nodeGroupMask = realloc(nodeGroupMask,
                                     maxNodes * sizeof(GROUP_AFFINITY));
         }
         nodeNumber[numNodes] = ptr->NumaNode.NodeNumber;
-        node_group_mask[numNodes] = ptr->NumaNode.GroupMask;
+        nodeGroupMask[numNodes] = ptr->NumaNode.GroupMask;
         numNodes++;
       }
       offset += ptr->Size;
@@ -251,7 +240,6 @@ void numa_init(void)
 
     // Then count cores in each node
     numPhysicalCores = calloc(numNodes, sizeof(int));
-//    numLogicalCores = calloc(numNodes, sizeof(int));
     ptr = buffer;
     offset = 0;
     while (ptr->Size > 0 && offset + ptr->Size <= len) {
@@ -259,8 +247,8 @@ void numa_init(void)
         // Loop through nodes to find one with matching group number
         // and intersecting mask
         for (int i = 0; i < numNodes; i++)
-          if (   node_group_mask[i].Group == ptr->Processor.GroupMask[0].Group
-              && (node_group_mask[i].Mask & ptr->Processor.GroupMask[0].Mask))
+          if (   nodeGroupMask[i].Group == ptr->Processor.GroupMask[0].Group
+              && (nodeGroupMask[i].Mask & ptr->Processor.GroupMask[0].Mask))
             numPhysicalCores[i]++;
       }
       offset += ptr->Size;
@@ -336,11 +324,10 @@ void numa_exit(void)
 
   free(nodeNumber);
   if (!nodeMask)
-    free(node_group_mask);
+    free(nodeGroupMask);
   else
     free(nodeMask);
   free(numPhysicalCores);
-//  free(numLogicalCores);
 }
 
 void read_numa_nodes(char *str)
@@ -396,8 +383,8 @@ int bind_thread_to_numa_node(int threadIdx)
   if (!nodeMask) {
     GROUP_AFFINITY aff;
     memset(&aff, 0, sizeof(aff));
-    aff.Group = node_group_mask[node].Group;
-    aff.Mask = node_group_mask[node].Mask;
+    aff.Group = nodeGroupMask[node].Group;
+    aff.Mask = nodeGroupMask[node].Mask;
     printf("info string Binding thread %d to node %d in group %d.\n",
            threadIdx, nodeNumber[node], aff.Group);
     if (!impSetThreadGroupAffinity(GetCurrentThread(), &aff, NULL))
