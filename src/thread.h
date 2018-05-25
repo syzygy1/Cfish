@@ -22,7 +22,7 @@
 #define THREAD_H
 
 #include <stdatomic.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <pthread.h>
 #else
 #include <windows.h>
@@ -32,7 +32,7 @@
 
 #define MAX_THREADS 512
 
-#ifndef __WIN32__
+#ifndef _WIN32
 #define LOCK_T pthread_mutex_t
 #define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
 #define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
@@ -46,12 +46,13 @@
 #define UNLOCK(x) ReleaseMutex(x)
 #endif
 
-void thread_init(void *arg);
-void thread_create(int idx);
+enum {
+  THREAD_SLEEP, THREAD_SEARCH, THREAD_TT_CLEAR, THREAD_EXIT, THREAD_RESUME
+};
+
 void thread_search(Pos *pos);
-void thread_idle_loop(Pos *pos);
-void thread_start_searching(Pos *pos, int resume);
-void thread_wait_for_search_finished(Pos *pos);
+void thread_wake_up(Pos *pos, int action);
+void thread_wait_until_sleeping(Pos *pos);
 void thread_wait(Pos *pos, atomic_bool *b);
 
 
@@ -67,7 +68,7 @@ typedef struct MainThread MainThread;
 
 extern MainThread mainThread;
 
-void mainthread_search();
+void mainthread_search(void);
 
 
 // ThreadPool struct handles all the threads-related stuff like init,
@@ -76,8 +77,8 @@ void mainthread_search();
 
 struct ThreadPool {
   Pos *pos[MAX_THREADS];
-  int num_threads;
-#ifndef __WIN32__
+  int numThreads;
+#ifndef _WIN32
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;
   int initializing;
@@ -102,8 +103,7 @@ INLINE Pos *threads_main(void)
   return Threads.pos[0];
 }
 
-CounterMoveHistoryStat **cmh_tables;
-int num_cmh_tables;
+CounterMoveHistoryStat **cmhTables;
+int numCmhTables;
 
 #endif
-

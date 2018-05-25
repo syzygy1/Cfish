@@ -21,8 +21,6 @@
 #ifndef SEARCH_H
 #define SEARCH_H
 
-#include <stdatomic.h>
-
 #include "misc.h"
 #include "position.h"
 #include "thread.h"
@@ -34,7 +32,7 @@
 // moves.
 
 struct RootMove {
-  int pv_size;
+  int pvSize;
   Value score;
   Value previousScore;
   int selDepth;
@@ -68,7 +66,7 @@ struct LimitsType {
   int ponder;
   uint64_t nodes;
   TimePoint startTime;
-  int num_searchmoves;
+  int numSearchmoves;
   Move searchmoves[MAX_MOVES];
 };
 
@@ -98,9 +96,8 @@ INLINE int use_time_management(void)
                        | Limits.infinite);
 }
 
-void search_clear();
+void search_clear(void);
 uint64_t perft(Pos *pos, Depth depth);
 void start_thinking(Pos *pos);
 
 #endif
-

@@ -75,11 +75,6 @@ INLINE int semiopen_file(PawnEntry *pe, int c, int f)
   return pe->semiopenFiles[c] & (1 << f);
 }
 
-INLINE int semiopen_side(PawnEntry *pe, int c, int f, int left)
-{
-  return pe->semiopenFiles[c] & (left ? (1 << f) - 1 : ~((1 << (f + 1)) - 1));
-}
-
 INLINE int pawns_on_same_color_squares(PawnEntry *pe, int c, Square s)
 {
   return pe->pawnsOnSquares[c][!!(DarkSquares & sq_bb(s))];
@@ -103,7 +98,6 @@ INLINE Score king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
     return pe->kingSafety[BLACK] = do_king_safety_black(pe, pos, ksq);
 }
 
-void pawn_init();
+void pawn_init(void);
 
 #endif
-

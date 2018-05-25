@@ -23,11 +23,12 @@
 
 #include <assert.h>
 #include <stdio.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <pthread.h>
 #endif
 #include <stdatomic.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "types.h"
 
@@ -52,6 +53,8 @@ INLINE void prefetch(void *addr)
 #else
   __builtin_prefetch(addr);
 #endif
+#else
+  (void)addr;
 #endif
 }
 
@@ -63,24 +66,34 @@ INLINE void prefetch2(void *addr)
 
 typedef int64_t TimePoint; // A value in milliseconds
 
-INLINE TimePoint now() {
+INLINE TimePoint now(void) {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return 1000 * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec / 1000;
 }
 
-#ifndef __WIN32__
-extern pthread_mutex_t io_mutex;
-#define IO_LOCK   pthread_mutex_lock(&io_mutex)
-#define IO_UNLOCK pthread_mutex_unlock(&io_mutex)
-#else
-ssize_t getline(char **lineptr, size_t *n, FILE *stream);
-extern HANDLE io_mutex;
-#define IO_LOCK WaitForSingleObject(io_mutex, INFINITE)
-#define IO_UNLOCK ReleaseMutex(io_mutex)
-int large_pages_supported(void);
-extern size_t large_page_minimum;
+#ifdef _WIN32
+bool large_pages_supported(void);
+extern size_t largePageMinimum;
 #endif
+
+ssize_t getline(char **lineptr, size_t *n, FILE *stream);
+
+#ifndef _WIN32
+typedef int FD;
+#define FD_ERR -1
+typedef size_t map_t;
+#else
+typedef HANDLE FD;
+#define FD_ERR INVALID_HANDLE_VALUE
+typedef HANDLE map_t;
+#endif
+
+FD open_file(const char *name);
+void close_file(FD fd);
+size_t file_size(FD fd);
+void *map_file(FD fd, map_t *map);
+void unmap_file(void *data, map_t map);
 
 struct PRNG
 {
@@ -93,5 +106,45 @@ void prng_init(PRNG *rng, uint64_t seed);
 uint64_t prng_rand(PRNG *rng);
 uint64_t prng_sparse_rand(PRNG *rng);
 
-#endif
+INLINE int is_little_endian(void)
+{
+  int num = 1;
+  return *(uint8_t *)&num == 1;
+}
 
+INLINE uint32_t from_le_u32(uint32_t v)
+{
+  return is_little_endian() ? v : __builtin_bswap32(v);
+}
+
+INLINE uint16_t from_le_u16(uint16_t v)
+{
+  return is_little_endian() ? v : __builtin_bswap16(v);
+}
+
+INLINE uint64_t from_be_u64(uint64_t v)
+{
+  return is_little_endian() ? __builtin_bswap64(v) : v;
+}
+
+INLINE uint32_t from_be_u32(uint32_t v)
+{
+  return is_little_endian() ? __builtin_bswap32(v) : v;
+}
+
+INLINE uint16_t from_be_u16(uint16_t v)
+{
+  return is_little_endian() ? __builtin_bswap16(v) : v;
+}
+
+INLINE uint32_t read_le_u32(void *p)
+{
+  return from_le_u32(*(uint32_t *)p);
+}
+
+INLINE uint16_t read_le_u16(void *p)
+{
+  return from_le_u16(*(uint16_t *)p);
+}
+
+#endif

@@ -98,8 +98,7 @@ INLINE int tte_bound(TTEntry *tte)
 // clusters never cross cache lines. This ensures best cache performance,
 // as the cacheline is prefetched, as soon as possible.
 
-#define CacheLineSize 64
-#define ClusterSize 3
+enum { CacheLineSize = 64, ClusterSize = 3 };
 
 struct Cluster {
   TTEntry entry[ClusterSize];
@@ -118,7 +117,7 @@ struct TranspositionTable {
 #endif
   Cluster *table;
   void *mem;
-  size_t alloc_size;
+  size_t allocSize;
   uint8_t generation8; // Size must be not bigger than TTEntry::genBound8
 };
 
@@ -151,6 +150,7 @@ TTEntry *tt_probe(Key key, int *found);
 int tt_hashfull(void);
 void tt_allocate(size_t mbSize);
 void tt_clear(void);
+void tt_clear_worker(int idx);
 
 #endif
 

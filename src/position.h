@@ -22,7 +22,7 @@
 #define POSITION_H
 
 #include <assert.h>
-#ifndef __WIN32__
+#ifndef _WIN32
 #include <pthread.h>
 #endif
 #include <stdatomic.h>
@@ -31,6 +31,9 @@
 
 #include "bitboard.h"
 #include "types.h"
+
+extern const char PieceToChar[];
+extern Key matKey[16];
 
 struct Zob {
   Key psq[16][64];
@@ -80,7 +83,6 @@ struct Stack {
   Move* pv;
   PieceToHistory *history;
   uint8_t ply;
-  uint8_t skipEarlyPruning;
   Move currentMove;
   Move excludedMove;
   Move killers[2];
@@ -93,7 +95,7 @@ struct Stack {
   Depth depth;
   Move ttMove;
   Value threshold;
-  Move mp_killers[2];
+  Move mpKillers[2];
   uint8_t stage;
   uint8_t recaptureSquare;
   ExtMove *cur, *endMoves, *endBadCaptures;
@@ -151,11 +153,12 @@ struct Pos {
   RootMoves *rootMoves;
   Stack *stack;
   uint64_t nodes;
-  uint64_t tb_hits;
+  uint64_t tbHits;
   int PVIdx, PVLast;
-  int selDepth, nmp_ply, nmp_odd;
+  int selDepth, nmpPly, nmpOdd;
   Depth rootDepth;
   Depth completedDepth;
+  Score contempt;
 
   // Pointers to thread-specific tables.
   CounterMoveStat *counterMoves;
@@ -168,9 +171,9 @@ struct Pos {
   // Thread-control data.
   atomic_bool resetCalls;
   int callsCnt;
-  int exit, searching;
-  int thread_idx;
-#ifndef __WIN32__
+  int action;
+  int threadIdx;
+#ifndef _WIN32
   pthread_t nativeThread;
   pthread_mutex_t mutex;
   pthread_cond_t sleepCondition;
@@ -205,6 +208,7 @@ PURE Value see_test(const Pos *pos, Move m, int value);
 
 PURE Key key_after(const Pos *pos, Move m);
 PURE int is_draw(const Pos *pos);
+PURE bool has_game_cycle(const Pos *pos);
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])
@@ -277,19 +281,9 @@ PURE int is_draw(const Pos *pos);
 #define pos_non_pawn_material(c) (pos->st->nonPawnMaterial[c])
 #define pos_pawns_only() (!pos->st->nonPawn)
 
-INLINE Bitboard discovered_check_candidates(const Pos *pos)
-{
-  return pos->st->blockersForKing[pos_stm() ^ 1] & pieces_c(pos_stm());
-}
-
 INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
 {
   return pos->st->blockersForKing[c];
-}
-
-INLINE Bitboard pinned_pieces(const Pos *pos, uint32_t c)
-{
-  return pos->st->blockersForKing[c] & pieces_c(c);
 }
 
 INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
@@ -336,7 +330,7 @@ INLINE int is_capture(const Pos *pos, Move m)
 
 INLINE int gives_check(const Pos *pos, Stack *st, Move m)
 {
-  return  type_of_m(m) == NORMAL && !discovered_check_candidates(pos)
+  return  type_of_m(m) == NORMAL && !(blockers_for_king(pos, pos_stm() ^ 1) & pieces_c(pos_stm()))
         ? !!(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
         : gives_check_special(pos, st, m);
 }
@@ -401,4 +395,3 @@ INLINE Bitboard pos_attackers_to_occ(const Pos *pos, Square s,
 }
 
 #endif
-

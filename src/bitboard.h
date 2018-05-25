@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -25,10 +25,10 @@
 
 #include "types.h"
 
-void bitbases_init();
+void bitbases_init(void);
 unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us);
 
-void bitboards_init();
+void bitboards_init(void);
 void print_pretty(Bitboard b);
 
 #define AllSquares (~0ULL)
@@ -86,19 +86,16 @@ extern uint8_t CastlingRookTo[16];
 INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
 {
   return SquareBB[s];
-//  Bitboard b;
-//  __asm__("xor %0, %0\n\tbtsq %1, %0" : "=&r" (b) : "r" ((uint64_t)s) : "cc");
-//  return b;
 }
 
 #if __x86_64__
-INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
+INLINE Bitboard inv_sq(Bitboard b, Square s)
 {
   __asm__("btcq %1, %0" : "+r" (b) : "r" ((uint64_t)s) : "cc");
   return b;
 }
 #else
-INLINE Bitboard inv_sq(Bitboard b, uint32_t s)
+INLINE Bitboard inv_sq(Bitboard b, Square s)
 {
   return b ^ sq_bb(s);
 }
@@ -113,7 +110,7 @@ INLINE uint64_t more_than_one(Bitboard b)
 // rank_bb() and file_bb() return a bitboard representing all the squares on
 // the given file or rank.
 
-INLINE Bitboard rank_bb(unsigned r)
+INLINE Bitboard rank_bb(Rank r)
 {
   return RankBB[r];
 }
@@ -123,7 +120,7 @@ INLINE Bitboard rank_bb_s(Square s)
   return RankBB[rank_of(s)];
 }
 
-INLINE Bitboard file_bb(unsigned f)
+INLINE Bitboard file_bb(File f)
 {
   return FileBB[f];
 }
@@ -139,6 +136,8 @@ INLINE Bitboard shift_bb(int Direction, Bitboard b)
 {
   return  Direction == NORTH  ?  b  << 8
         : Direction == SOUTH  ?  b  >> 8
+        : Direction == EAST   ? (b & ~FileHBB) << 1
+        : Direction == WEST   ? (b & ~FileABB) >> 1
         : Direction == NORTH_EAST ? (b & ~FileHBB) << 9
         : Direction == SOUTH_EAST ? (b & ~FileHBB) >> 7
         : Direction == NORTH_WEST ? (b & ~FileABB) << 7
@@ -146,12 +145,6 @@ INLINE Bitboard shift_bb(int Direction, Bitboard b)
         : 0;
 }
 
-#define shift_bb_N(b)  ((b) << 8)
-#define shift_bb_S(b)  ((b) >> 8)
-#define shift_bb_NE(b) (((b) & ~FileHBB) << 9)
-#define shift_bb_SE(b) (((b) & ~FileHBB) >> 7)
-#define shift_bb_NW(b) (((b) & ~FileABB) << 7)
-#define shift_bb_SW(b) (((b) & ~FileABB) >> 9)
 
 // adjacent_files_bb() returns a bitboard representing all the squares
 // on the adjacent files of the given one.
@@ -313,7 +306,9 @@ INLINE int msb(Bitboard b)
   return 63 ^ __builtin_clzll(b);
 }
 
-#elif defined(_WIN64) && defined(_MSC_VER)
+#elif defined(_MSC_VER)
+
+#if defined(_WIN64)
 
 INLINE Square lsb(Bitboard b)
 {
@@ -333,10 +328,37 @@ INLINE Square msb(Bitboard b)
 
 #else
 
-#define NO_BSF // Fallback on software implementation for other cases
+INLINE Square lsb(Bitboard b)
+{
+  assert(b);
+  unsigned long idx;
+  if ((uint32_t)b) {
+    _BitScanForward(&idx, (uint32_t)b);
+    return idx;
+  } else {
+    _BitScanForward(&idx, (uint32_t)(b >> 32));
+    return idx + 32;
+  }
+}
 
-Square lsb(Bitboard b);
-Square msb(Bitboard b);
+INLINE Square msb(Bitboard b)
+{
+  assert(b);
+  unsigned long idx;
+  if (b >> 32) {
+    _BitScanReverse(&idx, (uint32_t)(b >> 32));
+    return idx + 32;
+  } else {
+    _BitScanReverse(&idx, (uint32_t)b);
+    return idx;
+  }
+}
+
+#endif
+
+#else
+
+#error "Compiler not supported."
 
 #endif
 
@@ -366,4 +388,3 @@ INLINE Square  backmost_sq(unsigned c, Bitboard b)
 }
 
 #endif
-

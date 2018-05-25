@@ -5,14 +5,14 @@
 
 struct settings {
   NodeMask mask;
-  int numa_enabled;
-  size_t tt_size;
-  size_t num_threads;
-  int large_pages;
-  int clear;
+  size_t ttSize;
+  size_t numThreads;
+  bool numaEnabled;
+  bool largePages;
+  bool clear;
 };
 
-extern struct settings settings, delayed_settings;
+extern struct settings settings, delayedSettings;
 
 void process_delayed_settings(void);
 

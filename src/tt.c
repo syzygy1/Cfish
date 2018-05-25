@@ -20,15 +20,17 @@
 
 #define _GNU_SOURCE
 
-#include <string.h>   // For std::memset
+#include <inttypes.h>
 #include <stdio.h>
-#ifndef __WIN32__
+#include <string.h>   // For std::memset
+#ifndef _WIN32
 #include <sys/mman.h>
 #endif
 
 #include "bitboard.h"
 #include "numa.h"
 #include "settings.h"
+#include "thread.h"
 #include "tt.h"
 #include "types.h"
 #include "uci.h"
@@ -39,12 +41,12 @@ TranspositionTable TT; // Our global transposition table
 
 void tt_free(void)
 {
-#ifdef __WIN32__
+#ifdef _WIN32
   if (TT.mem)
     VirtualFree(TT.mem, 0, MEM_RELEASE);
 #else
   if (TT.mem)
-    munmap(TT.mem, TT.alloc_size);
+    munmap(TT.mem, TT.allocSize);
 #endif
   TT.mem = NULL;
 }
@@ -66,13 +68,13 @@ void tt_allocate(size_t mbSize)
 
   size_t size = count * sizeof(Cluster);
 
-#ifdef __WIN32__
+#ifdef _WIN32
 
   TT.mem = NULL;
-  if (settings.large_pages) {
-    size_t page_size = large_page_minimum;
-    size_t lp_size = (size + page_size - 1) & ~(page_size - 1);
-    TT.mem = VirtualAlloc(NULL, lp_size,
+  if (settings.largePages) {
+    size_t pageSize = largePageMinimum;
+    size_t lpSize = (size + pageSize - 1) & ~(pageSize - 1);
+    TT.mem = VirtualAlloc(NULL, lpSize,
                           MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES,
                           PAGE_READWRITE);
     if (!TT.mem)
@@ -91,12 +93,12 @@ void tt_allocate(size_t mbSize)
 
 #else /* Unix */
 
-  size_t alignment = settings.large_pages ? (1ULL << 21) : 1;
-  size_t alloc_size = size + alignment - 1;
+  size_t alignment = settings.largePages ? (1ULL << 21) : 1;
+  size_t allocSize = size + alignment - 1;
 
 #if defined(__APPLE__) && defined(VM_FLAGS_SUPERPAGE_SIZE_2MB)
 
-  if (settings.large_pages) {
+  if (settings.largePages) {
     TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
                   MAP_PRIVATE | MAP_ANONYMOUS, VM_FLAGS_SUPERPAGE_SIZE_2MB, 0);
     if (!TT.mem)
@@ -107,47 +109,39 @@ void tt_allocate(size_t mbSize)
     fflush(stdout);
   }
   if (!TT.mem)
-    TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
+    TT.mem = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
 #else
 
-  TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
+  TT.mem = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 #endif
 
-  TT.alloc_size = alloc_size;
+  TT.allocSize = allocSize;
   TT.table = (Cluster *)(  (((uintptr_t)TT.mem) + alignment - 1)
                          & ~(alignment - 1));
   if (!TT.mem)
     goto failed;
 
-#ifdef NUMA
-  // Interleave the shared transposition table across all nodes.
-  // Create an interleave mask of the nodes on which threads are
-  // actually running?
-  if (settings.numa_enabled)
-    numa_interleave_memory(TT.table, count * sizeof(Cluster), settings.mask);
-#endif
-
-#ifdef __linux__
-#ifdef MADV_HUGEPAGE
+#if defined(__linux__) && defined(MADV_HUGEPAGE)
 
   // Advise the kernel to allocate large pages.
-  if (settings.large_pages)
+  if (settings.largePages)
     madvise(TT.table, count * sizeof(Cluster), MADV_HUGEPAGE);
 
 #endif
 #endif
 
-#endif
-
+  // Clear the TT table to page in the memory immediately. This avoids
+  // an initial slow down during the first second or minutes of the search.
+  tt_clear();
   return;
 
-
 failed:
-  fprintf(stderr, "Failed to allocate %" FMT_Z "uMB for "
-                  "transposition table.\n", mbSize);
+  fprintf(stderr, "Failed to allocate %"PRIu64"MB for "
+                  "transposition table.\n", (uint64_t)mbSize);
   exit(EXIT_FAILURE);
 }
 
@@ -158,8 +152,32 @@ failed:
 
 void tt_clear(void)
 {
-  if (TT.table)
-    memset(TT.table, 0, (TT.mask + 1) * sizeof(Cluster));
+  // We let search threads clear the table in parallel. In NUMA mode,
+  // this has the beneficial effect of spreading the TT over all nodes.
+
+  if (TT.table) {
+    for (int idx = 0; idx < Threads.numThreads; idx++)
+      thread_wake_up(Threads.pos[idx], THREAD_TT_CLEAR);
+    for (int idx = 0; idx < Threads.numThreads; idx++)
+      thread_wait_until_sleeping(Threads.pos[idx]);
+  }
+}
+
+void tt_clear_worker(int idx)
+{
+  // Find out which part of the TT this thread should clear.
+  // To each thread we assign a number of 2MB blocks.
+
+  size_t total = (TT.mask + 1) * sizeof(Cluster);
+  size_t slice = (total + Threads.numThreads - 1) / Threads.numThreads;
+  size_t blocks = (slice + (2 * 1024 * 1024) - 1) / (2 * 1024 * 1024);
+  size_t begin = idx * blocks * (2 * 1024 * 1024);
+  size_t end = begin + blocks * (2 * 1024 * 1024);
+  begin = min(begin, total);
+  end = min(end, total);
+
+  // Now clear that part
+  memset((uint8_t *)TT.table + begin, 0, end - begin);
 }
 
 
@@ -179,13 +197,13 @@ TTEntry *tt_probe(Key key, int *found)
   for (int i = 0; i < ClusterSize; i++)
     if (!tte[i].key16 || tte[i].key16 == key16) {
       if ((tte[i].genBound8 & 0xFC) != TT.generation8 && tte[i].key16)
-        tte[i].genBound8 = (uint8_t)(TT.generation8 | tte_bound(&tte[i])); // Refresh
-      *found = (int)tte[i].key16;
+        tte[i].genBound8 = TT.generation8 | tte_bound(&tte[i]); // Refresh
+      *found = tte[i].key16;
       return &tte[i];
     }
 
   // Find an entry to be replaced according to the replacement strategy
-  TTEntry* replace = tte;
+  TTEntry *replace = tte;
   for (int i = 1; i < ClusterSize; i++)
     // Due to our packed storage format for generation and its cyclic
     // nature we add 259 (256 is the modulus plus 3 to keep the lowest
@@ -214,4 +232,3 @@ int tt_hashfull(void)
   }
   return cnt;
 }
-

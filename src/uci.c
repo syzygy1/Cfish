@@ -18,7 +18,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -36,7 +35,8 @@
 extern void benchmark(Pos *pos, char *str);
 
 // FEN string of the initial position, normal chess
-const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+static const char StartFEN[] =
+  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 // position() is called when the engine receives the "position" UCI
 // command. The function sets up the position described in the given FEN
@@ -93,25 +93,28 @@ void position(Pos *pos, char *str)
     int k = (pos->st - (pos->stack + 100)) - max(5, pos->st->pliesFromNull);
     for (; k < 0; k++)
       memcpy(pos->stack + 100 + k, pos->stack + 200 + k, StateSize);
-
-    // Finally, clear history position keys that have not yet repeated.
-    // This ensures that is_draw() does not flag as a draw the first
-    // repetition of a position coming before the root position.
-    // In addition, we set pos->hasRepeated to indicate whether a position
-    // has repeated since the last zeroing move.
-    for (k = 0; k <= pos->st->pliesFromNull; k++) {
-      int l;
-      for (l = k + 4; l <= pos->st->pliesFromNull; l += 2)
-        if ((pos->st - k)->key == (pos->st - l)->key)
-          break;
-      if (l <= pos->st->pliesFromNull)
-        pos->hasRepeated = 1;
-      else if ((pos->st - k)->key != pos->st->key)
-        (pos->st - k)->key = 0ULL;
-    }
   }
+
   pos->rootKeyFlip = pos->st->key;
   (pos->st-1)->endMoves = pos->moveList;
+
+  // Clear history position keys that have not yet repeated. This ensures
+  // that is_draw() does not flag as a draw the first repetition of a
+  // position coming before the root position. In addition, we set
+  // pos->hasRepeated to indicate whether a position has repeated since
+  // the last irreversible move.
+  for (int k = 0; k <= pos->st->pliesFromNull; k++) {
+    int l;
+    for (l = k + 4; l <= pos->st->pliesFromNull; l += 2)
+      if ((pos->st - k)->key == (pos->st - l)->key)
+        break;
+    if (l <= pos->st->pliesFromNull)
+      pos->hasRepeated = 1;
+    else
+      (pos->st - k)->key = 0;
+  }
+  pos->rootKeyFlip ^= pos->st->key;
+  pos->st->key ^= pos->rootKeyFlip;
 }
 
 
@@ -158,23 +161,19 @@ error:
 // the thinking time and other parameters from the input string, then starts
 // the search.
 
-void go(Pos *pos, char *str)
+static void go(Pos *pos, char *str)
 {
   char *token;
 
   process_delayed_settings();
 
+  Limits = (struct LimitsType){ 0 };
   Limits.startTime = now(); // As early as possible!
-
-  Limits.time[0] = Limits.time[1] = Limits.inc[0] = Limits.inc[1] = 0;
-  Limits.npmsec = Limits.movestogo = Limits.depth = Limits.movetime = 0;
-  Limits.mate = Limits.infinite = Limits.ponder = Limits.num_searchmoves = 0;
-  Limits.nodes = 0;
 
   for (token = strtok(str, " \t"); token; token = strtok(NULL, " \t")) {
     if (strcmp(token, "searchmoves") == 0)
       while ((token = strtok(NULL, " \t")))
-        Limits.searchmoves[Limits.num_searchmoves++] = uci_to_move(pos, token);
+        Limits.searchmoves[Limits.numSearchmoves++] = uci_to_move(pos, token);
     else if (strcmp(token, "wtime") == 0)
       Limits.time[WHITE] = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "btime") == 0)
@@ -228,7 +227,7 @@ void uci_loop(int argc, char **argv)
 
   // Signals.searching is only read and set by the UI thread.
   // The UI thread uses it to know whether it must still call
-  // thread_wait_for_search_finished() on the main search thread.
+  // thread_wait_until_sleeping() on the main search thread.
   // (This is important for our native Windows threading implementation.)
   Signals.searching = 0;
 
@@ -265,6 +264,7 @@ void uci_loop(int argc, char **argv)
 
   strcpy(fen, StartFEN);
   pos_set(&pos, fen, 0);
+  pos.rootKeyFlip = pos.st->key;
 
   do {
     if (argc == 1 && !getline(&cmd, &buf_size, stdin))
@@ -292,13 +292,12 @@ void uci_loop(int argc, char **argv)
     // waiting for 'ponderhit' to stop the search (for instance because we
     // already ran out of time), otherwise we should continue searching but
     // switching from pondering to normal search.
-    if (   strcmp(token, "quit") == 0
-        || strcmp(token, "stop") == 0) {
+    if (strcmp(token, "quit") == 0 || strcmp(token, "stop") == 0) {
       if (Signals.searching) {
         Signals.stop = 1;
         LOCK(Signals.lock);
         if (Signals.sleeping)
-          thread_start_searching(threads_main(), 1); // Wake up main thread.
+          thread_wake_up(threads_main(), THREAD_RESUME);
         Signals.sleeping = 0;
         UNLOCK(Signals.lock);
       }
@@ -310,7 +309,7 @@ void uci_loop(int argc, char **argv)
       LOCK(Signals.lock);
       if (Signals.sleeping) {
         Signals.stop = 1;
-        thread_start_searching(threads_main(), 1); // Wake up main thread.
+        thread_wake_up(threads_main(), THREAD_RESUME);
         Signals.sleeping = 0;
       }
       UNLOCK(Signals.lock);
@@ -349,7 +348,7 @@ void uci_loop(int argc, char **argv)
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
   if (Signals.searching)
-    thread_wait_for_search_finished(threads_main());
+    thread_wait_until_sleeping(threads_main());
 
   free(cmd);
   free(pos.stack);
@@ -441,4 +440,3 @@ Move uci_to_move(const Pos *pos, char *str)
 
   return 0;
 }
-

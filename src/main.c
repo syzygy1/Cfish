@@ -23,6 +23,7 @@
 #include "bitboard.h"
 #include "endgame.h"
 #include "pawns.h"
+#include "polybook.h"
 #include "position.h"
 #include "search.h"
 #include "thread.h"
@@ -35,8 +36,8 @@ int main(int argc, char **argv)
   print_engine_info(0);
 
   psqt_init();
-  zob_init();
   bitboards_init();
+  zob_init();
   bitbases_init();
   pawn_init();
   endgames_init();
@@ -50,7 +51,7 @@ int main(int argc, char **argv)
   TB_free();
   options_free();
   tt_free();
+  pb_free();
 
   return 0;
 }
-

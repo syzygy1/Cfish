@@ -22,7 +22,10 @@
 ### ==========================================================================
 
 ### Establish the operating system name
-UNAME = $(shell uname)
+KERNEL = $(shell uname -s)
+ifeq ($(KERNEL),Linux)
+	OS = $(shell uname -o)
+endif
 
 ### Executable name
 EXE = cripplefish
@@ -57,6 +60,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # pext = yes/no       --- -DUSE_PEXT       --- Use pext x86_64 asm-instruction
 # native = yes/no     --- -march=native    --- Optimize for local CPU
 # numa = yes/no       --- -DNUMA           --- Enable NUMA support
+# lto = yes/no        --- -flto            --- Enable link-time optimization
 #
 # Note that Makefile is space sensitive, so when adding new architectures
 # or modifying existing flags, you have to make sure there are no extra spaces
@@ -73,64 +77,74 @@ sse = yes
 pext = no
 native = yes
 numa = yes
+lto = no
+extra = no
 
 ### 2.2 Architecture specific
 
 ifeq ($(ARCH),general-32)
 	arch = any
+	bits = 32
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-32-old)
 	arch = i386
+	bits = 32
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-32)
 	arch = i386
-	prefetch = yes
-	sse = yes
+	bits = 32
+	popcnt = no
 endif
 
 ifeq ($(ARCH),general-64)
 	arch = any
-	bits = 64
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-64)
 	arch = x86_64
-	bits = 64
-	prefetch = yes
-	sse = yes
+	popcnt = no
 endif
 
 ifeq ($(ARCH),x86-64-modern)
 	arch = x86_64
-	bits = 64
-	prefetch = yes
-	popcnt = yes
-	sse = yes
 endif
 
 ifeq ($(ARCH),x86-64-bmi2)
 	arch = x86_64
-	bits = 64
-	prefetch = yes
-	popcnt = yes
-	sse = yes
 	pext = yes
 endif
 
 ifeq ($(ARCH),armv7)
 	arch = armv7
-	prefetch = yes
+	bits = 32
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),ppc-32)
 	arch = ppc
+	bits = 32
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 ifeq ($(ARCH),ppc-64)
 	arch = ppc64
-	bits = 64
+	prefetch = no
+	sse = no
+	popcnt = no
 endif
 
 
@@ -151,16 +165,27 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow -m$(bits)
-	ifneq ($(UNAME),Darwin)
-	   LDFLAGS += -Wl,--no-as-needed
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format
+	ifeq ($(ARCH),armv7)
+		ifeq ($(OS),Android)
+			CFLAGS += -m$(bits)
+			LDFLAGS += -m$(bits)
+		endif
+	else
+		CFLAGS += -m$(bits)
+		LDFLAGS += -m$(bits)
+	endif
+
+	ifneq ($(KERNEL),Darwin)
+		LDFLAGS += -Wl,--no-as-needed
 	endif
 endif
 
 ifeq ($(COMP),mingw)
 	comp=mingw
-
-	ifeq ($(UNAME),Linux)
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format -m$(bits)
+	LDFLAGS += -m$(bits)
+	ifeq ($(KERNEL),Linux)
 		ifeq ($(bits),64)
 #			ifeq ($(shell which x86_64-w64-mingw32-cc-posix),)
 				CC=x86_64-w64-mingw32-gcc
@@ -177,9 +202,6 @@ ifeq ($(COMP),mingw)
 	else
 		CC=gcc
 	endif
-
-	CFLAGS += -Wextra -Wshadow
-	LDFLAGS += #-static
 endif
 
 ifeq ($(COMP),icc)
@@ -191,27 +213,37 @@ endif
 ifeq ($(COMP),clang)
 	comp=clang
 	CC=clang
-	CFLAGS += -pedantic -Wextra -Wshadow -m$(bits)
-	LDFLAGS += -m$(bits)
-	ifeq ($(UNAME),Darwin)
+	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
+	ifeq ($(ARCH),armv7)
+		ifeq ($(OS),Android)
+			CFLAGS += -m$(bits)
+			LDFLAGS += -m$(bits)
+		endif
+	else
+		CFLAGS += -m$(bits)
+		LDFLAGS += -m$(bits)
+	endif
+
+	ifeq ($(KERNEL),Darwin)
 		CFLAGS += 
 		DEPENDFLAGS += 
 	endif
 endif
 
 ifeq ($(comp),icc)
-	profile_prepare = icc-profile-prepare
 	profile_make = icc-profile-make
 	profile_use = icc-profile-use
-	profile_clean = icc-profile-clean
 else
-	profile_prepare = gcc-profile-prepare
+ifeq ($(comp),clang)
+	profile_make = clang-profile-make
+	profile_use = clang-profile-use
+else
 	profile_make = gcc-profile-make
 	profile_use = gcc-profile-use
-	profile_clean = gcc-profile-clean
+endif
 endif
 
-ifeq ($(UNAME),Darwin)
+ifeq ($(KERNEL),Darwin)
 	CFLAGS += -arch $(arch) -mmacosx-version-min=10.9
 	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.9
 endif
@@ -231,7 +263,7 @@ ifneq ($(comp),mingw)
 	# On Android Bionic's C library comes with its own pthread implementation bundled in
 	ifneq ($(arch),armv7)
 		# Haiku has pthreads in its libroot, so only link it in on other platforms
-		ifneq ($(UNAME),Haiku)
+		ifneq ($(KERNEL),Haiku)
 			LDFLAGS += -lpthread
 		endif
 	endif
@@ -249,40 +281,19 @@ ifeq ($(optimize),yes)
 
 	CFLAGS += -O3
 
-	ifeq ($(comp),gcc)
-
-		ifeq ($(UNAME),Darwin)
-			ifeq ($(arch),i386)
-				CFLAGS += -mdynamic-no-pic
-			endif
-			ifeq ($(arch),x86_64)
-				CFLAGS += -mdynamic-no-pic
-			endif
+	ifeq ($(comp),$(filter $(comp),gcc mingw))
+		ifeq ($(extra),yes)
+			CFLAGS += -fira-loop-pressure -fconserve-stack -fmodulo-sched -fmodulo-sched-allow-regmoves -fsched-pressure -flimit-function-alignment
 		endif
 
-		ifeq ($(arch),armv7)
+		ifeq ($(OS),Android)
 			CFLAGS += -fno-gcse -mthumb -march=armv7-a -mfloat-abi=softfp
 		endif
 	endif
 
-	ifeq ($(comp),icc)
-		ifeq ($(UNAME),Darwin)
+	ifeq ($(comp),$(filter $(comp),gcc clang icc))
+		ifeq ($(KERNEL),Darwin)
 			CFLAGS += -mdynamic-no-pic
-		endif
-	endif
-
-	ifeq ($(comp),clang)
-		ifeq ($(UNAME),Darwin)
-			ifeq ($(pext),no)
-				CFLAGS += -flto
-				LDFLAGS += $(CFLAGS)
-			endif
-			ifeq ($(arch),i386)
-				CFLAGS += -mdynamic-no-pic
-			endif
-			ifeq ($(arch),x86_64)
-				CFLAGS += -mdynamic-no-pic
-			endif
 		endif
 	endif
 endif
@@ -327,7 +338,7 @@ endif
 ### numa
 ifeq ($(numa),yes)
 	CFLAGS += -DNUMA
-        ifeq ($(UNAME),Linux)
+        ifeq ($(KERNEL),Linux)
         ifneq ($(comp),mingw)
 		LDFLAGS += -lnuma
         endif
@@ -337,24 +348,15 @@ endif
 ### 3.8 Link Time Optimization, it works since gcc 4.5 but not on mingw under Windows.
 ### This is a mix of compile and link time options because the lto link phase
 ### needs access to the optimization flags.
-ifeq ($(comp),gcc)
-	ifeq ($(optimize),yes)
-	ifeq ($(debug),no)
-		CFLAGS += # -flto
+ifeq ($(lto),yes)
+ifeq ($(optimize),yes)
+ifeq ($(debug),no)
+	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
+		CFLAGS += -flto
 		LDFLAGS += $(CFLAGS)
-	endif
 	endif
 endif
-
-ifeq ($(comp),mingw)
-	ifeq ($(UNAME),Linux)
-	ifeq ($(optimize),yes)
-	ifeq ($(debug),no)
-		CFLAGS += # -flto
-		LDFLAGS += $(CFLAGS)
-	endif
-	endif
-	endif
+endif
 endif
 
 ### 3.9 Android 5 can only run position independent executables. Note that this
@@ -414,31 +416,27 @@ help:
 	@echo "make profile-build ARCH=x86-64-modern COMP=gcc COMPCC=gcc-4.8"
 	@echo ""
 
+.PHONY: help build profile-build strip install clean objclean profileclean \
+        config-sanity icc-profile-use icc-profile-make gcc-profile-use \
+        gcc-profile-make clang-profile-use clang-profile-make
 
-.PHONY: build profile-build
-build:
-	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) config-sanity
+build: config-sanity
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) all
 
-profile-build:
-	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) config-sanity
+profile-build: config-sanity objclean profileclean
 	@echo ""
-	@echo "Step 0/4. Preparing for profile build."
-	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_prepare)
-	@echo ""
-	@echo "Step 1/4. Building executable for benchmark ..."
-	@rm -f *.o
+	@echo "Step 1/4. Building instrumented executable ..."
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_make)
 	@echo ""
 	@echo "Step 2/4. Running benchmark for pgo-build ..."
 	$(PGOBENCH) > /dev/null
 	@echo ""
-	@echo "Step 3/4. Building final executable ..."
-	@rm -f *.o
+	@echo "Step 3/4. Building optimized executable ..."
+	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) objclean
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_use)
 	@echo ""
 	@echo "Step 4/4. NOT deleting profile data ..."
-#	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_clean)
+#	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) profileclean
 
 strip:
 	strip $(EXE)
@@ -448,8 +446,16 @@ install:
 	-cp $(EXE) $(BINDIR)
 	-strip $(BINDIR)/$(EXE)
 
-clean:
-	$(RM) $(EXE) $(EXE).exe *.o .depend *~ core bench.txt *.gcda
+clean: objclean profileclean
+	@rm -f .depend core
+
+objclean:
+	@rm -f $(EXE) $(EXE).exe *.o
+
+profileclean:
+	@rm -rf profdir
+	@rm -f bench.txt *.gcda *.gcno
+	@rm -f cfish.profdata *.profraw
 
 default:
 	help
@@ -488,13 +494,24 @@ config-sanity:
 	@test "$(popcnt)" = "yes" || test "$(popcnt)" = "no"
 	@test "$(sse)" = "yes" || test "$(sse)" = "no"
 	@test "$(pext)" = "yes" || test "$(pext)" = "no"
+	@test "$(lto)" = "yes" || test "$(lto)" = "no"
 	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang"
 
 $(EXE): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
 
-gcc-profile-prepare:
-	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) gcc-profile-clean
+clang-profile-make:
+	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
+	EXTRACFLAGS='-fprofile-instr-generate ' \
+	EXTRALDFLAGS=' -fprofile-instr-generate' \
+	all
+
+clang-profile-use:
+	llvm-profdata merge -output=cfish.profdata *.profraw
+	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
+	EXTRACFLAGS='-fprofile-instr-use=cfish.profdata' \
+	EXTRALDFLAGS='-fprofile-use ' \
+	all
 
 gcc-profile-make:
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
@@ -508,13 +525,6 @@ gcc-profile-use:
 	EXTRALDFLAGS='-lgcov' \
 	all
 
-gcc-profile-clean:
-	@rm -rf *.gcda *.gcno bench.txt
-
-icc-profile-prepare:
-	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) icc-profile-clean
-	@mkdir profdir
-
 icc-profile-make:
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
 	EXTRACFLAGS='-prof-gen=srcpos -prof_dir ./profdir' \
@@ -524,9 +534,6 @@ icc-profile-use:
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
 	EXTRACFLAGS='-prof_use -prof_dir ./profdir' \
 	all
-
-icc-profile-clean:
-	@rm -rf profdir bench.txt
 
 .depend:
 	-@$(CC) $(DEPENDFLAGS) -MM $(OBJS:.o=.c) > $@ 2> /dev/null

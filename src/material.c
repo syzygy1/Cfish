@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -49,20 +49,20 @@ static const int QuadraticTheirs[][8] = {
 };
 
 // Helper used to detect a given material distribution.
-static int is_KXK(const Pos *pos, int us)
+static bool is_KXK(const Pos *pos, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
         && pos_non_pawn_material(us) >= RookValueMg;
 }
 
-static int is_KBPsKs(const Pos *pos, int us)
+static bool is_KBPsK(const Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
         && pieces_cp(us, BISHOP)
         && pieces_cp(us, PAWN);
 }
 
-static int is_KQKRPs(const Pos *pos, int us) {
+static bool is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
         && pieces_cp(us, QUEEN)
@@ -144,7 +144,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   // generic ones that refer to more than one material distribution. Note
   // that in this case we do not return after setting the function.
   for (int c = 0; c < 2; c++) {
-    if (is_KBPsKs(pos, c))
+    if (is_KBPsK(pos, c))
       e->scal_func[c] = 18; // ScaleKBPsK
 
     else if (is_KQKRPs(pos, c))
@@ -185,12 +185,6 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
     e->factor[BLACK] = (uint8_t)(npm_b <  RookValueMg   ? SCALE_FACTOR_DRAW :
                                  npm_w <= BishopValueMg ? 4 : 14);
 
-  if (piece_count(WHITE, PAWN) == 1 && npm_w - npm_b <= BishopValueMg)
-    e->factor[WHITE] = (uint8_t)SCALE_FACTOR_ONEPAWN;
-
-  if (piece_count(BLACK, PAWN) == 1 && npm_b - npm_w <= BishopValueMg)
-    e->factor[BLACK] = (uint8_t)SCALE_FACTOR_ONEPAWN;
-
   // Evaluate the material imbalance. We use PIECE_TYPE_NONE as a place
   // holder for the bishop pair "extended piece", which allows us to be
   // more flexible in defining bishop pair bonuses.
@@ -204,4 +198,3 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
 #undef pc
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
 }
-

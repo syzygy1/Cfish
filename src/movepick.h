@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -34,73 +34,50 @@ static const int CounterMovePruneThreshold = 0;
 
 INLINE void cms_update(PieceToHistory cms, Piece pc, Square to, int v)
 {
-  int w = v >= 0 ? v : -v;
-
-  cms[pc][to] += v * 32 - cms[pc][to] * w / 936;
+  cms[pc][to] += v - cms[pc][to] * abs(v) / 29952;
 }
 
 INLINE void history_update(ButterflyHistory history, int c, Move m, int v)
 {
-  int w = v >= 0 ? v : -v;
-
   m &= 4095;
-  history[c][m] += v * 32 - history[c][m] * w / 324;
+  history[c][m] += v - history[c][m] * abs(v) / 10368;
 }
 
 INLINE void cpth_update(CapturePieceToHistory history, Piece pc, Square to,
                         int captured, int v)
 {
-  int w = v >= 0 ? v : -v;
-
-  history[pc][to][captured] += v * 2 - history[pc][to][captured] * w / 324;
+  history[pc][to][captured] += v - history[pc][to][captured] * abs(v) / 10368;
 }
 
-#define ST_MAIN_SEARCH             0
-#define ST_CAPTURES_GEN            1
-#define ST_GOOD_CAPTURES           2
-#define ST_KILLERS                 3
-#define ST_KILLERS_2               4
-#define ST_QUIET_GEN               5
-#define ST_QUIET                   6
-#define ST_BAD_CAPTURES            7
+enum {
+  ST_MAIN_SEARCH, ST_CAPTURES_INIT, ST_GOOD_CAPTURES, ST_KILLERS, ST_KILLERS_2,
+  ST_QUIET_INIT, ST_QUIET, ST_BAD_CAPTURES,
 
-#define ST_EVASIONS                8
-#define ST_ALL_EVASIONS            9
+  ST_EVASION, ST_EVASIONS_INIT, ST_ALL_EVASIONS,
 
-#define ST_QSEARCH_WITH_CHECKS     10
-#define ST_QCAPTURES_CHECKS_GEN    11
-#define ST_QCAPTURES_CHECKS        12
-#define ST_CHECKS                  13
+  ST_QSEARCH, ST_QCAPTURES_INIT, ST_QCAPTURES, ST_QCHECKS,
 
-#define ST_QSEARCH_WITHOUT_CHECKS  14
-#define ST_QCAPTURES_NO_CHECKS_GEN 15
-#define ST_REMAINING               16
-
-#define ST_RECAPTURES_GEN          17
-#define ST_RECAPTURES              18
-
-#define ST_PROBCUT                 19
-#define ST_PROBCUT_GEN             20
-#define ST_PROBCUT_2               21
+  ST_PROBCUT, ST_PROBCUT_INIT, ST_PROBCUT_2
+};
 
 Move next_move(const Pos *pos, int skipQuiets);
 
 // Initialisation of move picker data.
 
-INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
+INLINE void mp_init(const Pos *pos, Move ttm, Depth d)
 {
-  assert(depth > DEPTH_ZERO);
+  assert(d > DEPTH_ZERO);
 
   Stack *st = pos->st;
 
-  st->depth = depth;
+  st->depth = d;
 
   Square prevSq = to_sq((st-1)->currentMove);
   st->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
-  st->mp_killers[0] = st->killers[0];
-  st->mp_killers[1] = st->killers[1];
+  st->mpKillers[0] = st->killers[0];
+  st->mpKillers[1] = st->killers[1];
 
-  st->stage = pos_checkers() ? ST_EVASIONS : ST_MAIN_SEARCH;
+  st->stage = pos_checkers() ? ST_EVASION : ST_MAIN_SEARCH;
   st->ttMove = ttm;
   if (!ttm || !is_pseudo_legal(pos, ttm)) {
     st->stage++;
@@ -108,47 +85,37 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth depth)
   }
 }
 
-INLINE void mp_init_q(const Pos *pos, Move ttm, Depth depth, Square s)
+INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 {
-  assert(depth <= DEPTH_ZERO);
+  assert(d <= DEPTH_ZERO);
 
   Stack *st = pos->st;
 
-  if (pos_checkers())
-    st->stage = ST_EVASIONS;
-  else if (depth > DEPTH_QS_NO_CHECKS)
-    st->stage = ST_QSEARCH_WITH_CHECKS;
-  else if (depth > DEPTH_QS_RECAPTURES)
-    st->stage = ST_QSEARCH_WITHOUT_CHECKS;
-  else {
-    st->stage = ST_RECAPTURES_GEN;
-    st->recaptureSquare = s;
-    return;
-  }
+  st->stage = pos_checkers() ? ST_EVASION : ST_QSEARCH;
+  st->ttMove =   ttm
+              && is_pseudo_legal(pos, ttm)
+              && (d > DEPTH_QS_RECAPTURES || to_sq(ttm) == s) ? ttm : 0;
+  st->stage += (st->ttMove == 0);
 
-  st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm)) {
-    st->stage++;
-    st->ttMove = 0;
-  }
+  st->depth = d;
+  st->recaptureSquare = s;
 }
 
-INLINE void mp_init_pc(const Pos *pos, Move ttm, Value threshold)
+INLINE void mp_init_pc(const Pos *pos, Move ttm, Value th)
 {
   assert(!pos_checkers());
 
   Stack *st = pos->st;
 
-  st->threshold = threshold;
+  st->threshold = th;
 
   st->stage = ST_PROBCUT;
 
   // In ProbCut we generate captures with SEE higher than the given
   // threshold.
   st->ttMove =   ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-              && see_test(pos, ttm, threshold) ? ttm : 0;
+              && see_test(pos, ttm, th) ? ttm : 0;
   if (st->ttMove == 0) st->stage++;
 }
 
 #endif
-
