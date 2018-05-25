@@ -9,10 +9,10 @@
 #include "movegen.h"
 #include "pawns.h"
 #include "position.h"
+#include "tbprobe.h"
 #include "thread.h"
 #include "tt.h"
 #include "uci.h"
-#include "tbprobe.h"
 
 static void set_castling_right(Pos *pos, Color c, Square rfrom);
 static void set_state(Pos *pos, Stack *st);
@@ -145,6 +145,18 @@ void print_pos(Pos *pos)
   printf("\n");
 }
 
+INLINE Key H1(Key h)
+{
+  return h & 0x1fff;
+}
+
+INLINE Key H2(Key h)
+{
+  return (h >> 16) & 0x1fff;
+}
+
+static Key cuckoo[8192];
+static uint16_t cuckooMove[8192];
 
 // zob_init() initializes at startup the various arrays used to compute
 // hash keys.
@@ -173,6 +185,32 @@ void zob_init(void) {
 
   zob.side = prng_rand(&rng);
   zob.noPawns = prng_rand(&rng);
+
+  // Prepare the cuckoo tables
+  int count = 0;
+  for (int c = 0; c < 2; c++)
+    for (int pt = PAWN; pt <= KING; pt++) {
+      int pc = make_piece(c, pt);
+      for (Square s1 = 0; s1 < 64; s1++)
+        for (Square s2 = s1 + 1; s2 < 64; s2++)
+          if (PseudoAttacks[pt][s1] & sq_bb(s2)) {
+            Move move = make_move(s1, s2);
+            Key key = zob.psq[pc][s1] ^ zob.psq[pc][s2] ^ zob.side;
+            uint32_t i = H1(key);
+            while (1) {
+              Key tmpKey = cuckoo[i];
+              cuckoo[i] = key;
+              key = tmpKey;
+              Move tmpMove = cuckooMove[i];
+              cuckooMove[i] = move;
+              move = tmpMove;
+              if (!move) break;
+              i = (i == H1(key)) ? H2(key) : H1(key);
+            }
+            count++;
+          }
+    }
+  assert(count == 3668);
 }
 
 
@@ -1296,6 +1334,35 @@ int is_draw(const Pos *pos)
   }
 
   return 0;
+}
+
+
+// has_game_cycle() tests if the position has a move which draws by
+// repetition or an earlier position has a move that directly reaches
+// the current position.
+
+bool has_game_cycle(const Pos *pos) {
+  unsigned int j;
+
+  int end = pos->st->pliesFromNull;
+  if (end < 3) return false;
+
+  Key originalKey = pos->st->key;
+  Stack *stp = pos->st - 1;
+
+  for (int i = 3; i <= end; i += 2) {
+    stp -= 2;
+
+    Key moveKey = originalKey ^ stp->key;
+    if (   (j = H1(moveKey), cuckoo[j] == moveKey)
+        || (j = H2(moveKey), cuckoo[j] == moveKey))
+    {
+      Move m = cuckooMove[j];
+      if (!(between_bb(from_sq(m), to_sq(m)) & pieces()))
+        return true;
+    }
+  }
+  return false;
 }
 
 

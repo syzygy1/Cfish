@@ -78,6 +78,16 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     if (alpha >= mate_in(ss->ply+1))
       return alpha;
 #endif
+
+    if (pos_rule50_count() >= 3 && alpha < VALUE_DRAW && has_game_cycle(pos)) {
+#if PvNode
+      alpha = VALUE_DRAW;
+      if (alpha >= beta)
+        return alpha;
+#else
+      return VALUE_DRAW;
+#endif
+    }
   }
 
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
@@ -653,7 +663,7 @@ moves_loop: // When in check search starts from here.
           alpha = value;
         else {
           assert(value >= beta); // Fail high
-          ss->statScore = max(ss->statScore, 0);
+          ss->statScore = 0;
           break;
         }
       }

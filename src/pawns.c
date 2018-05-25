@@ -217,11 +217,10 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 
     int d = min(f, FILE_H - f);
     safety +=  ShelterStrength[d][ourRank];
-    if (ourRank || theirRank)
-      safety -= StormDanger
-                [  ourRank && (ourRank == theirRank - 1)
-                 ? BlockedByPawn : Unblocked]
-                [d][theirRank];
+    safety -= StormDanger
+              [  ourRank && (ourRank == theirRank - 1)
+               ? BlockedByPawn : Unblocked]
+              [d][theirRank];
   }
 
   return safety;

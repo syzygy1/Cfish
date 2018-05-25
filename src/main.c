@@ -36,8 +36,8 @@ int main(int argc, char **argv)
   print_engine_info(0);
 
   psqt_init();
-  zob_init();
   bitboards_init();
+  zob_init();
   bitbases_init();
   search_init();
   pawn_init();

@@ -477,7 +477,7 @@ finished:
   fflush(stdout);
 }
 
-static const int8_t offdiag[] = {
+static const int8_t OffDiag[] = {
   0,-1,-1,-1,-1,-1,-1,-1,
   1, 0,-1,-1,-1,-1,-1,-1,
   1, 1, 0,-1,-1,-1,-1,-1,
@@ -488,7 +488,7 @@ static const int8_t offdiag[] = {
   1, 1, 1, 1, 1, 1, 1, 0
 };
 
-static const uint8_t triangle[] = {
+static const uint8_t Triangle[] = {
   6, 0, 1, 2, 2, 1, 0, 6,
   0, 7, 3, 4, 4, 3, 7, 0,
   1, 3, 8, 5, 5, 8, 3, 1,
@@ -499,7 +499,7 @@ static const uint8_t triangle[] = {
   6, 0, 1, 2, 2, 1, 0, 6
 };
 
-static const uint8_t flipdiag[] = {
+static const uint8_t FlipDiag[] = {
    0,  8, 16, 24, 32, 40, 48, 56,
    1,  9, 17, 25, 33, 41, 49, 57,
    2, 10, 18, 26, 34, 42, 50, 58,
@@ -510,7 +510,7 @@ static const uint8_t flipdiag[] = {
    7, 15, 23, 31, 39, 47, 55, 63
 };
 
-static const uint8_t lower[] = {
+static const uint8_t Lower[] = {
   28,  0,  1,  2,  3,  4,  5,  6,
    0, 29,  7,  8,  9, 10, 11, 12,
    1,  7, 30, 13, 14, 15, 16, 17,
@@ -521,7 +521,7 @@ static const uint8_t lower[] = {
    6, 12, 17, 21, 24, 26, 27, 35
 };
 
-static const uint8_t diag[] = {
+static const uint8_t Diag[] = {
    0,  0,  0,  0,  0,  0,  0,  8,
    0,  1,  0,  0,  0,  0,  9,  0,
    0,  0,  2,  0,  0, 10,  0,  0,
@@ -532,7 +532,7 @@ static const uint8_t diag[] = {
   15,  0,  0,  0,  0,  0,  0,  7
 };
 
-static const uint8_t flap[2][64] = {
+static const uint8_t Flap[2][64] = {
   {  0,  0,  0,  0,  0,  0,  0,  0,
      0,  6, 12, 18, 18, 12,  6,  0,
      1,  7, 13, 19, 19, 13,  7,  1,
@@ -551,7 +551,7 @@ static const uint8_t flap[2][64] = {
      0,  0,  0,  0,  0,  0,  0,  0  }
 };
 
-static const uint8_t ptwist[2][64] = {
+static const uint8_t PawnTwist[2][64] = {
   {  0,  0,  0,  0,  0,  0,  0,  0,
     47, 35, 23, 11, 10, 22, 34, 46,
     45, 33, 21,  9,  8, 20, 32, 44,
@@ -570,7 +570,7 @@ static const uint8_t ptwist[2][64] = {
      0,  0,  0,  0,  0,  0,  0,  0 }
 };
 
-static const int16_t KK_idx[10][64] = {
+static const int16_t KKIdx[10][64] = {
   { -1, -1, -1,  0,  1,  2,  3,  4,
     -1, -1, -1,  5,  6,  7,  8,  9,
     10, 11, 12, 13, 14, 15, 16, 17,
@@ -653,20 +653,20 @@ static const int16_t KK_idx[10][64] = {
     -1, -1, -1, -1, -1, -1, -1,461 }
 };
 
-static const uint8_t file_to_file[] = { 0, 1, 2, 3, 3, 2, 1, 0 };
-static const int wdl_to_map[5] = { 1, 3, 0, 2, 0 };
-static const uint8_t pa_flags[5] = { 8, 0, 0, 0, 4 };
+static const uint8_t FileToFile[] = { 0, 1, 2, 3, 3, 2, 1, 0 };
+static const int WdlToMap[5] = { 1, 3, 0, 2, 0 };
+static const uint8_t PAFlags[5] = { 8, 0, 0, 0, 4 };
 
-static size_t binomial[7][64];
-static size_t pawnidx[2][6][24];
-static size_t pfactor_file[6][4];
-static size_t pfactor_rank[6][6];
+static size_t Binomial[7][64];
+static size_t PawnIdx[2][6][24];
+static size_t PawnFactorFile[6][4];
+static size_t PawnFactorRank[6][6];
 
 static void init_indices(void)
 {
   int i, j, k;
 
-  // binomial[k][n] = Bin(n, k)
+  // Binomial[k][n] = Bin(n, k)
   for (i = 0; i < 7; i++)
     for (j = 0; j < 64; j++) {
       size_t f = 1;
@@ -675,16 +675,16 @@ static void init_indices(void)
         f *= (j - k);
         l *= (k + 1);
       }
-      binomial[i][j] = f / l;
+      Binomial[i][j] = f / l;
     }
 
   for (i = 0; i < 6; i++) {
     size_t s = 0;
     for (j = 0; j < 24; j++) {
-      pawnidx[0][i][j] = s;
-      s += binomial[i][ptwist[0][(1 + (j % 6)) * 8 + (j / 6)]];
+      PawnIdx[0][i][j] = s;
+      s += Binomial[i][PawnTwist[0][(1 + (j % 6)) * 8 + (j / 6)]];
       if ((j + 1) % 6 == 0) {
-        pfactor_file[i][j / 6] = s;
+        PawnFactorFile[i][j / 6] = s;
         s = 0;
       }
     }
@@ -693,10 +693,10 @@ static void init_indices(void)
   for (i = 0; i < 6; i++) {
     size_t s = 0;
     for (j = 0; j < 24; j++) {
-      pawnidx[1][i][j] = s;
-      s += binomial[i][ptwist[1][(1 + (j / 4)) * 8 + (j % 4)]];
+      PawnIdx[1][i][j] = s;
+      s += Binomial[i][PawnTwist[1][(1 + (j / 4)) * 8 + (j % 4)]];
       if ((j + 1) % 4 == 0) {
-        pfactor_rank[i][j / 4] = s;
+        PawnFactorRank[i][j / 4] = s;
         s = 0;
       }
     }
@@ -706,10 +706,10 @@ static void init_indices(void)
 INLINE int leading_pawn(int *p, struct BaseEntry *be, const int enc)
 {
   for (int i = 1; i < be->pawns[0]; i++)
-    if (flap[enc-1][p[0]] > flap[enc-1][p[i]])
+    if (Flap[enc-1][p[0]] > Flap[enc-1][p[i]])
       Swap(p[0], p[i]);
 
-  return enc == FILE_ENC ? file_to_file[p[0] & 7] : (p[0] - 8) >> 3;
+  return enc == FILE_ENC ? FileToFile[p[0] & 7] : (p[0] - 8) >> 3;
 }
 
 INLINE size_t encode(int *p, struct EncInfo *ei, struct BaseEntry *be,
@@ -729,41 +729,41 @@ INLINE size_t encode(int *p, struct EncInfo *ei, struct BaseEntry *be,
         p[i] ^= 0x38;
 
     for (int i = 0; i < n; i++)
-      if (offdiag[p[i]]) {
-        if (offdiag[p[i]] > 0 && i < (be->kk_enc ? 2 : 3))
+      if (OffDiag[p[i]]) {
+        if (OffDiag[p[i]] > 0 && i < (be->kk_enc ? 2 : 3))
           for (int j = 0; j < n; j++)
-            p[j] = flipdiag[p[j]];
+            p[j] = FlipDiag[p[j]];
         break;
       }
 
     if (be->kk_enc) {
-      idx = KK_idx[triangle[p[0]]][p[1]];
+      idx = KKIdx[Triangle[p[0]]][p[1]];
       k = 2;
     } else {
       int s1 = (p[1] > p[0]);
       int s2 = (p[2] > p[0]) + (p[2] > p[1]);
 
-      if (offdiag[p[0]])
-        idx = triangle[p[0]] * 63*62 + (p[1] - s1) * 62 + (p[2] - s2);
-      else if (offdiag[p[1]])
-        idx = 6*63*62 + diag[p[0]] * 28*62 + lower[p[1]] * 62 + p[2] - s2;
-      else if (offdiag[p[2]])
-        idx = 6*63*62 + 4*28*62 + diag[p[0]] * 7*28 + (diag[p[1]] - s1) * 28 + lower[p[2]];
+      if (OffDiag[p[0]])
+        idx = Triangle[p[0]] * 63*62 + (p[1] - s1) * 62 + (p[2] - s2);
+      else if (OffDiag[p[1]])
+        idx = 6*63*62 + Diag[p[0]] * 28*62 + Lower[p[1]] * 62 + p[2] - s2;
+      else if (OffDiag[p[2]])
+        idx = 6*63*62 + 4*28*62 + Diag[p[0]] * 7*28 + (Diag[p[1]] - s1) * 28 + Lower[p[2]];
       else
-        idx = 6*63*62 + 4*28*62 + 4*7*28 + diag[p[0]] * 7*6 + (diag[p[1]] - s1) * 6 + (diag[p[2]] - s2);
+        idx = 6*63*62 + 4*28*62 + 4*7*28 + Diag[p[0]] * 7*6 + (Diag[p[1]] - s1) * 6 + (Diag[p[2]] - s2);
       k = 3;
     }
     idx *= ei->factor[0];
   } else {
     for (int i = 1; i < be->pawns[0]; i++)
       for (int j = i + 1; j < be->pawns[0]; j++)
-        if (ptwist[enc-1][p[i]] < ptwist[enc-1][p[j]])
+        if (PawnTwist[enc-1][p[i]] < PawnTwist[enc-1][p[j]])
           Swap(p[i], p[j]);
 
     k = be->pawns[0];
-    idx = pawnidx[enc-1][k-1][flap[enc-1][p[0]]];
+    idx = PawnIdx[enc-1][k-1][Flap[enc-1][p[0]]];
     for (int i = 1; i < k; i++)
-      idx += binomial[k-i][ptwist[enc-1][p[i]]];
+      idx += Binomial[k-i][PawnTwist[enc-1][p[i]]];
     idx *= ei->factor[0];
 
     // Pawns of other color
@@ -778,7 +778,7 @@ INLINE size_t encode(int *p, struct EncInfo *ei, struct BaseEntry *be,
         int skips = 0;
         for (int j = 0; j < k; j++)
           skips += (sq > p[j]);
-        s += binomial[i - k + 1][sq - skips - 8];
+        s += Binomial[i - k + 1][sq - skips - 8];
       }
       idx += s * ei->factor[k];
       k = t;
@@ -796,7 +796,7 @@ INLINE size_t encode(int *p, struct EncInfo *ei, struct BaseEntry *be,
       int skips = 0;
       for (int j = 0; j < k; j++)
         skips += (sq > p[j]);
-      s += binomial[i - k + 1][sq - skips];
+      s += Binomial[i - k + 1][sq - skips];
     }
     idx += s * ei->factor[k];
     k = t;
@@ -864,8 +864,8 @@ static size_t init_enc_info(struct EncInfo *ei, struct BaseEntry *be,
   for (int i = 0; k < be->num || i == order || i == order2; i++) {
     if (i == order) {
       ei->factor[0] = f;
-      f *=  enc == FILE_ENC ? pfactor_file[ei->norm[0] - 1][t]
-          : enc == RANK_ENC ? pfactor_rank[ei->norm[0] - 1][t]
+      f *=  enc == FILE_ENC ? PawnFactorFile[ei->norm[0] - 1][t]
+          : enc == RANK_ENC ? PawnFactorRank[ei->norm[0] - 1][t]
           : be->kk_enc ? 462 : 31332;
     } else if (i == order2) {
       ei->factor[ei->norm[0]] = f;
@@ -915,29 +915,29 @@ static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
 
   uint8_t blockSize = data[1];
   uint8_t idxBits = data[2];
-  uint32_t real_num_blocks = read_le_u32(&data[4]);
-  uint32_t num_blocks = real_num_blocks + data[3];
+  uint32_t realNumBlocks = read_le_u32(&data[4]);
+  uint32_t numBlocks = realNumBlocks + data[3];
   int maxLen = data[8];
   int minLen = data[9];
   int h = maxLen - minLen + 1;
-  uint32_t num_syms = read_le_u16(&data[10 + 2 * h]);
-  d = malloc(sizeof(*d) + h * sizeof(uint64_t) + num_syms);
+  uint32_t numSyms = read_le_u16(&data[10 + 2 * h]);
+  d = malloc(sizeof(*d) + h * sizeof(uint64_t) + numSyms);
   d->blockSize = blockSize;
   d->idxBits = idxBits;
   d->offset = (uint16_t *)&data[10];
   d->symLen = (uint8_t *)d + sizeof(*d) + h * sizeof(uint64_t);
   d->symPat = &data[12 + 2 * h];
   d->minLen = minLen;
-  *ptr = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
+  *ptr = &data[12 + 2 * h + 3 * numSyms + (numSyms & 1)];
 
   size_t num_indices = (tb_size + (1ULL << idxBits) - 1) >> idxBits;
   size[0] = 6ULL * num_indices;
-  size[1] = 2ULL * num_blocks;
-  size[2] = (size_t)real_num_blocks << blockSize;
+  size[1] = 2ULL * numBlocks;
+  size[2] = (size_t)realNumBlocks << blockSize;
 
-  char tmp[num_syms];
-  memset(tmp, 0, num_syms);
-  for (uint32_t s = 0; s < num_syms; s++)
+  char tmp[numSyms];
+  memset(tmp, 0, numSyms);
+  for (uint32_t s = 0; s < numSyms; s++)
     if (!tmp[s])
       calc_symLen(d, s, tmp);
 
@@ -1003,16 +1003,16 @@ static bool init_table(struct BaseEntry *be, const char *str, int type)
   if (type == DTM && !be->dtmLossOnly) {
     uint16_t *map = (uint16_t *)data;
     *(be->hasPawns ? &PAWN(be)->dtmMap : &PIECE(be)->dtmMap) = map;
-    uint16_t (*map_idx)[2][2] = be->hasPawns ? &PAWN(be)->dtmMapIdx[0]
+    uint16_t (*mapIdx)[2][2] = be->hasPawns ? &PAWN(be)->dtmMapIdx[0]
                                              : &PIECE(be)->dtmMapIdx;
     for (int t = 0; t < num; t++) {
       for (int i = 0; i < 2; i++) {
-        map_idx[t][0][i] = (uint16_t *)data + 1 - map;
+        mapIdx[t][0][i] = (uint16_t *)data + 1 - map;
         data += 2 + 2 * read_le_u16(data);
       }
       if (split) {
         for (int i = 0; i < 2; i++) {
-          map_idx[t][1][i] = (uint16_t *)data + 1 - map;
+          mapIdx[t][1][i] = (uint16_t *)data + 1 - map;
           data += 2 + 2 * read_le_u16(data);
         }
       }
@@ -1022,7 +1022,7 @@ static bool init_table(struct BaseEntry *be, const char *str, int type)
   if (type == DTZ) {
     void *map = data;
     *(be->hasPawns ? &PAWN(be)->dtzMap : &PIECE(be)->dtzMap) = map;
-    uint16_t (*map_idx)[4] = be->hasPawns ? &PAWN(be)->dtzMapIdx[0]
+    uint16_t (*mapIdx)[4] = be->hasPawns ? &PAWN(be)->dtzMapIdx[0]
                                           : &PIECE(be)->dtzMapIdx;
     uint8_t *flags = be->hasPawns ? &PAWN(be)->dtzFlags[0]
                                   : &PIECE(be)->dtzFlags;
@@ -1030,13 +1030,13 @@ static bool init_table(struct BaseEntry *be, const char *str, int type)
       if (flags[t] & 2) {
         if (!(flags[t] & 16)) {
           for (int i = 0; i < 4; i++) {
-            map_idx[t][i] = data + 1 - (uint8_t *)map;
+            mapIdx[t][i] = data + 1 - (uint8_t *)map;
             data += 1 + data[0];
           }
         } else {
           data += (uintptr_t)data & 0x01;
           for (int i = 0; i < 4; i++) {
-            map_idx[t][i] = (uint16_t *)data + 1 - (uint16_t *)map;
+            mapIdx[t][i] = (uint16_t *)data + 1 - (uint16_t *)map;
             data += 2 + 2 * read_le_u16(data);
           }
         }
@@ -1261,7 +1261,7 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
          : PIECE(be)->dtmMap[PIECE(be)->dtmMapIdx[bside][s] + v]);
   } else {
     if (flags & 2) {
-      int m = wdl_to_map[s + 2];
+      int m = WdlToMap[s + 2];
       if (!(flags & 16))
         v =  be->hasPawns
            ? ((uint8_t *)PAWN(be)->dtzMap)[PAWN(be)->dtzMapIdx[t][m] + v]
@@ -1271,7 +1271,7 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
            ? ((uint16_t *)PAWN(be)->dtzMap)[PAWN(be)->dtzMapIdx[t][m] + v]
            : ((uint16_t *)PIECE(be)->dtzMap)[PIECE(be)->dtzMapIdx[m] + v]);
     }
-    if (!(flags & pa_flags[s + 2]) || (s & 1))
+    if (!(flags & PAFlags[s + 2]) || (s & 1))
       v *= 2;
   }
 
@@ -1629,7 +1629,7 @@ Value TB_probe_dtm2(Pos *pos, int wdl, int *success)
 }
 #endif
 
-static int wdl_to_dtz[] = { -1, -101, 0, 101, 1 };
+static int WdlToDtz[] = { -1, -101, 0, 101, 1 };
 
 // Probe the DTZ table for a particular position.
 // If *success != 0, the probe was successful.
@@ -1669,7 +1669,7 @@ int TB_probe_dtz(Pos *pos, int *success)
 
   // Check for winning capture or en passant capture as only best move.
   if (*success == 2)
-    return wdl_to_dtz[wdl + 2];
+    return WdlToDtz[wdl + 2];
 
   ExtMove *m = (pos->st-1)->endMoves, *end = NULL;
 
@@ -1693,7 +1693,7 @@ int TB_probe_dtz(Pos *pos, int *success)
       undo_move(pos, move);
       if (*success == 0) return 0;
       if (v == wdl)
-        return wdl_to_dtz[wdl + 2];
+        return WdlToDtz[wdl + 2];
     }
   }
 
@@ -1704,7 +1704,7 @@ int TB_probe_dtz(Pos *pos, int *success)
 
   int dtz = probe_dtz_table(pos, wdl, success);
   if (*success >= 0)
-    return wdl_to_dtz[wdl + 2] + ((wdl > 0) ? dtz : -dtz);
+    return WdlToDtz[wdl + 2] + ((wdl > 0) ? dtz : -dtz);
 
   // *success < 0 means we need to probe DTZ for the other side to move.
   int best;
@@ -1716,7 +1716,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     // If (cursed) loss, the worst case is a losing capture or pawn move
     // as the "best" move, leading to dtz of -1 or -101.
     // In case of mate, this will cause -1 to be returned.
-    best = wdl_to_dtz[wdl + 2];
+    best = WdlToDtz[wdl + 2];
     // If wdl < 0, we still have to generate all moves.
     if (!pos_checkers())
       end = generate_non_evasions(pos, m);
@@ -1780,7 +1780,7 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
     if (pos_rule50_count() == 0) {
       // If the move resets the 50-move counter, dtz is -101/-1/0/1/101.
       v = -TB_probe_wdl(pos, &success);
-      v = wdl_to_dtz[v + 2];
+      v = WdlToDtz[v + 2];
     } else {
       // Otherwise, take dtz for the new position and correct by 1 ply.
       v = -TB_probe_dtz(pos, &success);
@@ -1824,8 +1824,8 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
 // A return value of 0 means that not all probes were successful.
 int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
 {
-  static int wdl_to_rank[] = { -1000, -899, 0, 899, 1000 };
-  static Value wdl_to_Value[] = {
+  static int WdlToRank[] = { -1000, -899, 0, 899, 1000 };
+  static Value WdlToValue[] = {
     -VALUE_MATE + MAX_MATE_PLY + 1,
     VALUE_DRAW - 2,
     VALUE_DRAW,
@@ -1846,8 +1846,8 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
     if (!success) return 0;
     if (!move50)
       v = v > 0 ? 2 : v < 0 ? -2 : 0;
-    m->TBRank = wdl_to_rank[v + 2];
-    m->TBScore = wdl_to_Value[v + 2];
+    m->TBRank = WdlToRank[v + 2];
+    m->TBScore = WdlToValue[v + 2];
   }
 
   return 1;
