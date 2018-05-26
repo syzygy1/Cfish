@@ -35,7 +35,7 @@ PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
 
 ### Built-in benchmark for pgo-builds
-PGOBENCH = ./$(EXE) bench 16 1 15
+PGOBENCH = ./$(EXE) bench 16 1 12
 
 ### Object files
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
@@ -128,6 +128,7 @@ endif
 ifeq ($(ARCH),armv7)
 	arch = armv7
 	bits = 32
+	prefetch = yes
 	sse = no
 	popcnt = no
 endif
@@ -216,6 +217,7 @@ ifeq ($(COMP),clang)
 	CC=clang
 	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
 	ifeq ($(ARCH),armv7)
+	CFLAGS += -mcpu=cortex-a53 -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=cortex-a53
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
