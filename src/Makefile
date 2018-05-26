@@ -167,6 +167,7 @@ ifeq ($(COMP),gcc)
 	CC=gcc
 	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format
 	ifeq ($(ARCH),armv7)
+	CFLAGS += -mcpu=cortex-a53 -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=cortex-a53
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
