@@ -165,7 +165,7 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format
+	CFLAGS += -pedantic -Wextra -Wshadow 
 	ifeq ($(ARCH),armv7)
 	CFLAGS += -mcpu=cortex-a53 -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=cortex-a53
 		ifeq ($(OS),Android)
@@ -184,7 +184,7 @@ endif
 
 ifeq ($(COMP),mingw)
 	comp=mingw
-	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format -m$(bits)
+	CFLAGS += -pedantic -Wextra -Wshadow  -m$(bits)
 	LDFLAGS += -m$(bits)
 	ifeq ($(KERNEL),Linux)
 		ifeq ($(bits),64)
