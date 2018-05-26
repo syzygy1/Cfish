@@ -217,7 +217,7 @@ ifeq ($(COMP),clang)
 	CC=clang
 	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
 	ifeq ($(ARCH),armv7)
-	CFLAGS += -mcpu=cortex-a53 -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=cortex-a53
+	CFLAGS += -mcpu=mative -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=native
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
