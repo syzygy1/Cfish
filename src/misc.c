@@ -198,7 +198,7 @@ size_t file_size(FD fd)
 #else
   DWORD sizeLow, sizeHigh;
   sizeLow = GetFileSize(fd, &sizeHigh);
-  return ((size_t)sizeHigh << 32) | (size_t)sizeLow;
+  return ((uint64_t)sizeHigh << 32) | sizeLow;
 #endif
 }
 
