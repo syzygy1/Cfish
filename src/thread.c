@@ -37,7 +37,7 @@ static void thread_idle_loop(Pos *pos);
 #ifndef _WIN32
 #define THREAD_FUNC void *
 #else
-#define THREAD_FUNC DWORD
+#define THREAD_FUNC DWORD WINAPI
 #endif
 
 // Global objects
