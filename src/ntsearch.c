@@ -340,11 +340,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (    depth >= 8 * ONE_PLY
       && !ttMove)
   {
-    Depth d = (3 * depth / (4 * ONE_PLY) - 2) * ONE_PLY;
     if (PvNode)
-      search_PV(pos, ss, alpha, beta, d);
+      search_PV(pos, ss, alpha, beta, depth - 7 * ONE_PLY);
     else
-      search_NonPV(pos, ss, alpha, d, cutNode);
+      search_NonPV(pos, ss, alpha, depth - 7 * ONE_PLY, cutNode);
 
     tte = tt_probe(posKey, &ttHit);
     // ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
