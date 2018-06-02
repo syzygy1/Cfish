@@ -33,7 +33,7 @@ uint32_t NonPawnPieceValue[16];
 // assigned. Table is defined for files A..D and white side: it is
 // symmetric for black side and second half of the files.
 
-const Score Bonus[][8][4] = {
+static const Score Bonus[][8][4] = {
   {{0}},
   { // Pawn
    { S(  0, 0), S(  0, 0), S(  0, 0), S( 0, 0) },
@@ -132,4 +132,3 @@ void psqt_init(void) {
     NonPawnPieceValue[pt + 8] = tmp.combi;
   }
 }
-

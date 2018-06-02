@@ -27,14 +27,6 @@ typedef struct Pos Pos;
 
 typedef Value (EgFunc)(const Pos *, unsigned);
 
-EgFunc EvaluateKPK, EvaluateKNNK, EvaluateKBNK, EvaluateKRKP,
-       EvaluateKRKB, EvaluateKRKN, EvaluateKQKP, EvaluateKQKR,
-       EvaluateKXK;
-
-EgFunc ScaleKNPK, ScaleKNPKB, ScaleKRPKR, ScaleKRPKB,
-       ScaleKBPKB, ScaleKBPKN, ScaleKBPPKB, ScaleKRPPKRP,
-       ScaleKBPsK, ScaleKQKRPs, ScaleKPKP, ScaleKPsK;
-
 #define NUM_EVAL 8
 #define NUM_SCALING 8
 

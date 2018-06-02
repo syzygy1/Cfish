@@ -72,7 +72,7 @@ static bool is_KQKRPs(const Pos *pos, int us) {
 
 // imbalance() calculates the imbalance by comparing the piece count of each
 // piece type for both colors.
-int imbalance(int us, int pieceCount[][8])
+static int imbalance(int us, int pieceCount[][8])
 {
   int *pc_us = pieceCount[us];
   int *pc_them = pieceCount[us ^ 1];

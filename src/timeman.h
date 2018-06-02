@@ -49,4 +49,3 @@ INLINE TimePoint time_elapsed(void)
 }
 
 #endif
-

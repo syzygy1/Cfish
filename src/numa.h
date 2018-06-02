@@ -9,7 +9,7 @@
 #include <windows.h>
 #endif
 
-bool numaAvail;
+extern bool numaAvail;
 void numa_init(void);
 void numa_exit(void);
 void read_numa_nodes(char *str);
@@ -39,4 +39,3 @@ typedef int NodeMask;
 #endif
 
 #endif
-

@@ -129,4 +129,3 @@ void time_init(int us, int ply)
   if (option_value(OPT_PONDER))
     Time.optimumTime += Time.optimumTime / 4;
 }
-
