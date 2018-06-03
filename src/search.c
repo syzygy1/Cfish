@@ -335,6 +335,7 @@ void mainthread_search(void)
     uci_print_pv(bestThread, bestThread->completedDepth,
                  -VALUE_INFINITE, VALUE_INFINITE);
 
+  flockfile(stdout);
   printf("bestmove %s", uci_move(buf, bestThread->rootMoves->move[0].pv[0], is_chess960()));
 
   if (bestThread->rootMoves->move[0].pvSize > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos))
@@ -342,6 +343,7 @@ void mainthread_search(void)
 
   printf("\n");
   fflush(stdout);
+  funlockfile(stdout);
 }
 
 
@@ -800,6 +802,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
   uint64_t tbhits = threads_tb_hits();
   char buf[16];
 
+  flockfile(stdout);
   for (int i = 0; i < multiPV; i++) {
     int updated = (i <= PVIdx && rm->move[i].score != -VALUE_INFINITE);
 
@@ -841,6 +844,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     printf("\n");
   }
   fflush(stdout);
+  funlockfile(stdout);
 }
 
 

@@ -117,6 +117,7 @@ void print_pos(Pos *pos)
   char fen[128];
   pos_fen(pos, fen);
 
+  flockfile(stdout);
   printf("\n +---+---+---+---+---+---+---+---+\n");
 
   for (int r = 7; r >= 0; r--) {
@@ -143,6 +144,8 @@ void print_pos(Pos *pos)
     }
   }
   printf("\n");
+  fflush(stdout);
+  funlockfile(stdout);
 }
 
 INLINE Key H1(Key h)

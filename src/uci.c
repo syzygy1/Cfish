@@ -315,12 +315,14 @@ void uci_loop(int argc, char **argv)
       UNLOCK(Signals.lock);
     }
     else if (strcmp(token, "uci") == 0) {
+      flockfile(stdout);
       printf("id name ");
       print_engine_info(1);
       printf("\n");
       print_options();
       printf("uciok\n");
       fflush(stdout);
+      funlockfile(stdout);
     }
     else if (strcmp(token, "ucinewgame") == 0) {
       process_delayed_settings();

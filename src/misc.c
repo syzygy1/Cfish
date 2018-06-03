@@ -168,6 +168,35 @@ bool large_pages_supported(void)
 
   return 1;
 }
+
+// The following two functions were taken from mingw_lock.c
+
+void __cdecl _lock(int locknum);
+void __cdecl _unlock(int locknum);
+#define _STREAM_LOCKS 16
+#define _IOLOCKED 0x8000
+typedef struct {
+  FILE f;
+  CRITICAL_SECTION lock;
+} _FILEX;
+
+void flockfile(FILE *F)
+{
+  if ((F >= (&__iob_func()[0])) && (F <= (&__iob_func()[_IOB_ENTRIES-1]))) {
+    _lock(_STREAM_LOCKS + (int)(F - (&__iob_func()[0])));
+    F->_flag |= _IOLOCKED;
+  } else
+    EnterCriticalSection(&(((_FILEX *)F)->lock));
+}
+
+void funlockfile(FILE *F)
+{
+  if ((F >= (&__iob_func()[0])) && (F <= (&__iob_func()[_IOB_ENTRIES-1]))) {
+    F->_flag &= ~_IOLOCKED;
+    _unlock(_STREAM_LOCKS + (int)(F - (&__iob_func()[0])));
+  } else
+    LeaveCriticalSection(&(((_FILEX *)F)->lock));
+}
 #endif
 
 FD open_file(const char *name)
