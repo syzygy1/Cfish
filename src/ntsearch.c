@@ -109,7 +109,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 #endif
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
-  ttMove =  rootNode ? pos->rootMoves->move[pos->PVIdx].pv[0]
+  ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
 
   // At non-PV nodes we check for an early TT cutoff.
@@ -378,10 +378,10 @@ moves_loop: // When in check search starts from here.
     // searched.
     if (rootNode) {
       int idx;
-      for (idx = pos->PVIdx; idx < pos->PVLast; idx++)
+      for (idx = pos->pvIdx; idx < pos->pvLast; idx++)
         if (pos->rootMoves->move[idx].pv[0] == move)
           break;
-      if (idx == pos->PVLast)
+      if (idx == pos->pvLast)
         continue;
     }
 
@@ -392,7 +392,7 @@ moves_loop: // When in check search starts from here.
       printf("info depth %d currmove %s currmovenumber %d\n",
              depth / ONE_PLY,
              uci_move(buf, move, is_chess960()),
-             moveCount + pos->PVIdx);
+             moveCount + pos->pvIdx);
       fflush(stdout);
     }
 
@@ -698,15 +698,15 @@ moves_loop: // When in check search starts from here.
     // Quiet best move: update move sorting heuristics.
     if (!is_capture_or_promotion(pos, bestMove))
       update_stats(pos, ss, bestMove, quietsSearched, quietCount,
-                   stat_bonus(depth));
+          stat_bonus(depth));
     else
       update_capture_stats(pos, bestMove, capturesSearched, captureCount,
-                           stat_bonus(depth));
+          stat_bonus(depth + (bestValue > beta + KnightValueMg) * ONE_PLY));
 
     // Extra penalty for a quiet TT move in previous ply when it gets refuted.
     if ((ss-1)->moveCount == 1 && !captured_piece())
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
-                      -stat_bonus(depth + ONE_PLY));
+          -stat_bonus(depth + ONE_PLY));
   }
   // Bonus for prior countermove that caused the fail low.
   else if (   (depth >= 3 * ONE_PLY || PvNode)
@@ -719,9 +719,9 @@ moves_loop: // When in check search starts from here.
 
   if (!excludedMove)
     tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
-             bestValue >= beta ? BOUND_LOWER :
-             PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-             depth, bestMove, ss->staticEval, tt_generation());
+        bestValue >= beta ? BOUND_LOWER :
+        PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
+        depth, bestMove, ss->staticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
@@ -736,4 +736,3 @@ moves_loop: // When in check search starts from here.
 #ifdef beta
 #undef beta
 #endif
-
