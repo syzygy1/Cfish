@@ -28,17 +28,13 @@
 #define V(v) ((Value)(v))
 #define S(mg, eg) make_score(mg, eg)
 
-// Isolated pawn penalty
+// Pawn penalties
 static const Score Isolated = S(13, 16);
-
-// Backward pawn penalty
 static const Score Backward = S(17, 11);
+static const Score Doubled = S(13, 40);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
-
-// Doubled pawn penalty
-static const Score Doubled = S(13, 40);
 
 // Strength of pawn shelter for our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
