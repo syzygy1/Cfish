@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -137,8 +137,8 @@ enum { WHITE, BLACK };
 enum { KING_SIDE, QUEEN_SIDE };
 
 enum {
-  NO_CASTLING = 0, WHITE_OO = 1, WHITE_OOO = 2,
-  BLACK_OO = 4, BLACK_OOO = 8, ANY_CASTLING = 15
+  NO_CASTLING = 0, WHITE_OO  = 1, WHITE_OOO    = 2,
+  BLACK_OO    = 4, BLACK_OOO = 8, ANY_CASTLING = 15
 };
 
 INLINE int make_castling_right(int c, int s)
@@ -151,16 +151,16 @@ enum { PHASE_ENDGAME = 0, PHASE_MIDGAME = 128 };
 enum { MG, EG };
 
 enum {
-  SCALE_FACTOR_DRAW = 0, SCALE_FACTOR_NORMAL = 64,
-  SCALE_FACTOR_MAX = 128, SCALE_FACTOR_NONE = 255
+  SCALE_FACTOR_DRAW = 0,   SCALE_FACTOR_NORMAL = 64,
+  SCALE_FACTOR_MAX  = 128, SCALE_FACTOR_NONE   = 255
 };
 
 enum { BOUND_NONE, BOUND_UPPER, BOUND_LOWER, BOUND_EXACT };
 
 enum {
-  VALUE_ZERO = 0, VALUE_DRAW = 0,
+  VALUE_ZERO      = 0,     VALUE_DRAW = 0,
   VALUE_KNOWN_WIN = 10000, VALUE_MATE = 32000,
-  VALUE_INFINITE = 32001, VALUE_NONE = 32002
+  VALUE_INFINITE  = 32001, VALUE_NONE = 32002
 };
 
 #ifdef LONG_MATES
@@ -175,13 +175,13 @@ enum {
 };
 
 enum {
-  PawnValueMg   =  171, PawnValueEg   =  240,
-  KnightValueMg =  764, KnightValueEg =  848,
-  BishopValueMg =  826, BishopValueEg =  891,
-  RookValueMg   = 1282, RookValueEg   = 1373,
-  QueenValueMg  = 2500, QueenValueEg  = 2670,
+  PawnValueMg   =  171,  PawnValueEg   =  240,
+  KnightValueMg =  764,  KnightValueEg =  848,
+  BishopValueMg =  826,  BishopValueEg =  891,
+  RookValueMg   = 1282,  RookValueEg   = 1373,
+  QueenValueMg  = 2500,  QueenValueEg  = 2670,
 
-  MidgameLimit = 15258, EndgameLimit = 3915
+  MidgameLimit  = 15258, EndgameLimit  = 3915
 };
 
 enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING };
@@ -193,12 +193,14 @@ enum {
 
 enum {
   ONE_PLY = 1,
+
   DEPTH_ZERO          =  0 * ONE_PLY,
   DEPTH_QS_CHECKS     =  0 * ONE_PLY,
   DEPTH_QS_NO_CHECKS  = -1 * ONE_PLY,
   DEPTH_QS_RECAPTURES = -5 * ONE_PLY,
+
   DEPTH_NONE = -6 * ONE_PLY,
-  DEPTH_MAX = MAX_PLY * ONE_PLY,
+  DEPTH_MAX  = MAX_PLY * ONE_PLY,
 };
 
 enum {
@@ -215,6 +217,7 @@ enum {
 
 enum {
   NORTH = 8, EAST = 1, SOUTH = -8, WEST = -1,
+
   NORTH_EAST = NORTH + EAST, SOUTH_EAST = SOUTH + EAST,
   NORTH_WEST = NORTH + WEST, SOUTH_WEST = SOUTH + WEST,
 };
@@ -256,7 +259,7 @@ INLINE Value mg_value(Score s)
   return (int16_t)s;
 }
 
-/// Division of a Score must be handled separately for each tEerm
+/// Division of a Score must be handled separately for each term
 INLINE Score score_divide(Score s, int i)
 {
   return make_score(mg_value(s) / i, eg_value(s) / i);
