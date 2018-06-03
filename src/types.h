@@ -259,7 +259,7 @@ INLINE Value mg_value(Score s)
   return (int16_t)s;
 }
 
-/// Division of a Score must be handled separately for each tEerm
+/// Division of a Score must be handled separately for each term
 INLINE Score score_divide(Score s, int i)
 {
   return make_score(mg_value(s) / i, eg_value(s) / i);
