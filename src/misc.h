@@ -80,8 +80,6 @@ typedef HANDLE FD;
 #define FD_ERR INVALID_HANDLE_VALUE
 typedef HANDLE map_t;
 
-//#define flockfile _lock_file
-//#define funlockfile _unlock_file
 void flockfile(FILE *F);
 void funlockfile(FILE *F);
 
