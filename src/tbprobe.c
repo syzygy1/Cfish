@@ -1108,7 +1108,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
   uint16_t *offset = d->offset;
   uint64_t *base = d->base - m;
   uint8_t *symLen = d->symLen;
-  int sym, bitCnt;
+  uint32_t sym, bitCnt;
 
   uint64_t code = from_be_u64(*(uint64_t *)ptr);
 
@@ -1127,8 +1127,8 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
       bitCnt -= 32;
       uint32_t tmp = from_be_u32(*ptr++);
       code |= (uint64_t)tmp << bitCnt;
-     }
-   }
+    }
+  }
 
   uint8_t *symPat = d->symPat;
   while (symLen[sym] != 0) {
