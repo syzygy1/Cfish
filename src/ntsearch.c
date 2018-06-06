@@ -701,10 +701,10 @@ moves_loop: // When in check search starts from here.
     // Quiet best move: update move sorting heuristics.
     if (!is_capture_or_promotion(pos, bestMove))
       update_stats(pos, ss, bestMove, quietsSearched, quietCount,
-          stat_bonus(depth));
+          stat_bonus(depth + (bestValue > beta + PawnValueMg) * ONE_PLY));
     else
       update_capture_stats(pos, bestMove, capturesSearched, captureCount,
-          stat_bonus(depth + (bestValue > beta + KnightValueMg) * ONE_PLY));
+          stat_bonus(depth + ONE_PLY));
 
     // Extra penalty for a quiet TT move in previous ply when it gets refuted.
     if ((ss-1)->moveCount == 1 && !captured_piece())
