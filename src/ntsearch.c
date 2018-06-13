@@ -505,7 +505,7 @@ moves_loop: // When in check search starts from here.
 //               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
       else if (    depth < 7 * ONE_PLY
                && !extension
-               && !see_test(pos, move, -CapturePruneMargin[depth / ONE_PLY]))
+               && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
         continue;
     }
 

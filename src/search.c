@@ -66,17 +66,6 @@ INLINE int futility_margin(Depth d, int improving) {
   return (175 - 50 * improving) * d / ONE_PLY;
 }
 
-// Margin for pruning capturing moves: almost linear in depth
-static const Value CapturePruneMargin[] = {
-  0,
-  1 * PawnValueEg * 1055 / 1000,
-  2 * PawnValueEg * 1042 / 1000,
-  3 * PawnValueEg *  963 / 1000,
-  4 * PawnValueEg * 1038 / 1000,
-  5 * PawnValueEg *  950 / 1000,
-  6 * PawnValueEg *  930 / 1000
-};
-
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
 static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
@@ -358,6 +347,7 @@ void thread_search(Pos *pos)
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
+  bool failedLow;
 
   Stack *ss = pos->st; // At least the fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
@@ -375,7 +365,7 @@ void thread_search(Pos *pos)
   pos->completedDepth = DEPTH_ZERO;
 
   if (pos->threadIdx == 0) {
-    mainThread.failedLow = 0;
+    failedLow = false;
     mainThread.bestMoveChanges = 0;
   }
 
@@ -410,7 +400,7 @@ void thread_search(Pos *pos)
     // Age out PV variability metric
     if (pos->threadIdx == 0) {
       mainThread.bestMoveChanges *= 0.517;
-      mainThread.failedLow = 0;
+      failedLow = false;
     }
 
     // Save the last iteration's scores before first PV line is searched and
@@ -492,7 +482,7 @@ void thread_search(Pos *pos)
           alpha = max(bestValue - delta, -VALUE_INFINITE);
 
           if (pos->threadIdx == 0) {
-            mainThread.failedLow = 1;
+            failedLow = true;
             Signals.stopOnPonderhit = 0;
           }
         } else if (bestValue >= beta) {
@@ -542,7 +532,7 @@ skip_search:
       if (!Signals.stop && !Signals.stopOnPonderhit) {
         // Stop the search if only one legal move is available, or if all
         // of the available time has been used.
-        const int F[] = { mainThread.failedLow,
+        const int F[] = { failedLow,
                           bestValue - mainThread.previousScore };
 
         int improvingFactor = max(246, min(832, 306 + 119 * F[0] - 6 * F[1]));
