@@ -496,15 +496,13 @@ moves_loop: // When in check search starts from here.
 
         // Prune moves with negative SEE at low depths and below a decreasing
         // threshold at higher depths.
-        if (   lmrDepth < 8
-            && !extension
-            && !see_test(pos, move, -35 * lmrDepth * lmrDepth))
+        if (   !extension
+            && !see_test(pos, move, -29 * lmrDepth * lmrDepth))
           continue;
       }
 //      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
 //               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-      else if (    depth < 7 * ONE_PLY
-               && !extension
+      else if (   !extension
                && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
         continue;
     }
