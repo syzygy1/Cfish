@@ -29,9 +29,9 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Isolated = S(13, 16);
-static const Score Backward = S(17, 11);
-static const Score Doubled  = S(13, 40);
+static const Score Isolated = S( 4, 20);
+static const Score Backward = S(21, 22);
+static const Score Doubled  = S(12, 54);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
@@ -40,25 +40,25 @@ static Score Connected[2][2][3][8];
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
 // our king.
 static const Value ShelterStrength[4][8] = {
-  { V(  7), V(76), V( 84), V( 38), V(  7), V( 30), V(-19) },
-  { V(-13), V(83), V( 42), V(-27), V(  2), V(-32), V(-45) },
-  { V(-26), V(63), V(  5), V(-44), V( -5), V(  2), V(-59) },
-  { V(-19), V(53), V(-11), V(-22), V(-12), V(-51), V(-60) }
+  { V( 16), V(82), V( 83), V( 47), V( 19), V( 44), V(  4) },
+  { V(-51), V(56), V( 33), V(-58), V(-57), V(-50), V(-39) },
+  { V(-20), V(71), V( 16), V(-10), V( 13), V( 19), V(-30) },
+  { V(-29), V(12), V(-21), V(-40), V(-15), V(-77), V(-91) }
 };
 
 // Danger of enemry pawns moving toward our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where the enemy has no pawn or where their
 // pawn is behind our king
 static const Value UnblockedStorm[4][8] = {
-  { V( 25), V( 79), V(107), V( 51), V( 27), V(  0), V(  0) },
-  { V(  5), V( 35), V(121), V( -2), V( 15), V(-10), V(-10) },
-  { V(-20), V( 22), V( 98), V( 36), V(  7), V(-20), V(-20) },
-  { V(-27), V( 24), V( 80), V( 25), V( -4), V(-30), V(-30) }
+  { V(54), V( 48), V( 99), V(91), V(42), V( 32), V( 31) },
+  { V(34), V( 27), V(105), V(38), V(32), V(-19), V(  3) },
+  { V(-4), V( 28), V( 87), V(18), V(-3), V(-14), V(-11) },
+  { V(-5), V( 22), V( 75), V(14), V( 2), V( -5), V(-19) }
 };
 
 // Danger of blocked enemy pawns storming our king, by rank
 static const Value BlockedStorm[8] =
-  { V(0), V(0), V(75), V(-10), V(-20), V(-20), V(-20) };
+  { V(0), V(0), V(81), V(-9), V(-5), V(-1), V(26) };
 
 #undef S
 #undef V
