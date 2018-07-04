@@ -688,7 +688,9 @@ static void update_capture_stats(const Pos *pos, Move move, Move *captures,
 {
   Piece moved_piece = moved_piece(move);
   int captured = type_of_p(piece_on(to_sq(move)));
-  cpth_update(*pos->captureHistory, moved_piece, to_sq(move), captured, bonus);
+
+  if (is_capture_or_promotion(pos, move))
+    cpth_update(*pos->captureHistory, moved_piece, to_sq(move), captured, bonus);
 
   // Decrease all the other played capture moves
   for (int i = 0; i < captureCnt; i++) {

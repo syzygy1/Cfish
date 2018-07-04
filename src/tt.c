@@ -52,8 +52,7 @@ void tt_free(void)
 }
 
 
-// tt_allocate() allocates the transposition table, measured in 
-// megabytes.
+// tt_allocate() allocates the transposition table, measured in megabytes.
 
 void tt_allocate(size_t mbSize)
 {
@@ -146,9 +145,7 @@ failed:
 }
 
 
-// tt_clear() overwrites the entire transposition table with zeros. It
-// is called whenever the table is resized, or when the user asks the
-// program to clear the table (from the UCI interface).
+// tt_clear() initialises the entire transposition table to zero.
 
 void tt_clear(void)
 {
