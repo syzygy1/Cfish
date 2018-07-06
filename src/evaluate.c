@@ -144,10 +144,6 @@ static const Score ThreatByRook[8] = {
   S(0, 0), S(0, 24), S(38, 71), S(38, 61), S( 0, 38), S(36, 38)
 };
 
-// ThreatByKing[on one/on many] contains bonuses for King attacks on
-// pawns or pieces which are not pawn-defended.
-static const Score ThreatByKing[2] = { S(30, 62), S(-9, 160) };
-
 // PassedRank[mg/eg][Rank] contains midgame and endgame bonuses for passed
 // pawns. We don't use a Score because we process the two components
 // independently.
@@ -183,6 +179,7 @@ static const Score Overload           = S( 10,  5);
 static const Score PawnlessFlank      = S( 20, 80);
 static const Score RookOnPawn         = S(  8, 24);
 static const Score SliderOnQueen      = S( 42, 21);
+static const Score ThreatByKing       = S( 31, 75);
 static const Score ThreatByPawnPush   = S( 49, 30);
 static const Score ThreatByRank       = S( 16,  3);
 static const Score ThreatBySafePawn   = S(165,133);
@@ -538,9 +535,9 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
         score += ThreatByRank * relative_rank_s(Them, s);
     }
 
-    b = weak & ei->attackedBy[Us][KING];
-    if (b)
-      score += ThreatByKing[!!more_than_one(b)];
+    // Bonus for king attacks on pawns or pieces which are not pawn-defended
+    if (weak & ei->attackedBy[Us][KING])
+      score += ThreatByKing;
 
     // Bonus for overload (non-pawn enemies attacked and defended exactly once)
     b =  nonPawnEnemies
