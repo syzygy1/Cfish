@@ -393,7 +393,7 @@ void thread_search(Pos *pos)
     // Distribute search depths across the threads
     if (pos->threadIdx) {
       int i = (pos->threadIdx - 1) % 20;
-      if (((pos->rootDepth / ONE_PLY + pos_game_ply() + skipPhase[i]) / skipSize[i]) % 2)
+      if (((pos->rootDepth / ONE_PLY + skipPhase[i]) / skipSize[i]) % 2)
         continue;
     }
 
