@@ -148,30 +148,30 @@ static const Score ThreatByRook[8] = {
 // pawns. We don't use a Score because we process the two components
 // independently.
 static const Value PassedRank[][8] = {
-  { V(0), V( 4), V( 7), V(14), V(42), V(165), V(279) },
-  { V(0), V(17), V(20), V(36), V(62), V(171), V(252) }
+  { V(0), V( 5), V(12), V(10), V(57), V(163), V(271) },
+  { V(0), V(18), V(23), V(31), V(62), V(167), V(250) }
 };
 
 // PassedFile[File] contains a bonus according to the file of a passed pawn
 static const Score PassedFile[8] = {
-  S( 11, 14), S( 0, -5), S(-2, -8), S(-25,-13),
-  S(-25,-13), S(-2, -8), S( 0, -5), S( 11, 14)
+  S( -1,  7), S( 0,  9), S(-9, -8), S(-30,-14),
+  S(-30,-14), S(-9, -8), S( 0,  9), S( -1,  7)
 };
 
 // Rank-dependent factor for a passed-pawn bonus
-static const int PassedDanger[8] = { 0, 0, 0, 2, 7, 12, 19 };
+static const int PassedDanger[8] = { 0, 0, 0, 3, 7, 11, 20 };
 
 // KingProtector[knight/bishop] contains a penalty according to distance
 // from king
-static const Score KingProtector[] = { S(4, 6), S(6, 3) };
+static const Score KingProtector[] = { S(5, 6), S(6, 5) };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BishopPawns        = S(  3,  5);
-static const Score CloseEnemies       = S(  8,  0);
+static const Score BishopPawns        = S(  3,  7);
+static const Score CloseEnemies       = S(  6,  0);
 static const Score Connectivity       = S(  3,  1);
 static const Score CorneredBishop     = S( 50, 50);
 static const Score Hanging            = S( 52, 30);
-static const Score HinderPassedPawn   = S(  5, -1);
+static const Score HinderPassedPawn   = S(  4,  0);
 static const Score KnightOnQueen      = S( 21, 11);
 static const Score LongDiagonalBishop = S( 22,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
@@ -179,13 +179,13 @@ static const Score Overload           = S( 10,  5);
 static const Score PawnlessFlank      = S( 20, 80);
 static const Score RookOnPawn         = S(  8, 24);
 static const Score SliderOnQueen      = S( 42, 21);
-static const Score ThreatByKing       = S( 31, 75);
-static const Score ThreatByPawnPush   = S( 49, 30);
+static const Score ThreatByKing       = S( 23, 76);
+static const Score ThreatByPawnPush   = S( 45, 40);
 static const Score ThreatByRank       = S( 16,  3);
-static const Score ThreatBySafePawn   = S(165,133);
+static const Score ThreatBySafePawn   = S(173,102);
 static const Score TrappedRook        = S( 92,  0);
 static const Score WeakQueen          = S( 50, 10);
-static const Score WeakUnopposedPawn  = S(  5, 26);
+static const Score WeakUnopposedPawn  = S(  5, 29);
 
 #undef S
 #undef V
@@ -286,9 +286,8 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
           score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & bb)];
       }
 
-      // Bonus when behind a pawn
-      if (    relative_rank_s(Us, s) < RANK_5
-          && (pieces_p(PAWN) & sq_bb(s + pawn_push(Us))))
+      // Knight and Bishop bonus for being right behind a pawn
+      if (shift_bb(Down, pieces_p(PAWN)) & sq_bb(s))
         score += MinorBehindPawn;
 
       // Penalty if the minor is far from the king
@@ -440,12 +439,12 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     unsafeChecks &= ei->mobilityArea[Them];
 
     kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
-                 +  64 * ei->kingAttacksCount[Them]
-                 + 183 * popcount(ei->kingRing[Us] & weak)
-                 + 122 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
-                 - 860 * !pieces_cp(Them, QUEEN)
-                 -   7 * mg_value(score) / 8
-                 +  17;
+                 +  69 * ei->kingAttacksCount[Them]
+                 + 185 * popcount(ei->kingRing[Us] & weak)
+                 + 129 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
+                 - 873 * !pieces_cp(Them, QUEEN)
+                 -   6 * mg_value(score) / 8
+                 -   2;
 
     // Transform the kingDanger units into a Score, and subtract it from
     // the evaluation.
