@@ -104,14 +104,17 @@ static void score_evasions(const Pos *pos)
   // stats heuristics.
 
   ButterflyHistory *history = pos->history;
+  PieceToHistory *cmh = (st-1)->history;
   Color c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - type_of_p(moved_piece(m->move)) + (1 << 28);
+                - type_of_p(moved_piece(m->move));
     else
-      m->value = (*history)[c][from_to(m->move)];
+      m->value =  (*history)[c][from_to(m->move)]
+                + (*cmh)[moved_piece(m->move)][to_sq(m->move)]
+                - (1 << 28);
 }
 
 

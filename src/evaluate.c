@@ -161,10 +161,6 @@ static const Score PassedFile[8] = {
 // Rank-dependent factor for a passed-pawn bonus
 static const int PassedDanger[8] = { 0, 0, 0, 3, 7, 11, 20 };
 
-// KingProtector[knight/bishop] contains a penalty according to distance
-// from king
-static const Score KingProtector[] = { S(5, 6), S(6, 5) };
-
 // Assorted bonuses and penalties used by evaluation
 static const Score BishopPawns        = S(  3,  7);
 static const Score CloseEnemies       = S(  6,  0);
@@ -172,6 +168,7 @@ static const Score Connectivity       = S(  3,  1);
 static const Score CorneredBishop     = S( 50, 50);
 static const Score Hanging            = S( 52, 30);
 static const Score HinderPassedPawn   = S(  4,  0);
+static const Score KingProtector      = S(  6,  6);
 static const Score KnightOnQueen      = S( 21, 11);
 static const Score LongDiagonalBishop = S( 22,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
@@ -291,7 +288,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
         score += MinorBehindPawn;
 
       // Penalty if the minor is far from the king
-      score -= KingProtector[Pt == BISHOP] * distance(s, square_of(Us, KING));
+      score -= KingProtector * distance(s, square_of(Us, KING));
 
       if (Pt == BISHOP) {
         // Penalty according to number of pawns on the same color square as
@@ -540,7 +537,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
     // Bonus for overload (non-pawn enemies attacked and defended exactly once)
     b =  nonPawnEnemies
-       & ei->attackedBy[Us][0]   & ~ei->attackedBy2[Us]
+       & ei->attackedBy[Us][0]
        & ei->attackedBy[Them][0] & ~ei->attackedBy2[Them];
     score += Overload * popcount(b);
 

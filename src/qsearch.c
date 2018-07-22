@@ -106,6 +106,8 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     futilityBase = bestValue + 128;
   }
 
+  ss->history = &(*pos->counterMoveHistory)[0][0];
+
   // Initialize move picker data for the current position, and prepare
   // to search the moves. Because the depth is <= 0 here, only captures,
   // queen promotions and checks (only if depth >= DEPTH_QS_CHECKS) will
@@ -161,6 +163,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     }
 
     ss->currentMove = move;
+    ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
 
     // Make and search the move
     do_move(pos, move, givesCheck);
