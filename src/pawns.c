@@ -191,8 +191,7 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
   const Bitboard BlockRanks =
                    (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
   
-  Bitboard b =  pieces_p(PAWN)
-              & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
+  Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
   Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;

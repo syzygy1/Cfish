@@ -164,7 +164,6 @@ static const int PassedDanger[8] = { 0, 0, 0, 3, 7, 11, 20 };
 // Assorted bonuses and penalties used by evaluation
 static const Score BishopPawns        = S(  3,  7);
 static const Score CloseEnemies       = S(  6,  0);
-static const Score Connectivity       = S(  3,  1);
 static const Score CorneredBishop     = S( 50, 50);
 static const Score Hanging            = S( 52, 30);
 static const Score HinderPassedPawn   = S(  4,  0);
@@ -172,7 +171,7 @@ static const Score KingProtector      = S(  6,  6);
 static const Score KnightOnQueen      = S( 21, 11);
 static const Score LongDiagonalBishop = S( 22,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
-static const Score Overload           = S( 10,  5);
+static const Score Overload           = S( 16,  7);
 static const Score PawnlessFlank      = S( 20, 80);
 static const Score RookOnPawn         = S(  8, 24);
 static const Score SliderOnQueen      = S( 42, 21);
@@ -523,7 +522,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
         score += ThreatByRank * relative_rank_s(Them, s);
     }
 
-    b = (pieces_cp(Them, QUEEN) | weak) & ei->attackedBy[Us][ROOK];
+    b = weak & ei->attackedBy[Us][ROOK];
     while (b) {
       Square s = pop_lsb(&b);
       score += ThreatByRook[piece_on(s) - 8 * Them];
@@ -536,9 +535,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByKing;
 
     // Bonus for overload (non-pawn enemies attacked and defended exactly once)
-    b =  nonPawnEnemies
-       & ei->attackedBy[Us][0]
-       & ei->attackedBy[Them][0] & ~ei->attackedBy2[Them];
+    b = weak & nonPawnEnemies & ei->attackedBy[Them][0];
     score += Overload * popcount(b);
 
     score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
@@ -578,10 +575,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
     score += SliderOnQueen * popcount(b & safeThreats & ei->attackedBy2[Us]);
   }
-
-  // Bonus for protected knights, bishops, rooks and queens
-  b = (pieces_c(Us) ^ pieces_cpp(Us, PAWN, KING)) & ei->attackedBy[Us][0];
-  score += Connectivity * popcount(b);
 
   return score;
 }

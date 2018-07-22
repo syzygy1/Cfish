@@ -538,11 +538,9 @@ moves_loop: // When in check search starts from here.
       Depth r = reduction(improving, depth, moveCount, NT);
 
       if (captureOrPromotion) {
-        // Increase reduction depending on opponent's stat score
-        if ((ss-1)->statScore >= 0)
-          r += ONE_PLY;
-
-        r -= r ? ONE_PLY : DEPTH_ZERO;
+        // Decrease reduction depending on opponent's stat score
+        if ((ss-1)->statScore < 0)
+          r -= ONE_PLY;
       } else {
         // Decrease reduction if opponent's move count is high
         if ((ss-1)->moveCount > 15)
@@ -582,10 +580,10 @@ moves_loop: // When in check search starts from here.
           r += ONE_PLY;
 
         // Decrease/increase reduction for moves with a good/bad history.
-        r = max(DEPTH_ZERO, (r / ONE_PLY - ss->statScore / 20000) * ONE_PLY);
+        r -= ss->statScore / 20000 * ONE_PLY;
       }
 
-      Depth d = max(newDepth - r, ONE_PLY);
+      Depth d = max(newDepth - max(r, DEPTH_ZERO), ONE_PLY);
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 
