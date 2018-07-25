@@ -40,13 +40,13 @@ INLINE void cms_update(PieceToHistory cms, Piece pc, Square to, int v)
 INLINE void history_update(ButterflyHistory history, int c, Move m, int v)
 {
   m &= 4095;
-  history[c][m] += v - history[c][m] * abs(v) / 10368;
+  history[c][m] += v - history[c][m] * abs(v) / 10692;
 }
 
 INLINE void cpth_update(CapturePieceToHistory history, Piece pc, Square to,
                         int captured, int v)
 {
-  history[pc][to][captured] += v - history[pc][to][captured] * abs(v) / 10368;
+  history[pc][to][captured] += v - history[pc][to][captured] * abs(v) / 10692;
 }
 
 enum {

@@ -549,7 +549,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   b  = shift_bb(Up, pieces_cp(Us, PAWN)) & ~pieces();
   b |= shift_bb(Up, b & TRank3BB) & ~pieces();
 
-  // Keep only those squares which are not completely unsafe
+  // Keep only those squares which are relatively safe
   b &=  ~pieces()
       & ~ei->attackedBy[Them][PAWN]
       & (ei->attackedBy[Us][0] | ~ei->attackedBy[Them][0]);
