@@ -520,6 +520,9 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByMinor[piece_on(s) - 8 * Them];
       if (piece_on(s) != make_piece(Them, PAWN))
         score += ThreatByRank * relative_rank_s(Them, s);
+
+      else if (blockers_for_king(pos, Them) & sq_bb(s))
+        score += score_divide(ThreatByRank * relative_rank_s(Them, s), 2);
     }
 
     b = weak & ei->attackedBy[Us][ROOK];
@@ -528,6 +531,9 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByRook[piece_on(s) - 8 * Them];
       if (piece_on(s) != make_piece(Them, PAWN))
         score += ThreatByRank * relative_rank_s(Them, s);
+
+      else if (blockers_for_king(pos, Them) & sq_bb(s))
+        score += score_divide(ThreatByRank * relative_rank_s(Them, s), 2);
     }
 
     // Bonus for king attacks on pawns or pieces which are not pawn-defended
@@ -555,10 +561,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       & (ei->attackedBy[Us][0] | ~ei->attackedBy[Them][0]);
 
   // Add a bonus for each new pawn threat from those squares
-  b =  (shift_bb(Left, b) | shift_bb(Right, b))
-     &  pieces_c(Them)
-     & ~ei->attackedBy[Us][PAWN];
-
+  b = (shift_bb(Left, b) | shift_bb(Right, b)) & pieces_c(Them);
   score += ThreatByPawnPush * popcount(b);
 
   // Bonus for impending threats against enemy queen
