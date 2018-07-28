@@ -77,8 +77,8 @@ typedef struct EvalInfo EvalInfo;
 #define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
 
 static const Bitboard KingFlank[8] = {
-  QueenSide, QueenSide, QueenSide, CenterFiles,
-  CenterFiles, KingSide, KingSide, KingSide
+  QueenSide ^ FileDBB, QueenSide, QueenSide, CenterFiles,
+  CenterFiles, KingSide, KingSide, KingSide ^ FileEBB
 };
 
 // Thresholds for lazy and space evaluation
@@ -166,13 +166,13 @@ static const Score BishopPawns        = S(  3,  7);
 static const Score CloseEnemies       = S(  6,  0);
 static const Score CorneredBishop     = S( 50, 50);
 static const Score Hanging            = S( 52, 30);
-static const Score HinderPassedPawn   = S(  4,  0);
+static const Score HinderPassedPawn   = S(  8,  0);
 static const Score KingProtector      = S(  6,  6);
 static const Score KnightOnQueen      = S( 21, 11);
 static const Score LongDiagonalBishop = S( 22,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
 static const Score Overload           = S( 13,  6);
-static const Score PawnlessFlank      = S( 20, 80);
+static const Score PawnlessFlank      = S( 19, 84);
 static const Score RookOnPawn         = S(  8, 24);
 static const Score SliderOnQueen      = S( 42, 21);
 static const Score ThreatByKing       = S( 23, 76);
@@ -486,7 +486,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
   enum { Minor, Rook };
 
-  Bitboard b, weak, defended, stronglyProtected, safeThreats;
+  Bitboard b, weak, defended, stronglyProtected, safe;
   Score score = SCORE_ZERO;
 
   // Non-pawn enemies
@@ -495,8 +495,8 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Our safe or protected pawns
   b = pieces_cp(Us, PAWN) & (~ei->attackedBy[Them][0] | ei->attackedBy[Us][0]);
 
-  safeThreats = (shift_bb(Right, b) | shift_bb(Left, b)) & nonPawnEnemies;
-  score += ThreatBySafePawn * popcount(safeThreats);
+  safe = (shift_bb(Right, b) | shift_bb(Left, b)) & nonPawnEnemies;
+  score += ThreatBySafePawn * popcount(safe);
 
   // Squares strongly protected by the opponent, either because they attack the
   // square with a pawn or because they attack the square twice and we don't.
@@ -567,16 +567,16 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Bonus for impending threats against enemy queen
   if (piece_count(Them, QUEEN) == 1) {
     Square s = square_of(Them, QUEEN);
-    safeThreats = ei->mobilityArea[Us] & ~stronglyProtected;
+    safe = ei->mobilityArea[Us] & ~stronglyProtected;
 
     b = ei->attackedBy[Us][KNIGHT] & attacks_from_knight(s);
 
-    score += KnightOnQueen * popcount(b & safeThreats);
+    score += KnightOnQueen * popcount(b & safe);
 
     b =  (ei->attackedBy[Us][BISHOP] & attacks_from_bishop(s))
        | (ei->attackedBy[Us][ROOK  ] & attacks_from_rook(s));
 
-    score += SliderOnQueen * popcount(b & safeThreats & ei->attackedBy2[Us]);
+    score += SliderOnQueen * popcount(b & safe & ei->attackedBy2[Us]);
   }
 
   return score;
@@ -607,8 +607,8 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 
     assert(!(pieces_cp(Them, PAWN) & forward_file_bb(Us, s + Up)));
 
-    bb = forward_file_bb(Us, s) & pieces_c(Them);
-    score -= HinderPassedPawn * popcount(bb);
+    if (forward_file_bb(Us, s) & pieces_c(Them))
+      score -= HinderPassedPawn;
 
     int r = relative_rank_s(Us, s);
     int w = PassedDanger[r];
