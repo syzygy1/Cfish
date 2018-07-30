@@ -374,11 +374,19 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
   const Square ksq = square_of(Us, KING);
-  Bitboard weak, b, b1, b2, safe, unsafeChecks;
+  Bitboard kingFlank, weak, b, b1, b2, safe, unsafeChecks;
 
   // King shelter and enemy pawns storm
   Score score = Us == WHITE ? king_safety_white(ei->pe, pos, ksq)
                             : king_safety_black(ei->pe, pos, ksq);
+
+  // Find the squares that opponent attacks in our king flank and the squares
+  // which are attacked twice in that flank but not defended by our pawns.
+  kingFlank = KingFlank[file_of(ksq)];
+  b1 = ei->attackedBy[Them][0] & kingFlank & Camp;
+  b2 = b1 & ei->attackedBy2[Them] & ~ei->attackedBy[Us][PAWN];
+
+  int tropism = popcount(b1) + popcount(b2);
 
   // Main king safety evaluation
   if (ei->kingAttackersCount[Them] > (1 - piece_count(Them, QUEEN))) {
@@ -438,9 +446,10 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                  +  69 * ei->kingAttacksCount[Them]
                  + 185 * popcount(ei->kingRing[Us] & weak)
                  + 129 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
+                 +   4 * tropism
                  - 873 * !pieces_cp(Them, QUEEN)
                  -   6 * mg_value(score) / 8
-                 -   2;
+                 -   30;
 
     // Transform the kingDanger units into a Score, and subtract it from
     // the evaluation.
@@ -451,23 +460,13 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     }
   }
 
-  // King tropism: firstly, find squares that we attack in the enemy king flank
-  File kf = file_of(ksq);
-  b = ei->attackedBy[Them][0] & KingFlank[kf] & Camp;
-
-  assert(((Us == WHITE ? b << 4 : b >> 4) & b) == 0);
-  assert(popcount(Us == WHITE ? b << 4 : b >> 4) == popcount(b));
-
-  // Secondly, add the squares which are attacked twice in that flank and
-  // which are not defended by our pawns.
-  b =  (Us == WHITE ? b << 4 : b >> 4)
-     | (b & ei->attackedBy2[Them] & ~ei->attackedBy[Us][PAWN]);
-
-  score -= CloseEnemies * popcount(b);
-
   // Penalty when our king is on a pawnless flank.
-  if (!(pieces_p(PAWN) & KingFlank[kf]))
+  if (!(pieces_p(PAWN) & kingFlank))
     score -= PawnlessFlank;
+
+  // King tropism bonus to anticipate slow motion attacks on our king
+  score -= CloseEnemies * tropism;
+
 
   return score;
 }
