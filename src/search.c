@@ -59,8 +59,7 @@ static Score base_ct;
 static const int skipSize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
 static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
 
-static const int RazorMargin1 = 590;
-static const int RazorMargin2 = 604;
+static const int RazorMargin = 600;
 
 INLINE int futility_margin(Depth d, int improving) {
   return (175 - 50 * improving) * d / ONE_PLY;
@@ -79,7 +78,7 @@ INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 static Value stat_bonus(Depth depth)
 {
   int d = depth / ONE_PLY;
-  return d > 17 ? 0 : 33 * d * d + 66 * d - 66;
+  return d > 17 ? 0 : 29 * d * d + 138 * d - 134;
 }
 
 // Skill structure is used to implement strength limit

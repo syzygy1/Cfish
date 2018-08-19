@@ -40,10 +40,10 @@ static Score Connected[2][2][3][8];
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
 // our king.
 static const Value ShelterStrength[4][8] = {
-  { V( -3), V( 81), V( 93), V( 58), V( 39), V( 18), V(  25) },
-  { V(-40), V( 61), V( 35), V(-49), V(-29), V(-11), V( -63) },
-  { V( -7), V( 75), V( 23), V( -2), V( 32), V(  3), V( -45) },
-  { V(-36), V(-13), V(-29), V(-52), V(-48), V(-67), V(-166) }
+  { V( -6), V( 81), V( 93), V( 58), V( 39), V( 18), V(  25) },
+  { V(-43), V( 61), V( 35), V(-49), V(-29), V(-11), V( -63) },
+  { V(-10), V( 75), V( 23), V( -2), V( 32), V(  3), V( -45) },
+  { V(-39), V(-13), V(-29), V(-52), V(-48), V(-67), V(-166) }
 };
 
 // Danger of enemry pawns moving toward our king by [distance from edge][rank].
@@ -115,7 +115,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // which could become passed after one or two pawn pushes when they
     // are not attacked more times than defended.
     if (   !(stoppers ^ lever ^ leverPush)
-        && !(ourPawns & forward_file_bb(Us, s))
         && popcount(supported) >= popcount(lever) - 1
         && popcount(phalanx)   >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
@@ -194,11 +193,9 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
   Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
-  Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;
+  Value safety = (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq)) ? 374 : 5;
 
   File center = max(FILE_B, min(FILE_G, file_of(ksq)));
-  if (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq))
-    safety += 374;
 
   for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);

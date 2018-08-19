@@ -84,7 +84,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (!rootNode) {
     // Step 2. Check for aborted search and immediate draw
     if (load_rlx(Signals.stop) || is_draw(pos) || ss->ply >= MAX_PLY)
-      return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos) : VALUE_DRAW;
+      return  ss->ply >= MAX_PLY && !inCheck
+            ? evaluate(pos) - 10 * ((ss-1)->statScore > 0)
+            : VALUE_DRAW;
 
     // Step 3. Mate distance pruning. Even if we mate at the next move our
     // score would be at best mate_in(ss->ply+1), but if alpha is already
@@ -221,15 +223,19 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   } else if (ttHit) {
     // Never assume anything on values stored in TT
     if ((ss->staticEval = eval = tte_eval(tte)) == VALUE_NONE)
-      eval = ss->staticEval = evaluate(pos);
+      eval = ss->staticEval = evaluate(pos) - 10 * ((ss-1)->statScore > 0);
 
     // Can ttValue be used as a better position evaluation?
     if (ttValue != VALUE_NONE)
       if (tte_bound(tte) & (ttValue > eval ? BOUND_LOWER : BOUND_UPPER))
         eval = ttValue;
   } else {
-    eval = ss->staticEval =
-    (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
+    int p = (ss-1)->statScore;
+    int malus = p > 0 ? (p + 5000) / 1024 :
+                p < 0 ? (p - 5000) / 1024 : 0;
+
+    ss->staticEval = eval =
+    (ss-1)->currentMove != MOVE_NULL ? evaluate(pos) - malus
                                      : -(ss-1)->staticEval + 2 * Tempo;
 
     tte_save(tte, posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, 0,
@@ -237,21 +243,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   // Step 7. Razoring
-  if (   !PvNode
-      && depth <= ONE_PLY)
-  {
-    if (eval + RazorMargin1 <= alpha)
-      return qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
-  }
-  else if (   !PvNode
-           && depth <= 2 * ONE_PLY
-           && eval + RazorMargin2 <= alpha)
-  {
-    Value ralpha = alpha - RazorMargin2;
-    Value v = qsearch_NonPV_false(pos, ss, ralpha, DEPTH_ZERO);
-    if (v <= ralpha)
-      return v;
-  }
+  if (   depth < 2 * ONE_PLY
+      && eval <= alpha - RazorMargin)
+    return PvNode ? qsearch_PV_false(pos, ss, alpha, beta, DEPTH_ZERO)
+                  : qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
 
   improving =   ss->staticEval >= (ss-2)->staticEval
              || (ss-2)->staticEval == VALUE_NONE;
@@ -266,7 +261,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 9. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && (ss-1)->currentMove != MOVE_NULL
-      && (ss-1)->statScore < 22500
+      && (ss-1)->statScore < 23200
       && eval >= beta
       && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
       && !excludedMove
@@ -537,15 +532,11 @@ moves_loop: // When in check search starts from here.
     {
       Depth r = reduction(improving, depth, moveCount, NT);
 
-      if (captureOrPromotion) {
-        // Decrease reduction depending on opponent's stat score
-        if ((ss-1)->statScore < 0)
-          r -= ONE_PLY;
-      } else {
-        // Decrease reduction if opponent's move count is high
-        if ((ss-1)->moveCount > 15)
-          r -= ONE_PLY;
+      // Decrease reduction if opponent's move count is high.
+      if ((ss-1)->moveCount > 15)
+        r -= ONE_PLY;
 
+      if (!captureOrPromotion) {
         // Decrease reduction for exact PV nodes
         if (pvExact)
           r -= ONE_PLY;
