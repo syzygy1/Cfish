@@ -227,7 +227,7 @@ void mainthread_search(void)
   time_init(us, pos_game_ply());
   tt_new_search();
   char buf[16];
-  int playBookMove = 0;
+  bool playBookMove = false;
 
   base_ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
@@ -249,7 +249,7 @@ void mainthread_search(void)
         RootMove tmp = pos->rootMoves->move[0];
         pos->rootMoves->move[0] = pos->rootMoves->move[i];
         pos->rootMoves->move[i] = tmp;
-        playBookMove = 1;
+        playBookMove = true;
         break;
       }
 
@@ -296,11 +296,12 @@ void mainthread_search(void)
   // When playing in 'nodes as time' mode, subtract the searched nodes from
   // the available ones before exiting.
   if (Limits.npmsec)
-      Time.availableNodes += Limits.inc[us] - threads_nodes_searched();
+    Time.availableNodes += Limits.inc[us] - threads_nodes_searched();
 
   // Check if there are threads with a better score than main thread
   Pos *bestThread = pos;
   if (    option_value(OPT_MULTI_PV) == 1
+      && !playBookMove
       && !Limits.depth
 //      && !Skill(option_value(OPT_SKILL_LEVEL)).enabled()
       &&  pos->rootMoves->move[0].pv[0] != 0)
