@@ -52,7 +52,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
-  Value bestValue, value, ttValue, eval, maxValue;
+  Value bestValue, value, ttValue, eval, maxValue, pureStaticEval;
   int ttHit, inCheck, givesCheck, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
   int ttCapture, pvExact;
@@ -217,13 +217,13 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Step 6. Static evaluation of the position
   if (inCheck) {
-    ss->staticEval = VALUE_NONE;
+    ss->staticEval = pureStaticEval = VALUE_NONE;
     improving = 0;
     goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
     // Never assume anything on values stored in TT
-    if ((ss->staticEval = eval = tte_eval(tte)) == VALUE_NONE)
-      eval = ss->staticEval = evaluate(pos) - 10 * ((ss-1)->statScore > 0);
+    if ((ss->staticEval = pureStaticEval = eval = tte_eval(tte)) == VALUE_NONE)
+      eval = ss->staticEval = (pureStaticEval = evaluate(pos)) - 10 * ((ss-1)->statScore > 0);
 
     // Can ttValue be used as a better position evaluation?
     if (ttValue != VALUE_NONE)
@@ -235,11 +235,11 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
                 p < 0 ? (p - 5000) / 1024 : 0;
 
     ss->staticEval = eval =
-    (ss-1)->currentMove != MOVE_NULL ? evaluate(pos) - malus
-                                     : -(ss-1)->staticEval + 2 * Tempo;
+    (ss-1)->currentMove != MOVE_NULL ? (pureStaticEval = evaluate(pos)) - malus
+                                     : (pureStaticEval = -(ss-1)->staticEval + 2 * Tempo);
 
     tte_save(tte, posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, 0,
-             ss->staticEval, tt_generation());
+             pureStaticEval, tt_generation());
   }
 
   // Step 7. Razoring
@@ -711,7 +711,7 @@ moves_loop: // When in check search starts from here.
     tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
         bestValue >= beta ? BOUND_LOWER :
         PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-        depth, bestMove, ss->staticEval, tt_generation());
+        depth, bestMove, pureStaticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
