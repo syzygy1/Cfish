@@ -37,14 +37,7 @@ void numa_init(void)
 
   numaAvail = true;
   numNodes = numa_max_node() + 1;
-#if 0
-  printf("numa nodes = %d\n", numNodes);
-  for (int node = 0; node < numNodes; node++)
-    if (numa_bitmask_isbitset(numa_all_nodes_ptr, node))
-      printf("node %d is present.\n", node);
-    else
-      printf("node %d is absent.\n", node);
-#endif
+  delayedSettings.mask = numa_allocate_nodemask();
 
   // Determine number of logical and physical cores per node
   numPhysicalCores = malloc(numNodes * sizeof(int));
@@ -57,6 +50,7 @@ void numa_init(void)
   for (int node = 0; node < numNodes; node++) {
     nodeMask[node] = numa_allocate_nodemask();
     numa_bitmask_setbit(nodeMask[node], node);
+    numa_bitmask_setbit(delayedSettings.mask, node);
     numPhysicalCores[node] = 0;
     numa_node_to_cpus(node, cpuMask);
     for (int cpu = 0; cpu < numCpus; cpu++)
@@ -77,8 +71,6 @@ void numa_init(void)
 
   delayedSettings.numaEnabled = true;
   settings.numaEnabled = false;
-  delayedSettings.mask = numa_allocate_nodemask();
-  copy_bitmask_to_bitmask(numa_all_nodes_ptr, delayedSettings.mask);
   settings.mask = numa_allocate_nodemask();
 }
 
