@@ -222,21 +222,23 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
     // Never assume anything on values stored in TT
-    if ((ss->staticEval = pureStaticEval = eval = tte_eval(tte)) == VALUE_NONE)
-      eval = ss->staticEval = (pureStaticEval = evaluate(pos)) - 10 * ((ss-1)->statScore > 0);
+    if ((eval = tte_eval(tte)) == VALUE_NONE)
+      eval = evaluate(pos);
+    ss->staticEval = pureStaticEval = eval;
 
     // Can ttValue be used as a better position evaluation?
     if (ttValue != VALUE_NONE)
       if (tte_bound(tte) & (ttValue > eval ? BOUND_LOWER : BOUND_UPPER))
         eval = ttValue;
   } else {
-    int p = (ss-1)->statScore;
-    int malus = p > 0 ? (p + 5000) / 1024 :
-                p < 0 ? (p - 5000) / 1024 : 0;
-
-    ss->staticEval = eval =
-    (ss-1)->currentMove != MOVE_NULL ? (pureStaticEval = evaluate(pos)) - malus
-                                     : (pureStaticEval = -(ss-1)->staticEval + 2 * Tempo);
+    if ((ss-1)->currentMove != MOVE_NULL) {
+      int p = (ss-1)->statScore;
+      int bonus = p > 0 ? (-p - 2500) / 512 :
+                  p < 0 ? (-p + 2500) / 512 : 0;
+      pureStaticEval = evaluate(pos);
+      ss->staticEval = eval = pureStaticEval + bonus;
+    } else
+      ss->staticEval = eval = pureStaticEval = -(ss-1)->staticEval + 2 * Tempo;
 
     tte_save(tte, posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, 0,
              pureStaticEval, tt_generation());
@@ -321,7 +323,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     int probCutCount = 3;
     while ((move = next_move(pos, 0)) && probCutCount)
-      if (is_legal(pos, move)) {
+      if (move != excludedMove && is_legal(pos, move)) {
         probCutCount--;
         ss->currentMove = move;
         ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];

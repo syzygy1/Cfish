@@ -169,7 +169,7 @@ static const Score Hanging            = S( 57, 32);
 static const Score HinderPassedPawn   = S(  8,  0);
 static const Score KingProtector      = S(  6,  6);
 static const Score KnightOnQueen      = S( 21, 11);
-static const Score LongDiagonalBishop = S( 22,  0);
+static const Score LongDiagonalBishop = S( 46,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
 static const Score Overload           = S( 13,  6);
 static const Score PawnlessFlank      = S( 19, 84);
@@ -299,7 +299,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 
         // Bonus for bishop on a long diagonal which can "see" both center
         // squares
-        if (more_than_one(Center & (attacks_bb_bishop(s, pieces_p(PAWN)) | sq_bb(s))))
+        if (more_than_one(attacks_bb_bishop(s, pieces_p(PAWN)) & Center))
           score += LongDiagonalBishop;
       }
 
@@ -726,7 +726,7 @@ INLINE Value evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
                   +  12 * outflanking
                   +  16 * bothFlanks
                   +  48 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK))
-                  - 136;
+                  - 118;
 
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the endgame value, and that we carefully cap the bonus so

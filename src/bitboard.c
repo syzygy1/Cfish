@@ -148,7 +148,7 @@ void bitboards_init(void)
     for (Square s2 = 0; s2 < 64; s2++)
       if (s1 != s2) {
         SquareDistance[s1][s2] = max(distance_f(s1, s2), distance_r(s1, s2));
-        DistanceRingBB[s1][SquareDistance[s1][s2] - 1] |= sq_bb(s2);
+        DistanceRingBB[s1][SquareDistance[s1][s2]] |= sq_bb(s2);
       }
 
 #ifndef PEDANTIC

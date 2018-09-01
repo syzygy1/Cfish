@@ -226,7 +226,7 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
 
   Bitboard pawns = pieces_cp(Us, PAWN);
   if (pawns)
-    while (!(DistanceRingBB[ksq][minKingPawnDistance++] & pawns)) {}
+    while (!(DistanceRingBB[ksq][++minKingPawnDistance] & pawns)) {}
 
   Value bonus = evaluate_shelter(pos, ksq, Us);
 
