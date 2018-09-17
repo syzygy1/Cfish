@@ -749,7 +749,7 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
     if (   opposite_bishops(pos)
         && pos_non_pawn_material(WHITE) == BishopValueMg
         && pos_non_pawn_material(BLACK) == BishopValueMg)
-      return 31;
+      return 8 + 4 * ei->pe->asymmetry;
     else
       return min(40 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN), sf);
   }
