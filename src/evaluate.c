@@ -137,11 +137,11 @@ static const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
 // which piece type attacks which one. Attacks on lesser pieces which are
 // pawn defended are not considered.
 static const Score ThreatByMinor[8] = {
-  S(0, 0), S(0, 31), S(39, 42), S(57, 44), S(68,112), S(47,120)
+  S(0, 0), S(0, 31), S(39, 42), S(57, 44), S(68,112), S(62,120)
 };
 
 static const Score ThreatByRook[8] = {
-  S(0, 0), S(0, 24), S(38, 71), S(38, 61), S( 0, 38), S(36, 38)
+  S(0, 0), S(0, 24), S(38, 71), S(38, 61), S( 0, 38), S(51, 38)
 };
 
 // PassedRank[mg/eg][Rank] contains midgame and endgame bonuses for passed
@@ -166,7 +166,6 @@ static const Score BishopPawns        = S(  3,  7);
 static const Score CloseEnemies       = S(  6,  0);
 static const Score CorneredBishop     = S( 50, 50);
 static const Score Hanging            = S( 57, 32);
-static const Score HinderPassedPawn   = S(  8,  0);
 static const Score KingProtector      = S(  6,  6);
 static const Score KnightOnQueen      = S( 21, 11);
 static const Score LongDiagonalBishop = S( 46,  0);
@@ -445,7 +444,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                  +  69 * ei->kingAttacksCount[Them]
                  + 185 * popcount(ei->kingRing[Us] & weak)
-                 + 129 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
+                 + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
                  +   4 * tropism
                  - 873 * !pieces_cp(Them, QUEEN)
                  -   6 * mg_value(score) / 8
@@ -519,9 +518,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByMinor[piece_on(s) - 8 * Them];
       if (piece_on(s) != make_piece(Them, PAWN))
         score += ThreatByRank * relative_rank_s(Them, s);
-
-      else if (blockers_for_king(pos, Them) & sq_bb(s))
-        score += score_divide(ThreatByRank * relative_rank_s(Them, s), 2);
     }
 
     b = weak & ei->attackedBy[Us][ROOK];
@@ -530,9 +526,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
       score += ThreatByRook[piece_on(s) - 8 * Them];
       if (piece_on(s) != make_piece(Them, PAWN))
         score += ThreatByRank * relative_rank_s(Them, s);
-
-      else if (blockers_for_king(pos, Them) & sq_bb(s))
-        score += score_divide(ThreatByRank * relative_rank_s(Them, s), 2);
     }
 
     // Bonus for king attacks on pawns or pieces which are not pawn-defended
@@ -606,9 +599,6 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 
     assert(!(pieces_cp(Them, PAWN) & forward_file_bb(Us, s + Up)));
 
-    if (forward_file_bb(Us, s) & pieces_c(Them))
-      score -= HinderPassedPawn;
-
     int r = relative_rank_s(Us, s);
     int w = PassedDanger[r];
 
@@ -654,8 +644,6 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 
         mbonus += k * w, ebonus += k * w;
       }
-      else if (pieces_c(Us) & sq_bb(blockSq))
-        mbonus += w + r * 2, ebonus += w + r * 2;
     } // w != 0
 
     // Scale down bonus for candidate passers which need more than one

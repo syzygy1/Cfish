@@ -24,11 +24,15 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && has_game_cycle(pos))
   {
 #if PvNode
-      alpha = VALUE_DRAW;
+      alpha = value_draw(depth, pos);
       if (alpha >= beta)
         return alpha;
 #else
-      return VALUE_DRAW;
+      // Yucky randomisation made this necessary
+      Value tmp_alpha = value_draw(depth, pos);
+      if (tmp_alpha >= beta)
+        return tmp_alpha;
+      alpha = tmp_alpha;
 #endif
   }
 
@@ -55,7 +59,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Value bestValue, value, ttValue, eval, maxValue, pureStaticEval;
   int ttHit, inCheck, givesCheck, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
-  int ttCapture, pvExact;
+  bool ttCapture, pvExact;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
 
@@ -84,9 +88,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (!rootNode) {
     // Step 2. Check for aborted search and immediate draw
     if (load_rlx(Signals.stop) || is_draw(pos) || ss->ply >= MAX_PLY)
-      return  ss->ply >= MAX_PLY && !inCheck
-            ? evaluate(pos) - 10 * ((ss-1)->statScore > 0)
-            : VALUE_DRAW;
+      return  ss->ply >= MAX_PLY && !inCheck ? evaluate(pos)
+                                             : value_draw(depth, pos);
 
     // Step 3. Mate distance pruning. Even if we mate at the next move our
     // score would be at best mate_in(ss->ply+1), but if alpha is already
@@ -265,7 +268,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss-1)->currentMove != MOVE_NULL
       && (ss-1)->statScore < 23200
       && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && pureStaticEval >= beta - 36 * depth / ONE_PLY + 225
       && !excludedMove
       && pos_non_pawn_material(pos_stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
@@ -369,7 +372,7 @@ moves_loop: // When in check search starts from here.
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
 
   skipQuiets = 0;
-  ttCapture = 0;
+  ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
   pvExact = PvNode && ttHit && tte_bound(tte) == BOUND_EXACT;
 
   // Step 12. Loop through moves
@@ -453,7 +456,6 @@ moves_loop: // When in check search starts from here.
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
     }
     else if (    givesCheck
-             && !moveCountPruning
              &&  see_test(pos, move, 0))
       extension = ONE_PLY;
 
@@ -512,9 +514,6 @@ moves_loop: // When in check search starts from here.
       ss->moveCount = --moveCount;
       continue;
     }
-
-    if (move == ttMove && captureOrPromotion)
-      ttCapture = 1;
 
     // Update the current move (this must be done after singular extension
     // search)

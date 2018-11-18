@@ -193,8 +193,8 @@ TTEntry *tt_probe(Key key, int *found)
 
   for (int i = 0; i < ClusterSize; i++)
     if (!tte[i].key16 || tte[i].key16 == key16) {
-      if ((tte[i].genBound8 & 0xFC) != TT.generation8 && tte[i].key16)
-        tte[i].genBound8 = TT.generation8 | tte_bound(&tte[i]); // Refresh
+//      if ((tte[i].genBound8 & 0xFC) != TT.generation8 && tte[i].key16)
+      tte[i].genBound8 = TT.generation8 | tte_bound(&tte[i]); // Refresh
       *found = tte[i].key16;
       return &tte[i];
     }
