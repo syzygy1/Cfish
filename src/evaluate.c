@@ -103,8 +103,8 @@ enum {
 // mobility area.
 static const Score MobilityBonus[4][32] = {
   // Knights
-  { S(-75,-76), S(-57,-54), S( -9,-28), S( -2,-10), S(  6,  5), S( 14, 12),
-    S( 22, 26), S( 29, 29), S( 36, 29) },
+  { S(-62,-81), S(-53,-56), S(-12,-30), S( -4,-14), S(  3,  8), S( 13, 15),
+    S( 22, 23), S( 28, 27), S( 33, 33) },
   // Bishops
   { S(-48,-59), S(-20,-23), S( 16, -3), S( 26, 13), S( 38, 24), S( 51, 42),
     S( 55, 54), S( 63, 57), S( 63, 65), S( 68, 73), S( 81, 78), S( 81, 86),
@@ -131,7 +131,7 @@ static const Score Outpost[][2] = {
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
+static const Score RookOnFile[2] = { S(18, 7), S(44, 20) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
@@ -158,8 +158,9 @@ static const Score PassedFile[8] = {
   S(-30,-14), S(-9, -8), S( 0,  9), S( -1,  7)
 };
 
-// Rank-dependent factor for a passed-pawn bonus
-static const int PassedDanger[8] = { 0, 0, 0, 3, 7, 11, 20 };
+// Rank-dependent factor for a passed-pawn bonus. In Stockfish, the cheap
+// lookup was replaced with an expensive calcuation.
+static const int PassedDanger[8] = { 0, 0, 0, 3, 6, 11, 18 };
 
 // Assorted bonuses and penalties used by evaluation
 static const Score BishopPawns        = S(  3,  7);
@@ -172,15 +173,15 @@ static const Score LongDiagonalBishop = S( 46,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
 static const Score Overload           = S( 13,  6);
 static const Score PawnlessFlank      = S( 19, 84);
-static const Score RookOnPawn         = S( 10, 30);
+static const Score RookOnPawn         = S( 10, 29);
 static const Score SliderOnQueen      = S( 42, 21);
-static const Score ThreatByKing       = S( 23, 76);
+static const Score ThreatByKing       = S( 22, 78);
 static const Score ThreatByPawnPush   = S( 45, 40);
 static const Score ThreatByRank       = S( 16,  3);
 static const Score ThreatBySafePawn   = S(173,102);
-static const Score TrappedRook        = S( 92,  0);
+static const Score TrappedRook        = S( 96,  5);
 static const Score WeakQueen          = S( 50, 10);
-static const Score WeakUnopposedPawn  = S(  5, 29);
+static const Score WeakUnopposedPawn  = S( 15, 19);
 
 #undef S
 #undef V
@@ -383,7 +384,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   // which are attacked twice in that flank but not defended by our pawns.
   kingFlank = KingFlank[file_of(ksq)];
   b1 = ei->attackedBy[Them][0] & kingFlank & Camp;
-  b2 = b1 & ei->attackedBy2[Them] & ~ei->attackedBy[Us][PAWN];
+  b2 = b1 & ei->attackedBy2[Them];
 
   int tropism = popcount(b1) + popcount(b2);
 
@@ -448,15 +449,13 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                  +   4 * tropism
                  - 873 * !pieces_cp(Them, QUEEN)
                  -   6 * mg_value(score) / 8
+                 +       mg_value(mobility[Them] - mobility[Us])
                  -   30;
 
     // Transform the kingDanger units into a Score, and subtract it from
     // the evaluation.
-    if (kingDanger > 0) {
-      int mobilityDanger = mg_value(mobility[Them] - mobility[Us]);
-      kingDanger = max(0, kingDanger + mobilityDanger);
+    if (kingDanger > 0)
       score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
-    }
   }
 
   // Penalty when our king is on a pawnless flank.

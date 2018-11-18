@@ -437,7 +437,6 @@ void thread_search(Pos *pos)
                                        : -make_score(base_ct, base_ct / 2);
 
     int pvFirst = 0, pvLast = 0;
-    Depth adjustedDepth = pos->rootDepth;
 
     // MultiPV loop. We perform a full root search for each PV line
     for (int pvIdx = 0; pvIdx < multiPV && !Signals.stop; pvIdx++) {
@@ -463,7 +462,7 @@ void thread_search(Pos *pos)
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
         Value previousScore = rm->move[pvIdx].previousScore;
-        delta = (Value)18;
+        delta = 20;
         alpha = max(previousScore - delta, -VALUE_INFINITE);
         beta  = min(previousScore + delta,  VALUE_INFINITE);
 
@@ -478,7 +477,7 @@ void thread_search(Pos *pos)
       // high/low anymore.
       int failedHighCnt = 0;
       while (true) {
-        adjustedDepth = max(ONE_PLY, pos->rootDepth - failedHighCnt * ONE_PLY);
+        Depth adjustedDepth = max(ONE_PLY, pos->rootDepth - failedHighCnt * ONE_PLY);
         bestValue = search_PV(pos, ss, alpha, beta, adjustedDepth);
 
         // Bring the best move to the front. It is critical that sorting
@@ -501,7 +500,7 @@ void thread_search(Pos *pos)
             && multiPV == 1
             && (bestValue <= alpha || bestValue >= beta)
             && time_elapsed() > 3000)
-          uci_print_pv(pos, adjustedDepth, alpha, beta);
+          uci_print_pv(pos, pos->rootDepth, alpha, beta);
 
         // In case of failing low/high increase aspiration window and
         // re-search, otherwise exit the loop.
@@ -532,15 +531,15 @@ void thread_search(Pos *pos)
 skip_search:
       if (    pos->threadIdx == 0
           && (Signals.stop || pvIdx + 1 == multiPV || time_elapsed() > 3000))
-        uci_print_pv(pos, adjustedDepth, alpha, beta);
+        uci_print_pv(pos, pos->rootDepth, alpha, beta);
     }
 
     if (!Signals.stop)
-      pos->completedDepth = adjustedDepth;
+      pos->completedDepth = pos->rootDepth;
 
     if (rm->move[0].pv[0] != lastBestMove) {
       lastBestMove = rm->move[0].pv[0];
-      lastBestMoveDepth = adjustedDepth;
+      lastBestMoveDepth = pos->rootDepth;
     }
 
     // Have we found a "mate in x"?
