@@ -109,7 +109,7 @@ void benchmark(Pos *current, char *str)
   int threads     = (token = strtok(NULL, " ")) ? atoi(token)  : 1;
   int64_t limit   = (token = strtok(NULL, " ")) ? atoll(token) : 13;
   char *fenFile   = (token = strtok(NULL, " ")) ? token        : NULL;
-  char *limitType = (token = strtok(NULL, " ")) ? token        : "";
+  char *limitType = (token = strtok(NULL, " ")) ? token        : (char*)"";
 
   delayedSettings.ttSize = ttSize;
   delayedSettings.numThreads = threads;
@@ -130,8 +130,8 @@ void benchmark(Pos *current, char *str)
     numFens = sizeof(Defaults) / sizeof(char *);
   }
   else if (strcmp(fenFile, "current") == 0) {
-    fens = malloc(sizeof(*fens));
-    fens[0] = malloc(128);
+    fens = (char**) malloc(sizeof(*fens));
+    fens[0] = (char*)malloc(128);
     pos_fen(current, fens[0]);
     numFens = 1;
   }
@@ -143,14 +143,14 @@ void benchmark(Pos *current, char *str)
       fprintf(stderr, "Unable to open file %s\n", fenFile);
       return;
     }
-    fens = malloc(maxFens * sizeof(*fens));
+    fens = (char**)malloc(maxFens * sizeof(*fens));
     fens[0] = NULL;
     size_t length = 0;
     while (getline(&fens[numFens], &length, F) > 0) {
       numFens++;
       if (numFens == maxFens) {
         maxFens += 100;
-        fens = realloc(fens, maxFens * sizeof(*fens));
+        fens = (char**)realloc(fens, maxFens * sizeof(*fens));
       }
       fens[numFens] = NULL;
       length = 0;
@@ -160,9 +160,9 @@ void benchmark(Pos *current, char *str)
 
   uint64_t nodes = 0;
   Pos pos;
-  pos.stack = malloc(215 * sizeof(*pos.stack));
+  pos.stack = (Stack*) malloc(215 * sizeof(*pos.stack));
   pos.st = pos.stack + 5;
-  pos.moveList = malloc(10000 * sizeof(*pos.moveList));
+  pos.moveList = (ExtMove*) malloc(10000 * sizeof(*pos.moveList));
   TimePoint elapsed = now();
 
   int numOpts = 0;

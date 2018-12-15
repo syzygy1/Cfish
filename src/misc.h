@@ -26,7 +26,6 @@
 #ifndef _WIN32
 #include <pthread.h>
 #endif
-#include <stdatomic.h>
 #include <sys/time.h>
 #include <unistd.h>
 

@@ -25,9 +25,18 @@
 #ifndef _WIN32
 #include <pthread.h>
 #endif
-#include <stdatomic.h>
 #include <stddef.h>  // For offsetof()
 #include <string.h>
+
+#if defined(__cplusplus)
+#include <atomic>
+using std::atomic_bool;
+using std::memory_order_relaxed;
+using std::memory_order_release;
+using std::memory_order_acquire;
+#else
+#include <stdatomic.h>
+#endif
 
 #include "bitboard.h"
 #include "types.h"

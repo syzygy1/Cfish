@@ -127,7 +127,7 @@ void print_pos(Pos *pos)
     printf(" |\n +---+---+---+---+---+---+---+---+\n");
   }
 
-  printf("\nFen: %s\nKey: %16"PRIX64"\nCheckers: ", fen, pos_key());
+  printf("\nFen: %s\nKey: %16" PRIX64 "\nCheckers: ", fen, pos_key());
 
   char buf[16];
   for (Bitboard b = pos_checkers(); b; )
@@ -228,7 +228,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
   Square sq = SQ_A8;
 
   Stack *st = pos->st;
-  memset(pos, 0, offsetof(Pos, moveList));
+  memset((void*)pos, 0, offsetof(Pos, moveList));
   pos->st = st;
   memset(st, 0, StateSize);
 #ifdef PEDANTIC
@@ -913,7 +913,7 @@ void undo_move(Pos *pos, Move m)
   Stack *st = pos->st--;
   pos->sideToMove ^= 1;
   Color us = pos->sideToMove;
- 
+
   if (likely(type_of_m(m) != PROMOTION)) {
     pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
   } else {

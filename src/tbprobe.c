@@ -3,7 +3,6 @@
   This file may be redistributed and/or modified without restrictions.
 */
 
-#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -211,7 +210,7 @@ static void add_to_hash(void *ptr, Key key)
     idx = (idx + 1) & ((1 << TB_HASHBITS) - 1);
 
   tbHash[idx].key = key;
-  tbHash[idx].ptr = ptr;
+  tbHash[idx].ptr = (struct BaseEntry*) ptr;
 }
 
 #define pchr(i) PieceToChar[QUEEN - (i)]
@@ -344,7 +343,7 @@ void TB_init(char *path)
   const char *p = path;
   if (strlen(p) == 0 || !strcmp(p, "<empty>")) return;
 
-  pathString = malloc(strlen(p) + 1);
+  pathString = (char*)malloc(strlen(p) + 1);
   strcpy(pathString, p);
   numPaths = 0;
   for (int i = 0;; i++) {
@@ -355,7 +354,7 @@ void TB_init(char *path)
     if (!pathString[i]) break;
     pathString[i] = 0;
   }
-  paths = malloc(numPaths * sizeof(*paths));
+  paths = (char**)malloc(numPaths * sizeof(*paths));
   for (int i = 0, j = 0; i < numPaths; i++) {
     while (!pathString[j]) j++;
     paths[i] = &pathString[j];
@@ -368,8 +367,8 @@ void TB_init(char *path)
   TB_MaxCardinality = TB_MaxCardinalityDTM = 0;
 
   if (!pieceEntry) {
-    pieceEntry = malloc(TB_MAX_PIECE * sizeof(*pieceEntry));
-    pawnEntry = malloc(TB_MAX_PAWN * sizeof(*pawnEntry));
+    pieceEntry = (struct PieceEntry*)malloc(TB_MAX_PIECE * sizeof(*pieceEntry));
+    pawnEntry = (PawnEntry*)malloc(TB_MAX_PAWN * sizeof(*pawnEntry));
     if (!pieceEntry || !pawnEntry) {
       fprintf(stderr, "Out of memory.\n");
       exit(EXIT_FAILURE);
@@ -904,7 +903,7 @@ static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
 
   *flags = data[0];
   if (data[0] & 0x80) {
-    d = malloc(sizeof(*d));
+    d = (struct PairsData*)malloc(sizeof(*d));
     d->idxBits = 0;
     d->constValue[0] = type == WDL ? data[1] : 0;
     d->constValue[1] = 0;
@@ -921,7 +920,7 @@ static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
   int minLen = data[9];
   int h = maxLen - minLen + 1;
   uint32_t numSyms = read_le_u16(&data[10 + 2 * h]);
-  d = malloc(sizeof(*d) + h * sizeof(uint64_t) + numSyms);
+  d = (struct PairsData*)malloc(sizeof(*d) + h * sizeof(uint64_t) + numSyms);
   d->blockSize = blockSize;
   d->idxBits = idxBits;
   d->offset = (uint16_t *)&data[10];
@@ -954,7 +953,7 @@ static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
 
 static bool init_table(struct BaseEntry *be, const char *str, int type)
 {
-  uint8_t *data = map_tb(str, tbSuffix[type], &be->mapping[type]);
+	uint8_t *data = (uint8_t*) map_tb(str, tbSuffix[type], &be->mapping[type]);
   if (!data) return false;
 
   if (read_le_u32(data) != tbMagic[type]) {
@@ -1158,7 +1157,7 @@ INLINE int fill_squares(Pos *pos, uint8_t *pc, bool flip, int mirror, int *p,
   } while (bb);
   return i;
 }
- 
+
 INLINE int probe_table(Pos *pos, int s, int *success, const int type)
 {
   // Obtain the position's material-signature key

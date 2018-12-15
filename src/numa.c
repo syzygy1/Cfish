@@ -40,8 +40,8 @@ void numa_init(void)
   delayedSettings.mask = numa_allocate_nodemask();
 
   // Determine number of logical and physical cores per node
-  numPhysicalCores = malloc(numNodes * sizeof(int));
-  nodeMask = malloc(numNodes * sizeof(struct bitmask *));
+  numPhysicalCores = (int*)malloc(numNodes * sizeof(int));
+  nodeMask = (struct bitmask**)malloc(numNodes * sizeof(struct bitmask *));
   struct bitmask *cpuMask = numa_allocate_cpumask();
   int numCpus = numa_num_configured_cpus();
   char name[96];
@@ -176,7 +176,7 @@ void numa_init(void)
   numNodes = 0;
   int maxNodes = 16;
   nodeNumber = malloc(maxNodes * sizeof(int));
-  
+
   DWORD len = 0;
   DWORD offset = 0;
 
@@ -227,7 +227,7 @@ void numa_init(void)
         numNodes++;
       }
       offset += ptr->Size;
-      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)(((char *)ptr) + ptr->Size);        
+      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)(((char *)ptr) + ptr->Size);
     }
 
     // Then count cores in each node
@@ -244,7 +244,7 @@ void numa_init(void)
             numPhysicalCores[i]++;
       }
       offset += ptr->Size;
-      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);        
+      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);
     }
     free(buffer);
 

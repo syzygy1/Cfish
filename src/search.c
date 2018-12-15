@@ -22,7 +22,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
-#include <string.h>   // For std::memset
+#include <string.h>
 
 #include "evaluate.h"
 #include "misc.h"
@@ -218,7 +218,7 @@ uint64_t perft(Pos *pos, Depth depth)
       nodes += cnt;
       undo_move(pos, m->move);
     }
-    printf("%s: %"PRIu64"\n", uci_move(buf, m->move, is_chess960()), cnt);
+    printf("%s: %" PRIu64 "\n", uci_move(buf, m->move, is_chess960()), cnt);
   }
   return nodes;
 }
@@ -373,6 +373,7 @@ void thread_search(Pos *pos)
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
   bool failedLow;
+  int failedHighCnt = 0;
 
   Stack *ss = pos->st; // At least the fifth element of the allocated array.
   for (int i = -5; i < 3; i++)
@@ -475,7 +476,7 @@ void thread_search(Pos *pos)
       // Start with a small aspiration window and, in the case of a fail
       // high/low, re-search with a bigger window until we're not failing
       // high/low anymore.
-      int failedHighCnt = 0;
+      // failedHighCnt = 0;
       while (true) {
         Depth adjustedDepth = max(ONE_PLY, pos->rootDepth - failedHighCnt * ONE_PLY);
         bestValue = search_PV(pos, ss, alpha, beta, adjustedDepth);
@@ -619,9 +620,10 @@ skip_search:
 // qsearch() is the quiescence search function, which is called by the main
 // search function when the remaining depth is zero (or, to be more precise,
 // less than ONE_PLY).
-
+#if !defined (__cplusplus)
 #define true 1
 #define false 0
+#endif
 
 #define NT PV
 #define InCheck false
@@ -853,13 +855,13 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     if (!tb && i == pvIdx)
       printf("%s", v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
 
-    printf(" nodes %"PRIu64" nps %"PRIu64, nodes_searched,
+    printf(" nodes %" PRIu64 " nps %" PRIu64, nodes_searched,
                               nodes_searched * 1000 / elapsed);
 
     if (elapsed > 1000)
       printf(" hashfull %d", tt_hashfull());
 
-    printf(" tbhits %"PRIu64" time %"PRIi64" pv", tbhits, elapsed);
+    printf(" tbhits %" PRIu64 " time %" PRIi64 " pv", tbhits, elapsed);
 
     for (int idx = 0; idx < rm->move[i].pvSize; idx++)
       printf(" %s", uci_move(buf, rm->move[i].pv[idx], is_chess960()));

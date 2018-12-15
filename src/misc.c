@@ -119,22 +119,24 @@ uint64_t prng_sparse_rand(PRNG *rng)
   return r1 & r2 & r3;
 }
 
+#if !defined(__cplusplus)
 ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
   if (*n == 0)
-    *lineptr = malloc(*n = 100);
+     *lineptr = (char*) malloc(*n = 100);
 
   int c = 0;
   size_t i = 0;
   while ((c = getc(stream)) != EOF) {
     (*lineptr)[i++] = c;
     if (i == *n)
-      *lineptr = realloc(*lineptr, *n += 100);
+	    *lineptr = (char*) realloc(*lineptr, *n += 100);
     if (c == '\n') break;
   }
   (*lineptr)[i] = 0;
   return i;
 }
+#endif
 
 #ifdef _WIN32
 typedef SIZE_T (WINAPI *GLPM)(void);

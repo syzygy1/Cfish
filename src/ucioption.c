@@ -167,13 +167,13 @@ void options_init()
     case OPT_TYPE_BUTTON:
       break;
     case OPT_TYPE_STRING:
-      opt->valString = malloc(strlen(opt->defString) + 1);
+      opt->valString = (char*)malloc(strlen(opt->defString) + 1);
       strcpy(opt->valString, opt->defString);
       break;
     case OPT_TYPE_COMBO:
       s = strstr(opt->defString, " var");
       len = strlen(opt->defString) - strlen(s);
-      opt->valString = malloc(len + 1);
+      opt->valString = (char*)malloc(len + 1);
       strncpy(opt->valString, opt->defString, len);
       opt->valString[len] = 0;
       for (s = opt->valString; *s; s++)
@@ -268,12 +268,12 @@ int option_set_by_name(char *name, char *value)
         break;
       case OPT_TYPE_STRING:
         free(opt->valString);
-        opt->valString = malloc(strlen(value) + 1);
+        opt->valString = (char*)malloc(strlen(value) + 1);
         strcpy(opt->valString, value);
         break;
       case OPT_TYPE_COMBO:
         free(opt->valString);
-        opt->valString = malloc(strlen(value) + 1);
+        opt->valString = (char*)malloc(strlen(value) + 1);
         strcpy(opt->valString, value);
         for (char *s = opt->valString; *s; s++)
           *s = tolower(*s);

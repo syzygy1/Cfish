@@ -54,7 +54,7 @@ unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us)
   return KPKBitbase[idx / 32] & (1 << (idx & 0x1F));
 }
 
-static uint8_t initial(unsigned idx)
+static uint8_t initial(int idx)
 {
   int ksq[2] = { (idx >> 0) & 0x3f, (idx >> 6) & 0x3f };
   int us     = (idx >> 12) & 0x01;
@@ -85,7 +85,7 @@ static uint8_t initial(unsigned idx)
   return RES_UNKNOWN;
 }
 
-static uint8_t classify(uint8_t *db, unsigned idx)
+static uint8_t classify(uint8_t *db, int idx)
 {
   int ksq[2] = { (idx >> 0) & 0x3f, (idx >> 6) & 0x3f };
   int us     = (idx >> 12) & 0x01;
@@ -127,7 +127,7 @@ static uint8_t classify(uint8_t *db, unsigned idx)
 
 void bitbases_init()
 {
-  uint8_t *db = malloc(MAX_INDEX);
+  uint8_t *db = (uint8_t*) malloc(MAX_INDEX);
   unsigned idx, repeat = 1;
 
   // Initialize db with known win / draw positions

@@ -19,7 +19,7 @@
 */
 
 #include <assert.h>
-#include <string.h>   // For std::memset
+#include <string.h>   // For memset
 
 #include "material.h"
 #include "position.h"
@@ -188,7 +188,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   // Evaluate the material imbalance. We use PIECE_TYPE_NONE as a place
   // holder for the bishop pair "extended piece", which allows us to be
   // more flexible in defining bishop pair bonuses.
-#define pc(c,p) piece_count_mk(c,p)
+#define pc(c,p) (int)piece_count_mk(c,p)
   int PieceCount[2][8] = {
     { pc(0, BISHOP) > 1, pc(0, PAWN), pc(0, KNIGHT),
       pc(0, BISHOP)    , pc(0, ROOK), pc(0, QUEEN) },

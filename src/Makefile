@@ -154,8 +154,7 @@ endif
 
 ### 3.1 Selecting compiler (default = gcc)
 
-CFLAGS += -Wall -std=c11 $(EXTRACFLAGS)
-DEPENDFLAGS += -std=c11
+CFLAGS += -Wall $(EXTRACFLAGS)
 LDFLAGS += $(EXTRALDFLAGS) -lm
 
 ifeq ($(COMP),)
@@ -229,8 +228,8 @@ ifeq ($(COMP),clang)
 	endif
 
 	ifeq ($(KERNEL),Darwin)
-		CFLAGS += 
-		DEPENDFLAGS += 
+		CFLAGS +=
+		DEPENDFLAGS +=
 	endif
 endif
 
@@ -376,6 +375,21 @@ ifeq ($(arch),armv7)
 	LDFLAGS += -fPIE -pie
 endif
 
+ifeq ($(LANG), c++)
+	lang=c++
+	ifeq ($(COMP),gcc)
+		CFLAGS += -x c++ -std=c++11 -Wno-pedantic -Wno-extra -Wno-write-strings -Wno-class-memaccess
+		DEPENDFLAGS += -std=c++11
+	else ifeq ($(COMP),clang)
+		CFLAGS += -x c++ -std=c++11 -Wno-gnu-anonymous-struct -Wno-c99-extensions -Wno-vla-extension -Wno-nested-anon-types -Wno-write-strings
+		DEPENDFLAGS += -std=c++11
+	endif
+else
+	lang=c
+	CFLAGS += -std=c11
+	DEPENDFLAGS += -std=c11
+endif
+
 
 ### ==========================================================================
 ### Section 4. Public targets
@@ -492,6 +506,7 @@ config-sanity:
 	@echo "CC: $(CC)"
 	@echo "CFLAGS: $(CFLAGS)"
 	@echo "LDFLAGS: $(LDFLAGS)"
+	@echo "LANG: $(LANG)"
 	@echo ""
 	@echo "Testing config sanity. If this fails, try 'make help' ..."
 	@echo ""
@@ -506,6 +521,7 @@ config-sanity:
 	@test "$(pext)" = "yes" || test "$(pext)" = "no"
 	@test "$(lto)" = "yes" || test "$(lto)" = "no"
 	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang"
+	@test "$(lang)" = "c" || (test "$(lang)" = "c++" && (test "$(comp)" = "gcc" || test "$(comp)" = "clang"))
 
 $(EXE): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
@@ -549,4 +565,3 @@ icc-profile-use:
 	-@$(CC) $(DEPENDFLAGS) -MM $(OBJS:.o=.c) > $@ 2> /dev/null
 
 -include .depend
-

@@ -60,16 +60,16 @@ static THREAD_FUNC thread_init(void *arg)
   if (node >= numCmhTables) {
     int old = numCmhTables;
     numCmhTables = node + 16;
-    cmhTables = realloc(cmhTables,
+    cmhTables = (CounterMoveHistoryStat **) realloc(cmhTables,
         numCmhTables * sizeof(CounterMoveHistoryStat *));
     while (old < numCmhTables)
       cmhTables[old++] = NULL;
   }
   if (!cmhTables[node]) {
     if (settings.numaEnabled)
-      cmhTables[node] = numa_alloc(sizeof(CounterMoveHistoryStat));
+      cmhTables[node] = (CounterMoveHistoryStat*) numa_alloc(sizeof(CounterMoveHistoryStat));
     else
-      cmhTables[node] = calloc(sizeof(CounterMoveHistoryStat), 1);
+      cmhTables[node] = (CounterMoveHistoryStat*) calloc(sizeof(CounterMoveHistoryStat), 1);
     for (int j = 0; j < 16; j++)
       for (int k = 0; k < 64; k++)
         (*cmhTables[node])[0][0][j][k] = CounterMovePruneThreshold - 1;
@@ -78,30 +78,30 @@ static THREAD_FUNC thread_init(void *arg)
   Pos *pos;
 
   if (settings.numaEnabled) {
-    pos = numa_alloc(sizeof(Pos));
-    pos->pawnTable = numa_alloc(PAWN_ENTRIES * sizeof(PawnEntry));
-    pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
-    pos->counterMoves = numa_alloc(sizeof(CounterMoveStat));
-    pos->history = numa_alloc(sizeof(ButterflyHistory));
-    pos->captureHistory = numa_alloc(sizeof(CapturePieceToHistory));
-    pos->rootMoves = numa_alloc(sizeof(RootMoves));
-    pos->stack = numa_alloc((MAX_PLY + 110) * sizeof(Stack));
-    pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
+    pos = (Pos*)numa_alloc(sizeof(Pos));
+    pos->pawnTable = (PawnEntry*)numa_alloc(PAWN_ENTRIES * sizeof(PawnEntry));
+    pos->materialTable = (MaterialEntry*)numa_alloc(8192 * sizeof(MaterialEntry));
+    pos->counterMoves = (CounterMoveStat*)numa_alloc(sizeof(CounterMoveStat));
+    pos->history = (ButterflyHistory*)numa_alloc(sizeof(ButterflyHistory));
+    pos->captureHistory = (CapturePieceToHistory*)numa_alloc(sizeof(CapturePieceToHistory));
+    pos->rootMoves = (RootMoves*)numa_alloc(sizeof(RootMoves));
+    pos->stack = (Stack*)numa_alloc((MAX_PLY + 110) * sizeof(Stack));
+    pos->moveList = (ExtMove*)numa_alloc(10000 * sizeof(ExtMove));
   } else {
-    pos = calloc(sizeof(Pos), 1);
-    pos->pawnTable = calloc(PAWN_ENTRIES * sizeof(PawnEntry), 1);
-    pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
-    pos->counterMoves = calloc(sizeof(CounterMoveStat), 1);
-    pos->history = calloc(sizeof(ButterflyHistory), 1);
-    pos->captureHistory = calloc(sizeof(CapturePieceToHistory), 1);
-    pos->rootMoves = calloc(sizeof(RootMoves), 1);
-    pos->stack = calloc((MAX_PLY + 110) * sizeof(Stack), 1);
-    pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
+    pos = (Pos*)calloc(sizeof(Pos), 1);
+    pos->pawnTable = (PawnEntry*)calloc(PAWN_ENTRIES * sizeof(PawnEntry), 1);
+    pos->materialTable = (MaterialEntry*)calloc(8192 * sizeof(MaterialEntry), 1);
+    pos->counterMoves = (CounterMoveStat*)calloc(sizeof(CounterMoveStat), 1);
+    pos->history = (ButterflyHistory*)calloc(sizeof(ButterflyHistory), 1);
+    pos->captureHistory = (CapturePieceToHistory*)calloc(sizeof(CapturePieceToHistory), 1);
+    pos->rootMoves = (RootMoves*)calloc(sizeof(RootMoves), 1);
+    pos->stack = (Stack*)calloc((MAX_PLY + 110) * sizeof(Stack), 1);
+    pos->moveList = (ExtMove*)calloc(10000 * sizeof(ExtMove), 1);
   }
   pos->threadIdx = idx;
   pos->counterMoveHistory = cmhTables[node];
 
-  atomic_store(&pos->resetCalls, 0);
+  atomic_store(&pos->resetCalls, false);
   pos->selDepth = pos->callsCnt = 0;
 
 #ifndef _WIN32  // linux

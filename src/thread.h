@@ -21,7 +21,13 @@
 #ifndef THREAD_H
 #define THREAD_H
 
+#ifdef __cplusplus
+#include <atomic>
+using std::atomic_bool;
+#else
 #include <stdatomic.h>
+#endif
+
 #ifndef _WIN32
 #include <pthread.h>
 #else
