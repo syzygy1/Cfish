@@ -185,18 +185,15 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
       bestValue = value;
 
       if (value > alpha) {
+        bestMove = move;
+
         if (PvNode) // Update pv even in fail-high case
           update_pv(ss->pv, move, (ss+1)->pv);
 
-        if (PvNode && value < beta) { // Update alpha here!
+        if (PvNode && value < beta) // Update alpha here!
           alpha = value;
-          bestMove = move;
-        } else { // Fail high
-          tte_save(tte, posKey, value_to_tt(value, ss->ply), BOUND_LOWER,
-                   ttDepth, move, ss->staticEval, tt_generation());
-
-          return value;
-        }
+        else
+          break; // Fail high
       }
     }
   }
@@ -207,7 +204,8 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     return mated_in(ss->ply); // Plies to mate from the root
 
   tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
-           PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
+           bestValue >= beta ? BOUND_LOWER :
+           PvNode && bestValue > oldAlpha  ? BOUND_EXACT : BOUND_UPPER,
            ttDepth, bestMove, ss->staticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);

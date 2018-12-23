@@ -18,6 +18,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
+
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -34,7 +36,7 @@
 
 // Version number. If Version is left empty, then compile date in the format
 // DD-MM-YY and show in engine_info.
-char Version[] = "";
+char Version[] = "10";
 
 #ifndef _WIN32
 pthread_mutex_t ioMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -237,6 +239,7 @@ void *map_file(FD fd, map_t *map)
 
   *map = file_size(fd);
   void *data = mmap(NULL, *map, PROT_READ, MAP_SHARED, fd, 0);
+  madvise(data, *map, MADV_RANDOM);
   return data == MAP_FAILED ? NULL : data;
 
 #else

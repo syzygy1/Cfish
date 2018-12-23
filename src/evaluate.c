@@ -173,6 +173,7 @@ static const Score LongDiagonalBishop = S( 44,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
 static const Score Overload           = S( 12,  6);
 static const Score PawnlessFlank      = S( 18, 94);
+static const Score RestrictedPiece    = S(  7,  6);
 static const Score RookOnPawn         = S( 10, 28);
 static const Score SliderOnQueen      = S( 49, 21);
 static const Score ThreatByKing       = S( 21, 84);
@@ -446,7 +447,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                  +  69 * ei->kingAttacksCount[Them]
                  + 185 * popcount(ei->kingRing[Us] & weak)
                  + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
-                 +   4 * tropism
+                 +       tropism * tropism / 4
                  - 873 * !pieces_cp(Them, QUEEN)
                  -   6 * mg_value(score) / 8
                  +       mg_value(mobility[Them] - mobility[Us])
@@ -483,7 +484,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
   enum { Minor, Rook };
 
-  Bitboard b, weak, defended, stronglyProtected, safe;
+  Bitboard b, weak, defended, stronglyProtected, safe, restricted;
   Score score = SCORE_ZERO;
 
   // Non-pawn enemies
@@ -538,7 +539,14 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
     score += Hanging * popcount(weak & ~ei->attackedBy[Them][0]);
   }
 
-  // Bonus for opponent unopposed weak pawns
+  // Bonus for restricting their piece moves
+  restricted =   ei->attackedBy[Them][0]
+              & ~ei->attackedBy[Them][PAWN]
+              & ~ei->attackedBy2[Them]
+              &  ei->attackedBy[Us][0];
+  score += RestrictedPiece * popcount(restricted);
+
+  // Bonus for enemy unopposed weak pawns
   if (pieces_cpp(Us, ROOK, QUEEN))
     score += WeakUnopposedPawn * ei->pe->weakUnopposed[Them];
 
