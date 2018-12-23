@@ -562,10 +562,8 @@ skip_search:
       if (!Signals.stop && !Signals.stopOnPonderhit) {
         // Stop the search if only one legal move is available, or if all
         // of the available time has been used.
-        const int F[] = { failedLow,
-                          bestValue - mainThread.previousScore };
-
-        int improvingFactor = max(246, min(832, 306 + 119 * F[0] - 6 * F[1]));
+        double fallingEval = (306 + 119 * failedLow + 6 * (mainThread.previousScore - bestValue)) / 581.0;
+        fallingEval = max(0.5, min(1.5, fallingEval));
 
         double bestMoveInstability = 1 + mainThread.bestMoveChanges;
 
@@ -580,7 +578,7 @@ skip_search:
         bestMoveInstability *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
         if (   rm->size == 1
-            || time_elapsed() > time_optimum() * bestMoveInstability * improvingFactor / 581)
+            || time_elapsed() > time_optimum() * bestMoveInstability * fallingEval)
         {
           // If we are allowed to ponder do not stop the search now but
           // keep pondering until the GUI sends "ponderhit" or "stop".
