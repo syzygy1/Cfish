@@ -101,7 +101,7 @@ static void on_book_depth(Option *opt)
 #endif
 
 static Option optionsMap[] = {
-  { "Contempt", OPT_TYPE_SPIN, 21, -100, 100, NULL, NULL, 0, NULL },
+  { "Contempt", OPT_TYPE_SPIN, 24, -100, 100, NULL, NULL, 0, NULL },
   { "Analysis Contempt", OPT_TYPE_COMBO, 0, 0, 0,
     "Off var Off var White var Black", NULL, 0, NULL },
   { "Threads", OPT_TYPE_SPIN, 1, 1, MAX_THREADS, NULL, on_threads, 0, NULL },

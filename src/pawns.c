@@ -56,10 +56,6 @@ static const Value UnblockedStorm[4][8] = {
   { V(-10), V(-14), V( 90), V(15), V( 2), V( -7), V(-16) }
 };
 
-// Danger of blocked enemy pawns storming our king, by rank
-static const Value BlockedStorm[8] =
-  { V(0), V(0), V(66), V(6), V(5), V(1), V(15) };
-
 #undef S
 #undef V
 
@@ -206,7 +202,7 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 
     int d = min(f, FILE_H - f);
     safety += ShelterStrength[d][ourRank];
-    safety -= (ourRank && (ourRank == theirRank - 1)) ? BlockedStorm[theirRank]
+    safety -= (ourRank && (ourRank == theirRank - 1)) ? 66 * (theirRank == RANK_3)
                                                : UnblockedStorm[d][theirRank];
   }
 

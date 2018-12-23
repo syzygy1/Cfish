@@ -163,25 +163,25 @@ static const Score PassedFile[8] = {
 static const int PassedDanger[8] = { 0, 0, 0, 3, 6, 11, 18 };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BishopPawns        = S(  3,  7);
-static const Score CloseEnemies       = S(  6,  0);
+static const Score BishopPawns        = S(  3,  8);
+static const Score CloseEnemies       = S(  7,  0);
 static const Score CorneredBishop     = S( 50, 50);
-static const Score Hanging            = S( 57, 32);
-static const Score KingProtector      = S(  6,  6);
-static const Score KnightOnQueen      = S( 21, 11);
-static const Score LongDiagonalBishop = S( 46,  0);
+static const Score Hanging            = S( 62, 34);
+static const Score KingProtector      = S(  6,  7);
+static const Score KnightOnQueen      = S( 20, 12);
+static const Score LongDiagonalBishop = S( 44,  0);
 static const Score MinorBehindPawn    = S( 16,  0);
-static const Score Overload           = S( 13,  6);
-static const Score PawnlessFlank      = S( 19, 84);
-static const Score RookOnPawn         = S( 10, 29);
-static const Score SliderOnQueen      = S( 42, 21);
-static const Score ThreatByKing       = S( 22, 78);
-static const Score ThreatByPawnPush   = S( 45, 40);
-static const Score ThreatByRank       = S( 16,  3);
-static const Score ThreatBySafePawn   = S(173,102);
-static const Score TrappedRook        = S( 96,  5);
-static const Score WeakQueen          = S( 50, 10);
-static const Score WeakUnopposedPawn  = S( 15, 19);
+static const Score Overload           = S( 12,  6);
+static const Score PawnlessFlank      = S( 18, 94);
+static const Score RookOnPawn         = S( 10, 28);
+static const Score SliderOnQueen      = S( 49, 21);
+static const Score ThreatByKing       = S( 21, 84);
+static const Score ThreatByPawnPush   = S( 48, 42);
+static const Score ThreatByRank       = S( 14,  3);
+static const Score ThreatBySafePawn   = S(169, 99);
+static const Score TrappedRook        = S( 98,  5);
+static const Score WeakQueen          = S( 51, 10);
+static const Score WeakUnopposedPawn  = S( 14, 20);
 
 #undef S
 #undef V
@@ -381,7 +381,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                             : king_safety_black(ei->pe, pos, ksq);
 
   // Find the squares that opponent attacks in our king flank and the squares
-  // which are attacked twice in that flank but not defended by our pawns.
+  // which are attacked twice in that flank.
   kingFlank = KingFlank[file_of(ksq)];
   b1 = ei->attackedBy[Them][0] & kingFlank & Camp;
   b2 = b1 & ei->attackedBy2[Them];
