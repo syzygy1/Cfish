@@ -5,7 +5,7 @@
 
 typedef struct Pos Pos;
 
-enum { Tempo = 20 };
+enum { Tempo = 28 };
 
 Value evaluate(const Pos *pos);
 

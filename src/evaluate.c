@@ -163,25 +163,25 @@ static const Score PassedFile[8] = {
 static const int PassedDanger[8] = { 0, 0, 0, 3, 6, 11, 18 };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BishopPawns        = S(  3,  8);
-static const Score CloseEnemies       = S(  7,  0);
+static const Score BishopPawns        = S(  3,  7);
+static const Score CloseEnemies       = S(  8,  0);
 static const Score CorneredBishop     = S( 50, 50);
-static const Score Hanging            = S( 62, 34);
-static const Score KingProtector      = S(  6,  7);
-static const Score KnightOnQueen      = S( 20, 12);
-static const Score LongDiagonalBishop = S( 44,  0);
-static const Score MinorBehindPawn    = S( 16,  0);
-static const Score PawnlessFlank      = S( 18, 94);
-static const Score RestrictedPiece    = S(  7,  6);
-static const Score RookOnPawn         = S( 10, 28);
-static const Score SliderOnQueen      = S( 49, 21);
-static const Score ThreatByKing       = S( 21, 84);
-static const Score ThreatByPawnPush   = S( 48, 42);
-static const Score ThreatByRank       = S( 14,  3);
-static const Score ThreatBySafePawn   = S(169, 99);
-static const Score TrappedRook        = S( 98,  5);
-static const Score WeakQueen          = S( 51, 10);
-static const Score WeakUnopposedPawn  = S( 14, 20);
+static const Score Hanging            = S( 69, 36);
+static const Score KingProtector      = S(  7,  8);
+static const Score KnightOnQueen      = S( 16, 12);
+static const Score LongDiagonalBishop = S( 45,  0);
+static const Score MinorBehindPawn    = S( 18,  3);
+static const Score PawnlessFlank      = S( 17, 95);
+static const Score RestrictedPiece    = S(  7,  7);
+static const Score RookOnPawn         = S( 10, 32);
+static const Score SliderOnQueen      = S( 59, 18);
+static const Score ThreatByKing       = S( 24, 89);
+static const Score ThreatByPawnPush   = S( 48, 39);
+static const Score ThreatByRank       = S( 13,  0);
+static const Score ThreatBySafePawn   = S(173, 94);
+static const Score TrappedRook        = S( 96,  4);
+static const Score WeakQueen          = S( 49, 15);
+static const Score WeakUnopposedPawn  = S( 12, 23);
 
 #undef S
 #undef V

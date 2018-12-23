@@ -257,7 +257,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
              || (ss-2)->staticEval == VALUE_NONE;
 
   // Step 8. Futility pruning: child node
-  if (   !rootNode
+  if (   !PvNode
       &&  depth < 7 * ONE_PLY
       &&  eval - futility_margin(depth, improving) >= beta
       &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
@@ -486,7 +486,7 @@ moves_loop: // When in check search starts from here.
         int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
 
         // Countermoves based pruning
-        if (   lmrDepth <= ((ss-1)->statScore > 0 ? 3 : 2)
+        if (   lmrDepth < 3 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
             && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
           continue;
@@ -698,16 +698,13 @@ moves_loop: // When in check search starts from here.
     update_capture_stats(pos, bestMove, capturesSearched, captureCount,
         stat_bonus(depth + ONE_PLY));
 
-    // Extra penalty for a quiet TT move in previous ply when it gets refuted
-    if ((ss-1)->moveCount == 1 && !captured_piece())
+    // Extra penalty for a quiet TT or main killer move in previous ply
+    // when it gets refuted
+    if ((   (ss-1)->moveCount == 1
+         || ((ss-1)->currentMove == (ss-1)->killers[0] && (ss-1)->killers[0]))
+        && !captured_piece())
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
           -stat_bonus(depth + ONE_PLY));
-
-    // Extra penalty for killer move in previous ply when it gets refuted
-    else if (   (ss-1)->killers[0]
-             && (ss-1)->currentMove == (ss-1)->killers[0]
-             && !captured_piece())
-      update_cm_stats(ss-1, piece_on(prevSq), prevSq, -stat_bonus(depth));
   }
   // Bonus for prior countermove that caused the fail low
   else if (   (depth >= 3 * ONE_PLY || PvNode)
