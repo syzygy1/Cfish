@@ -224,6 +224,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
       ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
 
     ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
+    ei->kingRing[Us] &= ~double_pawn_attacks_bb(pieces_cp(Us, PAWN), Us);
     ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
   }
   else
@@ -261,7 +262,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
     ei->attackedBy[Us][0] |= b;
     ei->attackedBy[Us][Pt] |= b;
 
-    if (b & ei->kingRing[Them] & ~double_pawn_attacks_bb(pieces_cp(Them, PAWN), Them)) {
+    if (b & ei->kingRing[Them]) {
       ei->kingAttackersCount[Us]++;
       ei->kingAttackersWeight[Us] += KingAttackWeights[Pt];
       ei->kingAttacksCount[Us] += popcount(b & ei->attackedBy[Them][KING]);
@@ -538,8 +539,7 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 
   // Bonus for restricting their piece moves
   restricted =   ei->attackedBy[Them][0]
-              & ~ei->attackedBy[Them][PAWN]
-              & ~ei->attackedBy2[Them]
+              & ~stronglyProtected
               &  ei->attackedBy[Us][0];
   score += RestrictedPiece * popcount(restricted);
 

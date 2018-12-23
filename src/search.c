@@ -315,7 +315,7 @@ void mainthread_search(void)
   {
     int i, num = 0, maxNum = min(pos->rootMoves->size, Threads.numThreads);
     Move mvs[maxNum];
-    int votes[maxNum];
+    int64_t votes[maxNum];
     Value minScore = pos->rootMoves->move[0].score;
     for (int idx = 1; idx < Threads.numThreads; idx++)
       minScore = min(minScore, Threads.pos[idx]->rootMoves->move[0].score);
@@ -329,9 +329,10 @@ void mainthread_search(void)
         mvs[i] = m;
         votes[i] = 0;
       }
-      votes[i] += p->rootMoves->move[0].score - minScore + p->completedDepth;
+      int64_t diff = p->rootMoves->move[0].score - minScore + 1;
+      votes[i] += 200 + (diff * diff) * p->completedDepth;
     }
-    int bestVote = votes[0];
+    int64_t bestVote = votes[0];
     for (int idx = 1; idx < Threads.numThreads; idx++) {
       Pos *p = Threads.pos[idx];
       for (i = 0; mvs[i] != p->rootMoves->move[0].pv[0]; i++);
@@ -369,6 +370,7 @@ void mainthread_search(void)
 void thread_search(Pos *pos)
 {
   Value bestValue, alpha, beta, delta;
+  Move pv[MAX_PLY + 1];
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
@@ -384,6 +386,7 @@ void thread_search(Pos *pos)
 
   for (int i = 0; i <= MAX_PLY; i++)
     ss[i].ply = i;
+  ss->pv = pv;
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;

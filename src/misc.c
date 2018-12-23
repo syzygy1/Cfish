@@ -207,7 +207,7 @@ FD open_file(const char *name)
   return open(name, O_RDONLY);
 #else
   return CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-      FILE_ATTRIBUTE_NORMAL, NULL);
+      FILE_FLAG_RANDOM_ACCESS, NULL);
 #endif
 }
 

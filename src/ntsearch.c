@@ -147,11 +147,13 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
         if (!is_capture_or_promotion(pos, ttMove))
           update_stats(pos, ss, ttMove, NULL, 0, stat_bonus(depth));
 
-        // Extra penalty for a quiet TT move in previous ply when it gets
-        // refuted.
-        if ((ss-1)->moveCount == 1 && !captured_piece())
+        // Extra penalty for a quiet TT or main killer move in previous ply
+        // when it gets refuted
+        if ((   (ss-1)->moveCount == 1
+             || ((ss-1)->currentMove == (ss-1)->killers[0] && (ss-1)->killers[0]))
+            && !captured_piece())
           update_cm_stats(ss-1, piece_on(prevSq), prevSq,
-                          -stat_bonus(depth + ONE_PLY));
+              -stat_bonus(depth + ONE_PLY));
       }
       // Penalty for a quiet ttMove that fails low
       else if (!is_capture_or_promotion(pos, ttMove)) {
@@ -248,7 +250,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   // Step 7. Razoring
-  if (   depth < 2 * ONE_PLY
+  if (   !rootNode
+      && depth < 2 * ONE_PLY
       && eval <= alpha - RazorMargin)
     return PvNode ? qsearch_PV_false(pos, ss, alpha, beta, DEPTH_ZERO)
                   : qsearch_NonPV_false(pos, ss, alpha, DEPTH_ZERO);
@@ -473,8 +476,7 @@ moves_loop: // When in check search starts from here.
     {
       if (   !captureOrPromotion
           && !givesCheck
-          && (  !advanced_pawn_push(pos, move)
-              || pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) >= 5000))
+          && !advanced_pawn_push(pos, move))
       {
         // Move count based pruning
         if (moveCountPruning) {

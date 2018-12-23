@@ -227,5 +227,5 @@ int tt_hashfull(void)
       if ((tte[j].genBound8 & 0xFC) == TT.generation8)
         cnt++;
   }
-  return cnt;
+  return cnt * 1000 / (ClusterSize * (1000 / ClusterSize));
 }
