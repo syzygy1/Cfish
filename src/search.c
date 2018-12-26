@@ -22,7 +22,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
-#include <string.h>   // For std::memset
+#include <string.h>   // For memset
 
 #include "evaluate.h"
 #include "misc.h"
@@ -381,7 +381,7 @@ void thread_search(Pos *pos)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;
 
-  for (int i = -4; i < 0; i++)
+  for (int i = -5; i < 0; i++)
     ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
 
   for (int i = 0; i <= MAX_PLY; i++)

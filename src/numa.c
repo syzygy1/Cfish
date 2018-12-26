@@ -176,7 +176,7 @@ void numa_init(void)
   numNodes = 0;
   int maxNodes = 16;
   nodeNumber = malloc(maxNodes * sizeof(int));
-  
+ 
   DWORD len = 0;
   DWORD offset = 0;
 
@@ -214,7 +214,7 @@ void numa_init(void)
     // First get nodes
     nodeGroupMask = malloc(maxNodes * sizeof(GROUP_AFFINITY));
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *ptr = buffer;
-    while (ptr->Size > 0 && offset + ptr->Size <= len) {
+    while (offset < len && offset + ptr->Size <= len) {
       if (ptr->Relationship == RelationNumaNode) {
         if (numNodes == maxNodes) {
           maxNodes += 16;
@@ -227,14 +227,14 @@ void numa_init(void)
         numNodes++;
       }
       offset += ptr->Size;
-      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)(((char *)ptr) + ptr->Size);        
+      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)(((char *)ptr) + ptr->Size);
     }
 
     // Then count cores in each node
     numPhysicalCores = calloc(numNodes, sizeof(int));
     ptr = buffer;
     offset = 0;
-    while (ptr->Size > 0 && offset + ptr->Size <= len) {
+    while (offset < len && offset + ptr->Size <= len) {
       if (ptr->Relationship == RelationProcessorCore) {
         // Loop through nodes to find one with matching group number
         // and intersecting mask
@@ -244,7 +244,7 @@ void numa_init(void)
             numPhysicalCores[i]++;
       }
       offset += ptr->Size;
-      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);        
+      ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);
     }
     free(buffer);
 

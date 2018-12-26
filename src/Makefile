@@ -229,8 +229,8 @@ ifeq ($(COMP),clang)
 	endif
 
 	ifeq ($(KERNEL),Darwin)
-		CFLAGS += 
-		DEPENDFLAGS += 
+		CFLAGS +=
+		DEPENDFLAGS +=
 	endif
 endif
 

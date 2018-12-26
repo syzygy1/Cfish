@@ -1158,7 +1158,7 @@ INLINE int fill_squares(Pos *pos, uint8_t *pc, bool flip, int mirror, int *p,
   } while (bb);
   return i;
 }
- 
+
 INLINE int probe_table(Pos *pos, int s, int *success, const int type)
 {
   // Obtain the position's material-signature key

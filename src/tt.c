@@ -22,7 +22,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
-#include <string.h>   // For std::memset
+#include <string.h>   // For memset
 #ifndef _WIN32
 #include <sys/mman.h>
 #endif

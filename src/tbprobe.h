@@ -17,4 +17,3 @@ int TB_root_probe_dtm(Pos *pos, RootMoves *rm);
 void TB_expand_mate(Pos *pos, RootMove *move);
 
 #endif
-

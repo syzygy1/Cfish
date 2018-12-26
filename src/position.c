@@ -913,7 +913,7 @@ void undo_move(Pos *pos, Move m)
   Stack *st = pos->st--;
   pos->sideToMove ^= 1;
   Color us = pos->sideToMove;
- 
+
   if (likely(type_of_m(m) != PROMOTION)) {
     pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
   } else {

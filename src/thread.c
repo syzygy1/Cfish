@@ -101,7 +101,7 @@ static THREAD_FUNC thread_init(void *arg)
   pos->threadIdx = idx;
   pos->counterMoveHistory = cmhTables[node];
 
-  atomic_store(&pos->resetCalls, 0);
+  atomic_store(&pos->resetCalls, false);
   pos->selDepth = pos->callsCnt = 0;
 
 #ifndef _WIN32  // linux

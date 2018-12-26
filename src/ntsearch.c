@@ -71,12 +71,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
-    store_rlx(pos->resetCalls, 0);
+    store_rlx(pos->resetCalls, false);
     pos->callsCnt = Limits.nodes ? min(1024, Limits.nodes / 1024) : 1024;
   }
   if (--pos->callsCnt <= 0) {
     for (int idx = 0; idx < Threads.numThreads; idx++)
-      store_rlx(Threads.pos[idx]->resetCalls, 1);
+      store_rlx(Threads.pos[idx]->resetCalls, true);
 
     check_time();
   }
@@ -149,8 +149,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
         // Extra penalty for a quiet TT or main killer move in previous ply
         // when it gets refuted
-        if ((   (ss-1)->moveCount == 1
-             || ((ss-1)->currentMove == (ss-1)->killers[0] && (ss-1)->killers[0]))
+        if (  ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0])
             && !captured_piece())
           update_cm_stats(ss-1, piece_on(prevSq), prevSq,
               -stat_bonus(depth + ONE_PLY));
@@ -702,16 +701,14 @@ moves_loop: // When in check search starts from here.
 
     // Extra penalty for a quiet TT or main killer move in previous ply
     // when it gets refuted
-    if ((   (ss-1)->moveCount == 1
-         || ((ss-1)->currentMove == (ss-1)->killers[0] && (ss-1)->killers[0]))
+    if (  ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0])
         && !captured_piece())
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
           -stat_bonus(depth + ONE_PLY));
   }
   // Bonus for prior countermove that caused the fail low
   else if (   (depth >= 3 * ONE_PLY || PvNode)
-           && !captured_piece()
-           && move_is_ok((ss-1)->currentMove))
+           && !captured_piece())
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
   if (PvNode && bestValue > maxValue)
