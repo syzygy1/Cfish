@@ -211,24 +211,19 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   ei->attackedBy2[Us]   = b & ei->attackedBy[Us][PAWN];
 
   // Init our king safety tables only if we are going to use them
-  if (pos_non_pawn_material(Them) >= RookValueMg + KnightValueMg) {
-    ei->kingRing[Us] = b;
+  ei->kingRing[Us] = b;
+  if (relative_rank_s(Us, square_of(Us, KING)) == RANK_1)
+    ei->kingRing[Us] |= shift_bb(Up, b);
 
-    if (relative_rank_s(Us, square_of(Us, KING)) == RANK_1)
-      ei->kingRing[Us] |= shift_bb(Up, b);
+  if (file_of(square_of(Us, KING)) == FILE_H)
+    ei->kingRing[Us] |= shift_bb(WEST, ei->kingRing[Us]);
 
-    if (file_of(square_of(Us, KING)) == FILE_H)
-      ei->kingRing[Us] |= shift_bb(WEST, ei->kingRing[Us]);
+  else if (file_of(square_of(Us, KING)) == FILE_A)
+    ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
 
-    else if (file_of(square_of(Us, KING)) == FILE_A)
-      ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
-
-    ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
-    ei->kingRing[Us] &= ~double_pawn_attacks_bb(pieces_cp(Us, PAWN), Us);
-    ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
-  }
-  else
-    ei->kingRing[Us] = ei->kingAttackersCount[Them] = 0;
+  ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
+  ei->kingRing[Us] &= ~double_pawn_attacks_bb(pieces_cp(Us, PAWN), Us);
+  ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
 }
 
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
@@ -390,82 +385,74 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   int tropism = popcount(b1) + popcount(b2);
 
   // Main king safety evaluation
-  if (ei->kingAttackersCount[Them] > (1 - piece_count(Them, QUEEN))) {
-    // Attacked squares defended at most once by our queen or king
-    weak =  ei->attackedBy[Them][0]
-          & ~ei->attackedBy2[Us]
-          & (   ei->attackedBy[Us][KING] | ei->attackedBy[Us][QUEEN]
-             | ~ei->attackedBy[Us][0]);
+  int kingDanger = 0;
+  unsafeChecks = 0;
 
-    int kingDanger = 0;
-    unsafeChecks = 0;
+  // Attacked squares defended at most once by our queen or king
+  weak =  ei->attackedBy[Them][0]
+        & ~ei->attackedBy2[Us]
+        & (   ei->attackedBy[Us][KING] | ei->attackedBy[Us][QUEEN]
+           | ~ei->attackedBy[Us][0]);
 
-    // Analyse the safe enemy's checks which are possible on next move
-    safe  = ~pieces_c(Them);
-    safe &= ~ei->attackedBy[Us][0] | (weak & ei->attackedBy2[Them]);
 
-    b1 = attacks_bb_rook(ksq, pieces() ^ pieces_cp(Us, QUEEN));
-    b2 = attacks_bb_bishop(ksq, pieces() ^ pieces_cp(Us, QUEEN));
+  // Analyse the safe enemy's checks which are possible on next move
+  safe  = ~pieces_c(Them);
+  safe &= ~ei->attackedBy[Us][0] | (weak & ei->attackedBy2[Them]);
 
-    // Enemy queen safe checks
-    if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe & ~ei->attackedBy[Us][QUEEN])
-      kingDanger += QueenSafeCheck;
+  b1 = attacks_bb_rook(ksq, pieces() ^ pieces_cp(Us, QUEEN));
+  b2 = attacks_bb_bishop(ksq, pieces() ^ pieces_cp(Us, QUEEN));
 
-    // For minors and rooks, also consider the square safe if attacked twice
-    // and only defended by our queen.
-    safe |=  ei->attackedBy2[Them]
-           & ~(ei->attackedBy2[Us] | pieces_c(Them))
-           & ei->attackedBy[Us][QUEEN];
+  // Enemy queen safe checks
+  if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe & ~ei->attackedBy[Us][QUEEN])
+    kingDanger += QueenSafeCheck;
 
-    b1 &= ei->attackedBy[Them][ROOK];
-    b2 &= ei->attackedBy[Them][BISHOP];
+  b1 &= ei->attackedBy[Them][ROOK];
+  b2 &= ei->attackedBy[Them][BISHOP];
 
-    // Enemy rooks checks
-    if (b1 & safe)
-      kingDanger += RookSafeCheck;
-    else
-      unsafeChecks |= b1;
+  // Enemy rooks checks
+  if (b1 & safe)
+    kingDanger += RookSafeCheck;
+  else
+    unsafeChecks |= b1;
 
-    // Enemy bishops checks
-    if (b2 & safe)
-      kingDanger += BishopSafeCheck;
-    else
-      unsafeChecks |= b2;
+  // Enemy bishops checks
+  if (b2 & safe)
+    kingDanger += BishopSafeCheck;
+  else
+    unsafeChecks |= b2;
 
-    // Enemy knights checks
-    b = attacks_from_knight(ksq) & ei->attackedBy[Them][KNIGHT];
-    if (b & safe)
-      kingDanger += KnightSafeCheck;
-    else
-      unsafeChecks |= b;
+  // Enemy knights checks
+  b = attacks_from_knight(ksq) & ei->attackedBy[Them][KNIGHT];
+  if (b & safe)
+    kingDanger += KnightSafeCheck;
+  else
+    unsafeChecks |= b;
 
-    // Unsafe or occupied checking squares will also be considered, as long
-    // the square is in the attacker's mobility area.
-    unsafeChecks &= ei->mobilityArea[Them];
+  // Unsafe or occupied checking squares will also be considered, as long
+  // the square is in the attacker's mobility area.
+  unsafeChecks &= ei->mobilityArea[Them];
 
-    kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
-                 +  69 * ei->kingAttacksCount[Them]
-                 + 185 * popcount(ei->kingRing[Us] & weak)
-                 + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
-                 +       tropism * tropism / 4
-                 - 873 * !pieces_cp(Them, QUEEN)
-                 -   6 * mg_value(score) / 8
-                 +       mg_value(mobility[Them] - mobility[Us])
-                 -   30;
+  kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
+               +  69 * ei->kingAttacksCount[Them]
+               + 185 * popcount(ei->kingRing[Us] & weak)
+               + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
+               +       tropism * tropism / 4
+               - 873 * !pieces_cp(Them, QUEEN)
+               -   6 * mg_value(score) / 8
+               +       mg_value(mobility[Them] - mobility[Us])
+               -   30;
 
-    // Transform the kingDanger units into a Score, and subtract it from
-    // the evaluation.
-    if (kingDanger > 0)
-      score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
-  }
+  // Transform the kingDanger units into a Score, and subtract it from
+  // the evaluation
+  if (kingDanger > 0)
+    score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
 
-  // Penalty when our king is on a pawnless flank.
+  // Penalty when our king is on a pawnless flank
   if (!(pieces_p(PAWN) & kingFlank))
     score -= PawnlessFlank;
 
   // King tropism bonus to anticipate slow motion attacks on our king
   score -= CloseEnemies * tropism;
-
 
   return score;
 }
