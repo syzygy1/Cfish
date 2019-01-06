@@ -527,6 +527,7 @@ int is_legal(const Pos *pos, Move m)
 
   uint64_t us = pos_stm();
   Square from = from_sq(m);
+  Square to = to_sq(m);
 
   assert(color_of(moved_piece(m)) == us);
   assert(piece_on(square_of(us, KING)) == make_piece(us, KING));
@@ -536,7 +537,6 @@ int is_legal(const Pos *pos, Move m)
   // the move is made.
   if (unlikely(type_of_m(m) == ENPASSANT)) {
     Square ksq = square_of(us, KING);
-    Square to = to_sq(m);
     Square capsq = to ^ 8;
     Bitboard occupied = pieces() ^ sq_bb(from) ^ sq_bb(capsq) ^ sq_bb(to);
 
@@ -549,12 +549,28 @@ int is_legal(const Pos *pos, Move m)
           && !(attacks_bb_bishop(ksq, occupied) & pieces_cpp(us ^ 1, QUEEN, BISHOP));
   }
 
+  // Check legality of castling moves.
+  if (unlikely(type_of_m(m) == CASTLING)) {
+    // to > from works both for standard chess and for Chess960.
+    to = relative_square(us, to > from ? SQ_G1 : SQ_C1);
+    int step = to > from ? WEST : EAST;
+
+    for (Square s = to; s != from; s += step)
+      if (attackers_to(s) & pieces_c(us ^ 1))
+        return false;
+
+    // For Chess960, verify that moving the castling rook does not discover
+    // some hidden checker, e.g. on SQ_A1 when castling rook is on SQ_B1.
+    return   !is_chess960()
+          || !(attacks_bb_rook(to, pieces() ^ sq_bb(to_sq(m)))
+               & pieces_cpp(us ^ 1, ROOK, QUEEN));
+  }
+
   // If the moving piece is a king, check whether the destination
   // square is attacked by the opponent. Castling moves are checked
   // for legality during move generation.
   if (pieces_p(KING) & sq_bb(from))
-    return   type_of_m(m) == CASTLING
-          || !(attackers_to(to_sq(m)) & pieces_c(us ^ 1));
+    return !(attackers_to(to) & pieces_c(us ^ 1));
 
   // A non-king move is legal if and only if it is not pinned or it
   // is moving along the ray towards or away from the king.
@@ -652,7 +668,7 @@ int is_pseudo_legal(const Pos *pos, Move m)
     ExtMove list[MAX_MOVES];
     ExtMove *end = generate_quiets(pos, list);
     for (ExtMove *p = list; p < end; p++)
-      if (p->move == m) return 1;
+      if (p->move == m) return is_legal(pos, m);
     return 0;
   }
 

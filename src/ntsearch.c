@@ -438,17 +438,24 @@ moves_loop: // When in check search starts from here.
         &&  tte_depth(tte) >= depth - 3 * ONE_PLY
         &&  is_legal(pos, move))
     {
-      Value rBeta = max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
-//      Value rBeta = min(max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE), VALUE_KNOWN_WIN);
-      Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
+      Value singularBeta = max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
+//      Value singularBeta = min(max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE), VALUE_KNOWN_WIN);
       ss->excludedMove = move;
       Move cm = ss->countermove;
       Move k1 = ss->mpKillers[0], k2 = ss->mpKillers[1];
-      value = search_NonPV(pos, ss, rBeta - 1, d, cutNode);
+      value = search_NonPV(pos, ss, singularBeta - 1, depth / 2, cutNode);
       ss->excludedMove = 0;
 
-      if (value < rBeta)
+      if (value < singularBeta)
         extension = ONE_PLY;
+
+      // Multi-cut pruning. Our ttMove is assumed to fail high, and now we
+      // failed high also on a reduced search without the ttMove. So we
+      // assume that this expected cut-node is not singular, i.e. multiple
+      // moves fail high. We therefore prune the whole subtree by returning
+      // the hard beta bound.
+      else if (cutNode && singularBeta > beta)
+        return beta;
 
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.

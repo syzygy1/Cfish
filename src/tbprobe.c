@@ -180,8 +180,15 @@ static FD open_tb(const char *str, const char *suffix)
 static bool test_tb(const char *str, const char *suffix)
 {
   FD fd = open_tb(str, suffix);
-  if (fd != FD_ERR)
+  if (fd != FD_ERR) {
+    size_t size = file_size(fd);
     close_file(fd);
+    if ((size & 63) != 16) {
+      fprintf(stderr, "Incomplete tablebase file %s.%s\n", str, suffix);
+      printf("info string Incomplete tablebase file %s.%s\n", str, suffix);
+      fd = FD_ERR;
+    }
+  }
   return fd != FD_ERR;
 }
 
