@@ -57,9 +57,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue, pureStaticEval;
-  int ttHit, inCheck, givesCheck, improving;
+  int ttHit, pvHit, inCheck, givesCheck, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
-  bool ttCapture, pvExact;
+  bool ttCapture;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
 
@@ -132,6 +132,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
+  pvHit = ttHit ? tte_pv_hit(tte) : 0;
 
   // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
@@ -164,6 +165,11 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     return ttValue;
   }
 
+  if (   depth > 4 * ONE_PLY
+      && !excludedMove
+      && PvNode)
+    pvHit = 4;
+
   // Step 5. Tablebase probe
   if (!rootNode && TB_Cardinality) {
     int piecesCnt = popcount(pieces());
@@ -190,7 +196,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
         if (    b == BOUND_EXACT
             || (b == BOUND_LOWER ? value >= beta : value <= alpha))
         {
-          tte_save(tte, posKey, value_to_tt(value, ss->ply), b,
+          tte_save(tte, posKey, value_to_tt(value, ss->ply), pvHit, b,
                    min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY), 0,
                    VALUE_NONE, tt_generation());
           return value;
@@ -200,7 +206,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
           Value mate = TB_probe_dtm(pos, wdl, &found);
           if (found) {
             mate += wdl > 0 ? -ss->ply : ss->ply;
-            tte_save(tte, posKey, value_to_tt(mate, ss->ply), BOUND_EXACT,
+            tte_save(tte, posKey, value_to_tt(mate, ss->ply), pvHit, BOUND_EXACT,
                      min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY), 0,
                      VALUE_NONE, tt_generation());
             return mate;
@@ -244,7 +250,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     } else
       ss->staticEval = eval = pureStaticEval = -(ss-1)->staticEval + 2 * Tempo;
 
-    tte_save(tte, posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, 0,
+    tte_save(tte, posKey, VALUE_NONE, pvHit, BOUND_NONE, DEPTH_NONE, 0,
              pureStaticEval, tt_generation());
   }
 
@@ -362,6 +368,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     tte = tt_probe(posKey, &ttHit);
     // ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
     ttMove = ttHit ? tte_move(tte) : 0;
+    pvHit = ttHit ? tte_pv_hit(tte) : 0;
   }
 
 moves_loop: // When in check search starts from here.
@@ -375,7 +382,6 @@ moves_loop: // When in check search starts from here.
 
   skipQuiets = 0;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
-  pvExact = PvNode && ttHit && tte_bound(tte) == BOUND_EXACT;
 
   // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
@@ -545,15 +551,15 @@ moves_loop: // When in check search starts from here.
     {
       Depth r = reduction(improving, depth, moveCount, NT);
 
+      // Decrease reduction if position is or has been on the PV
+      if (pvHit)
+        r -= ONE_PLY;
+
       // Decrease reduction if opponent's move count is high.
       if ((ss-1)->moveCount > 15)
         r -= ONE_PLY;
 
       if (!captureOrPromotion) {
-        // Decrease reduction for exact PV nodes
-        if (pvExact)
-          r -= ONE_PLY;
-
         // Increase reduction if ttMove is a capture
         if (ttCapture)
           r += ONE_PLY;
@@ -722,7 +728,7 @@ moves_loop: // When in check search starts from here.
      bestValue = maxValue;
 
   if (!excludedMove)
-    tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
+    tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), pvHit,
         bestValue >= beta ? BOUND_LOWER :
         PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
         depth, bestMove, pureStaticEval, tt_generation());

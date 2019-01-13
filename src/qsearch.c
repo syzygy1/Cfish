@@ -32,7 +32,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   Key posKey;
   Move ttMove, move, bestMove;
   Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
-  int ttHit, givesCheck, evasionPrunable;
+  int ttHit, pvHit, givesCheck, evasionPrunable;
   Depth ttDepth;
   int moveCount;
 
@@ -60,8 +60,9 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   // Transposition table lookup
   posKey = pos_key();
   tte = tt_probe(posKey, &ttHit);
-  ttMove = ttHit ? tte_move(tte) : 0;
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
+  ttMove = ttHit ? tte_move(tte) : 0;
+  pvHit = ttHit ? tte_pv_hit(tte) : 0;
 
   if (  !PvNode
       && ttHit
@@ -93,7 +94,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     // Stand pat. Return immediately if static value is at least beta
     if (bestValue >= beta) {
       if (!ttHit)
-        tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
+        tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), pvHit,
                  BOUND_LOWER, DEPTH_NONE, 0, ss->staticEval,
                  tt_generation());
 
@@ -203,7 +204,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   if (InCheck && bestValue == -VALUE_INFINITE)
     return mated_in(ss->ply); // Plies to mate from the root
 
-  tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
+  tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), pvHit,
            bestValue >= beta ? BOUND_LOWER :
            PvNode && bestValue > oldAlpha  ? BOUND_EXACT : BOUND_UPPER,
            ttDepth, bestMove, ss->staticEval, tt_generation());

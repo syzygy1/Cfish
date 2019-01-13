@@ -30,7 +30,8 @@
 // move       16 bit
 // value      16 bit
 // eval value 16 bit
-// generation  6 bit
+// generation  5 bit
+// pv node     1 bit
 // bound type  2 bit
 // depth       8 bit
 
@@ -45,7 +46,7 @@ struct TTEntry {
 
 typedef struct TTEntry TTEntry;
 
-INLINE void tte_save(TTEntry *tte, Key k, Value v, int b, Depth d,
+INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
                             Move m, Value ev, uint8_t g)
 {
   // Preserve any existing move for the same position
@@ -60,7 +61,7 @@ INLINE void tte_save(TTEntry *tte, Key k, Value v, int b, Depth d,
     tte->key16     = (uint16_t)(k >> 48);
     tte->value16   = (int16_t)v;
     tte->eval16    = (int16_t)ev;
-    tte->genBound8 = (uint8_t)(g | b);
+    tte->genBound8 = (uint8_t)(g | pn | b);
     tte->depth8    = (int8_t)(d / ONE_PLY);
   }
 }
@@ -83,6 +84,11 @@ INLINE Value tte_eval(TTEntry *tte)
 INLINE Depth tte_depth(TTEntry *tte)
 {
   return (Depth)(tte->depth8 * ONE_PLY);
+}
+
+INLINE int tte_pv_hit(TTEntry *tte)
+{
+  return tte->genBound8 & 0x4;
 }
 
 INLINE int tte_bound(TTEntry *tte)
@@ -129,7 +135,7 @@ void tt_free(void);
 
 INLINE void tt_new_search(void)
 {
-  TT.generation8 += 4; // Lower 2 bits are used by Bound
+  TT.generation8 += 8; // Lower 3 bits are used by PvNode and Bound
 }
 
 INLINE uint8_t tt_generation(void)
