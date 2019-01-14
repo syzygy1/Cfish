@@ -858,7 +858,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
                               nodes_searched * 1000 / elapsed);
 
     if (elapsed > 1000)
-      printf(" hashfull %d", tt_hashfull());
+     { printf(" hashfull %d", tt_hashfull());  dbg_print();}
 
     printf(" tbhits %"PRIu64" time %"PRIi64" pv", tbhits, elapsed);
 
