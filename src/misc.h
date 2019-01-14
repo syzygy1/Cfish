@@ -34,6 +34,11 @@
 
 void print_engine_info(int to_uci);
 
+void dbg_hit_on(int b);
+void dbg_hit_on2(int c, int b);
+void dbg_mean_of(int v);
+void dbg_print(void);
+
 // prefetch() preloads the given address in L1/L2 cache. This is
 // a non-blocking function that doesn't stall the CPU waiting for data
 // to be loaded from memory, which can be quite slow.
