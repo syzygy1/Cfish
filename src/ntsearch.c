@@ -583,11 +583,7 @@ moves_loop: // When in check search starts from here.
                        - 4000; // Correction factor.
 
         // Decrease/increase reduction by comparing with opponent's stat score.
-        if (ss->statScore >= 0 && (ss-1)->statScore < 0)
-          r -= ONE_PLY;
-
-        else if ((ss-1)->statScore >= 0 && ss->statScore < 0)
-          r += ONE_PLY;
+        r +=  ((ss-1)->statScore >= 0)-(ss->statScore >= 0);
 
         // Decrease/increase reduction for moves with a good/bad history.
         r -= ss->statScore / 20000 * ONE_PLY;
