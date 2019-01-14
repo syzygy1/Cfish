@@ -295,7 +295,7 @@ extern uint32_t NonPawnPieceValue[16];
 
 INLINE int opposite_colors(Square s1, Square s2)
 {
-  int s = s1 ^ s2;
+  Square s = s1 ^ s2;
   return ((s >> 3) ^ s) & 1;
 }
 

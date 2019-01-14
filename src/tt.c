@@ -22,7 +22,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
-#include <string.h>   // For std::memset
+#include <string.h>   // For memset
 #ifndef _WIN32
 #include <sys/mman.h>
 #endif
@@ -193,8 +193,8 @@ TTEntry *tt_probe(Key key, int *found)
 
   for (int i = 0; i < ClusterSize; i++)
     if (!tte[i].key16 || tte[i].key16 == key16) {
-//      if ((tte[i].genBound8 & 0xFC) != TT.generation8 && tte[i].key16)
-      tte[i].genBound8 = TT.generation8 | tte_bound(&tte[i]); // Refresh
+//      if ((tte[i].genBound8 & 0xF8) != TT.generation8 && tte[i].key16)
+      tte[i].genBound8 = TT.generation8 | (tte[i].genBound8 & 0x7); // Refresh
       *found = tte[i].key16;
       return &tte[i];
     }
@@ -203,11 +203,11 @@ TTEntry *tt_probe(Key key, int *found)
   TTEntry *replace = tte;
   for (int i = 1; i < ClusterSize; i++)
     // Due to our packed storage format for generation and its cyclic
-    // nature we add 259 (256 is the modulus plus 3 to keep the lowest
-    // two bound bits from affecting the result) to calculate the entry
+    // nature we add 263 (256 is the modulus plus 7 to keep the unrelated
+    // lowest three bits from affecting the result) to calculate the entry
     // age correctly even after generation8 overflows into the next cycle.
-    if (  replace->depth8 - ((259 + TT.generation8 - replace->genBound8) & 0xFC) * 2
-        >   tte[i].depth8 - ((259 + TT.generation8 -   tte[i].genBound8) & 0xFC) * 2)
+    if ( replace->depth8 - ((263 + TT.generation8 - replace->genBound8) & 0xF8)
+        >  tte[i].depth8 - ((263 + TT.generation8 -   tte[i].genBound8) & 0xF8))
       replace = &tte[i];
 
   *found = 0;
@@ -224,8 +224,8 @@ int tt_hashfull(void)
   for (int i = 0; i < 1000 / ClusterSize; i++) {
     const TTEntry *tte = &TT.table[i].entry[0];
     for (int j = 0; j < ClusterSize; j++)
-      if ((tte[j].genBound8 & 0xFC) == TT.generation8)
+      if ((tte[j].genBound8 & 0xF8) == TT.generation8)
         cnt++;
   }
-  return cnt;
+  return cnt * 1000 / (ClusterSize * (1000 / ClusterSize));
 }

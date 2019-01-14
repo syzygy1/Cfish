@@ -18,6 +18,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
+
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -205,7 +207,7 @@ FD open_file(const char *name)
   return open(name, O_RDONLY);
 #else
   return CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-      FILE_ATTRIBUTE_NORMAL, NULL);
+      FILE_FLAG_RANDOM_ACCESS, NULL);
 #endif
 }
 
@@ -237,6 +239,7 @@ void *map_file(FD fd, map_t *map)
 
   *map = file_size(fd);
   void *data = mmap(NULL, *map, PROT_READ, MAP_SHARED, fd, 0);
+  madvise(data, *map, MADV_RANDOM);
   return data == MAP_FAILED ? NULL : data;
 
 #else

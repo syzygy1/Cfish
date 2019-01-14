@@ -19,7 +19,7 @@
 */
 
 #include <assert.h>
-#include <string.h>   // For std::memset
+#include <string.h>   // For memset
 
 #include "material.h"
 #include "position.h"
