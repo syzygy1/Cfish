@@ -269,3 +269,17 @@ void unmap_file(void *data, map_t map)
 
 #endif
 }
+//Stockfish dbg functions
+ unsigned long long int hits[2],means[2];
+ void dbg_mean_of(int v) { ++means[0]; means[1] += v; }
+ void dbg_hit_on(int b) { ++hits[0]; if (b) ++hits[1]; }
+ inline void dbg_hit_on2(int c, int b){
+ if (c) dbg_hit_on(b); }
+
+ inline void dbg_print(void) {
+  if (hits[0]!=0){
+    printf("\nTotal:%llu Hits:%llu Hitrate:%G%% \n",
+hits[0],hits[1],100.0*(double)hits[1]/(double)hits[0]);}
+  if (means[0]!=0){
+printf("\nTotal:%llu Mean:%G \n",means[0],(double)means[1]/(double)means[0]);}}
+
