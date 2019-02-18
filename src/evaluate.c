@@ -90,8 +90,8 @@ static const int KingAttackWeights[8] = { 0, 0, 77, 55, 44, 10 };
 // Penalties for enemy's safe checks
 enum {
   QueenSafeCheck  = 780,
-  RookSafeCheck   = 880,
-  BishopSafeCheck = 435,
+  RookSafeCheck   = 1080,
+  BishopSafeCheck = 635,
   KnightSafeCheck = 790
 };
 
@@ -125,8 +125,8 @@ static const Score MobilityBonus[4][32] = {
 // if they can reach an outpost square, bigger if that square is supported0
 // by a pawn. If the minor occupies an outpost square, then score is doubled.
 static const Score Outpost[][2] = {
-  { S(22, 6), S(36,12) }, // Knight
-  { S( 9, 2), S(15, 5) }  // Bishop
+  { S(18, 6), S(36,12) }, // Knight
+  { S( 9, 3), S(18, 6) }  // Bishop
 };
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
@@ -164,8 +164,8 @@ static const int PassedDanger[8] = { 0, 0, 0, 3, 6, 11, 18 };
 
 // Assorted bonuses and penalties used by evaluation
 static const Score BishopPawns        = S(  3,  7);
-static const Score CloseEnemies       = S(  8,  0);
 static const Score CorneredBishop     = S( 50, 50);
+static const Score FlankAttacks       = S(  8,  0);
 static const Score Hanging            = S( 69, 36);
 static const Score KingProtector      = S(  7,  8);
 static const Score KnightOnQueen      = S( 16, 12);
@@ -204,7 +204,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // enemy pawns are excluded from the mobility area
   ei->mobilityArea[Us] = ~(b | pieces_cpp(Us, KING, QUEEN) | ei->pe->pawnAttacks[Them]);
 
-  // Initialise the attackedBy bitboards for kings and pawns
+  // Initialise attackedBy[] for kings and pawns
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
   ei->attackedBy[Us][PAWN] = ei->pe->pawnAttacks[Us];
   ei->attackedBy[Us][0] = b | ei->attackedBy[Us][PAWN];
@@ -222,7 +222,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
     ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
 
   ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
-  ei->kingRing[Us] &= ~double_pawn_attacks_bb(pieces_cp(Us, PAWN), Us);
+  ei->kingRing[Us] &= ~pawn_double_attacks_bb(pieces_cp(Us, PAWN), Us);
   ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
 }
 
@@ -370,23 +370,12 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
   const Square ksq = square_of(Us, KING);
-  Bitboard kingFlank, weak, b, b1, b2, safe, unsafeChecks;
+  Bitboard weak, b, b1, b2, safe, unsafeChecks = 0;
+  int kingDanger = 0;
 
   // King shelter and enemy pawns storm
   Score score = Us == WHITE ? king_safety_white(ei->pe, pos, ksq)
                             : king_safety_black(ei->pe, pos, ksq);
-
-  // Find the squares that opponent attacks in our king flank and the squares
-  // which are attacked twice in that flank.
-  kingFlank = KingFlank[file_of(ksq)];
-  b1 = ei->attackedBy[Them][0] & kingFlank & Camp;
-  b2 = b1 & ei->attackedBy2[Them];
-
-  int tropism = popcount(b1) + popcount(b2);
-
-  // Main king safety evaluation
-  int kingDanger = 0;
-  unsafeChecks = 0;
 
   // Attacked squares defended at most once by our queen or king
   weak =  ei->attackedBy[Them][0]
@@ -402,24 +391,33 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   b1 = attacks_bb_rook(ksq, pieces() ^ pieces_cp(Us, QUEEN));
   b2 = attacks_bb_bishop(ksq, pieces() ^ pieces_cp(Us, QUEEN));
 
-  // Enemy queen safe checks
-  if ((b1 | b2) & ei->attackedBy[Them][QUEEN] & safe & ~ei->attackedBy[Us][QUEEN])
-    kingDanger += QueenSafeCheck;
-
-  b1 &= ei->attackedBy[Them][ROOK];
-  b2 &= ei->attackedBy[Them][BISHOP];
-
   // Enemy rooks checks
-  if (b1 & safe)
+  Bitboard RookCheck =  b1
+                      & safe
+                      & ei->attackedBy[Them][ROOK];
+  if (RookCheck)
     kingDanger += RookSafeCheck;
   else
-    unsafeChecks |= b1;
+    unsafeChecks |= b1 & ei->attackedBy[Them][ROOK];
 
-  // Enemy bishops checks
-  if (b2 & safe)
+  Bitboard QueenCheck =  (b1 | b2)
+                       & ei->attackedBy[Them][QUEEN]
+                       & safe
+                       & ~ei->attackedBy[Us][QUEEN]
+                       & ~RookCheck;
+  if (QueenCheck)
+    kingDanger += QueenSafeCheck;
+
+  // Enemy bishops checks: we count them only if they are from squares from
+  // which we can't give a queen check, because queen checks are more valuable.
+  Bitboard BishopCheck =  b2
+                        & ei->attackedBy[Them][BISHOP]
+                        & safe
+                        & ~QueenCheck;
+  if (BishopCheck)
     kingDanger += BishopSafeCheck;
   else
-    unsafeChecks |= b2;
+    unsafeChecks |= b2 & ei->attackedBy[Them][BISHOP];
 
   // Enemy knights checks
   b = attacks_from_knight(ksq) & ei->attackedBy[Them][KNIGHT];
@@ -432,15 +430,23 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   // the square is in the attacker's mobility area.
   unsafeChecks &= ei->mobilityArea[Them];
 
+  // Find the squares that opponent attacks in our king flank and the squares
+  // which are attacked twice in that flank.
+  b1 = ei->attackedBy[Them][0] & KingFlank[file_of(ksq)] & Camp;
+  b2 = b1 & ei->attackedBy2[Them];
+
+  int kingFlankAttacks = popcount(b1) + popcount(b2);
+
   kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                +  69 * ei->kingAttacksCount[Them]
                + 185 * popcount(ei->kingRing[Us] & weak)
+               - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
                + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
-               +       tropism * tropism / 4
                - 873 * !pieces_cp(Them, QUEEN)
                -   6 * mg_value(score) / 8
                +       mg_value(mobility[Them] - mobility[Us])
-               -   30;
+               +   5 * kingFlankAttacks * kingFlankAttacks / 16
+               -  25;
 
   // Transform the kingDanger units into a Score, and subtract it from
   // the evaluation
@@ -448,11 +454,11 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
 
   // Penalty when our king is on a pawnless flank
-  if (!(pieces_p(PAWN) & kingFlank))
+  if (!(pieces_p(PAWN) & KingFlank[file_of(ksq)]))
     score -= PawnlessFlank;
 
-  // King tropism bonus to anticipate slow motion attacks on our king
-  score -= CloseEnemies * tropism;
+  // Penalty if king flank is under attack, potentially moving toward the king
+  score -= FlankAttacks * kingFlankAttacks;
 
   return score;
 }

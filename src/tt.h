@@ -86,7 +86,7 @@ INLINE Depth tte_depth(TTEntry *tte)
   return (Depth)(tte->depth8 * ONE_PLY);
 }
 
-INLINE int tte_pv_hit(TTEntry *tte)
+INLINE int tte_is_pv(TTEntry *tte)
 {
   return tte->genBound8 & 0x4;
 }
