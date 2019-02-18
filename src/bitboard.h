@@ -58,7 +58,6 @@ extern uint8_t SquareDistance[64][64];
 extern Bitboard SquareBB[64];
 extern Bitboard FileBB[8];
 extern Bitboard RankBB[8];
-extern Bitboard AdjacentFilesBB[8];
 extern Bitboard ForwardRanksBB[2][8];
 extern Bitboard BetweenBB[64][64];
 extern Bitboard LineBB[64][64];
@@ -161,7 +160,7 @@ INLINE Bitboard double_pawn_attacks_bb(Bitboard b, const int C)
 
 INLINE Bitboard adjacent_files_bb(unsigned f)
 {
-  return AdjacentFilesBB[f];
+  return shift_bb(EAST, FileBB[f]) | shift_bb(WEST, FileBB[f]);
 }
 
 

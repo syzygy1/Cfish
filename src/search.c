@@ -561,35 +561,32 @@ skip_search:
 #endif
 
     // Do we have time for the next iteration? Can we stop searching now?
-    if (use_time_management()) {
-      if (!Signals.stop && !Signals.stopOnPonderhit) {
-        // Stop the search if only one legal move is available, or if all
-        // of the available time has been used.
-        double fallingEval = (306 + 119 * failedLow + 6 * (mainThread.previousScore - bestValue)) / 581.0;
-        fallingEval = max(0.5, min(1.5, fallingEval));
+    if (    use_time_management()
+        && !Signals.stop
+        && !Signals.stopOnPonderhit) {
+      // Stop the search if only one legal move is available, or if all
+      // of the available time has been used.
+      double fallingEval = (306 + 119 * failedLow + 6 * (mainThread.previousScore - bestValue)) / 581.0;
+      fallingEval = max(0.5, min(1.5, fallingEval));
 
-        double bestMoveInstability = 1 + mainThread.bestMoveChanges;
+      // If the best move is stable over several iterations, reduce time
+      // accordingly
+      timeReduction =  lastBestMoveDepth + 10 * ONE_PLY < pos->completedDepth
+                     ? 1.95 : 1.0;
 
-        // If the best move is stable over several iterations, reduce time
-        // for this move, the longer the move has been stable, the more.
-        // Use part of the time gained from a previous stable move for the
-        // current move.
-        timeReduction = 1;
-        for (int i = 3; i < 6; i++)
-          if (lastBestMoveDepth * i < pos->completedDepth)
-            timeReduction *= 1.25;
-        bestMoveInstability *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
+      // Use part of the gained time from a previous stable move for this move
+      double bestMoveInstability = 1.0 + mainThread.bestMoveChanges;
+      bestMoveInstability *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
-        if (   rm->size == 1
-            || time_elapsed() > time_optimum() * bestMoveInstability * fallingEval)
-        {
-          // If we are allowed to ponder do not stop the search now but
-          // keep pondering until the GUI sends "ponderhit" or "stop".
-          if (Limits.ponder)
-            Signals.stopOnPonderhit = 1;
-          else
-            Signals.stop = 1;
-        }
+      if (   rm->size == 1
+          || time_elapsed() > time_optimum() * bestMoveInstability * fallingEval)
+      {
+        // If we are allowed to ponder do not stop the search now but
+        // keep pondering until the GUI sends "ponderhit" or "stop".
+        if (Limits.ponder)
+          Signals.stopOnPonderhit = 1;
+        else
+          Signals.stop = 1;
       }
     }
   }

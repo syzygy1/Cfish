@@ -133,6 +133,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
   pvHit = ttHit ? tte_pv_hit(tte) : 0;
+  if (PvNode && depth > 4 * ONE_PLY) pvHit = 4;
 
   // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
@@ -164,11 +165,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     }
     return ttValue;
   }
-
-  if (   depth > 4 * ONE_PLY
-      && !excludedMove
-      && PvNode)
-    pvHit = 4;
 
   // Step 5. Tablebase probe
   if (!rootNode && TB_Cardinality) {
@@ -242,9 +238,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
         eval = ttValue;
   } else {
     if ((ss-1)->currentMove != MOVE_NULL) {
-      int p = (ss-1)->statScore;
-      int bonus = p > 0 ? (-p - 2500) / 512 :
-                  p < 0 ? (-p + 2500) / 512 : 0;
+      int bonus = -(ss-1)->statScore / 512;
       pureStaticEval = evaluate(pos);
       ss->staticEval = eval = pureStaticEval + bonus;
     } else
@@ -368,7 +362,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     tte = tt_probe(posKey, &ttHit);
     // ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
     ttMove = ttHit ? tte_move(tte) : 0;
-    pvHit = ttHit ? tte_pv_hit(tte) : 0;
   }
 
 moves_loop: // When in check search starts from here.

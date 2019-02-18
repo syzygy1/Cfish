@@ -92,9 +92,9 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
       // if the pawn is not on the same file as the enemy king, because we
       // don't generate captures. Note that a possible discovery check
       // promotion has been already generated amongst the captures.
-      Bitboard dcCandidates = blockers_for_king(pos, Them);
-      if (pawnsNotOn7 & dcCandidates) {
-        Bitboard dc1 = shift_bb(Up, pawnsNotOn7 & dcCandidates) & emptySquares & ~file_bb_s(st->ksq);
+      Bitboard dcCandidatesQuiets = blockers_for_king(pos, Them) & pawnsNotOn7;
+      if (dcCandidatesQuiets) {
+        Bitboard dc1 = shift_bb(Up, dcCandidatesQuiets) & emptySquares & ~file_bb_s(st->ksq);
         Bitboard dc2 = shift_bb(Up, dc1 & TRank3BB) & emptySquares;
 
         b1 |= dc1;
