@@ -67,11 +67,11 @@ INLINE int futility_margin(Depth d, int improving) {
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
-static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
+static int Reductions[2][64][64];  // [pv][improving][depth][moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
-  return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
+  return (Reductions[i][min(d / ONE_PLY, 63)][min(mn, 63)] - NT) * ONE_PLY;
 }
 
 // History and stats update bonus, based on depth
@@ -133,12 +133,11 @@ void search_init(void)
       for (int mc = 1; mc < 64; ++mc) {
         double r = log(d) * log(mc) / 1.95;
 
-        Reductions[NonPV][imp][d][mc] = ((int)lround(r));
-        Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);
+        Reductions[imp][d][mc] = ((int)lround(r));
 
         // Increase reduction for non-PV nodes when eval is not improving
         if (!imp && r > 1.0)
-          Reductions[NonPV][imp][d][mc]++;
+          Reductions[imp][d][mc]++;
       }
 
   for (int d = 0; d < 16; ++d) {

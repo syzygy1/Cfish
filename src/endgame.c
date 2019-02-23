@@ -99,47 +99,48 @@ static Key calc_key(const char *code, int c)
   return key;
 }
 
-static EgFunc EvaluateKPK, EvaluateKNNK, EvaluateKBNK, EvaluateKRKP,
-              EvaluateKRKB, EvaluateKRKN, EvaluateKQKP, EvaluateKQKR,
-              EvaluateKXK;
+static EgFunc EvaluateKPK, EvaluateKNNK, EvaluateKNNKP, EvaluateKBNK,
+              EvaluateKRKP, EvaluateKRKB, EvaluateKRKN, EvaluateKQKP,
+              EvaluateKQKR, EvaluateKXK;
 
 static EgFunc ScaleKNPK, ScaleKNPKB, ScaleKRPKR, ScaleKRPKB,
               ScaleKBPKB, ScaleKBPKN, ScaleKBPPKB, ScaleKRPPKRP,
               ScaleKBPsK, ScaleKQKRPs, ScaleKPKP, ScaleKPsK;
 
-EgFunc *endgame_funcs[22] = {
+EgFunc *endgame_funcs[NUM_EVAL + NUM_SCALING + 6] = {
   NULL,
-// Entries 1-9 are evaluation functions.
+// Entries 1-10 are evaluation functions.
   &EvaluateKPK,    // 1
   &EvaluateKNNK,   // 2
-  &EvaluateKBNK,   // 3
-  &EvaluateKRKP,   // 4
-  &EvaluateKRKB,   // 5
-  &EvaluateKRKN,   // 6
-  &EvaluateKQKP,   // 7
-  &EvaluateKQKR,   // 8
-  &EvaluateKXK,    // 9
-// Entries 10-21 are scaling functions.
-  &ScaleKNPK,      // 10
-  &ScaleKNPKB,     // 11
-  &ScaleKRPKR,     // 12
-  &ScaleKRPKB,     // 13
-  &ScaleKBPKB,     // 14
-  &ScaleKBPKN,     // 15
-  &ScaleKBPPKB,    // 16
-  &ScaleKRPPKRP,   // 17
-  &ScaleKBPsK,     // 18
-  &ScaleKQKRPs,    // 19
-  &ScaleKPsK,      // 20
-  &ScaleKPKP       // 21
+  &EvaluateKNNKP,  // 3
+  &EvaluateKBNK,   // 4
+  &EvaluateKRKP,   // 5
+  &EvaluateKRKB,   // 6
+  &EvaluateKRKN,   // 7
+  &EvaluateKQKP,   // 8
+  &EvaluateKQKR,   // 9
+  &EvaluateKXK,    // 10
+// Entries 11-22 are scaling functions.
+  &ScaleKNPK,      // 11
+  &ScaleKNPKB,     // 12
+  &ScaleKRPKR,     // 13
+  &ScaleKRPKB,     // 14
+  &ScaleKBPKB,     // 15
+  &ScaleKBPKN,     // 16
+  &ScaleKBPPKB,    // 17
+  &ScaleKRPPKRP,   // 18
+  &ScaleKBPsK,     // 19
+  &ScaleKQKRPs,    // 20
+  &ScaleKPsK,      // 21
+  &ScaleKPKP       // 22
 };
 
-Key endgame_keys[16][2];
+Key endgame_keys[NUM_EVAL + NUM_SCALING][2];
 
-static const char *endgame_codes[16] = {
-  // Codes for evaluation functions 1-8.
-  "KPk", "KNNk", "KBNk", "KRkp", "KRkb", "KRkn", "KQkp", "KQkr",
-  // Codes for scaling functions 10-17.
+static const char *endgame_codes[NUM_EVAL + NUM_SCALING] = {
+  // Codes for evaluation functions 1-9.
+  "KPk", "KNNk", "KNNkp", "KBNk", "KRkp", "KRkb", "KRkn", "KQkp", "KQkr",
+  // Codes for scaling functions 11-18.
   "KNPk", "KNPkb", "KRPkr", "KRPkb", "KBPkb", "KBPkn", "KBPPkb", "KRPPkrp"
 };
 
@@ -363,6 +364,22 @@ static Value EvaluateKQKR(const Pos *pos, unsigned strongSide)
                 - RookValueEg
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
+
+  return strongSide == pos_stm() ? result : -result;
+}
+
+
+// KNN vs KP. Simply push the opposing king to the corner.
+static Value EvaluateKNNKP(const Pos *pos, unsigned strongSide)
+{
+  unsigned weakSide = strongSide ^ 1;
+
+  assert(verify_material(pos, strongSide, 2 * KnightValueMg, 0));
+  assert(verify_material(pos, weakSide, VALUE_ZERO, 1));
+
+  Value result =  2 * KnightValueEg
+                - PawnValueEg
+                + PushToEdges[square_of(weakSide, KING)];
 
   return strongSide == pos_stm() ? result : -result;
 }

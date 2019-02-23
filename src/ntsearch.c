@@ -58,7 +58,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue, pureStaticEval;
   int ttHit, ttPv, inCheck, givesCheck, improving;
-  int captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets;
+  int captureOrPromotion, doFullDepthSearch, moveCountPruning;
   bool ttCapture;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
@@ -326,7 +326,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
-    int probCutCount = 3;
+    int probCutCount = 2 + 2 * cutNode;
     while ((move = next_move(pos, 0)) && probCutCount)
       if (move != excludedMove && is_legal(pos, move)) {
         probCutCount--;
@@ -373,13 +373,13 @@ moves_loop: // When in check search starts from here.
   mp_init(pos, ttMove, depth);
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
 
-  skipQuiets = 0;
+  moveCountPruning = 0;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
 
   // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
   // cutoff occurs
-  while ((move = next_move(pos, skipQuiets))) {
+  while ((move = next_move(pos, moveCountPruning))) {
     assert(move_is_ok(move));
 
     if (move == excludedMove)
@@ -484,10 +484,8 @@ moves_loop: // When in check search starts from here.
           && !advanced_pawn_push(pos, move))
       {
         // Move count based pruning
-        if (moveCountPruning) {
-          skipQuiets = 1;
+        if (moveCountPruning)
           continue;
-        }
 
         // Reduced depth of the next LMR search
         int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
