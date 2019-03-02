@@ -418,9 +418,6 @@ moves_loop: // When in check search starts from here.
 
     givesCheck = gives_check(pos, ss, move);
 
-    moveCountPruning = depth < 16 * ONE_PLY
-                && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
-
     // Step 13. Singular and Gives Check Extensions
 
     // Singular extension search. If all moves but one fail low on a search
@@ -479,6 +476,10 @@ moves_loop: // When in check search starts from here.
         && pos_non_pawn_material(pos_stm())
         && bestValue > VALUE_MATED_IN_MAX_PLY)
     {
+      // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
+      moveCountPruning = depth < 16 * ONE_PLY
+                && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
+
       if (   !captureOrPromotion
           && !givesCheck
           && !advanced_pawn_push(pos, move))
