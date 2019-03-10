@@ -141,8 +141,8 @@ void search_init(void)
       }
 
   for (int d = 0; d < 16; ++d) {
-    FutilityMoveCounts[0][d] = (int)(2.4 + 0.74 * pow(d, 1.78));
-    FutilityMoveCounts[1][d] = (int)(5.0 + 1.00 * pow(d, 2.00));
+    FutilityMoveCounts[0][d] = (5 + d * d) / 2;
+    FutilityMoveCounts[1][d] = 5 + d * d;
   }
 }
 
@@ -373,7 +373,6 @@ void thread_search(Pos *pos)
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
-  bool failedLow;
 
   Stack *ss = pos->st; // At least the seventh element of the allocated array.
   for (int i = -7; i < 3; i++)
@@ -391,10 +390,8 @@ void thread_search(Pos *pos)
   beta = VALUE_INFINITE;
   pos->completedDepth = DEPTH_ZERO;
 
-  if (pos->threadIdx == 0) {
-    failedLow = false;
+  if (pos->threadIdx == 0)
     mainThread.bestMoveChanges = 0;
-  }
 
   int multiPV = option_value(OPT_MULTI_PV);
 #if 0
@@ -425,10 +422,8 @@ void thread_search(Pos *pos)
     }
 
     // Age out PV variability metric
-    if (pos->threadIdx == 0) {
+    if (pos->threadIdx == 0)
       mainThread.bestMoveChanges *= 0.517;
-      failedLow = false;
-    }
 
     // Save the last iteration's scores before first PV line is searched and
     // all the move scores except the (new) PV are set to -VALUE_INFINITE.
@@ -512,7 +507,6 @@ void thread_search(Pos *pos)
 
           if (pos->threadIdx == 0) {
             failedHighCnt = 0;
-            failedLow = true;
             Signals.stopOnPonderhit = 0;
           }
         } else if (bestValue >= beta) {
@@ -565,20 +559,20 @@ skip_search:
         && !Signals.stopOnPonderhit) {
       // Stop the search if only one legal move is available, or if all
       // of the available time has been used.
-      double fallingEval = (306 + 119 * failedLow + 6 * (mainThread.previousScore - bestValue)) / 581.0;
+      double fallingEval = (306 + 9 * (mainThread.previousScore - bestValue)) / 581.0;
       fallingEval = max(0.5, min(1.5, fallingEval));
 
       // If the best move is stable over several iterations, reduce time
       // accordingly
       timeReduction =  lastBestMoveDepth + 10 * ONE_PLY < pos->completedDepth
                      ? 1.95 : 1.0;
+      double reduction = pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
       // Use part of the gained time from a previous stable move for this move
       double bestMoveInstability = 1.0 + mainThread.bestMoveChanges;
-      bestMoveInstability *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
       if (   rm->size == 1
-          || time_elapsed() > time_optimum() * bestMoveInstability * fallingEval)
+          || time_elapsed() > time_optimum() * fallingEval * reduction * bestMoveInstability)
       {
         // If we are allowed to ponder do not stop the search now but
         // keep pondering until the GUI sends "ponderhit" or "stop".

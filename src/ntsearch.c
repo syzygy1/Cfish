@@ -429,13 +429,13 @@ moves_loop: // When in check search starts from here.
         &&  move == ttMove
         && !rootNode
         && !excludedMove // No recursive singular search
-        &&  ttValue != VALUE_NONE
+     /* &&  ttValue != VALUE_NONE implicit in the next condition */
+        &&  abs(ttValue) < VALUE_KNOWN_WIN
         && (tte_bound(tte) & BOUND_LOWER)
         &&  tte_depth(tte) >= depth - 3 * ONE_PLY
         &&  is_legal(pos, move))
     {
-      Value singularBeta = max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
-//      Value singularBeta = min(max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE), VALUE_KNOWN_WIN);
+      Value singularBeta = ttValue - 2 * depth / ONE_PLY;
       ss->excludedMove = move;
       Move cm = ss->countermove;
       Move k1 = ss->mpKillers[0], k2 = ss->mpKillers[1];
