@@ -83,6 +83,7 @@ static void score_quiets(const Pos *pos)
   PieceToHistory *cmh = (st-1)->history;
   PieceToHistory *fmh = (st-2)->history;
   PieceToHistory *fmh2 = (st-4)->history;
+  PieceToHistory *fmh3 = (st-6)->history;
 
   Color c = pos_stm();
 
@@ -93,6 +94,7 @@ static void score_quiets(const Pos *pos)
     m->value =  (*cmh)[piece_on(from)][to]
               + (*fmh)[piece_on(from)][to]
               + (*fmh2)[piece_on(from)][to]
+              + (*fmh3)[piece_on(from)][to] / 2
               + (*history)[c][move];
   }
 }

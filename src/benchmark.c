@@ -160,8 +160,8 @@ void benchmark(Pos *current, char *str)
 
   uint64_t nodes = 0;
   Pos pos;
-  pos.stack = malloc(215 * sizeof(*pos.stack));
-  pos.st = pos.stack + 5;
+  pos.stack = malloc(217 * sizeof(*pos.stack));
+  pos.st = pos.stack + 7;
   pos.moveList = malloc(10000 * sizeof(*pos.moveList));
   TimePoint elapsed = now();
 

@@ -90,7 +90,7 @@ void position(Pos *pos, char *str)
 
     // Now move some of the game history at the end of the circular buffer
     // in front of that buffer.
-    int k = (pos->st - (pos->stack + 100)) - max(5, pos->st->pliesFromNull);
+    int k = (pos->st - (pos->stack + 100)) - max(7, pos->st->pliesFromNull);
     for (; k < 0; k++)
       memcpy(pos->stack + 100 + k, pos->stack + 200 + k, StateSize);
   }

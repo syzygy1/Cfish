@@ -375,12 +375,12 @@ void thread_search(Pos *pos)
   double timeReduction = 1.0;
   bool failedLow;
 
-  Stack *ss = pos->st; // At least the fifth element of the allocated array.
-  for (int i = -5; i < 3; i++)
+  Stack *ss = pos->st; // At least the seventh element of the allocated array.
+  for (int i = -7; i < 3; i++)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;
 
-  for (int i = -5; i < 0; i++)
+  for (int i = -7; i < 0; i++)
     ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
 
   for (int i = 0; i <= MAX_PLY; i++)
@@ -705,6 +705,9 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus)
 
   if (move_is_ok((ss-4)->currentMove))
     cms_update(*(ss-4)->history, pc, s, bonus);
+
+  if (move_is_ok((ss-6)->currentMove))
+    cms_update(*(ss-6)->history, pc, s, bonus);
 }
 
 // update_capture_stats() updates move sorting heuristics when a new capture
@@ -1002,7 +1005,7 @@ void start_thinking(Pos *root)
     }
     memcpy(pos, root, offsetof(Pos, moveList));
     // Copy enough of the root State buffer.
-    int n = max(5, root->st->pliesFromNull);
+    int n = max(7, root->st->pliesFromNull);
     for (int i = 0; i <= n; i++)
       memcpy(&pos->stack[i], &root->st[i - n], StateSize);
     pos->st = pos->stack + n;
