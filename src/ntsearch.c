@@ -511,8 +511,7 @@ moves_loop: // When in check search starts from here.
       }
 //      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
 //               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-      else if (   !extension
-               && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
+      else if (!see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
         continue;
     }
 
