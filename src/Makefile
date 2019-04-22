@@ -166,7 +166,7 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
-	CFLAGS += -pedantic -Wextra -Wshadow 
+	CFLAGS += -pedantic -Wextra -Wshadow
 	ifeq ($(ARCH),armv7)
 	CFLAGS += -mcpu=native -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=native
 		ifeq ($(OS),Android)
@@ -180,6 +180,10 @@ ifeq ($(COMP),gcc)
 
 	ifneq ($(KERNEL),Darwin)
 		LDFLAGS += -Wl,--no-as-needed
+	endif
+
+	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Haiku))
+		CFLAGS += -Wno-pedantic-ms-format
 	endif
 endif
 
@@ -228,9 +232,15 @@ ifeq ($(COMP),clang)
 	endif
 
 	ifeq ($(KERNEL),Darwin)
-		CFLAGS += 
-		DEPENDFLAGS += 
+		CFLAGS +=
+		DEPENDFLAGS +=
 	endif
+endif
+
+ifneq ($(COMP),mingw)
+ifeq ($(KERNEL),$(filter $(KERNEL),Linux Haiku))
+	CFLAGS += -D_POSIX_C_SOURCE=199506L
+endif
 endif
 
 ifeq ($(comp),icc)

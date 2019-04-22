@@ -18,6 +18,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
+
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -168,6 +170,35 @@ bool large_pages_supported(void)
 
   return 1;
 }
+
+// The following two functions were taken from mingw_lock.c
+
+void __cdecl _lock(int locknum);
+void __cdecl _unlock(int locknum);
+#define _STREAM_LOCKS 16
+#define _IOLOCKED 0x8000
+typedef struct {
+  FILE f;
+  CRITICAL_SECTION lock;
+} _FILEX;
+
+void flockfile(FILE *F)
+{
+  if ((F >= (&__iob_func()[0])) && (F <= (&__iob_func()[_IOB_ENTRIES-1]))) {
+    _lock(_STREAM_LOCKS + (int)(F - (&__iob_func()[0])));
+    F->_flag |= _IOLOCKED;
+  } else
+    EnterCriticalSection(&(((_FILEX *)F)->lock));
+}
+
+void funlockfile(FILE *F)
+{
+  if ((F >= (&__iob_func()[0])) && (F <= (&__iob_func()[_IOB_ENTRIES-1]))) {
+    F->_flag &= ~_IOLOCKED;
+    _unlock(_STREAM_LOCKS + (int)(F - (&__iob_func()[0])));
+  } else
+    LeaveCriticalSection(&(((_FILEX *)F)->lock));
+}
 #endif
 
 FD open_file(const char *name)
@@ -176,7 +207,7 @@ FD open_file(const char *name)
   return open(name, O_RDONLY);
 #else
   return CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-      FILE_ATTRIBUTE_NORMAL, NULL);
+      FILE_FLAG_RANDOM_ACCESS, NULL);
 #endif
 }
 
@@ -208,6 +239,7 @@ void *map_file(FD fd, map_t *map)
 
   *map = file_size(fd);
   void *data = mmap(NULL, *map, PROT_READ, MAP_SHARED, fd, 0);
+  madvise(data, *map, MADV_RANDOM);
   return data == MAP_FAILED ? NULL : data;
 
 #else

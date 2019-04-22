@@ -175,13 +175,13 @@ enum {
 };
 
 enum {
-  PawnValueMg   =  171, PawnValueEg   =  240,
-  KnightValueMg =  764, KnightValueEg =  848,
-  BishopValueMg =  826, BishopValueEg =  891,
-  RookValueMg   = 1282, RookValueEg   = 1373,
-  QueenValueMg  = 2500, QueenValueEg  = 2670,
+  PawnValueMg   = 128,   PawnValueEg   = 213,
+  KnightValueMg = 782,   KnightValueEg = 865,
+  BishopValueMg = 830,   BishopValueEg = 918,
+  RookValueMg   = 1289,  RookValueEg   = 1378,
+  QueenValueMg  = 2529,  QueenValueEg  = 2687,
 
-  MidgameLimit = 15258, EndgameLimit = 3915
+  MidgameLimit  = 15258, EndgameLimit = 3915
 };
 
 enum { PAWN = 1, KNIGHT, BISHOP, ROOK, QUEEN, KING };
@@ -295,7 +295,7 @@ extern uint32_t NonPawnPieceValue[16];
 
 INLINE int opposite_colors(Square s1, Square s2)
 {
-  int s = s1 ^ s2;
+  Square s = s1 ^ s2;
   return ((s >> 3) ^ s) & 1;
 }
 

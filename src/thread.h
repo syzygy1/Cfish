@@ -59,7 +59,6 @@ void thread_wait(Pos *pos, atomic_bool *b);
 // MainThread struct seems to exist mostly for easy move.
 
 struct MainThread {
-  int failedLow;
   double bestMoveChanges, previousTimeReduction;
   Value previousScore;
 };
@@ -103,7 +102,7 @@ INLINE Pos *threads_main(void)
   return Threads.pos[0];
 }
 
-CounterMoveHistoryStat **cmhTables;
-int numCmhTables;
+extern CounterMoveHistoryStat **cmhTables;
+extern int numCmhTables;
 
 #endif

@@ -32,7 +32,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   Key posKey;
   Move ttMove, move, bestMove;
   Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
-  int ttHit, givesCheck, evasionPrunable;
+  int ttHit, ttPv, givesCheck, evasionPrunable;
   Depth ttDepth;
   int moveCount;
 
@@ -60,8 +60,9 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   // Transposition table lookup
   posKey = pos_key();
   tte = tt_probe(posKey, &ttHit);
-  ttMove = ttHit ? tte_move(tte) : 0;
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
+  ttMove = ttHit ? tte_move(tte) : 0;
+  ttPv = ttHit ? tte_is_pv(tte) : 0;
 
   if (  !PvNode
       && ttHit
@@ -93,7 +94,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     // Stand pat. Return immediately if static value is at least beta
     if (bestValue >= beta) {
       if (!ttHit)
-        tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
+        tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), ttPv,
                  BOUND_LOWER, DEPTH_NONE, 0, ss->staticEval,
                  tt_generation());
 
@@ -105,6 +106,8 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
 
     futilityBase = bestValue + 128;
   }
+
+  ss->history = &(*pos->counterMoveHistory)[0][0];
 
   // Initialize move picker data for the current position, and prepare
   // to search the moves. Because the depth is <= 0 here, only captures,
@@ -161,6 +164,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     }
 
     ss->currentMove = move;
+    ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
 
     // Make and search the move
     do_move(pos, move, givesCheck);
@@ -182,18 +186,15 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
       bestValue = value;
 
       if (value > alpha) {
+        bestMove = move;
+
         if (PvNode) // Update pv even in fail-high case
           update_pv(ss->pv, move, (ss+1)->pv);
 
-        if (PvNode && value < beta) { // Update alpha here!
+        if (PvNode && value < beta) // Update alpha here!
           alpha = value;
-          bestMove = move;
-        } else { // Fail high
-          tte_save(tte, posKey, value_to_tt(value, ss->ply), BOUND_LOWER,
-                   ttDepth, move, ss->staticEval, tt_generation());
-
-          return value;
-        }
+        else
+          break; // Fail high
       }
     }
   }
@@ -203,8 +204,9 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   if (InCheck && bestValue == -VALUE_INFINITE)
     return mated_in(ss->ply); // Plies to mate from the root
 
-  tte_save(tte, posKey, value_to_tt(bestValue, ss->ply),
-           PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
+  tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), ttPv,
+           bestValue >= beta ? BOUND_LOWER :
+           PvNode && bestValue > oldAlpha  ? BOUND_EXACT : BOUND_UPPER,
            ttDepth, bestMove, ss->staticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);

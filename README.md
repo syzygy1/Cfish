@@ -100,7 +100,7 @@ Use Syzygy DTM tablebases (not yet released).
 Control PolyGlot book usage.
 
 #### LargePages
-Control allocation of the hash table as Large Pages (LP). On Windows this option does not appear if the operating system lacks LP support of if LP has not properly been set up.
+Control allocation of the hash table as Large Pages (LP). On Windows this option does not appear if the operating system lacks LP support or if LP has not properly been set up.
 
 #### NUMA
 This option only appears on NUMA machines, i.e. machines with two or more CPUS. If this option is set to "on" or "all", Cfish will spread its search threads over all nodes. If the option is set to "off", Cfish will ignore the NUMA architecture of the machine. On Linux, a subset of nodes may be specified on which to run the search threads (e.g. "0-1" or "0,1" to limit the search threads to nodes 0 and 1 out of nodes 0-3).

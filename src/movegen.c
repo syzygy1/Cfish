@@ -26,51 +26,6 @@
 
 enum { CAPTURES, QUIETS, QUIET_CHECKS, EVASIONS, NON_EVASIONS, LEGAL };
 
-INLINE ExtMove *generate_castling(const Pos *pos, ExtMove *list, int us,
-                                  const int Cr, const int Checks,
-                                  const int Chess960)
-{
-  const int KingSide = (Cr == WHITE_OO || Cr == BLACK_OO);
-
-  if (castling_impeded(Cr) || !can_castle_cr(Cr))
-    return list;
-
-  // After castling, the rook and king final positions are the same in Chess960
-  // as they would be in standard chess.
-  Square kfrom = square_of(us, KING);
-  Square rfrom = castling_rook_square(Cr);
-  Square kto = relative_square(us, KingSide ? SQ_G1 : SQ_C1);
-  Bitboard enemies = pieces_c(us ^ 1);
-
-  assert(!pos_checkers());
-
-  const int K = Chess960 ? kto > kfrom ? WEST : EAST
-                         : KingSide    ? WEST : EAST;
-
-  for (Square s = kto; s != kfrom; s += K)
-    if (attackers_to(s) & enemies)
-      return list;
-
-  // Because we generate only legal castling moves we need to verify that
-  // when moving the castling rook we do not discover some hidden checker.
-  // For instance an enemy queen in SQ_A1 when castling rook is in SQ_B1.
-  if (Chess960 && (attacks_bb_rook(kto, pieces() ^ sq_bb(rfrom))
-                                   & pieces_cpp(us ^ 1, ROOK, QUEEN)))
-    return list;
-
-#ifdef PEDANTIC
-  Move m = make_castling(kfrom, rfrom);
-#else
-  Move m = make_castling(kfrom, kto);
-#endif
-
-  if (Checks && !gives_check(pos, pos->st, m))
-    return list;
-
-  (list++)->move = m;
-  return list;
-}
-
 
 INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
                                 const int Type, const int Direction)
@@ -137,9 +92,9 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
       // if the pawn is not on the same file as the enemy king, because we
       // don't generate captures. Note that a possible discovery check
       // promotion has been already generated amongst the captures.
-      Bitboard dcCandidates = blockers_for_king(pos, Them);
-      if (pawnsNotOn7 & dcCandidates) {
-        Bitboard dc1 = shift_bb(Up, pawnsNotOn7 & dcCandidates) & emptySquares & ~file_bb_s(st->ksq);
+      Bitboard dcCandidatesQuiets = blockers_for_king(pos, Them) & pawnsNotOn7;
+      if (dcCandidatesQuiets) {
+        Bitboard dc1 = shift_bb(Up, dcCandidatesQuiets) & emptySquares & ~file_bb_s(st->ksq);
         Bitboard dc2 = shift_bb(Up, dc1 & TRank3BB) & emptySquares;
 
         b1 |= dc1;
@@ -218,7 +173,7 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 
 
 INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
-                               Bitboard target, const int Pt, const int Checks)
+                               Bitboard target, const int Pt, const bool Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
@@ -250,7 +205,9 @@ INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
 INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
                              const int Us, const int Type)
 {
-  const int Checks = Type == QUIET_CHECKS;
+  const int OO = make_castling_right(Us, KING_SIDE);
+  const int OOO = make_castling_right(Us, QUEEN_SIDE);
+  const bool Checks = Type == QUIET_CHECKS;
 
   list = generate_pawn_moves(pos, list, target, Us, Type);
   list = generate_moves(pos, list, Us, target, KNIGHT, Checks);
@@ -263,15 +220,13 @@ INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
     Bitboard b = attacks_from_king(ksq) & target;
     while (b)
       (list++)->move = make_move(ksq, pop_lsb(&b));
-  }
 
-  if (Type != CAPTURES && Type != EVASIONS && can_castle_c(Us)) {
-    if (is_chess960()) {
-      list = generate_castling(pos, list, Us, make_castling_right(Us, KING_SIDE), Checks, 1);
-      list = generate_castling(pos, list, Us, make_castling_right(Us, QUEEN_SIDE), Checks, 1);
-    } else {
-      list = generate_castling(pos, list, Us, make_castling_right(Us, KING_SIDE), Checks, 0);
-      list = generate_castling(pos, list, Us, make_castling_right(Us, QUEEN_SIDE), Checks, 0);
+    if (Type != CAPTURES && can_castle_c(Us)) {
+      if (!castling_impeded(OO) && can_castle_cr(OO))
+        (list++)->move = make_castling(ksq, castling_rook_square(OO));
+
+      if (!castling_impeded(OOO) && can_castle_cr(OOO))
+        (list++)->move = make_castling(ksq, castling_rook_square(OOO));
     }
   }
 

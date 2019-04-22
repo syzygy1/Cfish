@@ -90,7 +90,7 @@ void position(Pos *pos, char *str)
 
     // Now move some of the game history at the end of the circular buffer
     // in front of that buffer.
-    int k = (pos->st - (pos->stack + 100)) - max(5, pos->st->pliesFromNull);
+    int k = (pos->st - (pos->stack + 100)) - max(7, pos->st->pliesFromNull);
     for (; k < 0; k++)
       memcpy(pos->stack + 100 + k, pos->stack + 200 + k, StateSize);
   }
@@ -315,16 +315,19 @@ void uci_loop(int argc, char **argv)
       UNLOCK(Signals.lock);
     }
     else if (strcmp(token, "uci") == 0) {
+      flockfile(stdout);
       printf("id name ");
       print_engine_info(1);
       printf("\n");
       print_options();
       printf("uciok\n");
       fflush(stdout);
+      funlockfile(stdout);
     }
-    else if (strcmp(token, "ucinewgame") == 0)
+    else if (strcmp(token, "ucinewgame") == 0) {
+      process_delayed_settings();
       search_clear();
-    else if (strcmp(token, "isready") == 0) {
+    } else if (strcmp(token, "isready") == 0) {
       process_delayed_settings();
       printf("readyok\n");
       fflush(stdout);

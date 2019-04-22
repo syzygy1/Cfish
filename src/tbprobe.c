@@ -180,8 +180,15 @@ static FD open_tb(const char *str, const char *suffix)
 static bool test_tb(const char *str, const char *suffix)
 {
   FD fd = open_tb(str, suffix);
-  if (fd != FD_ERR)
+  if (fd != FD_ERR) {
+    size_t size = file_size(fd);
     close_file(fd);
+    if ((size & 63) != 16) {
+      fprintf(stderr, "Incomplete tablebase file %s.%s\n", str, suffix);
+      printf("info string Incomplete tablebase file %s.%s\n", str, suffix);
+      fd = FD_ERR;
+    }
+  }
   return fd != FD_ERR;
 }
 
@@ -1108,7 +1115,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
   uint16_t *offset = d->offset;
   uint64_t *base = d->base - m;
   uint8_t *symLen = d->symLen;
-  int sym, bitCnt;
+  uint32_t sym, bitCnt;
 
   uint64_t code = from_be_u64(*(uint64_t *)ptr);
 
@@ -1127,8 +1134,8 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
       bitCnt -= 32;
       uint32_t tmp = from_be_u32(*ptr++);
       code |= (uint64_t)tmp << bitCnt;
-     }
-   }
+    }
+  }
 
   uint8_t *symPat = d->symPat;
   while (symLen[sym] != 0) {
@@ -1158,7 +1165,7 @@ INLINE int fill_squares(Pos *pos, uint8_t *pc, bool flip, int mirror, int *p,
   } while (bb);
   return i;
 }
- 
+
 INLINE int probe_table(Pos *pos, int s, int *success, const int type)
 {
   // Obtain the position's material-signature key
@@ -1804,12 +1811,12 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
     int r =  v > 0 ? (v + cnt50 <= 99 && !rep ? 1000 : 1000 - (v + cnt50))
            : v < 0 ? (-v * 2 + cnt50 < 100 ? -1000 : -1000 + (-v + cnt50))
            : 0;
-    m->TBRank = r;
+    m->tbRank = r;
 
     // Determine the score to be displayed for this move. Assign at least
     // 1 cp to cursed wins and let it grow to 49 cp as the position gets
     // closer to a real win.
-    m->TBScore =  r >= bound ? VALUE_MATE - MAX_MATE_PLY - 1
+    m->tbScore =  r >= bound ? VALUE_MATE - MAX_MATE_PLY - 1
                 : r >  0     ? max( 3, r - 800) * PawnValueEg / 200
                 : r == 0     ? VALUE_DRAW
                 : r > -bound ? min(-3, r + 800) * PawnValueEg / 200
@@ -1846,8 +1853,8 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
     if (!success) return 0;
     if (!move50)
       v = v > 0 ? 2 : v < 0 ? -2 : 0;
-    m->TBRank = WdlToRank[v + 2];
-    m->TBScore = WdlToValue[v + 2];
+    m->tbRank = WdlToRank[v + 2];
+    m->tbScore = WdlToValue[v + 2];
   }
 
   return 1;
@@ -1866,9 +1873,9 @@ int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
   for (int i = 0; i < rm->size; i++) {
     RootMove *m = &rm->move[i];
 
-    // Use TBScore to find out if the position is won or lost.
-    int wdl =  m->TBScore >  PawnValueEg ?  2
-             : m->TBScore < -PawnValueEg ? -2 : 0;
+    // Use tbScore to find out if the position is won or lost.
+    int wdl =  m->tbScore >  PawnValueEg ?  2
+             : m->tbScore < -PawnValueEg ? -2 : 0;
 
     if (wdl == 0)
       tmpScore[i] = 0;
@@ -1887,13 +1894,13 @@ int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
   for (int i = 0; i < rm->size; i++) {
     RootMove *m = &rm->move[i];
 
-    m->TBScore = tmpScore[i];
+    m->tbScore = tmpScore[i];
 
     // Let rank correspond to mate score, except for critical moves
     // ranked 900, which we rank below all other mates for safety.
     // By ranking mates above 1000 or below -1000, we let the search
     // know it need not search those moves.
-    m->TBRank = m->TBRank == 900 ? 1001 : m->TBScore;
+    m->tbRank = m->tbRank == 900 ? 1001 : m->tbScore;
   }
 
   return 1;

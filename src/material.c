@@ -19,7 +19,7 @@
 */
 
 #include <assert.h>
-#include <string.h>   // For std::memset
+#include <string.h>   // For memset
 
 #include "material.h"
 #include "position.h"
@@ -29,12 +29,12 @@
 static const int QuadraticOurs[][8] = {
   //            OUR PIECES
   // pair pawn knight bishop rook queen
-  {1667                               }, // Bishop pair
-  {  40,    0                         }, // Pawn
-  {  32,  255,  -3                    }, // Knight      OUR PIECES
+  {1438                               }, // Bishop pair
+  {  40,   38                         }, // Pawn
+  {  32,  255, -62                    }, // Knight      OUR PIECES
   {   0,  104,   4,    0              }, // Bishop
-  { -26,   -2,  47,   105,  -149      }, // Rook
-  {-189,   24, 117,   133,  -134, -10 }  // Queen
+  { -26,   -2,  47,   105,  -208      }, // Rook
+  {-189,   24, 117,   133,  -134, -6  }  // Queen
 };
 
 static const int QuadraticTheirs[][8] = {
@@ -72,7 +72,7 @@ static bool is_KQKRPs(const Pos *pos, int us) {
 
 // imbalance() calculates the imbalance by comparing the piece count of each
 // piece type for both colors.
-int imbalance(int us, int pieceCount[][8])
+static int imbalance(int us, int pieceCount[][8])
 {
   int *pc_us = pieceCount[us];
   int *pc_them = pieceCount[us ^ 1];
@@ -127,7 +127,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
 
   for (int c = 0; c < 2; c++)
     if (is_KXK(pos, c)) {
-      e->eval_func = 9; // EvaluateKXK
+      e->eval_func = 10; // EvaluateKXK
       e->eval_func_side = c;
       return;
     }
@@ -136,7 +136,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   for (int i = 0; i < NUM_SCALING; i++)
     for (int c = 0; c < 2; c++)
       if (endgame_keys[NUM_EVAL + i][c] == key) {
-        e->scal_func[c] = 10 + i;
+        e->scal_func[c] = 11 + i;
         return;
       }
 
@@ -145,10 +145,10 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   // that in this case we do not return after setting the function.
   for (int c = 0; c < 2; c++) {
     if (is_KBPsK(pos, c))
-      e->scal_func[c] = 18; // ScaleKBPsK
+      e->scal_func[c] = 19; // ScaleKBPsK
 
     else if (is_KQKRPs(pos, c))
-      e->scal_func[c] = 19; // ScaleKQKRPs
+      e->scal_func[c] = 20; // ScaleKQKRPs
   }
 
   Value npm_w = pos_non_pawn_material(WHITE);
@@ -158,18 +158,18 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
     if (!pieces_cp(BLACK, PAWN)) {
       assert(piece_count(WHITE, PAWN) >= 2);
 
-      e->scal_func[WHITE] = 20; // ScaleKPsK
+      e->scal_func[WHITE] = 21; // ScaleKPsK
     }
     else if (!pieces_cp(WHITE, PAWN)) {
       assert(piece_count(BLACK, PAWN) >= 2);
 
-      e->scal_func[BLACK] = 20; // ScaleKPsK
+      e->scal_func[BLACK] = 21; // ScaleKPsK
     }
     else if (popcount(pieces_p(PAWN)) == 2) { // Each side has one pawn.
       // This is a special case because we set scaling functions
       // for both colors instead of only one.
-      e->scal_func[WHITE] = 21; // ScaleKPKP
-      e->scal_func[BLACK] = 21; // ScaleKPKP
+      e->scal_func[WHITE] = 22; // ScaleKPKP
+      e->scal_func[BLACK] = 22; // ScaleKPKP
     }
   }
 

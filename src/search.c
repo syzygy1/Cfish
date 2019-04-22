@@ -22,7 +22,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
-#include <string.h>   // For std::memset
+#include <string.h>   // For memset
 
 #include "evaluate.h"
 #include "misc.h"
@@ -54,43 +54,34 @@ static Score base_ct;
 #define NonPV 0
 #define PV 1
 
-// Sizes and phases of the skip blocks, used for distributing search depths
-// across the threads
-static const int skipSize[20] = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
-static const int skipPhase[20] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
-
-static const int RazorMargin1 = 590;
-static const int RazorMargin2 = 604;
+static const int RazorMargin = 600;
 
 INLINE int futility_margin(Depth d, int improving) {
   return (175 - 50 * improving) * d / ONE_PLY;
 }
 
-// Margin for pruning capturing moves: almost linear in depth
-static const Value CapturePruneMargin[] = {
-  0,
-  1 * PawnValueEg * 1055 / 1000,
-  2 * PawnValueEg * 1042 / 1000,
-  3 * PawnValueEg *  963 / 1000,
-  4 * PawnValueEg * 1038 / 1000,
-  5 * PawnValueEg *  950 / 1000,
-  6 * PawnValueEg *  930 / 1000
-};
-
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
-static int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
+static int Reductions[64]; // [depth or moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
-  return Reductions[NT][i][min(d / ONE_PLY, 63)][min(mn, 63)] * ONE_PLY;
+  int r = Reductions[min(d / ONE_PLY, 63)] * Reductions[min(mn, 63)] / 1024;
+  return ((r + 512) / 1024 + (!i && r > 1024) - NT) * ONE_PLY;
 }
 
 // History and stats update bonus, based on depth
 static Value stat_bonus(Depth depth)
 {
   int d = depth / ONE_PLY;
-  return d > 17 ? 0 : 32 * d * d + 64 * d - 64;
+  return d > 17 ? 0 : 29 * d * d + 138 * d - 134;
+}
+
+// Add a small random component to draw evaluations to keep search dynamic
+// and to avoid three-fold blindness. (Yucks, ugly hack)
+static Value value_draw(Depth depth, Pos *pos)
+{
+  return depth < 4 ? VALUE_DRAW : VALUE_DRAW + 2 * (pos->nodes % 2) - 1;
 }
 
 // Skill structure is used to implement strength limit
@@ -133,22 +124,12 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 
 void search_init(void)
 {
-  for (int imp = 0; imp <= 1; imp++)
-    for (int d = 1; d < 64; ++d)
-      for (int mc = 1; mc < 64; ++mc) {
-        double r = log(d) * log(mc) / 1.95;
-
-        Reductions[NonPV][imp][d][mc] = ((int)lround(r));
-        Reductions[PV][imp][d][mc] = max(Reductions[NonPV][imp][d][mc] - 1, 0);
-
-        // Increase reduction for non-PV nodes when eval is not improving
-        if (!imp && r > 1.0)
-          Reductions[NonPV][imp][d][mc]++;
-      }
+  for (int i = 1; i < 64; i++)
+    Reductions[i] = 1024 * log(i) / sqrt(1.95);
 
   for (int d = 0; d < 16; ++d) {
-    FutilityMoveCounts[0][d] = (int)(2.4 + 0.74 * pow(d, 1.78));
-    FutilityMoveCounts[1][d] = (int)(5.0 + 1.00 * pow(d, 2.00));
+    FutilityMoveCounts[0][d] = (5 + d * d) / 2;
+    FutilityMoveCounts[1][d] = 5 + d * d;
   }
 }
 
@@ -239,7 +220,7 @@ void mainthread_search(void)
   time_init(us, pos_game_ply());
   tt_new_search();
   char buf[16];
-  int playBookMove = 0;
+  bool playBookMove = false;
 
   base_ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
@@ -261,7 +242,7 @@ void mainthread_search(void)
         RootMove tmp = pos->rootMoves->move[0];
         pos->rootMoves->move[0] = pos->rootMoves->move[i];
         pos->rootMoves->move[i] = tmp;
-        playBookMove = 1;
+        playBookMove = true;
         break;
       }
 
@@ -308,23 +289,43 @@ void mainthread_search(void)
   // When playing in 'nodes as time' mode, subtract the searched nodes from
   // the available ones before exiting.
   if (Limits.npmsec)
-      Time.availableNodes += Limits.inc[us] - threads_nodes_searched();
+    Time.availableNodes += Limits.inc[us] - threads_nodes_searched();
 
   // Check if there are threads with a better score than main thread
   Pos *bestThread = pos;
   if (    option_value(OPT_MULTI_PV) == 1
+      && !playBookMove
       && !Limits.depth
 //      && !Skill(option_value(OPT_SKILL_LEVEL)).enabled()
       &&  pos->rootMoves->move[0].pv[0] != 0)
   {
+    int i, num = 0, maxNum = min(pos->rootMoves->size, Threads.numThreads);
+    Move mvs[maxNum];
+    int64_t votes[maxNum];
+    Value minScore = pos->rootMoves->move[0].score;
+    for (int idx = 1; idx < Threads.numThreads; idx++)
+      minScore = min(minScore, Threads.pos[idx]->rootMoves->move[0].score);
+    for (int idx = 0; idx < Threads.numThreads; idx++) {
+      Pos *p = Threads.pos[idx];
+      Move m = p->rootMoves->move[0].pv[0];
+      for (i = 0; i < num; i++)
+        if (mvs[i] == m) break;
+      if (i == num) {
+        num++;
+        mvs[i] = m;
+        votes[i] = 0;
+      }
+      int64_t diff = p->rootMoves->move[0].score - minScore + 1;
+      votes[i] += 200 + (diff * diff) * p->completedDepth;
+    }
+    int64_t bestVote = votes[0];
     for (int idx = 1; idx < Threads.numThreads; idx++) {
       Pos *p = Threads.pos[idx];
-      Depth depthDiff = p->completedDepth - bestThread->completedDepth;
-      Value scoreDiff = p->rootMoves->move[0].score - bestThread->rootMoves->move[0].score;
-      // Select the thread with the best score, always if it is a mate
-      if (    scoreDiff > 0
-          && (depthDiff >= 0 || p->rootMoves->move[0].score >= VALUE_MATE_IN_MAX_PLY))
+      for (i = 0; mvs[i] != p->rootMoves->move[0].pv[0]; i++);
+      if (votes[i] > bestVote) {
+        bestVote = votes[i];
         bestThread = p;
+      }
     }
   }
 
@@ -335,6 +336,7 @@ void mainthread_search(void)
     uci_print_pv(bestThread, bestThread->completedDepth,
                  -VALUE_INFINITE, VALUE_INFINITE);
 
+  flockfile(stdout);
   printf("bestmove %s", uci_move(buf, bestThread->rootMoves->move[0].pv[0], is_chess960()));
 
   if (bestThread->rootMoves->move[0].pvSize > 1 || extract_ponder_from_tt(&bestThread->rootMoves->move[0], pos))
@@ -342,6 +344,7 @@ void mainthread_search(void)
 
   printf("\n");
   fflush(stdout);
+  funlockfile(stdout);
 }
 
 
@@ -353,29 +356,29 @@ void mainthread_search(void)
 void thread_search(Pos *pos)
 {
   Value bestValue, alpha, beta, delta;
+  Move pv[MAX_PLY + 1];
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   double timeReduction = 1.0;
 
-  Stack *ss = pos->st; // At least the fifth element of the allocated array.
-  for (int i = -5; i < 3; i++)
+  Stack *ss = pos->st; // At least the seventh element of the allocated array.
+  for (int i = -7; i < 3; i++)
     memset(SStackBegin(ss[i]), 0, SStackSize);
   (ss-1)->endMoves = pos->moveList;
 
-  for (int i = -4; i < 0; i++)
+  for (int i = -7; i < 0; i++)
     ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
 
   for (int i = 0; i <= MAX_PLY; i++)
     ss[i].ply = i;
+  ss->pv = pv;
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
   pos->completedDepth = DEPTH_ZERO;
 
-  if (pos->threadIdx == 0) {
-    mainThread.failedLow = 0;
+  if (pos->threadIdx == 0)
     mainThread.bestMoveChanges = 0;
-  }
 
   int multiPV = option_value(OPT_MULTI_PV);
 #if 0
@@ -398,18 +401,9 @@ void thread_search(Pos *pos)
               && pos->threadIdx == 0
               && pos->rootDepth / ONE_PLY > Limits.depth))
   {
-    // Distribute search depths across the threads
-    if (pos->threadIdx) {
-      int i = (pos->threadIdx - 1) % 20;
-      if (((pos->rootDepth / ONE_PLY + pos_game_ply() + skipPhase[i]) / skipSize[i]) % 2)
-        continue;
-    }
-
     // Age out PV variability metric
-    if (pos->threadIdx == 0) {
+    if (pos->threadIdx == 0)
       mainThread.bestMoveChanges *= 0.517;
-      mainThread.failedLow = 0;
-    }
 
     // Save the last iteration's scores before first PV line is searched and
     // all the move scores except the (new) PV are set to -VALUE_INFINITE.
@@ -419,24 +413,24 @@ void thread_search(Pos *pos)
     pos->contempt = pos_stm() == WHITE ?  make_score(base_ct, base_ct / 2)
                                        : -make_score(base_ct, base_ct / 2);
 
-    int PVFirst = 0, PVLast = 0;
+    int pvFirst = 0, pvLast = 0;
 
     // MultiPV loop. We perform a full root search for each PV line
-    for (int PVIdx = 0; PVIdx < multiPV && !Signals.stop; PVIdx++) {
-      pos->PVIdx = PVIdx;
-      if (PVIdx == PVLast) {
-        PVFirst = PVLast;
-        for (PVLast++; PVLast < rm->size; PVLast++)
-          if (rm->move[PVLast].TBRank != rm->move[PVFirst].TBRank)
+    for (int pvIdx = 0; pvIdx < multiPV && !Signals.stop; pvIdx++) {
+      pos->pvIdx = pvIdx;
+      if (pvIdx == pvLast) {
+        pvFirst = pvLast;
+        for (pvLast++; pvLast < rm->size; pvLast++)
+          if (rm->move[pvLast].tbRank != rm->move[pvFirst].tbRank)
             break;
-        pos->PVLast = PVLast;
+        pos->pvLast = pvLast;
       }
 
       pos->selDepth = 0;
 
       // Skip the search if we have a mate value from DTM tables.
-      if (abs(rm->move[PVIdx].TBRank) > 1000) {
-        bestValue = rm->move[PVIdx].score = rm->move[PVIdx].TBScore;
+      if (abs(rm->move[pvIdx].tbRank) > 1000) {
+        bestValue = rm->move[pvIdx].score = rm->move[pvIdx].tbScore;
         alpha = -VALUE_INFINITE;
         beta = VALUE_INFINITE;
         goto skip_search;
@@ -444,8 +438,8 @@ void thread_search(Pos *pos)
 
       // Reset aspiration window starting size
       if (pos->rootDepth >= 5 * ONE_PLY) {
-        Value previousScore = rm->move[PVIdx].previousScore;
-        delta = (Value)18;
+        Value previousScore = rm->move[pvIdx].previousScore;
+        delta = 20;
         alpha = max(previousScore - delta, -VALUE_INFINITE);
         beta  = min(previousScore + delta,  VALUE_INFINITE);
 
@@ -458,8 +452,10 @@ void thread_search(Pos *pos)
       // Start with a small aspiration window and, in the case of a fail
       // high/low, re-search with a bigger window until we're not failing
       // high/low anymore.
-      while (1) {
-        bestValue = search_PV(pos, ss, alpha, beta, pos->rootDepth);
+      int failedHighCnt = 0;
+      while (true) {
+        Depth adjustedDepth = max(ONE_PLY, pos->rootDepth - failedHighCnt * ONE_PLY);
+        bestValue = search_PV(pos, ss, alpha, beta, adjustedDepth);
 
         // Bring the best move to the front. It is critical that sorting
         // is done with a stable algorithm because all the values but the
@@ -467,7 +463,7 @@ void thread_search(Pos *pos)
         // and we want to keep the same order for all the moves except the
         // new PV that goes to the front. Note that in case of MultiPV
         // search the already searched PV lines are preserved.
-        stable_sort(&rm->move[PVIdx], PVLast - PVIdx);
+        stable_sort(&rm->move[pvIdx], pvLast - pvIdx);
 
         // If search has been stopped, we break immediately. Sorting and
         // writing PV back to TT is safe because RootMoves is still
@@ -490,11 +486,13 @@ void thread_search(Pos *pos)
           alpha = max(bestValue - delta, -VALUE_INFINITE);
 
           if (pos->threadIdx == 0) {
-            mainThread.failedLow = 1;
+            failedHighCnt = 0;
             Signals.stopOnPonderhit = 0;
           }
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
+          if (pos->threadIdx == 0)
+            failedHighCnt++;
         } else
           break;
 
@@ -504,11 +502,11 @@ void thread_search(Pos *pos)
       }
 
       // Sort the PV lines searched so far and update the GUI
-      stable_sort(&rm->move[PVFirst], PVIdx - PVFirst + 1);
+      stable_sort(&rm->move[pvFirst], pvIdx - pvFirst + 1);
 
 skip_search:
       if (    pos->threadIdx == 0
-          && (Signals.stop || PVIdx + 1 == multiPV || time_elapsed() > 3000))
+          && (Signals.stop || pvIdx + 1 == multiPV || time_elapsed() > 3000))
         uci_print_pv(pos, pos->rootDepth, alpha, beta);
     }
 
@@ -536,37 +534,32 @@ skip_search:
 #endif
 
     // Do we have time for the next iteration? Can we stop searching now?
-    if (use_time_management()) {
-      if (!Signals.stop && !Signals.stopOnPonderhit) {
-        // Stop the search if only one legal move is available, or if all
-        // of the available time has been used.
-        const int F[] = { mainThread.failedLow,
-                          bestValue - mainThread.previousScore };
+    if (    use_time_management()
+        && !Signals.stop
+        && !Signals.stopOnPonderhit) {
+      // Stop the search if only one legal move is available, or if all
+      // of the available time has been used.
+      double fallingEval = (306 + 9 * (mainThread.previousScore - bestValue)) / 581.0;
+      fallingEval = max(0.5, min(1.5, fallingEval));
 
-        int improvingFactor = max(246, min(832, 306 + 119 * F[0] - 6 * F[1]));
+      // If the best move is stable over several iterations, reduce time
+      // accordingly
+      timeReduction =  lastBestMoveDepth + 10 * ONE_PLY < pos->completedDepth
+                     ? 1.95 : 1.0;
+      double reduction = pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
-        double bestMoveInstability = 1 + mainThread.bestMoveChanges;
+      // Use part of the gained time from a previous stable move for this move
+      double bestMoveInstability = 1.0 + mainThread.bestMoveChanges;
 
-        // If the best move is stable over several iterations, reduce time
-        // for this move, the longer the move has been stable, the more.
-        // Use part of the time gained from a previous stable move for the
-        // current move.
-        timeReduction = 1;
-        for (int i = 3; i < 6; i++)
-          if (lastBestMoveDepth * i < pos->completedDepth)
-            timeReduction *= 1.25;
-        bestMoveInstability *= pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
-
-        if (   rm->size == 1
-            || time_elapsed() > time_optimum() * bestMoveInstability * improvingFactor / 581)
-        {
-          // If we are allowed to ponder do not stop the search now but
-          // keep pondering until the GUI sends "ponderhit" or "stop".
-          if (Limits.ponder)
-            Signals.stopOnPonderhit = 1;
-          else
-            Signals.stop = 1;
-        }
+      if (   rm->size == 1
+          || time_elapsed() > time_optimum() * fallingEval * reduction * bestMoveInstability)
+      {
+        // If we are allowed to ponder do not stop the search now but
+        // keep pondering until the GUI sends "ponderhit" or "stop".
+        if (Limits.ponder)
+          Signals.stopOnPonderhit = 1;
+        else
+          Signals.stop = 1;
       }
     }
   }
@@ -621,7 +614,7 @@ skip_search:
 #undef true
 #undef false
 
-#define rm_lt(m1,m2) ((m1).TBRank != (m2).TBRank ? (m1).TBRank < (m2).TBRank : (m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
+#define rm_lt(m1,m2) ((m1).tbRank != (m2).tbRank ? (m1).tbRank < (m2).tbRank : (m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
 
 // stable_sort() sorts RootMoves from highest-scoring move to lowest-scoring
 // move while preserving order of equal elements.
@@ -686,6 +679,9 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus)
 
   if (move_is_ok((ss-4)->currentMove))
     cms_update(*(ss-4)->history, pc, s, bonus);
+
+  if (move_is_ok((ss-6)->currentMove))
+    cms_update(*(ss-6)->history, pc, s, bonus);
 }
 
 // update_capture_stats() updates move sorting heuristics when a new capture
@@ -696,7 +692,9 @@ static void update_capture_stats(const Pos *pos, Move move, Move *captures,
 {
   Piece moved_piece = moved_piece(move);
   int captured = type_of_p(piece_on(to_sq(move)));
-  cpth_update(*pos->captureHistory, moved_piece, to_sq(move), captured, bonus);
+
+  if (is_capture_or_promotion(pos, move))
+    cpth_update(*pos->captureHistory, moved_piece, to_sq(move), captured, bonus);
 
   // Decrease all the other played capture moves
   for (int i = 0; i < captureCnt; i++) {
@@ -794,14 +792,15 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 {
   TimePoint elapsed = time_elapsed() + 1;
   RootMoves *rm = pos->rootMoves;
-  int PVIdx = pos->PVIdx;
+  int pvIdx = pos->pvIdx;
   int multiPV = min(option_value(OPT_MULTI_PV), rm->size);
   uint64_t nodes_searched = threads_nodes_searched();
   uint64_t tbhits = threads_tb_hits();
   char buf[16];
 
+  flockfile(stdout);
   for (int i = 0; i < multiPV; i++) {
-    int updated = (i <= PVIdx && rm->move[i].score != -VALUE_INFINITE);
+    int updated = (i <= pvIdx && rm->move[i].score != -VALUE_INFINITE);
 
     if (depth == ONE_PLY && !updated)
         continue;
@@ -811,7 +810,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 
     int tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_MATE_PLY;
     if (tb)
-      v = rm->move[i].TBScore;
+      v = rm->move[i].tbScore;
 
     // An incomplete mate PV may be caused by cutoffs in qsearch() and
     // by TB cutoffs. We try to complete the mate PV if we may be in the
@@ -822,10 +821,10 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
       TB_expand_mate(pos, &rm->move[i]);
 
     printf("info depth %d seldepth %d multipv %d score %s",
-           d / ONE_PLY, rm->move[i].selDepth + 1, (int)i + 1,
+           d / ONE_PLY, rm->move[i].selDepth, i + 1,
            uci_value(buf, v));
 
-    if (!tb && i == PVIdx)
+    if (!tb && i == pvIdx)
       printf("%s", v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
 
     printf(" nodes %"PRIu64" nps %"PRIu64, nodes_searched,
@@ -841,6 +840,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     printf("\n");
   }
   fflush(stdout);
+  funlockfile(stdout);
 }
 
 
@@ -917,12 +917,12 @@ static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 
     // Only probe during search if DTM and DTZ are not available
     // and we are winning.
-    if (dtm_available || dtz_available || rm->move[0].TBRank <= 0)
+    if (dtm_available || dtz_available || rm->move[0].tbRank <= 0)
       TB_Cardinality = 0;
   }
   else // Ranking was not successful.
     for (int i = 0; i < rm->size; i++)
-      rm->move[i].TBRank = 0;
+      rm->move[i].tbRank = 0;
 }
 
 
@@ -974,12 +974,12 @@ void start_thinking(Pos *root)
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
       rm->move[i].selDepth = 0;
-      rm->move[i].TBRank = moves->move[i].TBRank;
-      rm->move[i].TBScore = moves->move[i].TBScore;
+      rm->move[i].tbRank = moves->move[i].tbRank;
+      rm->move[i].tbScore = moves->move[i].tbScore;
     }
     memcpy(pos, root, offsetof(Pos, moveList));
     // Copy enough of the root State buffer.
-    int n = max(5, root->st->pliesFromNull);
+    int n = max(7, root->st->pliesFromNull);
     for (int i = 0; i <= n; i++)
       memcpy(&pos->stack[i], &root->st[i - n], StateSize);
     pos->st = pos->stack + n;

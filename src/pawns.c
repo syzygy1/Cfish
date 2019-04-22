@@ -28,41 +28,33 @@
 #define V(v) ((Value)(v))
 #define S(mg, eg) make_score(mg, eg)
 
-// Isolated pawn penalty
-static const Score Isolated = S(13, 16);
-
-// Backward pawn penalty
-static const Score Backward = S(17, 11);
+// Pawn penalties
+static const Score Isolated = S( 5, 15);
+static const Score Backward = S( 9, 24);
+static const Score Doubled  = S(11, 56);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
-
-// Doubled pawn penalty
-static const Score Doubled = S(13, 40);
 
 // Strength of pawn shelter for our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
 // our king.
 static const Value ShelterStrength[4][8] = {
-  { V(  7), V(76), V( 84), V( 38), V(  7), V( 30), V(-19) },
-  { V(-13), V(83), V( 42), V(-27), V(  2), V(-32), V(-45) },
-  { V(-26), V(63), V(  5), V(-44), V( -5), V(  2), V(-59) },
-  { V(-19), V(53), V(-11), V(-22), V(-12), V(-51), V(-60) }
+  { V( -6), V( 81), V( 93), V( 58), V( 39), V( 18), V(  25) },
+  { V(-43), V( 61), V( 35), V(-49), V(-29), V(-11), V( -63) },
+  { V(-10), V( 75), V( 23), V( -2), V( 32), V(  3), V( -45) },
+  { V(-39), V(-13), V(-29), V(-52), V(-48), V(-67), V(-166) }
 };
 
 // Danger of enemry pawns moving toward our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where the enemy has no pawn or where their
 // pawn is behind our king
 static const Value UnblockedStorm[4][8] = {
-  { V( 25), V( 79), V(107), V( 51), V( 27), V(  0), V(  0) },
-  { V(  5), V( 35), V(121), V( -2), V( 15), V(-10), V(-10) },
-  { V(-20), V( 22), V( 98), V( 36), V(  7), V(-20), V(-20) },
-  { V(-27), V( 24), V( 80), V( 25), V( -4), V(-30), V(-30) }
+  { V( 89), V(107), V(123), V(93), V(57), V( 45), V( 51) },
+  { V( 44), V(-18), V(123), V(46), V(39), V( -7), V( 23) },
+  { V(  4), V( 52), V(162), V(37), V( 7), V(-14), V( -2) },
+  { V(-10), V(-14), V( 90), V(15), V( 2), V( -7), V(-16) }
 };
-
-// Danger of blocked enemy pawns storming our king, by rank
-static const Value BlockedStorm[8] =
-  { V(0), V(0), V(75), V(-10), V(-20), V(-20), V(-20) };
 
 #undef S
 #undef V
@@ -119,7 +111,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // which could become passed after one or two pawn pushes when they
     // are not attacked more times than defended.
     if (   !(stoppers ^ lever ^ leverPush)
-        && !(ourPawns & forward_file_bb(Us, s))
         && popcount(supported) >= popcount(lever) - 1
         && popcount(phalanx)   >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
@@ -195,15 +186,12 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
   const Bitboard BlockRanks =
                    (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
   
-  Bitboard b =  pieces_p(PAWN)
-              & (forward_ranks_bb(Us, rank_of(ksq)) | rank_bb_s(ksq));
+  Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
-  Value safety = (ourPawns & file_bb_s(ksq)) ? 5 : -5;
+  Value safety = (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq)) ? 374 : 5;
 
   File center = max(FILE_B, min(FILE_G, file_of(ksq)));
-  if (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq))
-    safety += 374;
 
   for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
@@ -214,7 +202,7 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 
     int d = min(f, FILE_H - f);
     safety += ShelterStrength[d][ourRank];
-    safety -= (ourRank && (ourRank == theirRank - 1)) ? BlockedStorm[theirRank]
+    safety -= (ourRank && (ourRank == theirRank - 1)) ? 66 * (theirRank == RANK_3)
                                                : UnblockedStorm[d][theirRank];
   }
 
@@ -234,7 +222,7 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
 
   Bitboard pawns = pieces_cp(Us, PAWN);
   if (pawns)
-    while (!(DistanceRingBB[ksq][minKingPawnDistance++] & pawns)) {}
+    while (!(DistanceRingBB[ksq][++minKingPawnDistance] & pawns)) {}
 
   Value bonus = evaluate_shelter(pos, ksq, Us);
 

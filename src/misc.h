@@ -75,19 +75,23 @@ INLINE TimePoint now(void) {
 #ifdef _WIN32
 bool large_pages_supported(void);
 extern size_t largePageMinimum;
-#endif
 
-ssize_t getline(char **lineptr, size_t *n, FILE *stream);
-
-#ifndef _WIN32
-typedef int FD;
-#define FD_ERR -1
-typedef size_t map_t;
-#else
 typedef HANDLE FD;
 #define FD_ERR INVALID_HANDLE_VALUE
 typedef HANDLE map_t;
+
+void flockfile(FILE *F);
+void funlockfile(FILE *F);
+
+#else /* Unix */
+
+typedef int FD;
+#define FD_ERR -1
+typedef size_t map_t;
+
 #endif
+
+ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
 FD open_file(const char *name);
 void close_file(FD fd);

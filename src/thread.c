@@ -43,8 +43,8 @@ static void thread_idle_loop(Pos *pos);
 // Global objects
 ThreadPool Threads;
 MainThread mainThread;
-CounterMoveHistoryStat **cmh_tables = NULL;
-int num_cmh_tables = 0;
+CounterMoveHistoryStat **cmhTables = NULL;
+int numCmhTables = 0;
 
 // thread_init() is where a search thread starts and initialises itself.
 
@@ -57,22 +57,22 @@ static THREAD_FUNC thread_init(void *arg)
     node = bind_thread_to_numa_node(idx);
   else
     node = 0;
-  if (node >= num_cmh_tables) {
-    int old = num_cmh_tables;
-    num_cmh_tables = node + 16;
-    cmh_tables = realloc(cmh_tables,
-        num_cmh_tables * sizeof(CounterMoveHistoryStat *));
-    while (old < num_cmh_tables)
-      cmh_tables[old++] = NULL;
+  if (node >= numCmhTables) {
+    int old = numCmhTables;
+    numCmhTables = node + 16;
+    cmhTables = realloc(cmhTables,
+        numCmhTables * sizeof(CounterMoveHistoryStat *));
+    while (old < numCmhTables)
+      cmhTables[old++] = NULL;
   }
-  if (!cmh_tables[node]) {
+  if (!cmhTables[node]) {
     if (settings.numaEnabled)
-      cmh_tables[node] = numa_alloc(sizeof(CounterMoveHistoryStat));
+      cmhTables[node] = numa_alloc(sizeof(CounterMoveHistoryStat));
     else
-      cmh_tables[node] = calloc(sizeof(CounterMoveHistoryStat), 1);
+      cmhTables[node] = calloc(sizeof(CounterMoveHistoryStat), 1);
     for (int j = 0; j < 16; j++)
       for (int k = 0; k < 64; k++)
-        (*cmh_tables[node])[0][0][j][k] = CounterMovePruneThreshold - 1;
+        (*cmhTables[node])[0][0][j][k] = CounterMovePruneThreshold - 1;
   }
 
   Pos *pos;
@@ -99,9 +99,9 @@ static THREAD_FUNC thread_init(void *arg)
     pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
   }
   pos->threadIdx = idx;
-  pos->counterMoveHistory = cmh_tables[node];
+  pos->counterMoveHistory = cmhTables[node];
 
-  atomic_store(&pos->resetCalls, 0);
+  atomic_store(&pos->resetCalls, false);
   pos->selDepth = pos->callsCnt = 0;
 
 #ifndef _WIN32  // linux
@@ -392,8 +392,8 @@ void threads_set_number(int num)
     thread_destroy(Threads.pos[--Threads.numThreads]);
 
   if (num == 0 && numCmhTables > 0) {
-    for (int i = 0; i < num_cmh_tables; i++)
-      if (cmh_tables[i]) {
+    for (int i = 0; i < numCmhTables; i++)
+      if (cmhTables[i]) {
         if (settings.numaEnabled)
           numa_free(cmhTables[i], sizeof(CounterMoveHistoryStat));
         else

@@ -376,7 +376,7 @@ Move pb_probe(Pos *pos)
   Move m1 = 0;
 
   if (!enabled) return m1;
-  if (!check_do_search(pos)) return m1;   
+  if (!check_do_search(pos)) return m1;
 
   if (book_depth_count >= max_book_depth)
     return m1;
@@ -460,7 +460,7 @@ static Key polyglot_key(const Pos *pos)
 // move is a promotion we have to convert to our representation, in all the
 // other cases we can directly compare with a Move after having masked out
 // the special Move's flags (bit 14-15) that are not supported by PolyGlot.
-// 
+//
 // SF:
 // bit  0- 5: destination square (from 0 to 63)
 // bit  6-11: origin square (from 0 to 63)

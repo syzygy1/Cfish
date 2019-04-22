@@ -71,7 +71,7 @@ static void score_captures(const Pos *pos)
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-              + (*history)[moved_piece(m->move)][to_sq(m->move)][type_of_p(piece_on(to_sq(m->move)))] / 16;
+              + (*history)[moved_piece(m->move)][to_sq(m->move)][type_of_p(piece_on(to_sq(m->move)))] / 8;
 }
 
 SMALL
@@ -83,6 +83,7 @@ static void score_quiets(const Pos *pos)
   PieceToHistory *cmh = (st-1)->history;
   PieceToHistory *fmh = (st-2)->history;
   PieceToHistory *fmh2 = (st-4)->history;
+  PieceToHistory *fmh3 = (st-6)->history;
 
   Color c = pos_stm();
 
@@ -93,6 +94,7 @@ static void score_quiets(const Pos *pos)
     m->value =  (*cmh)[piece_on(from)][to]
               + (*fmh)[piece_on(from)][to]
               + (*fmh2)[piece_on(from)][to]
+              + (*fmh3)[piece_on(from)][to] / 2
               + (*history)[c][move];
   }
 }
@@ -104,14 +106,17 @@ static void score_evasions(const Pos *pos)
   // stats heuristics.
 
   ButterflyHistory *history = pos->history;
+  PieceToHistory *cmh = (st-1)->history;
   Color c = pos_stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
       m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-                - type_of_p(moved_piece(m->move)) + (1 << 28);
+                - type_of_p(moved_piece(m->move));
     else
-      m->value = (*history)[c][from_to(m->move)];
+      m->value =  (*history)[c][from_to(m->move)]
+                + (*cmh)[moved_piece(m->move)][to_sq(m->move)]
+                - (1 << 28);
 }
 
 
