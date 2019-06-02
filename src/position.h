@@ -209,7 +209,7 @@ PURE Value see_test(const Pos *pos, Move m, int value);
 
 PURE Key key_after(const Pos *pos, Move m);
 PURE int is_draw(const Pos *pos);
-PURE bool has_game_cycle(const Pos *pos);
+PURE bool has_game_cycle(const Pos *pos, int ply);
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])

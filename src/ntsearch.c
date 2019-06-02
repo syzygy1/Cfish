@@ -21,7 +21,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   if (   pos->st->pliesFromNull >= 3
       && alpha < VALUE_DRAW
       && !rootNode
-      && has_game_cycle(pos))
+      && has_game_cycle(pos, ss->ply))
   {
 #if PvNode
       alpha = value_draw(depth, pos);
