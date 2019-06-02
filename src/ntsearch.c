@@ -374,6 +374,7 @@ moves_loop: // When in check search starts from here.
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
   moveCountPruning = 0;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
+  int singularExtensionLMRMultiplier = 0;
 
   // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
@@ -442,8 +443,12 @@ moves_loop: // When in check search starts from here.
       value = search_NonPV(pos, ss, singularBeta - 1, halfDepth, cutNode);
       ss->excludedMove = 0;
 
-      if (value < singularBeta)
+      if (value < singularBeta) {
         extension = ONE_PLY;
+        singularExtensionLMRMultiplier++;
+        if (value < singularBeta - min(3 * depth / ONE_PLY, 39))
+          singularExtensionLMRMultiplier++;
+      }
 
       // Multi-cut pruning. Our ttMove is assumed to fail high, and now we
       // failed high also on a reduced search without the ttMove. So we
@@ -502,7 +507,7 @@ moves_loop: // When in check search starts from here.
           continue;
 
         // Reduced depth of the next LMR search
-        int lmrDepth = max(newDepth - reduction(improving, depth, moveCount, NT), DEPTH_ZERO) / ONE_PLY;
+        int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), DEPTH_ZERO) / ONE_PLY;
 
         // Countermoves based pruning
         if (   lmrDepth < 3 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
@@ -554,15 +559,18 @@ moves_loop: // When in check search starts from here.
             || moveCountPruning
             || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha))
     {
-      Depth r = reduction(improving, depth, moveCount, NT);
+      Depth r = reduction(improving, depth, moveCount);
 
       // Decrease reduction if position is or has been on the PV
       if (ttPv)
-        r -= ONE_PLY;
+        r -= 2 * ONE_PLY;
 
-      // Decrease reduction if opponent's move count is high.
+      // Decrease reduction if opponent's move count is high
       if ((ss-1)->moveCount > 15)
         r -= ONE_PLY;
+
+      // Decrease reduction if move has been singularly extended
+      r -= singularExtensionLMRMultiplier * ONE_PLY;
 
       if (!captureOrPromotion) {
         // Increase reduction if ttMove is a capture

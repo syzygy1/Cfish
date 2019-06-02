@@ -41,7 +41,7 @@ struct TTEntry {
   int16_t  value16;
   int16_t  eval16;
   uint8_t  genBound8;
-  int8_t   depth8;
+  uint8_t   depth8;
 };
 
 typedef struct TTEntry TTEntry;
@@ -55,14 +55,15 @@ INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
 
   // Don't overwrite more valuable entries
   if (  (k >> 48) != tte->key16
-      || d / ONE_PLY > tte->depth8 - 4
+      || d / ONE_PLY + 10 > tte->depth8
    /* || g != (tte->genBound8 & 0xFC) // Matching non-zero keys are already refreshed by probe() */
       || b == BOUND_EXACT) {
     tte->key16     = (uint16_t)(k >> 48);
     tte->value16   = (int16_t)v;
     tte->eval16    = (int16_t)ev;
     tte->genBound8 = (uint8_t)(g | pn | b);
-    tte->depth8    = (int8_t)(d / ONE_PLY);
+    assert((d - DEPTH_NONE) / ONE_PLY >= 0);
+    tte->depth8    = (int8_t)((d - DEPTH_NONE) / ONE_PLY);
   }
 }
 
@@ -83,7 +84,7 @@ INLINE Value tte_eval(TTEntry *tte)
 
 INLINE Depth tte_depth(TTEntry *tte)
 {
-  return (Depth)(tte->depth8 * ONE_PLY);
+  return (Depth)(tte->depth8 * ONE_PLY) + DEPTH_NONE;
 }
 
 INLINE int tte_is_pv(TTEntry *tte)

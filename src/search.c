@@ -64,10 +64,10 @@ INLINE int futility_margin(Depth d, int improving) {
 static int FutilityMoveCounts[2][16]; // [improving][depth]
 static int Reductions[MAX_MOVES]; // [depth or moveNumber]
 
-INLINE Depth reduction(int i, Depth d, int mn, const int NT)
+INLINE Depth reduction(int i, Depth d, int mn)
 {
   int r = Reductions[d / ONE_PLY] * Reductions[mn] / 1024;
-  return ((r + 512) / 1024 + (!i && r > 1024) - NT) * ONE_PLY;
+  return ((r + 512) / 1024 + (!i && r > 1024)) * ONE_PLY;
 }
 
 // History and stats update bonus, based on depth
