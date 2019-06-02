@@ -56,7 +56,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
-  Value bestValue, value, ttValue, eval, maxValue, pureStaticEval;
+  Value bestValue, value, ttValue, eval, maxValue;
   int ttHit, ttPv, inCheck, givesCheck, improving;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
   bool ttCapture;
@@ -231,14 +231,14 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Step 6. Static evaluation of the position
   if (inCheck) {
-    ss->staticEval = pureStaticEval = VALUE_NONE;
+    ss->staticEval = VALUE_NONE;
     improving = 0;
     goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
     // Never assume anything on values stored in TT
     if ((eval = tte_eval(tte)) == VALUE_NONE)
       eval = evaluate(pos);
-    ss->staticEval = pureStaticEval = eval;
+    ss->staticEval = eval;
 
     // Can ttValue be used as a better position evaluation?
     if (ttValue != VALUE_NONE)
@@ -247,13 +247,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   } else {
     if ((ss-1)->currentMove != MOVE_NULL) {
       int bonus = -(ss-1)->statScore / 512;
-      pureStaticEval = evaluate(pos);
-      ss->staticEval = eval = pureStaticEval + bonus;
+      ss->staticEval = eval = evaluate(pos) + bonus;
     } else
-      ss->staticEval = eval = pureStaticEval = -(ss-1)->staticEval + 2 * Tempo;
+      ss->staticEval = eval = -(ss-1)->staticEval + 2 * Tempo;
 
     tte_save(tte, posKey, VALUE_NONE, ttPv, BOUND_NONE, DEPTH_NONE, 0,
-             pureStaticEval, tt_generation());
+             eval, tt_generation());
   }
 
   // Step 7. Razoring
@@ -278,7 +277,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss-1)->currentMove != MOVE_NULL
       && (ss-1)->statScore < 23200
       && eval >= beta
-      && pureStaticEval >= beta - 36 * depth / ONE_PLY + 225
+      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
       && !excludedMove
       && pos_non_pawn_material(pos_stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
@@ -359,9 +358,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   // Step 11. Internal iterative deepening
-  if (    depth >= 8 * ONE_PLY
-      && !ttMove)
-  {
+  if (depth >= 8 * ONE_PLY && !ttMove) {
     if (PvNode)
       search_PV(pos, ss, alpha, beta, depth - 7 * ONE_PLY);
     else
@@ -379,8 +376,8 @@ moves_loop: // When in check search starts from here.
   PieceToHistory *fmh2 = (ss-4)->history;
 
   mp_init(pos, ttMove, depth);
-  value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
 
+  value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
   moveCountPruning = 0;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
 
@@ -444,10 +441,11 @@ moves_loop: // When in check search starts from here.
         &&  is_legal(pos, move))
     {
       Value singularBeta = ttValue - 2 * depth / ONE_PLY;
+      Depth halfDepth = depth / (2 * ONE_PLY) * ONE_PLY;
       ss->excludedMove = move;
       Move cm = ss->countermove;
       Move k1 = ss->mpKillers[0], k2 = ss->mpKillers[1];
-      value = search_NonPV(pos, ss, singularBeta - 1, depth / 2, cutNode);
+      value = search_NonPV(pos, ss, singularBeta - 1, halfDepth, cutNode);
       ss->excludedMove = 0;
 
       if (value < singularBeta)
@@ -659,8 +657,8 @@ moves_loop: // When in check search starts from here.
         // We record how often the best move has been changed in each
         // iteration. This information is used for time management: When
         // the best move changes frequently, we allocate some more time.
-        if (moveCount > 1 && pos->threadIdx == 0)
-          mainThread.bestMoveChanges++;
+        if (moveCount > 1)
+          pos->bestMoveChanges++;
       } else
         // All other moves but the PV are set to the lowest value: this is
         // not a problem when sorting because the sort is stable and the
@@ -736,7 +734,7 @@ moves_loop: // When in check search starts from here.
     tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), ttPv,
         bestValue >= beta ? BOUND_LOWER :
         PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-        depth, bestMove, pureStaticEval, tt_generation());
+        depth, bestMove, ss->staticEval, tt_generation());
 
   assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 

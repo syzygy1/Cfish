@@ -619,7 +619,7 @@ int is_pseudo_legal_old(Pos *pos, Move m)
   if (type_of_p(pc) == PAWN) {
     // We have already handled promotion moves, so destination
     // cannot be on the 8th/1st rank.
-    if (rank_of(to) == relative_rank(us, RANK_8))
+    if (!((to + 0x08) & 0x30))
       return 0;
 
     if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to)) // Not a capture
@@ -714,7 +714,7 @@ int is_pseudo_legal(const Pos *pos, Move m)
     }
   } else {
     if (likely(type_of_m(m) == NORMAL)) {
-      if (rank_of(to) == relative_rank(us, RANK_8))
+      if (!((to + 0x08) & 0x30))
         return 0;
       if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
           && !((from + pawn_push(us) == to) && is_empty(to))

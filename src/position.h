@@ -169,6 +169,7 @@ struct Pos {
   CounterMoveHistoryStat *counterMoveHistory;
 
   // Thread-control data.
+  uint64_t bestMoveChanges;
   atomic_bool resetCalls;
   int callsCnt;
   int action;

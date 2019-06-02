@@ -197,6 +197,8 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   const Bitboard LowRanks = (Us == WHITE ? Rank2BB | Rank3BB
                                          : Rank7BB | Rank6BB);
 
+  Bitboard dblAttackByPawn = pawn_double_attacks_bb(pieces_cp(Us, PAWN), Us);
+
   // Find our pawns on the first two ranks, and those which are blocked
   Bitboard b = pieces_cp(Us, PAWN) & (shift_bb(Down, pieces()) | LowRanks);
 
@@ -208,7 +210,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
   ei->attackedBy[Us][PAWN] = ei->pe->pawnAttacks[Us];
   ei->attackedBy[Us][0] = b | ei->attackedBy[Us][PAWN];
-  ei->attackedBy2[Us]   = b & ei->attackedBy[Us][PAWN];
+  ei->attackedBy2[Us]   = (b & ei->attackedBy[Us][PAWN]) | dblAttackByPawn;
 
   // Init our king safety tables only if we are going to use them
   ei->kingRing[Us] = b;
@@ -222,7 +224,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
     ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
 
   ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
-  ei->kingRing[Us] &= ~pawn_double_attacks_bb(pieces_cp(Us, PAWN), Us);
+  ei->kingRing[Us] &= ~dblAttackByPawn;
   ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
 }
 
@@ -446,11 +448,11 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                -   6 * mg_value(score) / 8
                +       mg_value(mobility[Them] - mobility[Us])
                +   5 * kingFlankAttacks * kingFlankAttacks / 16
-               -  25;
+               -  15;
 
   // Transform the kingDanger units into a Score, and subtract it from
   // the evaluation
-  if (kingDanger > 0)
+  if (kingDanger > 100)
     score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
 
   // Penalty when our king is on a pawnless flank
