@@ -329,6 +329,7 @@ extern struct PSQT psqt;
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
+#define clamp(a,b,c) ((a) < (b) ? (b) : (a) > (c) ? (c) : (a))
 
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)

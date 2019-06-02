@@ -58,14 +58,12 @@ static bool is_KXK(const Pos *pos, int us)
 static bool is_KBPsK(const Pos *pos, int us)
 {
   return   pos_non_pawn_material(us) == BishopValueMg
-        && pieces_cp(us, BISHOP)
         && pieces_cp(us, PAWN);
 }
 
 static bool is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && pos_non_pawn_material(us) == QueenValueMg
-        && pieces_cp(us, QUEEN)
         && piece_count(us ^ 1, ROOK) == 1
         && pieces_cp(us ^ 1, PAWN);
 }
@@ -110,10 +108,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   e->factor[WHITE] = e->factor[BLACK] = (uint8_t)SCALE_FACTOR_NORMAL;
 
   Value npm = pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK);
-  if (npm > MidgameLimit)
-      npm = MidgameLimit;
-  if (npm < EndgameLimit)
-      npm = EndgameLimit;
+  npm = clamp(npm, EndgameLimit, MidgameLimit);
   e->gamePhase = ((npm - EndgameLimit) * PHASE_MIDGAME) / (MidgameLimit - EndgameLimit);
 
   // Look for a specialized evaluation function.

@@ -699,19 +699,19 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 // attacking/defending status of the players.
 
 // Since only eg is involved, we return a Value and not a Score.
-INLINE Value evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
+INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Value eg)
 {
   int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                    - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
   bool bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
 
   // Compute the initiative bonus for the attacking side
-  int initiative =    9 * asymmetry
+  int initiative =    9 * passedCount
                   +  11 * popcount(pieces_p(PAWN))
                   +   9 * outflanking
                   +  18 * bothFlanks
                   +  49 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK))
-                  - 121;
+                  - 103;
 
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the endgame value, and that we carefully cap the bonus so
@@ -734,7 +734,7 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
     if (   opposite_bishops(pos)
         && pos_non_pawn_material(WHITE) == BishopValueMg
         && pos_non_pawn_material(BLACK) == BishopValueMg)
-      return 8 + 4 * ei->pe->asymmetry;
+      return 16 + 4 * ei->pe->passedCount;
     else
       return min(40 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN), sf);
   }
@@ -806,7 +806,7 @@ Value evaluate(const Pos *pos)
   // Evaluate position potential for the winning side
   //  score += evaluate_initiative(pos, ei.pi->asymmetry, eg_value(score));
   int eg = eg_value(score);
-  eg += evaluate_initiative(pos, ei.pe->asymmetry, eg);
+  eg += evaluate_initiative(pos, ei.pe->passedCount, eg);
 
   // Evaluate scale factor for the winning side
   //int sf = evaluate_scale_factor(pos, &ei, eg_value(score));

@@ -540,7 +540,7 @@ skip_search:
       // Stop the search if only one legal move is available, or if all
       // of the available time has been used.
       double fallingEval = (306 + 9 * (mainThread.previousScore - bestValue)) / 581.0;
-      fallingEval = max(0.5, min(1.5, fallingEval));
+      fallingEval = clamp(fallingEval, 0.5, 1.5);
 
       // If the best move is stable over several iterations, reduce time
       // accordingly

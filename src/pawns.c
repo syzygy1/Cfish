@@ -66,7 +66,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   const int Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
   const int Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
 
-  Bitboard b, neighbours, stoppers, doubled, supported, phalanx;
+  Bitboard b, neighbours, stoppers, doubled, support, phalanx;
   Bitboard lever, leverPush;
   Square s;
   bool opposed, backward;
@@ -99,7 +99,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     doubled    = ourPawns   & sq_bb(s - Up);
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
-    supported  = neighbours & rank_bb_s(s - Up);
+    support    = neighbours & rank_bb_s(s - Up);
 
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot be safely advanced.
@@ -111,22 +111,22 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // which could become passed after one or two pawn pushes when they
     // are not attacked more times than defended.
     if (   !(stoppers ^ lever ^ leverPush)
-        && popcount(supported) >= popcount(lever) - 1
+        && (support || !more_than_one(lever))
         && popcount(phalanx)   >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
 
     else if (   stoppers == sq_bb(s + Up)
              && relative_rank_s(Us, s) >= RANK_5)
     {
-      b = shift_bb(Up, supported) & ~theirPawns;
+      b = shift_bb(Up, support) & ~theirPawns;
       while (b)
         if (!more_than_one(theirPawns & PawnAttacks[Us][pop_lsb(&b)]))
           e->passedPawns[Us] |= sq_bb(s);
     }
 
     // Score this pawn
-    if (supported | phalanx)
-      score += Connected[opposed][!!phalanx][popcount(supported)][relative_rank_s(Us, s)];
+    if (support | phalanx)
+      score += Connected[opposed][!!phalanx][popcount(support)][relative_rank_s(Us, s)];
 
     else if (!neighbours) {
       score -= Isolated;
@@ -138,7 +138,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       e->weakUnopposed[Us] += !opposed;
     }
 
-    if (doubled && !supported)
+    if (doubled && !support)
       score -= Doubled;
   }
 
@@ -171,8 +171,7 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
   e->key = key;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
   e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
-  e->asymmetry = popcount(e->passedPawns[WHITE] | e->passedPawns[BLACK]
-                        | (e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]));
+  e->passedCount = popcount(e->passedPawns[WHITE] | e->passedPawns[BLACK]);
 }
 
 
@@ -191,7 +190,7 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
   Bitboard theirPawns = b & pieces_c(Them);
   Value safety = (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq)) ? 374 : 5;
 
-  File center = max(FILE_B, min(FILE_G, file_of(ksq)));
+  File center = clamp(file_of(ksq), FILE_B, FILE_G);
 
   for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
