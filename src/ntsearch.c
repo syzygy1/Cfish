@@ -135,14 +135,6 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   ttPv = ttHit ? tte_is_pv(tte) : 0;
   if (PvNode && depth > 4 * ONE_PLY) ttPv = 4;
 
-  if (   pos_rule50_count() > 36
-      && ss->ply > 36
-      && depth < 3 * ONE_PLY
-      && ttHit
-      && tte_depth(tte) > depth
-      && pieces_p(PAWN))
-    return VALUE_DRAW;
-
   // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
       && ttHit
@@ -470,15 +462,14 @@ moves_loop: // When in check search starts from here.
              && (blockers_for_king(pos, pos_stm() ^ 1) & sq_bb(from_sq(move)) || see_test(pos, move, 0)))
       extension = ONE_PLY;
 
-    // Shuffle extension
-    else if (   PvNode
-             && pos_rule50_count() > 14
-             && ss->ply > 14
-             && depth < 3 * ONE_PLY)
-      extension = ONE_PLY;
-
     // Castling extension
     else if (type_of_m(move) == CASTLING)
+      extension = ONE_PLY;
+
+    // Passed pawn extension
+    else if (   move == ss->killers[0]
+             && advanced_pawn_push(pos, move)
+             && pawn_passed(pos, pos_stm(), to_sq(move)))
       extension = ONE_PLY;
 
     // Calculate new depth for this move
