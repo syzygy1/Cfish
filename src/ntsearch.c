@@ -117,7 +117,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 //  ss->history = &(*pos->counterMoveHistory)[0][0];
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
   Square prevSq = to_sq((ss-1)->currentMove);
-  (ss+2)->statScore = 0;
+  if (rootNode)
+    (ss+4)->statScore = 0;
+  else
+    (ss+2)->statScore = 0;
 
   // Step 4. Transposition table lookup. We don't want the score of a
   // partial search to overwrite a previous full search TT value, so we
@@ -465,6 +468,13 @@ moves_loop: // When in check search starts from here.
     else if (type_of_m(move) == CASTLING)
       extension = ONE_PLY;
 
+    // Shuffle extension
+    else if (   PvNode
+             && pos_rule50_count() > 18
+             && depth < 3 * ONE_PLY
+             && ss->ply < 3 * pos->rootDepth / ONE_PLY)
+      extension = ONE_PLY;
+
     // Passed pawn extension
     else if (   move == ss->killers[0]
              && advanced_pawn_push(pos, move)
@@ -539,8 +549,10 @@ moves_loop: // When in check search starts from here.
     // Step 16. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3 * ONE_PLY
-        &&  moveCount > 1
-        && (!captureOrPromotion || moveCountPruning))
+        &&  moveCount > 1 + 3 * rootNode
+        && (   !captureOrPromotion
+            || moveCountPruning
+            || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha))
     {
       Depth r = reduction(improving, depth, moveCount, NT);
 

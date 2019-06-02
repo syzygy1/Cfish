@@ -443,12 +443,13 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                +  69 * ei->kingAttacksCount[Them]
                + 185 * popcount(ei->kingRing[Us] & weak)
                - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
+               -  35 * !!(ei->attackedBy[Us][BISHOP] & ei->attackedBy[Us][KING])
                + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
                - 873 * !pieces_cp(Them, QUEEN)
                -   6 * mg_value(score) / 8
                +       mg_value(mobility[Them] - mobility[Us])
                +   5 * kingFlankAttacks * kingFlankAttacks / 16
-               -  15;
+               -   7;
 
   // Transform the kingDanger units into a Score, and subtract it from
   // the evaluation
@@ -734,8 +735,7 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   // If scale is not already specific, scale down via general heuristics
   if (sf == SCALE_FACTOR_NORMAL) {
     if (   opposite_bishops(pos)
-        && pos_non_pawn_material(WHITE) == BishopValueMg
-        && pos_non_pawn_material(BLACK) == BishopValueMg)
+        && pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) == 2 * BishopValueMg)
       return 16 + 4 * ei->pe->passedCount;
     else
       return min(40 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN), sf);

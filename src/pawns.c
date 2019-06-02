@@ -182,13 +182,13 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const int Down = (Us == WHITE ? SOUTH : NORTH);
-  const Bitboard BlockRanks =
-                   (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
+  const Bitboard BlockSquares =  (Rank1BB | Rank2BB | Rank7BB | Rank8BB)
+                               & (FileABB | FileHBB);
   
   Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
-  Value safety = (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq)) ? 374 : 5;
+  Value safety = (shift_bb(Down, theirPawns) & BlockSquares & sq_bb(ksq)) ? 374 : 5;
 
   File center = clamp(file_of(ksq), FILE_B, FILE_G);
 
