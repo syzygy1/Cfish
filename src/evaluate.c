@@ -690,7 +690,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 
   // ...count safe + (behind & safe) with a single popcount.
   int bonus = popcount((Us == WHITE ? safe << 32 : safe >> 32) | (behind & safe));
-  int weight = popcount(pieces_c(Us)) - 2 * ei->pe->openFiles;
+  int weight = popcount(pieces_c(Us)) - (16 - popcount(pieces_p(PAWN))) / 4;
 
   return make_score(bonus * weight * weight / 16, 0);
 }

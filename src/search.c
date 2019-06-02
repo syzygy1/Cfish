@@ -62,11 +62,11 @@ INLINE int futility_margin(Depth d, int improving) {
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
-static int Reductions[64]; // [depth or moveNumber]
+static int Reductions[MAX_MOVES]; // [depth or moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn, const int NT)
 {
-  int r = Reductions[min(d / ONE_PLY, 63)] * Reductions[min(mn, 63)] / 1024;
+  int r = Reductions[d / ONE_PLY] * Reductions[mn] / 1024;
   return ((r + 512) / 1024 + (!i && r > 1024) - NT) * ONE_PLY;
 }
 
@@ -124,7 +124,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 
 void search_init(void)
 {
-  for (int i = 1; i < 64; i++)
+  for (int i = 1; i < MAX_MOVES; i++)
     Reductions[i] = 1024 * log(i) / sqrt(1.95);
 
   for (int d = 0; d < 16; ++d) {

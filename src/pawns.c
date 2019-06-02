@@ -112,7 +112,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // are not attacked more times than defended.
     if (   !(stoppers ^ lever ^ leverPush)
         && (support || !more_than_one(lever))
-        && popcount(phalanx)   >= popcount(leverPush))
+        && popcount(phalanx) >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
 
     else if (   stoppers == sq_bb(s + Up)
@@ -150,14 +150,14 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
 void pawn_init(void)
 {
-  static const int Seed[8] = { 0, 13, 24, 18, 65, 100, 175, 330 };
+  static const int Seed[7] = { 0, 13, 17, 24, 59, 96, 171 };
 
   for (int opposed = 0; opposed < 2; opposed++)
     for (int phalanx = 0; phalanx < 2; phalanx++)
       for (int support = 0; support <= 2; support++)
         for (int r = RANK_2; r < RANK_8; ++r) {
-          int v = 17 * support;
-          v += (Seed[r] + (phalanx ? (Seed[r + 1] - Seed[r]) / 2 : 0)) >> opposed;
+          int v = (phalanx ? 3 : 2) * Seed[r];
+          v = 17 * support + (v >> (opposed + 1));
           Connected[opposed][phalanx][support][r] = make_score(v, v * (r-2) / 4);
       }
 }

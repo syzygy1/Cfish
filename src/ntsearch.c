@@ -114,7 +114,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
   (ss+1)->excludedMove = bestMove = 0;
-  ss->history = &(*pos->counterMoveHistory)[0][0];
+//  ss->history = &(*pos->counterMoveHistory)[0][0];
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
   Square prevSq = to_sq((ss-1)->currentMove);
   (ss+2)->statScore = 0;
@@ -151,8 +151,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
         // Extra penalty for a quiet TT or main killer move in previous ply
         // when it gets refuted
-        if (  ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0])
-            && !captured_piece())
+        if ((ss-1)->moveCount <= 2 && !captured_piece())
           update_cm_stats(ss-1, piece_on(prevSq), prevSq,
               -stat_bonus(depth + ONE_PLY));
       }
