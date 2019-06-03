@@ -125,7 +125,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 void search_init(void)
 {
   for (int i = 1; i < MAX_MOVES; i++)
-    Reductions[i] = 1024 * log(i) / sqrt(1.95);
+    Reductions[i] = 733.3 * log(i);
 
   for (int d = 0; d < 16; ++d) {
     FutilityMoveCounts[0][d] = (5 + d * d) / 2;
@@ -318,8 +318,7 @@ void mainthread_search(void)
         mvs[i] = m;
         votes[i] = 0;
       }
-      int64_t diff = p->rootMoves->move[0].score - minScore + 1;
-      votes[i] += 200 + (diff * diff) * p->completedDepth;
+      votes[i] += (p->rootMoves->move[0].score - minScore + 14) * p->completedDepth;
     }
     int64_t bestVote = votes[0];
     for (int idx = 1; idx < Threads.numThreads; idx++) {
