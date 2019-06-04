@@ -82,7 +82,7 @@ static const Bitboard KingFlank[8] = {
 };
 
 // Thresholds for lazy and space evaluation
-enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
+enum { LazyThreshold = 1400, SpaceThreshold = 12222 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
 static const int KingAttackWeights[8] = { 0, 0, 77, 55, 44, 10 };
@@ -622,7 +622,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         // in the pawn's path attacked or occupied by the enemy.
         defendedSquares = unsafeSquares = squaresToQueen = forward_file_bb(Us, s);
 
-        bb = forward_file_bb(Them, s) & pieces_pp(ROOK, QUEEN) & attacks_from_rook(s);
+        bb = forward_file_bb(Them, s) & pieces_pp(ROOK, QUEEN);
 
         if (!(pieces_c(Us) & bb))
           defendedSquares &= ei->attackedBy[Us][0];
@@ -776,7 +776,7 @@ Value evaluate(const Pos *pos)
 
   // Early exit if score is high
   v = (mg_value(score) + eg_value(score)) / 2;
-  if (abs(v) > LazyThreshold)
+  if (abs(v) > LazyThreshold + (pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK)) / 64)
     return pos_stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.

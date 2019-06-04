@@ -66,7 +66,7 @@ static int Reductions[MAX_MOVES]; // [depth or moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn)
 {
-  int r = Reductions[d / ONE_PLY] * Reductions[mn] / 1024;
+  int r = Reductions[d / ONE_PLY] * Reductions[mn];
   return ((r + 512) / 1024 + (!i && r > 1024)) * ONE_PLY;
 }
 
@@ -125,7 +125,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 void search_init(void)
 {
   for (int i = 1; i < MAX_MOVES; i++)
-    Reductions[i] = 733.3 * log(i);
+    Reductions[i] = 22.9 * log(i);
 
   for (int d = 0; d < 16; ++d) {
     FutilityMoveCounts[0][d] = (5 + d * d) / 2;
@@ -484,14 +484,12 @@ void thread_search(Pos *pos)
           beta = (alpha + beta) / 2;
           alpha = max(bestValue - delta, -VALUE_INFINITE);
 
-          if (pos->threadIdx == 0) {
-            failedHighCnt = 0;
+          failedHighCnt = 0;
+          if (pos->threadIdx == 0)
             Signals.stopOnPonderhit = 0;
-          }
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
-          if (pos->threadIdx == 0)
-            failedHighCnt++;
+          failedHighCnt++;
         } else
           break;
 
