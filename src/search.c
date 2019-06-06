@@ -62,12 +62,12 @@ INLINE int futility_margin(Depth d, int improving) {
 
 // Futility and reductions lookup tables, initialized at startup
 static int FutilityMoveCounts[2][16]; // [improving][depth]
-static int Reductions[64]; // [depth or moveNumber]
+static int Reductions[MAX_MOVES]; // [depth or moveNumber]
 
-INLINE Depth reduction(int i, Depth d, int mn, const int NT)
+INLINE Depth reduction(int i, Depth d, int mn)
 {
-  int r = Reductions[min(d / ONE_PLY, 63)] * Reductions[min(mn, 63)] / 1024;
-  return ((r + 512) / 1024 + (!i && r > 1024) - NT) * ONE_PLY;
+  int r = Reductions[d / ONE_PLY] * Reductions[mn];
+  return ((r + 512) / 1024 + (!i && r > 1024)) * ONE_PLY;
 }
 
 // History and stats update bonus, based on depth
@@ -81,7 +81,7 @@ static Value stat_bonus(Depth depth)
 // and to avoid three-fold blindness. (Yucks, ugly hack)
 static Value value_draw(Depth depth, Pos *pos)
 {
-  return depth < 4 ? VALUE_DRAW : VALUE_DRAW + 2 * (pos->nodes % 2) - 1;
+  return depth < 4 * ONE_PLY ? VALUE_DRAW : VALUE_DRAW + 2 * (pos->nodes & 1) - 1;
 }
 
 // Skill structure is used to implement strength limit
@@ -124,8 +124,8 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
 
 void search_init(void)
 {
-  for (int i = 1; i < 64; i++)
-    Reductions[i] = 1024 * log(i) / sqrt(1.95);
+  for (int i = 1; i < MAX_MOVES; i++)
+    Reductions[i] = 22.9 * log(i);
 
   for (int d = 0; d < 16; ++d) {
     FutilityMoveCounts[0][d] = (5 + d * d) / 2;
@@ -247,8 +247,11 @@ void mainthread_search(void)
       }
 
     if (!playBookMove) {
-      for (int idx = 1; idx < Threads.numThreads; idx++)
+      Threads.pos[0]->bestMoveChanges = 0;
+      for (int idx = 1; idx < Threads.numThreads; idx++) {
+        Threads.pos[idx]->bestMoveChanges = 0;
         thread_wake_up(Threads.pos[idx], THREAD_SEARCH);
+      }
 
       thread_search(pos); // Let's start searching!
     }
@@ -315,8 +318,7 @@ void mainthread_search(void)
         mvs[i] = m;
         votes[i] = 0;
       }
-      int64_t diff = p->rootMoves->move[0].score - minScore + 1;
-      votes[i] += 200 + (diff * diff) * p->completedDepth;
+      votes[i] += (p->rootMoves->move[0].score - minScore + 14) * p->completedDepth;
     }
     int64_t bestVote = votes[0];
     for (int idx = 1; idx < Threads.numThreads; idx++) {
@@ -359,7 +361,7 @@ void thread_search(Pos *pos)
   Move pv[MAX_PLY + 1];
   Move lastBestMove = 0;
   Depth lastBestMoveDepth = DEPTH_ZERO;
-  double timeReduction = 1.0;
+  double timeReduction = 1.0, totBestMoveChanges = 0;
 
   Stack *ss = pos->st; // At least the seventh element of the allocated array.
   for (int i = -7; i < 3; i++)
@@ -376,9 +378,6 @@ void thread_search(Pos *pos)
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
   pos->completedDepth = DEPTH_ZERO;
-
-  if (pos->threadIdx == 0)
-    mainThread.bestMoveChanges = 0;
 
   int multiPV = option_value(OPT_MULTI_PV);
 #if 0
@@ -403,7 +402,7 @@ void thread_search(Pos *pos)
   {
     // Age out PV variability metric
     if (pos->threadIdx == 0)
-      mainThread.bestMoveChanges *= 0.517;
+      totBestMoveChanges /= 2;
 
     // Save the last iteration's scores before first PV line is searched and
     // all the move scores except the (new) PV are set to -VALUE_INFINITE.
@@ -485,14 +484,12 @@ void thread_search(Pos *pos)
           beta = (alpha + beta) / 2;
           alpha = max(bestValue - delta, -VALUE_INFINITE);
 
-          if (pos->threadIdx == 0) {
-            failedHighCnt = 0;
+          failedHighCnt = 0;
+          if (pos->threadIdx == 0)
             Signals.stopOnPonderhit = 0;
-          }
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
-          if (pos->threadIdx == 0)
-            failedHighCnt++;
+          failedHighCnt++;
         } else
           break;
 
@@ -539,8 +536,8 @@ skip_search:
         && !Signals.stopOnPonderhit) {
       // Stop the search if only one legal move is available, or if all
       // of the available time has been used.
-      double fallingEval = (306 + 9 * (mainThread.previousScore - bestValue)) / 581.0;
-      fallingEval = max(0.5, min(1.5, fallingEval));
+      double fallingEval = (314 + 9 * (mainThread.previousScore - bestValue)) / 581.0;
+      fallingEval = clamp(fallingEval, 0.5, 1.5);
 
       // If the best move is stable over several iterations, reduce time
       // accordingly
@@ -549,7 +546,12 @@ skip_search:
       double reduction = pow(mainThread.previousTimeReduction, 0.528) / timeReduction;
 
       // Use part of the gained time from a previous stable move for this move
-      double bestMoveInstability = 1.0 + mainThread.bestMoveChanges;
+      for (int i = 0; i < Threads.numThreads; i++) {
+        totBestMoveChanges += Threads.pos[i]->bestMoveChanges;
+        Threads.pos[i]->bestMoveChanges = 0;
+      }
+
+      double bestMoveInstability = 1 + totBestMoveChanges / Threads.numThreads;
 
       if (   rm->size == 1
           || time_elapsed() > time_optimum() * fallingEval * reduction * bestMoveInstability)

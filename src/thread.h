@@ -59,7 +59,7 @@ void thread_wait(Pos *pos, atomic_bool *b);
 // MainThread struct seems to exist mostly for easy move.
 
 struct MainThread {
-  double bestMoveChanges, previousTimeReduction;
+  double previousTimeReduction;
   Value previousScore;
 };
 

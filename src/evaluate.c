@@ -82,7 +82,7 @@ static const Bitboard KingFlank[8] = {
 };
 
 // Thresholds for lazy and space evaluation
-enum { LazyThreshold = 1500, SpaceThreshold = 12222 };
+enum { LazyThreshold = 1400, SpaceThreshold = 12222 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
 static const int KingAttackWeights[8] = { 0, 0, 77, 55, 44, 10 };
@@ -197,6 +197,8 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   const Bitboard LowRanks = (Us == WHITE ? Rank2BB | Rank3BB
                                          : Rank7BB | Rank6BB);
 
+  Bitboard dblAttackByPawn = pawn_double_attacks_bb(pieces_cp(Us, PAWN), Us);
+
   // Find our pawns on the first two ranks, and those which are blocked
   Bitboard b = pieces_cp(Us, PAWN) & (shift_bb(Down, pieces()) | LowRanks);
 
@@ -208,7 +210,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
   ei->attackedBy[Us][PAWN] = ei->pe->pawnAttacks[Us];
   ei->attackedBy[Us][0] = b | ei->attackedBy[Us][PAWN];
-  ei->attackedBy2[Us]   = b & ei->attackedBy[Us][PAWN];
+  ei->attackedBy2[Us]   = (b & ei->attackedBy[Us][PAWN]) | dblAttackByPawn;
 
   // Init our king safety tables only if we are going to use them
   ei->kingRing[Us] = b;
@@ -222,7 +224,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
     ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
 
   ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
-  ei->kingRing[Us] &= ~pawn_double_attacks_bb(pieces_cp(Us, PAWN), Us);
+  ei->kingRing[Us] &= ~dblAttackByPawn;
   ei->kingAttacksCount[Them] = ei->kingAttackersWeight[Them] = 0;
 }
 
@@ -441,16 +443,17 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                +  69 * ei->kingAttacksCount[Them]
                + 185 * popcount(ei->kingRing[Us] & weak)
                - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
+               -  35 * !!(ei->attackedBy[Us][BISHOP] & ei->attackedBy[Us][KING])
                + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
                - 873 * !pieces_cp(Them, QUEEN)
                -   6 * mg_value(score) / 8
                +       mg_value(mobility[Them] - mobility[Us])
                +   5 * kingFlankAttacks * kingFlankAttacks / 16
-               -  25;
+               -   7;
 
   // Transform the kingDanger units into a Score, and subtract it from
   // the evaluation
-  if (kingDanger > 0)
+  if (kingDanger > 100)
     score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
 
   // Penalty when our king is on a pawnless flank
@@ -619,7 +622,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         // in the pawn's path attacked or occupied by the enemy.
         defendedSquares = unsafeSquares = squaresToQueen = forward_file_bb(Us, s);
 
-        bb = forward_file_bb(Them, s) & pieces_pp(ROOK, QUEEN) & attacks_from_rook(s);
+        bb = forward_file_bb(Them, s) & pieces_pp(ROOK, QUEEN);
 
         if (!(pieces_c(Us) & bb))
           defendedSquares &= ei->attackedBy[Us][0];
@@ -688,7 +691,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 
   // ...count safe + (behind & safe) with a single popcount.
   int bonus = popcount((Us == WHITE ? safe << 32 : safe >> 32) | (behind & safe));
-  int weight = popcount(pieces_c(Us)) - 2 * ei->pe->openFiles;
+  int weight = popcount(pieces_c(Us)) - 1;
 
   return make_score(bonus * weight * weight / 16, 0);
 }
@@ -699,19 +702,19 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 // attacking/defending status of the players.
 
 // Since only eg is involved, we return a Value and not a Score.
-INLINE Value evaluate_initiative(const Pos *pos, int asymmetry, Value eg)
+INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Value eg)
 {
   int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                    - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
   bool bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
 
   // Compute the initiative bonus for the attacking side
-  int initiative =    9 * asymmetry
+  int initiative =    9 * passedCount
                   +  11 * popcount(pieces_p(PAWN))
                   +   9 * outflanking
                   +  18 * bothFlanks
                   +  49 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK))
-                  - 121;
+                  - 103;
 
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the endgame value, and that we carefully cap the bonus so
@@ -732,9 +735,8 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   // If scale is not already specific, scale down via general heuristics
   if (sf == SCALE_FACTOR_NORMAL) {
     if (   opposite_bishops(pos)
-        && pos_non_pawn_material(WHITE) == BishopValueMg
-        && pos_non_pawn_material(BLACK) == BishopValueMg)
-      return 8 + 4 * ei->pe->asymmetry;
+        && pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) == 2 * BishopValueMg)
+      return 16 + 4 * ei->pe->passedCount;
     else
       return min(40 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN), sf);
   }
@@ -774,7 +776,7 @@ Value evaluate(const Pos *pos)
 
   // Early exit if score is high
   v = (mg_value(score) + eg_value(score)) / 2;
-  if (abs(v) > LazyThreshold)
+  if (abs(v) > LazyThreshold + (pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK)) / 64)
     return pos_stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.
@@ -806,7 +808,7 @@ Value evaluate(const Pos *pos)
   // Evaluate position potential for the winning side
   //  score += evaluate_initiative(pos, ei.pi->asymmetry, eg_value(score));
   int eg = eg_value(score);
-  eg += evaluate_initiative(pos, ei.pe->asymmetry, eg);
+  eg += evaluate_initiative(pos, ei.pe->passedCount, eg);
 
   // Evaluate scale factor for the winning side
   //int sf = evaluate_scale_factor(pos, &ei, eg_value(score));

@@ -44,7 +44,7 @@ struct PawnEntry {
   uint8_t semiopenFiles[2];
   uint8_t weakUnopposed[2];
   uint8_t pawnsOnSquares[2][2]; // [color][light/dark squares]
-  uint8_t asymmetry;
+  uint8_t passedCount;
   uint8_t openFiles;
 };
 

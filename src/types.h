@@ -116,7 +116,7 @@
 typedef uint64_t Key;
 typedef uint64_t Bitboard;
 
-enum { MAX_MOVES = 256, MAX_PLY = 128 };
+enum { MAX_MOVES = 256, MAX_PLY = 246 };
 
 // A move needs 16 bits to be stored
 //
@@ -329,6 +329,7 @@ extern struct PSQT psqt;
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
+#define clamp(a,b,c) ((a) < (b) ? (b) : (a) > (c) ? (c) : (a))
 
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)

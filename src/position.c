@@ -197,11 +197,12 @@ void zob_init(void) {
       for (Square s1 = 0; s1 < 64; s1++)
         for (Square s2 = s1 + 1; s2 < 64; s2++)
           if (PseudoAttacks[pt][s1] & sq_bb(s2)) {
-            Move move = between_bb(s1, s2) ? make_move(s1, s2)
-                                           : make_move(SQ_C3, SQ_D5);
+//            Move move = between_bb(s1, s2) ? make_move(s1, s2)
+//                                           : make_move(SQ_C3, SQ_D5);
+            Move move = make_move(s1, s2);
             Key key = zob.psq[pc][s1] ^ zob.psq[pc][s2] ^ zob.side;
             uint32_t i = H1(key);
-            while (1) {
+            while (true) {
               Key tmpKey = cuckoo[i];
               cuckoo[i] = key;
               key = tmpKey;
@@ -619,7 +620,7 @@ int is_pseudo_legal_old(Pos *pos, Move m)
   if (type_of_p(pc) == PAWN) {
     // We have already handled promotion moves, so destination
     // cannot be on the 8th/1st rank.
-    if (rank_of(to) == relative_rank(us, RANK_8))
+    if (!((to + 0x08) & 0x30))
       return 0;
 
     if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to)) // Not a capture
@@ -714,7 +715,7 @@ int is_pseudo_legal(const Pos *pos, Move m)
     }
   } else {
     if (likely(type_of_m(m) == NORMAL)) {
-      if (rank_of(to) == relative_rank(us, RANK_8))
+      if (!((to + 0x08) & 0x30))
         return 0;
       if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
           && !((from + pawn_push(us) == to) && is_empty(to))
@@ -1362,7 +1363,7 @@ int is_draw(const Pos *pos)
 // repetition or an earlier position has a move that directly reaches
 // the current position.
 
-bool has_game_cycle(const Pos *pos) {
+bool has_game_cycle(const Pos *pos, int ply) {
   unsigned int j;
 
   int end = pos->st->pliesFromNull;
@@ -1377,8 +1378,12 @@ bool has_game_cycle(const Pos *pos) {
     if (   (j = H1(moveKey), cuckoo[j] == moveKey)
         || (j = H2(moveKey), cuckoo[j] == moveKey))
     {
-      if (!(((Bitboard *)BetweenBB)[cuckooMove[j]] & pieces()))
+      Move m = cuckooMove[j];
+      if (!(((Bitboard *)BetweenBB)[m] & pieces())) {
+        if (   ply > i
+            || color_of(piece_on(is_empty(from_sq(m)) ? to_sq(m) : from_sq(m))) == pos_stm())
         return true;
+      }
     }
   }
   return false;

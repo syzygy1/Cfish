@@ -66,7 +66,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   const int Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
   const int Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
 
-  Bitboard b, neighbours, stoppers, doubled, supported, phalanx;
+  Bitboard b, neighbours, stoppers, doubled, support, phalanx;
   Bitboard lever, leverPush;
   Square s;
   bool opposed, backward;
@@ -99,7 +99,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     doubled    = ourPawns   & sq_bb(s - Up);
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
-    supported  = neighbours & rank_bb_s(s - Up);
+    support    = neighbours & rank_bb_s(s - Up);
 
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot be safely advanced.
@@ -111,22 +111,22 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // which could become passed after one or two pawn pushes when they
     // are not attacked more times than defended.
     if (   !(stoppers ^ lever ^ leverPush)
-        && popcount(supported) >= popcount(lever) - 1
-        && popcount(phalanx)   >= popcount(leverPush))
+        && (support || !more_than_one(lever))
+        && popcount(phalanx) >= popcount(leverPush))
       e->passedPawns[Us] |= sq_bb(s);
 
     else if (   stoppers == sq_bb(s + Up)
              && relative_rank_s(Us, s) >= RANK_5)
     {
-      b = shift_bb(Up, supported) & ~theirPawns;
+      b = shift_bb(Up, support) & ~theirPawns;
       while (b)
         if (!more_than_one(theirPawns & PawnAttacks[Us][pop_lsb(&b)]))
           e->passedPawns[Us] |= sq_bb(s);
     }
 
     // Score this pawn
-    if (supported | phalanx)
-      score += Connected[opposed][!!phalanx][popcount(supported)][relative_rank_s(Us, s)];
+    if (support | phalanx)
+      score += Connected[opposed][!!phalanx][popcount(support)][relative_rank_s(Us, s)];
 
     else if (!neighbours) {
       score -= Isolated;
@@ -138,7 +138,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       e->weakUnopposed[Us] += !opposed;
     }
 
-    if (doubled && !supported)
+    if (doubled && !support)
       score -= Doubled;
   }
 
@@ -150,14 +150,13 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
 void pawn_init(void)
 {
-  static const int Seed[8] = { 0, 13, 24, 18, 65, 100, 175, 330 };
+  static const int Seed[7] = { 0, 7, 8, 12, 29, 48, 86 };
 
   for (int opposed = 0; opposed < 2; opposed++)
     for (int phalanx = 0; phalanx < 2; phalanx++)
       for (int support = 0; support <= 2; support++)
         for (int r = RANK_2; r < RANK_8; ++r) {
-          int v = 17 * support;
-          v += (Seed[r] + (phalanx ? (Seed[r + 1] - Seed[r]) / 2 : 0)) >> opposed;
+          int v =  Seed[r] * (phalanx ? 3 : 2) / (opposed ? 2 : 1) + 17 * support;
           Connected[opposed][phalanx][support][r] = make_score(v, v * (r-2) / 4);
       }
 }
@@ -171,27 +170,27 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
   e->key = key;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
   e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
-  e->asymmetry = popcount(e->passedPawns[WHITE] | e->passedPawns[BLACK]
-                        | (e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]));
+  e->passedCount = popcount(e->passedPawns[WHITE] | e->passedPawns[BLACK]);
 }
 
 
 // evaluate_shelter() calculates the shelter bonus and the storm penalty
 // for a king, by looking at the king file and the two closest files.
 
-INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
+INLINE void evaluate_shelter(const Pos *pos, Square ksq, Score *shelter,
+                             const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const int Down = (Us == WHITE ? SOUTH : NORTH);
-  const Bitboard BlockRanks =
-                   (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
+  const Bitboard BlockSquares =  (Rank1BB | Rank2BB | Rank7BB | Rank8BB)
+                               & (FileABB | FileHBB);
   
   Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
-  Value safety = (shift_bb(Down, theirPawns) & (FileABB | FileHBB) & BlockRanks & sq_bb(ksq)) ? 374 : 5;
+  Value bonus[] = { (shift_bb(Down, theirPawns) & BlockSquares & sq_bb(ksq)) ? 374 : 5, VALUE_ZERO };
 
-  File center = max(FILE_B, min(FILE_G, file_of(ksq)));
+  File center = clamp(file_of(ksq), FILE_B, FILE_G);
 
   for (File f = center - 1; f <= center + 1; f++) {
     b = ourPawns & file_bb(f);
@@ -201,12 +200,17 @@ INLINE Value evaluate_shelter(const Pos *pos, Square ksq, const int Us)
     int theirRank = b ? relative_rank_s(Us, frontmost_sq(Them, b)) : 0;
 
     int d = min(f, FILE_H - f);
-    safety += ShelterStrength[d][ourRank];
-    safety -= (ourRank && (ourRank == theirRank - 1)) ? 66 * (theirRank == RANK_3)
-                                               : UnblockedStorm[d][theirRank];
+    bonus[MG] += ShelterStrength[d][ourRank];
+
+    if (ourRank && (ourRank == theirRank - 1)) {
+      bonus[MG] -= 82 * (theirRank == RANK_3);
+      bonus[EG] -= 82 * (theirRank == RANK_3);
+    } else
+      bonus[MG] -= UnblockedStorm[d][theirRank];
   }
 
-  return safety;
+  if (bonus[MG] > mg_value(*shelter))
+    *shelter = make_score(bonus[MG], bonus[EG]);
 }
 
 
@@ -224,20 +228,17 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
   if (pawns)
     while (!(DistanceRingBB[ksq][++minKingPawnDistance] & pawns)) {}
 
-  Value bonus = evaluate_shelter(pos, ksq, Us);
+  Score shelter = make_score(-VALUE_INFINITE, VALUE_ZERO);
+  evaluate_shelter(pos, ksq, &shelter, Us);
 
   // If we can castle use the bonus after the castling if it is bigger
-  if (can_castle_cr(make_castling_right(Us, KING_SIDE))) {
-    Value v = evaluate_shelter(pos, relative_square(Us, SQ_G1), Us);
-    bonus = max(bonus, v);
-  }
+  if (can_castle_cr(make_castling_right(Us, KING_SIDE)))
+    evaluate_shelter(pos, relative_square(Us, SQ_G1), &shelter, Us);
 
-  if (can_castle_cr(make_castling_right(Us, QUEEN_SIDE))) {
-    Value v = evaluate_shelter(pos, relative_square(Us, SQ_C1), Us);
-    bonus = max(bonus, v);
-  }
+  if (can_castle_cr(make_castling_right(Us, QUEEN_SIDE)))
+    evaluate_shelter(pos, relative_square(Us, SQ_C1), &shelter, Us);
 
-  return make_score(bonus, -16 * minKingPawnDistance);
+  return shelter - make_score(VALUE_ZERO, 16 * minKingPawnDistance);
 }
 
 // "template" instantiation:
