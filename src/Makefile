@@ -79,6 +79,17 @@ native = yes
 numa = no
 lto = no
 extra = no
+ifeq ($(KERNEL),Darwin)
+	## for my personal setup, change to "no" if it doesn't work for you
+	clang = yes
+	ifeq ($(clang),yes)
+		llvm=llvm-profdata-mp-7.0
+		else
+		llvm=llvm-profdata
+	endif
+	else
+	llvm=llvm-profdata
+endif
 
 ### 2.2 Architecture specific
 
@@ -520,7 +531,7 @@ clang-profile-make:
 	all
 
 clang-profile-use:
-	llvm-profdata merge -output=cfish.profdata *.profraw
+	$(llvm) merge -output=cfish.profdata *.profraw
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
 	EXTRACFLAGS='-fprofile-instr-use=cfish.profdata' \
 	EXTRALDFLAGS='-fprofile-use ' \
