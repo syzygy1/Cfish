@@ -61,7 +61,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
   bool ttCapture;
   Piece movedPiece;
-  int moveCount, captureCount, quietCount;
+  int moveCount, captureCount, quietCount, singularLMR;
 
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
@@ -135,8 +135,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
-  ttPv = ttHit ? tte_is_pv(tte) : 0;
-  if (PvNode && depth > 4 * ONE_PLY) ttPv = 4;
+  ttPv = PvNode ? 4 : (ttHit ? tte_is_pv(tte) : 0);
 
   // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
@@ -374,7 +373,7 @@ moves_loop: // When in check search starts from here.
   value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
   moveCountPruning = 0;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
-  int singularExtensionLMRMultiplier = 0;
+  singularLMR = 0;
 
   // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
@@ -445,9 +444,9 @@ moves_loop: // When in check search starts from here.
 
       if (value < singularBeta) {
         extension = ONE_PLY;
-        singularExtensionLMRMultiplier++;
+        singularLMR++;
         if (value < singularBeta - min(3 * depth / ONE_PLY, 39))
-          singularExtensionLMRMultiplier++;
+          singularLMR++;
       }
 
       // Multi-cut pruning. Our ttMove is assumed to fail high, and now we
@@ -500,7 +499,8 @@ moves_loop: // When in check search starts from here.
 
       if (   !captureOrPromotion
           && !givesCheck
-          && !advanced_pawn_push(pos, move))
+          && (   !advanced_pawn_push(pos, move)
+              || pos_non_pawn_material(pos_stm() ^ 1) > BishopValueMg))
       {
         // Move count based pruning
         if (moveCountPruning)
@@ -528,7 +528,9 @@ moves_loop: // When in check search starts from here.
       }
 //      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
 //               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-      else if (!see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
+      else if (  (   !givesCheck
+                  || !(blockers_for_king(pos, pos_stm() ^ 1) & sq_bb(from_sq(move))))
+               && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
         continue;
     }
 
@@ -570,7 +572,7 @@ moves_loop: // When in check search starts from here.
         r -= ONE_PLY;
 
       // Decrease reduction if move has been singularly extended
-      r -= singularExtensionLMRMultiplier * ONE_PLY;
+      r -= singularLMR * ONE_PLY;
 
       if (!captureOrPromotion) {
         // Increase reduction if ttMove is a capture

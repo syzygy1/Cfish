@@ -43,12 +43,8 @@ struct EvalInfo {
   // added.
   Bitboard attackedBy2[2];
 
-  // kingRing[color] is the zone around the king which is considered
-  // by the king safety evaluation. This consists of the squares directly
-  // adjacent to the king, and (only for a king on its first rank) the
-  // squares two ranks in front of the king. For instance, if black's king
-  // is on g8, kingRing[BLACK] is a bitboard containing the squares f8, h8,
-  // f7, g7, h7, f6, g6 and h6.
+  // kingRing[color] are the squares adjacent to the king plus some other
+  // very near squares, depending on king position.
   Bitboard kingRing[2];
 
   // kingAttackersCount[color] is the number of pieces of the given color
@@ -121,14 +117,6 @@ static const Score MobilityBonus[4][32] = {
     S(106,184), S(109,191), S(113,206), S(116,212) }
 };
 
-// Outpost[knight/bishop][supported by pawn] contains bonuses for minors
-// if they can reach an outpost square, bigger if that square is supported0
-// by a pawn. If the minor occupies an outpost square, then score is doubled.
-static const Score Outpost[][2] = {
-  { S(18, 6), S(36,12) }, // Knight
-  { S( 9, 3), S(18, 6) }  // Bishop
-};
-
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
 static const Score RookOnFile[2] = { S(18, 7), S(44, 20) };
@@ -171,6 +159,7 @@ static const Score KingProtector      = S(  7,  8);
 static const Score KnightOnQueen      = S( 16, 12);
 static const Score LongDiagonalBishop = S( 45,  0);
 static const Score MinorBehindPawn    = S( 18,  3);
+static const Score Outpost            = S( 36, 12);
 static const Score PawnlessFlank      = S( 17, 95);
 static const Score RestrictedPiece    = S(  7,  7);
 static const Score RookOnPawn         = S( 10, 32);
@@ -181,7 +170,6 @@ static const Score ThreatByRank       = S( 13,  0);
 static const Score ThreatBySafePawn   = S(173, 94);
 static const Score TrappedRook        = S( 47,  4);
 static const Score WeakQueen          = S( 49, 15);
-static const Score WeakUnopposedPawn  = S( 12, 23);
 
 #undef S
 #undef V
@@ -271,14 +259,12 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 
     if (Pt == BISHOP || Pt == KNIGHT) {
       // Bonus for outpost squares
-      bb = OutpostRanks & ~ei->pe->pawnAttacksSpan[Them];
+      bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & sq_bb(s))] * 2;
-      else {
-        bb &= b & ~pieces_c(Us);
-        if (bb)
-          score += Outpost[Pt == BISHOP][!!(ei->attackedBy[Us][PAWN] & bb)];
-      }
+        score += Outpost * (Pt == KNIGHT ? 2 : 1);
+
+      else if (bb & b & ~pieces_c(Us))
+        score += Outpost / (Pt == KNIGHT ? 1 : 2);
 
       // Knight and Bishop bonus for being right behind a pawn
       if (shift_bb(Down, pieces_p(PAWN)) & sq_bb(s))
@@ -539,10 +525,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
               &  ei->attackedBy[Us][0];
   score += RestrictedPiece * popcount(restricted);
 
-  // Bonus for enemy unopposed weak pawns
-  if (pieces_cpp(Us, ROOK, QUEEN))
-    score += WeakUnopposedPawn * ei->pe->weakUnopposed[Them];
-
   // Find the squares reachable by a single pawn push
   b  = shift_bb(Up, pieces_cp(Us, PAWN)) & ~pieces();
   b |= shift_bb(Up, b & TRank3BB) & ~pieces();
@@ -634,13 +616,9 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         // assign a smaller bonus if the block square isn't attacked.
         int k = !unsafeSquares ? 20 : !(unsafeSquares & sq_bb(blockSq)) ? 9 : 0;
 
-        // If the path to the queen is fully defended, assign a big bonus.
-        // Otherwise assign a smaller bonus if the block square is defended.
-        if (defendedSquares == squaresToQueen)
-          k += 6;
-
-        else if (defendedSquares & sq_bb(blockSq))
-          k += 4;
+        // Assign a larger bonus if the block square is defended
+        if (defendedSquares & sq_bb(blockSq))
+          k += 5;
 
         mbonus += k * w, ebonus += k * w;
       }
