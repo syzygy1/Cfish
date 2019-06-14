@@ -526,10 +526,7 @@ moves_loop: // When in check search starts from here.
         if (!see_test(pos, move, -29 * lmrDepth * lmrDepth))
           continue;
       }
-//      else if (   depth < 7 * ONE_PLY && ss->stage != ST_GOOD_CAPTURES
-//               && !see_test(pos, move, -35 * depth / ONE_PLY * depth / ONE_PLY))
-      else if (  (   !givesCheck
-                  || !(blockers_for_king(pos, pos_stm() ^ 1) & sq_bb(from_sq(move))))
+      else if (  (!givesCheck || !extension)
                && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
         continue;
     }
