@@ -967,7 +967,7 @@ void start_thinking(Pos *root)
     pos->selDepth = 0;
     pos->nmpPly = pos->nmpOdd = 0;
     pos->rootDepth = DEPTH_ZERO;
-    pos->nodes = pos->tbHits = 0;
+    pos->shuffleExts = pos->nodes = pos->tbHits = 0;
     RootMoves *rm = pos->rootMoves;
     rm->size = end - list;
     for (int i = 0; i < rm->size; i++) {

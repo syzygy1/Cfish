@@ -179,10 +179,12 @@ Move next_move(const Pos *pos, int skipQuiets)
     /* fallthrough */
 
   case ST_QUIET_INIT:
-    st->cur = st->endBadCaptures;
-    st->endMoves = generate_quiets(pos, st->cur);
-    score_quiets(pos);
-    partial_insertion_sort(st->cur, st->endMoves, -4000 * st->depth / ONE_PLY);
+    if (!skipQuiets) {
+      st->cur = st->endBadCaptures;
+      st->endMoves = generate_quiets(pos, st->cur);
+      score_quiets(pos);
+      partial_insertion_sort(st->cur, st->endMoves, -4000 * st->depth / ONE_PLY);
+    }
     st->stage++;
     /* fallthrough */
 

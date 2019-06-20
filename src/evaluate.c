@@ -572,6 +572,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
   const int Up   = (Us == WHITE ? NORTH : SOUTH);
 
   Bitboard b, bb, squaresToQueen, defendedSquares, unsafeSquares;
+  Bitboard wideUnsafeSquares;
   Score score = SCORE_ZERO;
 
   b = ei->pe->passedPawns[Us];
@@ -603,6 +604,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         // consider all the squaresToQueen. Otherwise consider only the squares
         // in the pawn's path attacked or occupied by the enemy.
         defendedSquares = unsafeSquares = squaresToQueen = forward_file_bb(Us, s);
+        wideUnsafeSquares = AllSquares;
 
         bb = forward_file_bb(Them, s) & pieces_pp(ROOK, QUEEN);
 
@@ -612,9 +614,15 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         if (!(pieces_c(Them) & bb))
           unsafeSquares &= ei->attackedBy[Them][0] | pieces_c(Them);
 
+        if (!unsafeSquares)
+          wideUnsafeSquares =  (ei->attackedBy[Them][0] | pieces_c(Them))
+                             & (shift_bb(WEST, squaresToQueen) | shift_bb(EAST, squaresToQueen));
+
         // If there aren't any enemy attacks, assign a big bonus. Otherwise
         // assign a smaller bonus if the block square isn't attacked.
-        int k = !unsafeSquares ? 20 : !(unsafeSquares & sq_bb(blockSq)) ? 9 : 0;
+        int k =  !wideUnsafeSquares ? 35
+               : !unsafeSquares ? 20
+               : !(unsafeSquares & sq_bb(blockSq)) ? 9 : 0;
 
         // Assign a larger bonus if the block square is defended
         if (defendedSquares & sq_bb(blockSq))

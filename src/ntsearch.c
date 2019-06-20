@@ -224,7 +224,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
   // Step 6. Static evaluation of the position
   if (inCheck) {
-    ss->staticEval = VALUE_NONE;
+    ss->staticEval = eval = VALUE_NONE;
     improving = 0;
     goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
@@ -453,9 +453,9 @@ moves_loop: // When in check search starts from here.
       // failed high also on a reduced search without the ttMove. So we
       // assume that this expected cut-node is not singular, i.e. multiple
       // moves fail high. We therefore prune the whole subtree by returning
-      // the hard beta bound.
-      else if (cutNode && singularBeta > beta)
-        return beta;
+      // a soft bound.
+      else if (eval >= beta && singularBeta >= beta)
+        return singularBeta;
 
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.
@@ -476,7 +476,7 @@ moves_loop: // When in check search starts from here.
     else if (   PvNode
              && pos_rule50_count() > 18
              && depth < 3 * ONE_PLY
-             && ss->ply < 3 * pos->rootDepth / ONE_PLY)
+             && ++pos->shuffleExts < pos->nodes / 4)
       extension = ONE_PLY;
 
     // Passed pawn extension
