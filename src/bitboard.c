@@ -65,7 +65,7 @@ Bitboard BetweenBB[64][64];
 Bitboard LineBB[64][64];
 Bitboard DistanceRingBB[64][8];
 Bitboard ForwardFileBB[2][64];
-Bitboard PassedPawnMask[2][64];
+Bitboard PassedPawnSpan[2][64];
 Bitboard PawnAttackSpan[2][64];
 Bitboard PseudoAttacks[8][64];
 Bitboard PawnAttacks[2][64];
@@ -137,7 +137,7 @@ void bitboards_init(void)
     for (Square s = 0; s < 64; s++) {
       ForwardFileBB[c][s]  = ForwardRanksBB[c][rank_of(s)] & FileBB[file_of(s)];
       PawnAttackSpan[c][s] = ForwardRanksBB[c][rank_of(s)] & adjacent_files_bb(file_of(s));
-      PassedPawnMask[c][s] = ForwardFileBB[c][s] | PawnAttackSpan[c][s];
+      PassedPawnSpan[c][s] = ForwardFileBB[c][s] | PawnAttackSpan[c][s];
     }
 
   for (Square s1 = 0; s1 < 64; s1++)

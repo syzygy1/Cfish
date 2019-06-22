@@ -488,7 +488,7 @@ Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
   // Snipers are sliders that attack square 's'when a piece removed.
   snipers = (  (PseudoAttacks[ROOK  ][s] & pieces_pp(QUEEN, ROOK))
              | (PseudoAttacks[BISHOP][s] & pieces_pp(QUEEN, BISHOP))) & sliders;
-  Bitboard occupancy = pieces() & ~snipers;
+  Bitboard occupancy = pieces() ^ snipers;
 
   while (snipers) {
     Square sniperSq = pop_lsb(&snipers);

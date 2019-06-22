@@ -63,7 +63,7 @@ extern Bitboard BetweenBB[64][64];
 extern Bitboard LineBB[64][64];
 extern Bitboard DistanceRingBB[64][8];
 extern Bitboard ForwardFileBB[2][64];
-extern Bitboard PassedPawnMask[2][64];
+extern Bitboard PassedPawnSpan[2][64];
 extern Bitboard PawnAttackSpan[2][64];
 extern Bitboard PseudoAttacks[8][64];
 extern Bitboard PawnAttacks[2][64];
@@ -208,13 +208,13 @@ INLINE Bitboard pawn_attack_span(unsigned c, Square s)
 }
 
 
-// passed_pawn_mask() returns a bitboard mask which can be used to test
+// passed_pawn_span() returns a bitboard mask which can be used to test
 // if a pawn of the given color and on the given square is a passed pawn:
-//     PassedPawnMask[c][s] = pawn_attack_span(c, s) | forward_bb(c, s)
+//     PassedPawnSpan[c][s] = pawn_attack_span(c, s) | forward_bb(c, s)
 
-INLINE Bitboard passed_pawn_mask(unsigned c, Square s)
+INLINE Bitboard passed_pawn_span(unsigned c, Square s)
 {
-  return PassedPawnMask[c][s];
+  return PassedPawnSpan[c][s];
 }
 
 

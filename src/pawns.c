@@ -29,9 +29,10 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Isolated = S( 5, 15);
-static const Score Backward = S( 9, 24);
-static const Score Doubled  = S(11, 56);
+static const Score Backward      = S( 9, 24);
+static const Score Doubled       = S(11, 56);
+static const Score Isolated      = S( 5, 15);
+static const Score WeakUnopposed = S(13, 27);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
@@ -75,7 +76,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   Bitboard ourPawns   = pieces_cp(Us, PAWN);
   Bitboard theirPawns = pieces_p(PAWN) ^ ourPawns;
 
-  e->passedPawns[Us] = e->pawnAttacksSpan[Us] = e->weakUnopposed[Us] = 0;
+  e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
   e->semiopenFiles[Us] = 0xFF;
   e->kingSquares[Us] = SQ_NONE;
   e->pawnAttacks[Us] = shift_bb(Right, ourPawns) | shift_bb(Left, ourPawns);
@@ -93,7 +94,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
     // Flag the pawn
     opposed    = theirPawns & forward_file_bb(Us, s);
-    stoppers   = theirPawns & passed_pawn_mask(Us, s);
+    stoppers   = theirPawns & passed_pawn_span(Us, s);
     lever      = theirPawns & PawnAttacks[Us][s];
     leverPush  = theirPawns & PawnAttacks[Us][s + Up];
     doubled    = ourPawns   & sq_bb(s - Up);
@@ -110,9 +111,9 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // full attack info to evaluate them. Include also not passed pawns
     // which could become passed after one or two pawn pushes when they
     // are not attacked more times than defended.
-    if (   !(stoppers ^ lever ^ leverPush)
-        && (support || !more_than_one(lever))
-        && popcount(phalanx) >= popcount(leverPush))
+    if (   !(stoppers ^ lever)
+        || (  !(stoppers ^ leverPush)
+            && popcount(phalanx) >= popcount(leverPush)))
       e->passedPawns[Us] |= sq_bb(s);
 
     else if (   stoppers == sq_bb(s + Up)
@@ -128,15 +129,11 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     if (support | phalanx)
       score += Connected[opposed][!!phalanx][popcount(support)][relative_rank_s(Us, s)];
 
-    else if (!neighbours) {
-      score -= Isolated;
-      e->weakUnopposed[Us] += !opposed;
-    }
+    else if (!neighbours)
+      score -= Isolated + (opposed ? 0 : WeakUnopposed);
 
-    else if (backward) {
-      score -= Backward;
-      e->weakUnopposed[Us] += !opposed;
-    }
+    else if (backward)
+      score -= Backward + (opposed ? 0 : WeakUnopposed);
 
     if (doubled && !support)
       score -= Doubled;
