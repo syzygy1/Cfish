@@ -290,7 +290,7 @@ INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
 
 INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
 {
-  return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_mask(c, s));
+  return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_span(c, s));
 }
 
 INLINE int advanced_pawn_push(const Pos *pos, Move m)

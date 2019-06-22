@@ -94,7 +94,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
     // Flag the pawn
     opposed    = theirPawns & forward_file_bb(Us, s);
-    stoppers   = theirPawns & passed_pawn_mask(Us, s);
+    stoppers   = theirPawns & passed_pawn_span(Us, s);
     lever      = theirPawns & PawnAttacks[Us][s];
     leverPush  = theirPawns & PawnAttacks[Us][s + Up];
     doubled    = ourPawns   & sq_bb(s - Up);
