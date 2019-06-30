@@ -408,6 +408,17 @@ moves_loop: // When in check search starts from here.
       fflush(stdout);
     }
 
+    // In MultiPV also skip moves which will be searched later as PV move.
+    // This seems questionable.
+    if (rootNode) {
+      int idx;
+      for (idx = pos->pvIdx + 1; idx < pos->multiPV; idx++)
+        if (pos->rootMoves->move[idx].pv[0] == move)
+          break;
+      if (idx < pos->multiPV)
+        continue;
+    }
+
     if (PvNode)
       (ss+1)->pv = NULL;
 

@@ -379,7 +379,7 @@ void thread_search(Pos *pos)
   beta = VALUE_INFINITE;
   pos->completedDepth = DEPTH_ZERO;
 
-  int multiPV = option_value(OPT_MULTI_PV);
+  pos->multiPV = option_value(OPT_MULTI_PV);
 #if 0
   Skill skill(option_value(OPT_SKILL_LEVEL));
 
@@ -390,7 +390,7 @@ void thread_search(Pos *pos)
 #endif
 
   RootMoves *rm = pos->rootMoves;
-  multiPV = min(multiPV, rm->size);
+  pos->multiPV = min(pos->multiPV, rm->size);
 
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.
@@ -415,7 +415,7 @@ void thread_search(Pos *pos)
     int pvFirst = 0, pvLast = 0;
 
     // MultiPV loop. We perform a full root search for each PV line
-    for (int pvIdx = 0; pvIdx < multiPV && !Signals.stop; pvIdx++) {
+    for (int pvIdx = 0; pvIdx < pos->multiPV && !Signals.stop; pvIdx++) {
       pos->pvIdx = pvIdx;
       if (pvIdx == pvLast) {
         pvFirst = pvLast;
@@ -473,7 +473,7 @@ void thread_search(Pos *pos)
         // When failing high/low give some update (without cluttering
         // the UI) before a re-search.
         if (   pos->threadIdx == 0
-            && multiPV == 1
+            && pos->multiPV == 1
             && (bestValue <= alpha || bestValue >= beta)
             && time_elapsed() > 3000)
           uci_print_pv(pos, pos->rootDepth, alpha, beta);
@@ -503,7 +503,7 @@ void thread_search(Pos *pos)
 
 skip_search:
       if (    pos->threadIdx == 0
-          && (Signals.stop || pvIdx + 1 == multiPV || time_elapsed() > 3000))
+          && (Signals.stop || pvIdx + 1 == pos->multiPV || time_elapsed() > 3000))
         uci_print_pv(pos, pos->rootDepth, alpha, beta);
     }
 
