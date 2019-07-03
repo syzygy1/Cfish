@@ -151,6 +151,7 @@ static const Score PassedFile[8] = {
 static const int PassedDanger[8] = { 0, 0, 0, 3, 6, 11, 18 };
 
 // Assorted bonuses and penalties used by evaluation
+static const Score AttacksOnSpaceArea = S(  4,  0);
 static const Score BishopPawns        = S(  3,  7);
 static const Score CorneredBishop     = S( 50, 50);
 static const Score FlankAttacks       = S(  8,  0);
@@ -460,23 +461,15 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them  = (Us == WHITE ? BLACK      : WHITE);
   const int Up    = (Us == WHITE ? NORTH      : SOUTH);
-  const int Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
-  const int Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
   const Bitboard TRank3BB = (Us == WHITE ? Rank3BB  : Rank6BB);
 
   enum { Minor, Rook };
 
-  Bitboard b, weak, defended, stronglyProtected, safe, restricted;
+  Bitboard b, weak, defended, stronglyProtected, safe;
   Score score = SCORE_ZERO;
 
   // Non-pawn enemies
   Bitboard nonPawnEnemies = pieces_c(Them) & ~pieces_p(PAWN);
-
-  // Our safe or protected pawns
-  b = pieces_cp(Us, PAWN) & (~ei->attackedBy[Them][0] | ei->attackedBy[Us][0]);
-
-  safe = (shift_bb(Right, b) | shift_bb(Left, b)) & nonPawnEnemies;
-  score += ThreatBySafePawn * popcount(safe);
 
   // Squares strongly protected by the opponent, either because they attack the
   // square with a pawn or because they attack the square twice and we don't.
@@ -484,13 +477,13 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
                      | (ei->attackedBy2[Them] & ~ei->attackedBy2[Us]);
 
   // Non-pawn enemies, strongly protected
-  defended =  (pieces_c(Them) ^ pieces_cp(Them, PAWN))
-            & stronglyProtected;
+  defended = nonPawnEnemies & stronglyProtected;
 
   // Enemies not strongly protected and under our attack
-  weak =   pieces_c(Them)
-        & ~stronglyProtected
-        &  ei->attackedBy[Us][0];
+  weak = pieces_c(Them) & ~stronglyProtected & ei->attackedBy[Us][0];
+
+  // Safe or protected squares
+  safe = ~ei->attackedBy[Them][0] | ei->attackedBy[Us][0];
 
   // Add a bonus according to the kind of attacking pieces
   if (defended | weak) {
@@ -520,23 +513,27 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   }
 
   // Bonus for restricting their piece moves
-  restricted =   ei->attackedBy[Them][0]
-              & ~stronglyProtected
-              &  ei->attackedBy[Us][0];
-  score += RestrictedPiece * popcount(restricted);
+  b =   ei->attackedBy[Them][0]
+     & ~stronglyProtected
+     &  ei->attackedBy[Us][0];
+  score += RestrictedPiece * popcount(b);
 
   // Find the squares reachable by a single pawn push
   b  = shift_bb(Up, pieces_cp(Us, PAWN)) & ~pieces();
   b |= shift_bb(Up, b & TRank3BB) & ~pieces();
 
   // Keep only those squares which are relatively safe
-  b &=  ~pieces()
-      & ~ei->attackedBy[Them][PAWN]
-      & (ei->attackedBy[Us][0] | ~ei->attackedBy[Them][0]);
+  b &= ~ei->attackedBy[Them][PAWN] & safe;
 
   // Add a bonus for each new pawn threat from those squares
-  b = (shift_bb(Left, b) | shift_bb(Right, b)) & pieces_c(Them);
+  b = pawn_attacks_bb(b, Us) & pieces_c(Them);
   score += ThreatByPawnPush * popcount(b);
+
+  // Our safe or protected pawns
+  b = pieces_cp(Us, PAWN) & safe;
+
+  b = pawn_attacks_bb(b, Us) & nonPawnEnemies;
+  score += ThreatBySafePawn * popcount(b);
 
   // Bonus for impending threats against enemy queen
   if (piece_count(Them, QUEEN) == 1) {
@@ -675,8 +672,11 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
   // ...count safe + (behind & safe) with a single popcount.
   int bonus = popcount((Us == WHITE ? safe << 32 : safe >> 32) | (behind & safe));
   int weight = popcount(pieces_c(Us)) - 1;
+  Score score = make_score(bonus * weight * weight / 16, 0);
 
-  return make_score(bonus * weight * weight / 16, 0);
+  score -= AttacksOnSpaceArea * popcount(ei->attackedBy[Them][0] & behind & safe);
+
+  return score;
 }
 
 

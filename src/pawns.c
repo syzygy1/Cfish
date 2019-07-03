@@ -29,10 +29,11 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Backward      = S( 9, 24);
-static const Score Doubled       = S(11, 56);
-static const Score Isolated      = S( 5, 15);
-static const Score WeakUnopposed = S(13, 27);
+static const Score Attacked2Unsupported = S( 0, 20);
+static const Score Backward             = S( 9, 24);
+static const Score Doubled              = S(11, 56);
+static const Score Isolated             = S( 5, 15);
+static const Score WeakUnopposed        = S(13, 27);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
@@ -51,10 +52,10 @@ static const Value ShelterStrength[4][8] = {
 // RANK_1 = 0 is used for files where the enemy has no pawn or where their
 // pawn is behind our king
 static const Value UnblockedStorm[4][8] = {
-  { V( 89), V(107), V(123), V(93), V(57), V( 45), V( 51) },
-  { V( 44), V(-18), V(123), V(46), V(39), V( -7), V( 23) },
-  { V(  4), V( 52), V(162), V(37), V( 7), V(-14), V( -2) },
-  { V(-10), V(-14), V( 90), V(15), V( 2), V( -7), V(-16) }
+  { V( 89), V(-285), V(-185), V(93), V(57), V( 45), V( 51) },
+  { V( 44), V( -18), V( 123), V(46), V(39), V( -7), V( 23) },
+  { V(  4), V(  52), V( 162), V(37), V( 7), V(-14), V( -2) },
+  { V(-10), V( -14), V(  90), V(15), V( 2), V( -7), V(-16) }
 };
 
 #undef S
@@ -64,8 +65,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 {
   const int Them  = (Us == WHITE ? BLACK      : WHITE);
   const int Up    = (Us == WHITE ? NORTH      : SOUTH);
-  const int Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
-  const int Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
 
   Bitboard b, neighbours, stoppers, doubled, support, phalanx;
   Bitboard lever, leverPush;
@@ -79,9 +78,14 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
   e->semiopenFiles[Us] = 0xFF;
   e->kingSquares[Us] = SQ_NONE;
-  e->pawnAttacks[Us] = shift_bb(Right, ourPawns) | shift_bb(Left, ourPawns);
+  e->pawnAttacks[Us] = pawn_attacks_bb(ourPawns, Us);
   e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
+
+  // Unsupported enemy pawns attacked twice by us
+  score += Attacked2Unsupported * popcount(theirPawns
+             &  pawn_double_attacks_bb(ourPawns, Us)
+             & ~pawn_attacks_bb(theirPawns, Them));
 
   // Loop through all pawns of the current color and score each pawn
   loop_through_pieces(Us, PAWN, s) {
@@ -178,14 +182,11 @@ INLINE void evaluate_shelter(const Pos *pos, Square ksq, Score *shelter,
                              const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
-  const int Down = (Us == WHITE ? SOUTH : NORTH);
-  const Bitboard BlockSquares =  (Rank1BB | Rank2BB | Rank7BB | Rank8BB)
-                               & (FileABB | FileHBB);
   
   Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us);
   Bitboard theirPawns = b & pieces_c(Them);
-  Value bonus[] = { (shift_bb(Down, theirPawns) & BlockSquares & sq_bb(ksq)) ? 374 : 5, VALUE_ZERO };
+  Value bonus[] = { 5, 5 };
 
   File center = clamp(file_of(ksq), FILE_B, FILE_G);
 
