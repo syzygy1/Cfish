@@ -70,8 +70,8 @@ static void score_captures(const Pos *pos)
   // preferring captures near our with a good history.
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
-    m->value =  PieceValue[MG][piece_on(to_sq(m->move))]
-              + (*history)[moved_piece(m->move)][to_sq(m->move)][type_of_p(piece_on(to_sq(m->move)))] / 8;
+    m->value =  PieceValue[MG][piece_on(to_sq(m->move))] * 6
+              + (*history)[moved_piece(m->move)][to_sq(m->move)][type_of_p(piece_on(to_sq(m->move)))];
 }
 
 SMALL
