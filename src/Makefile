@@ -327,10 +327,12 @@ endif
 ifeq ($(popcnt),yes)
 	ifeq ($(arch),ppc64)
 		CFLAGS += -DUSE_POPCNT
-	else ifeq ($(comp),icc)
+	else
+	ifeq ($(comp),icc)
 		CFLAGS += -msse3 -DUSE_POPCNT
 	else
 		CFLAGS += -msse3 -mpopcnt -DUSE_POPCNT
+	endif
 	endif
 endif
 
