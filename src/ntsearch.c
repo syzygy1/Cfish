@@ -633,6 +633,9 @@ moves_loop: // When in check search starts from here.
         int bonus = value > alpha ?  stat_bonus(newDepth)
                                   : -stat_bonus(newDepth);
 
+        if (move == ss->killers[0])
+          bonus += bonus / 4;
+
         update_cm_stats(ss, movedPiece, to_sq(move), bonus);
       }
     }

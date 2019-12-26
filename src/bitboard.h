@@ -133,14 +133,16 @@ INLINE Bitboard file_bb_s(Square s)
 // shift_bb() moves a bitboard one step along direction Direction.
 INLINE Bitboard shift_bb(int Direction, Bitboard b)
 {
-  return  Direction == NORTH  ?  b  << 8
-        : Direction == SOUTH  ?  b  >> 8
-        : Direction == EAST   ? (b & ~FileHBB) << 1
-        : Direction == WEST   ? (b & ~FileABB) >> 1
-        : Direction == NORTH_EAST ? (b & ~FileHBB) << 9
-        : Direction == SOUTH_EAST ? (b & ~FileHBB) >> 7
-        : Direction == NORTH_WEST ? (b & ~FileABB) << 7
-        : Direction == SOUTH_WEST ? (b & ~FileABB) >> 9
+  return  Direction == NORTH       ?  b << 8
+        : Direction == SOUTH       ?  b >> 8
+        : Direction == NORTH+NORTH ?  b << 16
+        : Direction == SOUTH+SOUTH ?  b >> 16
+        : Direction == EAST        ? (b & ~FileHBB) << 1
+        : Direction == WEST        ? (b & ~FileABB) >> 1
+        : Direction == NORTH_EAST  ? (b & ~FileHBB) << 9
+        : Direction == SOUTH_EAST  ? (b & ~FileHBB) >> 7
+        : Direction == NORTH_WEST  ? (b & ~FileABB) << 7
+        : Direction == SOUTH_WEST  ? (b & ~FileABB) >> 9
         : 0;
 }
 

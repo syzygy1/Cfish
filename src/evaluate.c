@@ -136,18 +136,17 @@ static const Score ThreatByRook[8] = {
 // pawns. We don't use a Score because we process the two components
 // independently.
 static const Value PassedRank[][8] = {
-  { V(0), V( 5), V(12), V(10), V(57), V(163), V(271) },
-  { V(0), V(18), V(23), V(31), V(62), V(167), V(250) }
+  { V(0), V(10), V(17), V(15), V(62), V(168), V(276) },
+  { V(0), V(28), V(33), V(41), V(72), V(177), V(260) }
 };
 
 // PassedFile[File] contains a bonus according to the file of a passed pawn
 static const Score PassedFile[8] = {
-  S( -1,  7), S( 0,  9), S(-9, -8), S(-30,-14),
-  S(-30,-14), S(-9, -8), S( 0,  9), S( -1,  7)
+  S( 0,  0), S(11,  8), S(22, 16), S(33, 24),
+  S(33, 24), S(22, 16), S(11,  8), S( 0,  0)
 };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score AttacksOnSpaceArea = S(  4,  0);
 static const Score BishopPawns        = S(  3,  7);
 static const Score CorneredBishop     = S( 50, 50);
 static const Score FlankAttacks       = S(  8,  0);
@@ -564,7 +563,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const int Up   = (Us == WHITE ? NORTH : SOUTH);
 
-  Bitboard b, bb, squaresToQueen, defendedSquares, unsafeSquares;
+  Bitboard b, bb, squaresToQueen, unsafeSquares;
   Score score = SCORE_ZERO;
 
   b = ei->pe->passedPawns[Us];
@@ -595,16 +594,13 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
         // If there is a rook or queen attacking/defending the pawn from behind,
         // consider all the squaresToQueen. Otherwise consider only the squares
         // in the pawn's path attacked or occupied by the enemy.
-        defendedSquares = squaresToQueen = forward_file_bb(Us, s);
+        squaresToQueen = forward_file_bb(Us, s);
         unsafeSquares = passed_pawn_span(Us, s);
 
         bb = forward_file_bb(Them, s) & pieces_pp(ROOK, QUEEN);
 
-        if (!(pieces_c(Us) & bb))
-          defendedSquares &= ei->attackedBy[Us][0];
-
         if (!(pieces_c(Them) & bb))
-          unsafeSquares &= ei->attackedBy[Them][0] | pieces_c(Them);
+          unsafeSquares &= ei->attackedBy[Them][0];
 
         // If there are no enemy attacks on passed pawn span, assign a big
         // bonus. Otherwise, assign a smaller bonus if the path to queen is
@@ -615,7 +611,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
                : !(unsafeSquares & sq_bb(blockSq)) ? 9 : 0;
 
         // Assign a larger bonus if the block square is defended
-        if (defendedSquares & sq_bb(blockSq))
+        if ((pieces_c(Us) & bb) || (ei->attackedBy[Us][0] & sq_bb(blockSq)))
           k += 5;
 
         mbonus += k * w, ebonus += k * w;
@@ -625,13 +621,13 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
     // Scale down bonus for candidate passers which need more than one
     // push to become passed or have a pawn in front of them.
     if (   !pawn_passed(pos, Us, s + Up)
-        || (pieces_p(PAWN) & forward_file_bb(Us, s)))
+        || (pieces_p(PAWN) & sq_bb(s + Up)))
     {
       mbonus /= 2;
       ebonus /= 2;
     }
 
-    score += make_score(mbonus, ebonus) + PassedFile[file_of(s)];
+    score += make_score(mbonus, ebonus) - PassedFile[file_of(s)];
   }
 
   return score;
@@ -648,6 +644,7 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
+  const int Down = (Us == WHITE ? SOUTH : NORTH);
   const Bitboard SpaceMask =
     Us == WHITE ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)
                 : (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB);
@@ -659,18 +656,12 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 
   // Find all squares which are at most three squares behind some friendly pawn
   Bitboard behind = pieces_cp(Us, PAWN);
-  behind |= (Us == WHITE ? behind >>  8 : behind <<  8);
-  behind |= (Us == WHITE ? behind >> 16 : behind << 16);
+  behind |= shift_bb(Down, behind);
+  behind |= shift_bb(Down + Down, behind);
 
-  // Since SpaceMask[Us] is fully on our half of the board...
-  assert((unsigned)(safe >> (Us == WHITE ? 32 : 0)) == 0);
-
-  // ...count safe + (behind & safe) with a single popcount.
-  int bonus = popcount((Us == WHITE ? safe << 32 : safe >> 32) | (behind & safe));
+  int bonus = popcount(safe) + popcount(behind & safe & ~ei->attackedBy[Them][0]);
   int weight = popcount(pieces_c(Us)) - 1;
   Score score = make_score(bonus * weight * weight / 16, 0);
-
-  score -= AttacksOnSpaceArea * popcount(ei->attackedBy[Them][0] & behind & safe);
 
   return score;
 }
