@@ -146,10 +146,6 @@ static const Score PassedFile[8] = {
   S(-30,-14), S(-9, -8), S( 0,  9), S( -1,  7)
 };
 
-// Rank-dependent factor for a passed-pawn bonus. In Stockfish, the cheap
-// lookup was replaced with an expensive calcuation.
-static const int PassedDanger[8] = { 0, 0, 0, 3, 6, 11, 18 };
-
 // Assorted bonuses and penalties used by evaluation
 static const Score AttacksOnSpaceArea = S(  4,  0);
 static const Score BishopPawns        = S(  3,  7);
@@ -160,7 +156,7 @@ static const Score KingProtector      = S(  7,  8);
 static const Score KnightOnQueen      = S( 16, 12);
 static const Score LongDiagonalBishop = S( 45,  0);
 static const Score MinorBehindPawn    = S( 18,  3);
-static const Score Outpost            = S( 36, 12);
+static const Score Outpost            = S( 18,  6);
 static const Score PawnlessFlank      = S( 17, 95);
 static const Score RestrictedPiece    = S(  7,  7);
 static const Score RookOnPawn         = S( 10, 32);
@@ -262,10 +258,10 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       // Bonus for outpost squares
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += Outpost * (Pt == KNIGHT ? 2 : 1);
+        score += Outpost * (Pt == KNIGHT ? 4 : 2);
 
       else if (bb & b & ~pieces_c(Us))
-        score += Outpost / (Pt == KNIGHT ? 1 : 2);
+        score += Outpost * (Pt == KNIGHT ? 2 : 1);
 
       // Knight and Bishop bonus for being right behind a pawn
       if (shift_bb(Down, pieces_p(PAWN)) & sq_bb(s))
@@ -525,8 +521,8 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Keep only those squares which are relatively safe
   b &= ~ei->attackedBy[Them][PAWN] & safe;
 
-  // Add a bonus for each new pawn threat from those squares
-  b = pawn_attacks_bb(b, Us) & pieces_c(Them);
+  // Bonus for safe pawn threats on the next move
+  b = pawn_attacks_bb(b, Us) & nonPawnEnemies;
   score += ThreatByPawnPush * popcount(b);
 
   // Our safe or protected pawns
@@ -579,11 +575,11 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
     assert(!(pieces_cp(Them, PAWN) & forward_file_bb(Us, s + Up)));
 
     int r = relative_rank_s(Us, s);
-    int w = PassedDanger[r];
 
     Value mbonus = PassedRank[MG][r], ebonus = PassedRank[EG][r];
 
-    if (w) {
+    if (r > RANK_3) {
+      int w = 5 * r - 13;
       Square blockSq = s + Up;
 
       // Adjust bonus based on the king's proximity

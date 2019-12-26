@@ -288,6 +288,11 @@ INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
   return pos->st->blockersForKing[c];
 }
 
+INLINE bool is_discovery_check_on_king(const Pos *pos, uint32_t c, Move m)
+{
+  return pos->st->blockersForKing[c] & sq_bb(from_sq(m));
+}
+
 INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
 {
   return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_span(c, s));

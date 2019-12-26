@@ -29,7 +29,7 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Attacked2Unsupported = S( 0, 20);
+static const Score Attacked2Unsupported = S( 0, 56);
 static const Score Backward             = S( 9, 24);
 static const Score Doubled              = S(11, 56);
 static const Score Isolated             = S( 5, 15);
@@ -82,11 +82,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
 
-  // Unsupported enemy pawns attacked twice by us
-  score += Attacked2Unsupported * popcount(theirPawns
-             &  pawn_double_attacks_bb(ourPawns, Us)
-             & ~pawn_attacks_bb(theirPawns, Them));
-
   // Loop through all pawns of the current color and score each pawn
   loop_through_pieces(Us, PAWN, s) {
     assert(piece_on(s) == make_piece(Us, PAWN));
@@ -107,8 +102,9 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     support    = neighbours & rank_bb_s(s - Up);
 
     // A pawn is backward when it is behind all pawns of the same color on
-    // the adjacent files and cannot be safely advanced.
-    backward =   !(ourPawns & pawn_attack_span(Them, s + Up))
+    // the adjacent files and cannot safely advance. Phalanx and isolated
+    // pawns will be excluded when the pawn is scored.
+    backward =   !(neighbours & forward_ranks_bb(Them, rank_of(s)))
               &&  (stoppers & (leverPush | sq_bb(s + Up)));
 
     // Passed pawns will be properly scored in evaluation because we need
@@ -143,6 +139,12 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       score -= Doubled;
   }
 
+  // Unsupported friendly pawns attacked twice by the enemy
+  score -= Attacked2Unsupported * popcount(ourPawns
+             &  pawn_double_attacks_bb(theirPawns, Them)
+             & ~pawn_attacks_bb(ourPawns, Us)
+             & ~e->passedPawns[Us]);
+printf("score=%d\n",score);
   return score;
 }
 

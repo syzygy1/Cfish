@@ -78,7 +78,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     bestValue = futilityBase = -VALUE_INFINITE;
   } else {
     if (ttHit) {
-      // Never assume anything on values stored in TT
+      // Never assume anything about values stored in TT
       if ((ss->staticEval = bestValue = tte_eval(tte)) == VALUE_NONE)
          ss->staticEval = bestValue = evaluate(pos);
 

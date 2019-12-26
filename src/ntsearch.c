@@ -57,7 +57,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue;
-  int ttHit, ttPv, inCheck, givesCheck, improving;
+  int ttHit, ttPv, inCheck, givesCheck, improving, doLMR;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
   bool ttCapture;
   Piece movedPiece;
@@ -228,7 +228,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     improving = 0;
     goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
-    // Never assume anything on values stored in TT
+    // Never assume anything about values stored in TT
     if ((eval = tte_eval(tte)) == VALUE_NONE)
       eval = evaluate(pos);
     ss->staticEval = eval;
@@ -476,7 +476,7 @@ moves_loop: // When in check search starts from here.
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
     }
     else if (    givesCheck
-             && (blockers_for_king(pos, pos_stm() ^ 1) & sq_bb(from_sq(move)) || see_test(pos, move, 0)))
+             && (is_discovery_check_on_king(pos, pos_stm() ^ 1, move) || see_test(pos, move, 0)))
       extension = ONE_PLY;
 
     // Castling extension
@@ -620,14 +620,22 @@ moves_loop: // When in check search starts from here.
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 
-      doFullDepthSearch = (value > alpha && d != newDepth);
+      doFullDepthSearch = (value > alpha && d != newDepth), doLMR = true;
 
     } else
-      doFullDepthSearch = !PvNode || moveCount > 1;
+      doFullDepthSearch = !PvNode || moveCount > 1, doLMR = false;
 
     // Step 17. Full depth search when LMR is skipped or fails high.
-    if (doFullDepthSearch)
+    if (doFullDepthSearch) {
       value = -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
+
+      if (doLMR && !captureOrPromotion) {
+        int bonus = value > alpha ?  stat_bonus(newDepth)
+                                  : -stat_bonus(newDepth);
+
+        update_cm_stats(ss, movedPiece, to_sq(move), bonus);
+      }
+    }
 
     // For PV nodes only, do a full PV search on the first move or after a fail
     // high (in the latter case search only if value < beta), otherwise let the
