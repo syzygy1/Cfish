@@ -259,6 +259,8 @@ INLINE unsigned distance_r(Square x, Square y)
   return r1 < r2 ? r2 - r1 : r1 - r2;
 }
 
+#define attacks_bb_queen(s, occupied)	(attacks_bb_bishop((s), (occupied)) | attacks_bb_rook((s), (occupied)))
+
 #if defined(MAGIC_FANCY)
 #include "magic-fancy.h"
 #elif defined(MAGIC_PLAIN)
@@ -269,6 +271,8 @@ INLINE unsigned distance_r(Square x, Square y)
 #include "bmi2-fancy.h"
 #elif defined(BMI2_PLAIN)
 #include "bmi2-plain.h"
+#elif defined(AVX2_BITBOARD)
+#include "avx2-bitboard.h"
 #endif
 
 INLINE Bitboard attacks_bb(int pt, Square s, Bitboard occupied)
@@ -281,7 +285,7 @@ INLINE Bitboard attacks_bb(int pt, Square s, Bitboard occupied)
   case ROOK:
       return attacks_bb_rook(s, occupied);
   case QUEEN:
-      return attacks_bb_bishop(s, occupied) | attacks_bb_rook(s, occupied);
+      return attacks_bb_queen(s, occupied);
   default:
       return PseudoAttacks[pt][s];
   }

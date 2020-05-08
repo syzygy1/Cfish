@@ -26,6 +26,7 @@ uint8_t PopCnt16[1 << 16];
 #endif
 uint8_t SquareDistance[64][64];
 
+#ifndef AVX2_BITBOARD
 static int RookDirs[] = { NORTH, EAST, SOUTH, WEST };
 static int BishopDirs[] = { NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST };
 
@@ -44,6 +45,7 @@ static Bitboard sliding_attack(int dirs[], Square sq, Bitboard occupied)
 
   return attack;
 }
+#endif
 
 #if defined(MAGIC_FANCY)
 #include "magic-fancy.c"
@@ -55,6 +57,8 @@ static Bitboard sliding_attack(int dirs[], Square sq, Bitboard occupied)
 #include "bmi2-fancy.c"
 #elif defined(BMI2_PLAIN)
 #include "bmi2-plain.c"
+#elif defined(AVX2_BITBOARD)
+#include "avx2-bitboard.c"
 #endif
 
 Bitboard SquareBB[64];
