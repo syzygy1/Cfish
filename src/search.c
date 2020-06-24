@@ -57,7 +57,7 @@ static Score base_ct;
 static const int RazorMargin = 661;
 
 INLINE int futility_margin(Depth d, int improving) {
-  return 198 * (d / ONE_PLY) - 178 * improving;
+  return 198 * (d / ONE_PLY - improving);
 }
 
 // Futility and reductions lookup tables, initialized at startup
@@ -495,8 +495,10 @@ void thread_search(Pos *pos)
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
           failedHighCnt++;
-        } else
+        } else {
+          rm->move[pvIdx].bestMoveCount++;
           break;
+        }
 
         delta += delta / 4 + 5;
 
@@ -582,6 +584,15 @@ skip_search:
     std::swap(rm[0], *std::find(rm.begin(),
               rm.end(), skill.best_move(multiPV)));
 #endif
+}
+
+static int best_move_count(Pos *pos, Move move)
+{
+  int idx;
+  for (idx = pos->pvIdx; idx < pos->pvLast; idx++)
+    if (pos->rootMoves->move[idx].pv[0] == move)
+      break;
+  return idx < pos->pvLast ? pos->rootMoves->move[idx].bestMoveCount : 0;
 }
 
 // search_PV() is the main search function for PV nodes.
@@ -725,6 +736,9 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
   int c = pos_stm();
   history_update(*pos->history, c, move, bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
+
+  if (type_of_p(moved_piece(move)) != PAWN)
+    history_update(*pos->history, c, reverse_move(move), -bonus);
 
   if (move_is_ok((ss-1)->currentMove)) {
     Square prevSq = to_sq((ss-1)->currentMove);
@@ -980,7 +994,7 @@ void start_thinking(Pos *root)
       rm->move[i].pv[0] = moves->move[i].pv[0];
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
-      rm->move[i].selDepth = 0;
+      rm->move[i].selDepth = rm->move[i].bestMoveCount = 0;
       rm->move[i].tbRank = moves->move[i].tbRank;
       rm->move[i].tbScore = moves->move[i].tbScore;
     }

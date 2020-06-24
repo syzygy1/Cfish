@@ -288,6 +288,7 @@ extern uint32_t NonPawnPieceValue[16];
 #define type_of_m(m) ((m) >> 14)
 #define promotion_type(m) ((((m)>>12) & 3) + KNIGHT)
 #define make_move(from,to) ((Move)((to) | ((from) << 6)))
+#define reverse_move(m) (make_move(to_sq(m), from_sq(m)))
 #define make_promotion(from,to,pt) ((Move)((to) | ((from)<<6) | (PROMOTION<<14) | (((pt)-KNIGHT)<<12)))
 #define make_enpassant(from,to) ((Move)((to) | ((from)<<6) | (ENPASSANT<<14)))
 #define make_castling(from,to) ((Move)((to) | ((from)<<6) | (CASTLING<<14)))

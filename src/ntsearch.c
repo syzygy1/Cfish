@@ -270,7 +270,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss-1)->currentMove != MOVE_NULL
       && (ss-1)->statScore < 22661
       && eval >= beta
-      && ss->staticEval >= beta - 33 * depth / ONE_PLY + 299
+      && eval >= ss->staticEval
+      && ss->staticEval >= beta - 33 * depth / ONE_PLY + 299 - improving * 30
       && !excludedMove
       && pos_non_pawn_material(pos_stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
@@ -553,7 +554,8 @@ moves_loop: // When in check search starts from here.
     // Step 16. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3 * ONE_PLY
-        &&  moveCount > 1 + 3 * rootNode
+        &&  moveCount > 1 + 2 * rootNode
+        && (!rootNode || best_move_count(pos, move) == 0)
         && (   !captureOrPromotion
             || moveCountPruning
             || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha
@@ -586,7 +588,7 @@ moves_loop: // When in check search starts from here.
         // hence break make_move(). Also use see() instead of see_sign(),
         // because the destination square is empty.
         else if (   type_of_m(move) == NORMAL
-                 && !see_test(pos, make_move(to_sq(move), from_sq(move)), 0))
+                 && !see_test(pos, reverse_move(move), 0))
           r -= 2 * ONE_PLY;
 
         ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
