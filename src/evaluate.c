@@ -410,10 +410,6 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   else
     unsafeChecks |= b;
 
-  // Unsafe or occupied checking squares will also be considered, as long
-  // the square is in the attacker's mobility area.
-  unsafeChecks &= ei->mobilityArea[Them];
-
   // Find the squares that opponent attacks in our king flank and the squares
   // which are attacked twice in that flank.
   b1 = ei->attackedBy[Them][0] & KingFlank[file_of(ksq)] & Camp;
@@ -426,7 +422,8 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                + 185 * popcount(ei->kingRing[Us] & weak)
                - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
                -  35 * !!(ei->attackedBy[Us][BISHOP] & ei->attackedBy[Us][KING])
-               + 150 * popcount(blockers_for_king(pos, Us) | unsafeChecks)
+               + 148 * popcount(unsafeChecks)
+               +  98 * popcount(blockers_for_king(pos, Us))
                - 873 * !pieces_cp(Them, QUEEN)
                -   6 * mg_value(score) / 8
                +       mg_value(mobility[Them] - mobility[Us])
@@ -477,9 +474,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Enemies not strongly protected and under our attack
   weak = pieces_c(Them) & ~stronglyProtected & ei->attackedBy[Us][0];
 
-  // Safe or protected squares
-  safe = ~ei->attackedBy[Them][0] | ei->attackedBy[Us][0];
-
   // Add a bonus according to the kind of attacking pieces
   if (defended | weak) {
     b = (defended | weak) & (ei->attackedBy[Us][KNIGHT] | ei->attackedBy[Us][BISHOP]);
@@ -513,6 +507,14 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
      &  ei->attackedBy[Us][0];
   score += RestrictedPiece * popcount(b);
 
+  // Protected or unattacked squares
+  safe = ~ei->attackedBy[Them][0] | ei->attackedBy[Us][0];
+
+  // Bonus for attacking enemy pieces with our relatively safe pawns
+  b = pieces_cp(Us, PAWN) & safe;
+  b = pawn_attacks_bb(b, Us) & nonPawnEnemies;
+  score += ThreatBySafePawn * popcount(b);
+
   // Find the squares reachable by a single pawn push
   b  = shift_bb(Up, pieces_cp(Us, PAWN)) & ~pieces();
   b |= shift_bb(Up, b & TRank3BB) & ~pieces();
@@ -523,12 +525,6 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Bonus for safe pawn threats on the next move
   b = pawn_attacks_bb(b, Us) & nonPawnEnemies;
   score += ThreatByPawnPush * popcount(b);
-
-  // Our safe or protected pawns
-  b = pieces_cp(Us, PAWN) & safe;
-
-  b = pawn_attacks_bb(b, Us) & nonPawnEnemies;
-  score += ThreatBySafePawn * popcount(b);
 
   // Bonus for impending threats against enemy queen
   if (piece_count(Them, QUEEN) == 1) {

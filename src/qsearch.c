@@ -104,7 +104,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     if (PvNode && bestValue > alpha)
       alpha = bestValue;
 
-    futilityBase = bestValue + 128;
+    futilityBase = bestValue + 153;
   }
 
   ss->history = &(*pos->counterMoveHistory)[0][0];

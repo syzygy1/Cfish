@@ -268,9 +268,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 9. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && (ss-1)->currentMove != MOVE_NULL
-      && (ss-1)->statScore < 23200
+      && (ss-1)->statScore < 22661
       && eval >= beta
-      && ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+      && ss->staticEval >= beta - 33 * depth / ONE_PLY + 299
       && !excludedMove
       && pos_non_pawn_material(pos_stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
@@ -278,7 +278,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + min((eval - beta) / 200, 3)) * ONE_PLY;
+    Depth R = ((835 + 70 * depth / ONE_PLY) / 256 + min((eval - beta) / 185, 3)) * ONE_PLY;
 
     ss->currentMove = MOVE_NULL;
     ss->history = &(*pos->counterMoveHistory)[0][0];
@@ -293,7 +293,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       if (nullValue >= VALUE_MATE_IN_MAX_PLY)
         nullValue = beta;
 
-      if (   (depth < 12 * ONE_PLY || pos->nmpPly)
+      if (   (depth < 13 * ONE_PLY || pos->nmpPly)
           && abs(beta) < VALUE_KNOWN_WIN)
         return nullValue;
 
@@ -319,7 +319,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       &&  depth >= 5 * ONE_PLY
       &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
   {
-    Value rbeta = min(beta + 216 - 48 * improving, VALUE_INFINITE);
+    Value rbeta = min(beta + 191 - 46 * improving, VALUE_INFINITE);
     Depth rdepth = depth - 4 * ONE_PLY;
 
     assert(rdepth >= ONE_PLY);
@@ -351,7 +351,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   }
 
   // Step 11. Internal iterative deepening
-  if (depth >= 8 * ONE_PLY && !ttMove) {
+  if (depth >= 7 * ONE_PLY && !ttMove) {
     if (PvNode)
       search_PV(pos, ss, alpha, beta, depth - 7 * ONE_PLY);
     else
@@ -408,17 +408,6 @@ moves_loop: // When in check search starts from here.
       fflush(stdout);
     }
 
-    // In MultiPV also skip moves which will be searched later as PV move.
-    // This seems questionable.
-    if (rootNode) {
-      int idx;
-      for (idx = pos->pvIdx + 1; idx < pos->multiPV; idx++)
-        if (pos->rootMoves->move[idx].pv[0] == move)
-          break;
-      if (idx < pos->multiPV)
-        continue;
-    }
-
     if (PvNode)
       (ss+1)->pv = NULL;
 
@@ -435,7 +424,7 @@ moves_loop: // When in check search starts from here.
     // that move is singular and should be extended. To verify this we do a
     // reduced search on all the other moves but the ttMove and if the
     // result is lower than ttValue minus a margin then we extend the ttMove.
-    if (    depth >= 8 * ONE_PLY
+    if (    depth >= 6 * ONE_PLY
         &&  move == ttMove
         && !rootNode
         && !excludedMove // No recursive singular search
@@ -456,7 +445,7 @@ moves_loop: // When in check search starts from here.
       if (value < singularBeta) {
         extension = ONE_PLY;
         singularLMR++;
-        if (value < singularBeta - min(3 * depth / ONE_PLY, 39))
+        if (value < singularBeta - min(4 * depth / ONE_PLY, 36))
           singularLMR++;
       }
 
@@ -521,24 +510,24 @@ moves_loop: // When in check search starts from here.
         int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), DEPTH_ZERO) / ONE_PLY;
 
         // Countermoves based pruning
-        if (   lmrDepth < 3 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
+        if (   lmrDepth < 4 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
             && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
           continue;
 
         // Futility pruning: parent node
-        if (   lmrDepth < 7
+        if (   lmrDepth < 6
             && !inCheck
-            && ss->staticEval + 256 + 200 * lmrDepth <= alpha)
+            && ss->staticEval + 250 + 211 * lmrDepth <= alpha)
           continue;
 
         // Prune moves with negative SEE at low depths and below a decreasing
         // threshold at higher depths.
-        if (!see_test(pos, move, -29 * lmrDepth * lmrDepth))
+        if (!see_test(pos, move, -(31 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
           continue;
       }
       else if (  (!givesCheck || !extension)
-               && !see_test(pos, move, -PawnValueEg * (depth / ONE_PLY)))
+               && !see_test(pos, move, -199 * (depth / ONE_PLY)))
         continue;
     }
 
@@ -567,7 +556,8 @@ moves_loop: // When in check search starts from here.
         &&  moveCount > 1 + 3 * rootNode
         && (   !captureOrPromotion
             || moveCountPruning
-            || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha))
+            || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha
+            || cutNode))
     {
       Depth r = reduction(improving, depth, moveCount);
 
@@ -603,13 +593,20 @@ moves_loop: // When in check search starts from here.
                        + (*fmh )[movedPiece][to_sq(move)]
                        + (*fmh2)[movedPiece][to_sq(move)]
                        + (*pos->history)[pos_stm() ^ 1][from_to(move)]
-                       - 4000; // Correction factor.
+                       - 4729;
+
+        // Reset statScore if negative and most stats show >= 0
+        if (    ss->statScore < 0
+            && (*cmh )[movedPiece][to_sq(move)] >= 0
+            && (*fmh )[movedPiece][to_sq(move)] >= 0
+            && (*pos->history)[pos_stm() ^ 1][from_to(move)] >= 0)
+          ss->statScore = 0;
 
         // Decrease/increase reduction by comparing with opponent's stat score.
-        if (ss->statScore >= 0 && (ss-1)->statScore < 0)
+        if (ss->statScore >= -99 && (ss-1)->statScore < -116)
           r -= ONE_PLY;
 
-        else if ((ss-1)->statScore >= 0 && ss->statScore < 0)
+        else if ((ss-1)->statScore >= -117 && ss->statScore < -144)
           r += ONE_PLY;
 
         // Decrease/increase reduction for moves with a good/bad history.

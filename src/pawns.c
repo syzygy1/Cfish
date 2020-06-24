@@ -29,11 +29,11 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Attacked2Unsupported = S( 0, 56);
-static const Score Backward             = S( 9, 24);
-static const Score Doubled              = S(11, 56);
-static const Score Isolated             = S( 5, 15);
-static const Score WeakUnopposed        = S(13, 27);
+static const Score Backward      = S( 9, 24);
+static const Score Doubled       = S(11, 56);
+static const Score Isolated      = S( 5, 15);
+static const Score WeakLever     = S( 0, 56);
+static const Score WeakUnopposed = S(13, 27);
 
 // Connected pawn bonus by opposed, phalanx, #support and rank
 static Score Connected[2][2][3][8];
@@ -50,7 +50,8 @@ static const Value ShelterStrength[4][8] = {
 
 // Danger of enemry pawns moving toward our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where the enemy has no pawn or where their
-// pawn is behind our king
+// pawn is behind our king. Note that UnblockedStorm[0][1-2] accommodates
+// opponent pawn on edge, likely blocked by our king.
 static const Value UnblockedStorm[4][8] = {
   { V( 89), V(-285), V(-185), V(93), V(57), V( 45), V( 51) },
   { V( 44), V( -18), V( 123), V(46), V(39), V( -7), V( 23) },
@@ -66,14 +67,16 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   const int Them  = (Us == WHITE ? BLACK      : WHITE);
   const int Up    = (Us == WHITE ? NORTH      : SOUTH);
 
-  Bitboard b, neighbours, stoppers, doubled, support, phalanx;
+  Bitboard neighbours, stoppers, doubled, support, phalanx;
   Bitboard lever, leverPush;
   Square s;
-  bool opposed, backward;
+  bool opposed, backward, passed;
   Score score = SCORE_ZERO;
 
   Bitboard ourPawns   = pieces_cp(Us, PAWN);
   Bitboard theirPawns = pieces_p(PAWN) ^ ourPawns;
+
+  Bitboard doubleAttackThem = pawn_double_attacks_bb(theirPawns, Them);
 
   e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
   e->semiopenFiles[Us] = 0xFF;
@@ -107,23 +110,20 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     backward =   !(neighbours & forward_ranks_bb(Them, rank_of(s)))
               &&  (stoppers & (leverPush | sq_bb(s + Up)));
 
-    // Passed pawns will be properly scored in evaluation because we need
-    // full attack info to evaluate them. Include also not passed pawns
-    // which could become passed after one or two pawn pushes when they
-    // are not attacked more times than defended.
-    if (   !(stoppers ^ lever)
-        || (  !(stoppers ^ leverPush)
-            && popcount(phalanx) >= popcount(leverPush)))
-      e->passedPawns[Us] |= sq_bb(s);
+    // A pawn is passed if one of the three following conditions is true:
+    // (a) there are no stoppers except some levers
+    // (b) the only stoppers are the leverPush, but we outnumber them
+    // (c) there is only one front stopper which can be levered
+    passed =   !(stoppers ^ lever)
+            || (   !(stoppers ^ leverPush)
+                && popcount(phalanx) >= popcount(leverPush))
+            || (   stoppers == sq_bb(s + Up) && relative_rank_s(Us, s) >= RANK_5
+                && (shift_bb(Up, support) & ~(theirPawns | doubleAttackThem)));
 
-    else if (   stoppers == sq_bb(s + Up)
-             && relative_rank_s(Us, s) >= RANK_5)
-    {
-      b = shift_bb(Up, support) & ~theirPawns;
-      while (b)
-        if (!more_than_one(theirPawns & PawnAttacks[Us][pop_lsb(&b)]))
-          e->passedPawns[Us] |= sq_bb(s);
-    }
+    // Passed pawns will be properly scored later in evaluation when we have
+    // full attack info.
+    if (passed)
+      e->passedPawns[Us] |= sq_bb(s);
 
     // Score this pawn
     if (support | phalanx)
@@ -139,12 +139,11 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       score -= Doubled;
   }
 
-  // Unsupported friendly pawns attacked twice by the enemy
-  score -= Attacked2Unsupported * popcount(ourPawns
-             &  pawn_double_attacks_bb(theirPawns, Them)
-             & ~pawn_attacks_bb(ourPawns, Us)
-             & ~e->passedPawns[Us]);
-printf("score=%d\n",score);
+  // Penalize our unsupported pawns attacked twice by the enemy
+  score -= WeakLever * popcount(  ourPawns
+                                & doubleAttackThem
+                                & ~e->pawnAttacks[Us]);
+
   return score;
 }
 
@@ -228,7 +227,7 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
   if (pawns)
     while (!(DistanceRingBB[ksq][++minKingPawnDistance] & pawns)) {}
 
-  Score shelter = make_score(-VALUE_INFINITE, VALUE_ZERO);
+  Score shelter = make_score(-VALUE_INFINITE, 0);
   evaluate_shelter(pos, ksq, &shelter, Us);
 
   // If we can castle use the bonus after the castling if it is bigger
@@ -238,7 +237,7 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
   if (can_castle_cr(make_castling_right(Us, QUEEN_SIDE)))
     evaluate_shelter(pos, relative_square(Us, SQ_C1), &shelter, Us);
 
-  return shelter - make_score(VALUE_ZERO, 16 * minKingPawnDistance);
+  return shelter - make_score(0, 16 * minKingPawnDistance);
 }
 
 // "template" instantiation:
