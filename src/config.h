@@ -11,6 +11,7 @@
 //#define MAGIC_BLACK
 #define MAGIC_PLAIN
 //#define MAGIC_FANCY
+//#define AVX2_BITBOARD
 #endif
 
 //#define BIG_TT
