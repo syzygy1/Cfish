@@ -79,9 +79,9 @@ static Value stat_bonus(Depth depth)
 
 // Add a small random component to draw evaluations to keep search dynamic
 // and to avoid three-fold blindness. (Yucks, ugly hack)
-static Value value_draw(Depth depth, Pos *pos)
+static Value value_draw(Pos *pos)
 {
-  return depth < 4 * ONE_PLY ? VALUE_DRAW : VALUE_DRAW + 2 * (pos->nodes & 1) - 1;
+  return VALUE_DRAW + 2 * (pos->nodes & 1) - 1;
 }
 
 // Skill structure is used to implement strength limit

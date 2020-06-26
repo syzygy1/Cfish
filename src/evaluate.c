@@ -81,7 +81,7 @@ static const Bitboard KingFlank[8] = {
 enum { LazyThreshold = 1400, SpaceThreshold = 12222 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
-static const int KingAttackWeights[8] = { 0, 0, 77, 55, 44, 10 };
+static const int KingAttackWeights[8] = { 0, 0, 81, 52, 44, 10 };
 
 // Penalties for enemy's safe checks
 enum {
@@ -119,17 +119,17 @@ static const Score MobilityBonus[4][32] = {
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(18, 7), S(44, 20) };
+static const Score RookOnFile[2] = { S(21, 4), S(47, 25) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
 // pawn defended are not considered.
 static const Score ThreatByMinor[8] = {
-  S(0, 0), S(0, 31), S(39, 42), S(57, 44), S(68,112), S(62,120)
+  S(0, 0), S(6, 28), S(39, 42), S(57, 44), S(68,112), S(62,120)
 };
 
 static const Score ThreatByRook[8] = {
-  S(0, 0), S(0, 24), S(38, 71), S(38, 61), S( 0, 38), S(51, 38)
+  S(0, 0), S(3, 44), S(38, 71), S(38, 61), S( 0, 38), S(51, 38)
 };
 
 // PassedRank[mg/eg][Rank] contains midgame and endgame bonuses for passed
@@ -158,7 +158,7 @@ static const Score MinorBehindPawn    = S( 18,  3);
 static const Score Outpost            = S( 18,  6);
 static const Score PawnlessFlank      = S( 17, 95);
 static const Score RestrictedPiece    = S(  7,  7);
-static const Score RookOnPawn         = S( 10, 32);
+static const Score RookOnQueenFile    = S(  7,  6);
 static const Score SliderOnQueen      = S( 59, 18);
 static const Score ThreatByKing       = S( 24, 89);
 static const Score ThreatByPawnPush   = S( 48, 39);
@@ -298,11 +298,11 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
     }
 
     if (Pt == ROOK) {
-      // Bonus for aligning with enemy pawns on the same rank/file
-      if (relative_rank_s(Us, s) >= RANK_5)
-        score += RookOnPawn * popcount(pieces_cp(Them, PAWN) & PseudoAttacks[ROOK][s]);
+      // Bonus for rook on the same file as a queen
+      if (file_bb_s(s) & pieces_p(QUEEN))
+        score += RookOnQueenFile;
 
-      // Bonus when on an open or semi-open file
+      // Bonus for rook on an open or semi-open file
       if (semiopen_file(ei->pe, Us, file_of(s)))
         score += RookOnFile[!!semiopen_file(ei->pe, Them, file_of(s))];
 
@@ -668,11 +668,18 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 // attacking/defending status of the players.
 
 // Since only eg is involved, we return a Value and not a Score.
-INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Value eg)
+INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
 {
+  Value mg = mg_value(score);
+  Value eg = eg_value(score);
+
   int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                    - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
   bool bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
+
+  bool almostUnwinnable =   !passedCount
+                         &&  outflanking < 0
+                         && !bothFlanks;
 
   // Compute the initiative bonus for the attacking side
   int initiative =    9 * passedCount
@@ -680,15 +687,17 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Value eg)
                   +   9 * outflanking
                   +  18 * bothFlanks
                   +  49 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK))
+                  -  36 * almostUnwinnable
                   - 103;
 
   // Now apply the bonus: note that we find the attacking side by extracting
-  // the sign of the endgame value, and that we carefully cap the bonus so
-  // that the endgame score will never change sign after the bonus.
-  Value value = ((eg > 0) - (eg < 0)) * max(initiative, -abs(eg));
+  // the sign of the midgame or endgame values, and that we carefully cap the
+  // bonus so that the midgame and endgame scores will never change sign after
+  // the bonus.
+  int u = ((mg > 0) - (mg < 0)) * max(min(initiative + 50, 0), -abs(mg));
+  int v = ((eg > 0) - (eg < 0)) * max(initiative, -abs(eg));
 
-//  return make_score(0, value);
-  return value;
+  return make_score(u, v);
 }
 
 // evaluate_scale_factor() computes the scale factor for the winning side
@@ -702,9 +711,10 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   if (sf == SCALE_FACTOR_NORMAL) {
     if (   opposite_bishops(pos)
         && pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) == 2 * BishopValueMg)
-      return 16 + 4 * ei->pe->passedCount;
+      sf = 16 + 4 * ei->pe->passedCount;
     else
-      return min(40 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN), sf);
+      sf = min(sf, 36 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN));
+    sf = max(0, sf - (pos_rule50_count() - 12) / 4);
   }
 
   return sf;
@@ -772,19 +782,15 @@ Value evaluate(const Pos *pos)
               - evaluate_space(pos, &ei, BLACK);
 
   // Evaluate position potential for the winning side
-  //  score += evaluate_initiative(pos, ei.pi->asymmetry, eg_value(score));
-  int eg = eg_value(score);
-  eg += evaluate_initiative(pos, ei.pe->passedCount, eg);
+  score += evaluate_initiative(pos, ei.pe->passedCount, score);
 
   // Evaluate scale factor for the winning side
   //int sf = evaluate_scale_factor(pos, &ei, eg_value(score));
-  int sf = evaluate_scale_factor(pos, &ei, eg);
+  int sf = evaluate_scale_factor(pos, &ei, eg_value(score));
 
   // Interpolate between a middlegame and a (scaled by 'sf') endgame score
-  //  Value v =  mg_value(score) * ei.me->gamePhase
-  //           + eg_value(score) * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
   v =  mg_value(score) * ei.me->gamePhase
-     + eg * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
+     + eg_value(score) * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
 
   v /= PHASE_MIDGAME;
 

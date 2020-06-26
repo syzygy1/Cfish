@@ -24,12 +24,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && has_game_cycle(pos, ss->ply))
   {
 #if PvNode
-      alpha = value_draw(depth, pos);
+      alpha = value_draw(pos);
       if (alpha >= beta)
         return alpha;
 #else
       // Yucky randomisation made this necessary
-      Value tmp_alpha = value_draw(depth, pos);
+      Value tmp_alpha = value_draw(pos);
       if (tmp_alpha >= beta)
         return tmp_alpha;
       alpha = tmp_alpha;
@@ -89,7 +89,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     // Step 2. Check for aborted search and immediate draw
     if (load_rlx(Signals.stop) || is_draw(pos) || ss->ply >= MAX_PLY)
       return  ss->ply >= MAX_PLY && !inCheck ? evaluate(pos)
-                                             : value_draw(depth, pos);
+                                             : value_draw(pos);
 
     // Step 3. Mate distance pruning. Even if we mate at the next move our
     // score would be at best mate_in(ss->ply+1), but if alpha is already
@@ -232,6 +232,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     if ((eval = tte_eval(tte)) == VALUE_NONE)
       eval = evaluate(pos);
     ss->staticEval = eval;
+
+    if (eval == VALUE_DRAW)
+      eval = value_draw(pos);
 
     // Can ttValue be used as a better position evaluation?
     if (ttValue != VALUE_NONE)
@@ -469,10 +472,6 @@ moves_loop: // When in check search starts from here.
              && (is_discovery_check_on_king(pos, pos_stm() ^ 1, move) || see_test(pos, move, 0)))
       extension = ONE_PLY;
 
-    // Castling extension
-    else if (type_of_m(move) == CASTLING)
-      extension = ONE_PLY;
-
     // Shuffle extension
     else if (   PvNode
              && pos_rule50_count() > 18
@@ -484,6 +483,10 @@ moves_loop: // When in check search starts from here.
     else if (   move == ss->killers[0]
              && advanced_pawn_push(pos, move)
              && pawn_passed(pos, pos_stm(), to_sq(move)))
+      extension = ONE_PLY;
+
+    // Castling extension
+    if (type_of_m(move) == CASTLING)
       extension = ONE_PLY;
 
     // Calculate new depth for this move
@@ -527,7 +530,7 @@ moves_loop: // When in check search starts from here.
         if (!see_test(pos, move, -(31 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
           continue;
       }
-      else if (  (!givesCheck || !extension)
+      else if (   !(givesCheck && extension)
                && !see_test(pos, move, -199 * (depth / ONE_PLY)))
         continue;
     }
@@ -571,7 +574,7 @@ moves_loop: // When in check search starts from here.
       if ((ss-1)->moveCount > 15)
         r -= ONE_PLY;
 
-      // Decrease reduction if move has been singularly extended
+      // Decrease reduction if ttMove has been singularly extended
       r -= singularLMR * ONE_PLY;
 
       if (!captureOrPromotion) {

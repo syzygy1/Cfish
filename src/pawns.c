@@ -135,14 +135,10 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     else if (backward)
       score -= Backward + (opposed ? 0 : WeakUnopposed);
 
-    if (doubled && !support)
-      score -= Doubled;
+    if (!support)
+      score -=  (doubled ? Doubled : 0)
+              + (more_than_one(lever) ? WeakLever : 0);
   }
-
-  // Penalize our unsupported pawns attacked twice by the enemy
-  score -= WeakLever * popcount(  ourPawns
-                                & doubleAttackThem
-                                & ~e->pawnAttacks[Us]);
 
   return score;
 }
@@ -158,7 +154,7 @@ void pawn_init(void)
     for (int phalanx = 0; phalanx < 2; phalanx++)
       for (int support = 0; support <= 2; support++)
         for (int r = RANK_2; r < RANK_8; ++r) {
-          int v =  Seed[r] * (phalanx ? 3 : 2) / (opposed ? 2 : 1) + 17 * support;
+          int v = Seed[r] * (2 + (!!phalanx) - opposed) + 21 * support;
           Connected[opposed][phalanx][support][r] = make_score(v, v * (r-2) / 4);
       }
 }

@@ -340,7 +340,7 @@ endif
 ifeq ($(pext),yes)
 	CFLAGS += -DUSE_PEXT
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
-		CFLAGS += -mbmi2
+		CFLAGS += -msse4 -mbmi2
 	endif
 endif
 
