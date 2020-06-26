@@ -25,7 +25,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   assert(InCheck == !!pos_checkers());
   assert(alpha >= -VALUE_INFINITE && alpha < beta && beta <= VALUE_INFINITE);
   assert(PvNode || (alpha == beta - 1));
-  assert(depth <= DEPTH_ZERO);
+  assert(depth <= 0);
 
   Move pv[MAX_PLY+1];
   TTEntry *tte;
@@ -145,7 +145,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
 
     // Detect non-capture evasions that are candidates to be pruned
     evasionPrunable =    InCheck
-                     && (depth != DEPTH_ZERO || moveCount > 2)
+                     && (depth != 0 || moveCount > 2)
                      &&  bestValue > VALUE_MATED_IN_MAX_PLY
                      && !is_capture(pos, move);
 
@@ -171,12 +171,12 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     do_move(pos, move, givesCheck);
 #if PvNode
     value =  givesCheck
-           ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
-           : -qsearch_PV_false(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
+           ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, depth - 1)
+           : -qsearch_PV_false(pos, ss+1, -beta, -alpha, depth - 1);
 #else
     value =  givesCheck
-           ? -qsearch_NonPV_true(pos, ss+1, -beta, depth - ONE_PLY)
-           : -qsearch_NonPV_false(pos, ss+1, -beta, depth - ONE_PLY);
+           ? -qsearch_NonPV_true(pos, ss+1, -beta, depth - 1)
+           : -qsearch_NonPV_false(pos, ss+1, -beta, depth - 1);
 #endif
     undo_move(pos, move);
 

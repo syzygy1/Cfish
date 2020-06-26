@@ -391,6 +391,8 @@ void threads_set_number(int num)
   while (Threads.numThreads > num)
     thread_destroy(Threads.pos[--Threads.numThreads]);
 
+  search_init();
+
   if (num == 0 && numCmhTables > 0) {
     for (int i = 0; i < numCmhTables; i++)
       if (cmhTables[i]) {

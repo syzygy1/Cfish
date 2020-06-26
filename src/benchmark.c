@@ -189,7 +189,7 @@ void benchmark(Pos *current, char *str)
     fprintf(stderr, "\nPosition: %d/%d\n", ++j, numFens - numOpts);
 
     if (strcmp(limitType, "perft") == 0)
-      nodes += perft(&pos, Limits.depth * ONE_PLY);
+      nodes += perft(&pos, Limits.depth);
     else {
       Limits.startTime = now();
       start_thinking(&pos);

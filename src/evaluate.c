@@ -125,7 +125,7 @@ static const Score RookOnFile[2] = { S(21, 4), S(47, 25) };
 // which piece type attacks which one. Attacks on lesser pieces which are
 // pawn defended are not considered.
 static const Score ThreatByMinor[8] = {
-  S(0, 0), S(6, 28), S(39, 42), S(57, 44), S(68,112), S(62,120)
+  S(0, 0), S(6, 32), S(59, 41), S(79, 56), S(90,119), S(79,161)
 };
 
 static const Score ThreatByRook[8] = {
@@ -155,14 +155,13 @@ static const Score KingProtector      = S(  7,  8);
 static const Score KnightOnQueen      = S( 16, 12);
 static const Score LongDiagonalBishop = S( 45,  0);
 static const Score MinorBehindPawn    = S( 18,  3);
-static const Score Outpost            = S( 18,  6);
+static const Score Outpost            = S( 16,  5);
 static const Score PawnlessFlank      = S( 17, 95);
 static const Score RestrictedPiece    = S(  7,  7);
 static const Score RookOnQueenFile    = S(  7,  6);
 static const Score SliderOnQueen      = S( 59, 18);
 static const Score ThreatByKing       = S( 24, 89);
 static const Score ThreatByPawnPush   = S( 48, 39);
-static const Score ThreatByRank       = S( 13,  0);
 static const Score ThreatBySafePawn   = S(173, 94);
 static const Score TrappedRook        = S( 47,  4);
 static const Score WeakQueen          = S( 49, 15);
@@ -477,20 +476,12 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
   // Add a bonus according to the kind of attacking pieces
   if (defended | weak) {
     b = (defended | weak) & (ei->attackedBy[Us][KNIGHT] | ei->attackedBy[Us][BISHOP]);
-    while (b) {
-      Square s = pop_lsb(&b);
-      score += ThreatByMinor[piece_on(s) - 8 * Them];
-      if (piece_on(s) != make_piece(Them, PAWN))
-        score += ThreatByRank * relative_rank_s(Them, s);
-    }
+    while (b)
+      score += ThreatByMinor[piece_on(pop_lsb(&b)) - 8 * Them];
 
     b = weak & ei->attackedBy[Us][ROOK];
-    while (b) {
-      Square s = pop_lsb(&b);
-      score += ThreatByRook[piece_on(s) - 8 * Them];
-      if (piece_on(s) != make_piece(Them, PAWN))
-        score += ThreatByRank * relative_rank_s(Them, s);
-    }
+    while (b)
+      score += ThreatByRook[piece_on(pop_lsb(&b)) - 8 * Them];
 
     // Bonus for king attacks on pawns or pieces which are not pawn-defended
     if (weak & ei->attackedBy[Us][KING])

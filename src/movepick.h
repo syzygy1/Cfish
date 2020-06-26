@@ -66,7 +66,7 @@ Move next_move(const Pos *pos, int skipQuiets);
 
 INLINE void mp_init(const Pos *pos, Move ttm, Depth d)
 {
-  assert(d > DEPTH_ZERO);
+  assert(d > 0);
 
   Stack *st = pos->st;
 
@@ -87,7 +87,7 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth d)
 
 INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 {
-  assert(d <= DEPTH_ZERO);
+  assert(d <= 0);
 
   Stack *st = pos->st;
 

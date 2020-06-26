@@ -67,10 +67,10 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   const int Them  = (Us == WHITE ? BLACK      : WHITE);
   const int Up    = (Us == WHITE ? NORTH      : SOUTH);
 
-  Bitboard neighbours, stoppers, doubled, support, phalanx;
+  Bitboard neighbours, stoppers, doubled, support, phalanx, opposed;
   Bitboard lever, leverPush;
   Square s;
-  bool opposed, backward, passed;
+  bool backward, passed;
   Score score = SCORE_ZERO;
 
   Bitboard ourPawns   = pieces_cp(Us, PAWN);
@@ -92,7 +92,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     uint32_t f = file_of(s);
 
     e->semiopenFiles[Us] &= ~(1 << f);
-    e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s);
 
     // Flag the pawn
     opposed    = theirPawns & forward_file_bb(Us, s);
@@ -109,6 +108,16 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // pawns will be excluded when the pawn is scored.
     backward =   !(neighbours & forward_ranks_bb(Them, rank_of(s)))
               &&  (stoppers & (leverPush | sq_bb(s + Up)));
+
+    // Span of backward pawns and span behind opposing pawns are not included
+    // in the pawnAttacksSpan bitboard.
+    if (!backward || phalanx) {
+      if (opposed)
+        e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s) &
+                                 ~pawn_attack_span(Us, frontmost_sq(Them, opposed));
+      else
+        e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s);
+    }
 
     // A pawn is passed if one of the three following conditions is true:
     // (a) there are no stoppers except some levers
@@ -127,7 +136,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
     // Score this pawn
     if (support | phalanx)
-      score += Connected[opposed][!!phalanx][popcount(support)][relative_rank_s(Us, s)];
+      score += Connected[!!opposed][!!phalanx][popcount(support)][relative_rank_s(Us, s)];
 
     else if (!neighbours)
       score -= Isolated + (opposed ? 0 : WeakUnopposed);

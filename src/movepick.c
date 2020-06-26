@@ -183,7 +183,7 @@ Move next_move(const Pos *pos, int skipQuiets)
       st->cur = st->endBadCaptures;
       st->endMoves = generate_quiets(pos, st->cur);
       score_quiets(pos);
-      partial_insertion_sort(st->cur, st->endMoves, -4000 * st->depth / ONE_PLY);
+      partial_insertion_sort(st->cur, st->endMoves, -4000 * st->depth);
     }
     st->stage++;
     /* fallthrough */
