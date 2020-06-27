@@ -104,7 +104,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     if (PvNode && bestValue > alpha)
       alpha = bestValue;
 
-    futilityBase = bestValue + 153;
+    futilityBase = bestValue + 154;
   }
 
   ss->history = &(*pos->counterMoveHistory)[0][0][0][0];
@@ -150,9 +150,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
                      && !is_capture(pos, move);
 
     // Don't search moves with negative SEE values
-    if (   (!InCheck || evasionPrunable)
-        && !(givesCheck && (blockers_for_king(pos, pos_stm() ^ 1) & sq_bb(from_sq(move))))
-        && !see_test(pos, move, 0))
+    if ((!InCheck || evasionPrunable) && !see_test(pos, move, 0))
       continue;
 
     // Speculative prefetch as early as possible

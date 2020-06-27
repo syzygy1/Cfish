@@ -61,6 +61,7 @@ void thread_wait(Pos *pos, atomic_bool *b);
 struct MainThread {
   double previousTimeReduction;
   Value previousScore;
+  Value iterValue[4];
 };
 
 typedef struct MainThread MainThread;

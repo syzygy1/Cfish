@@ -166,7 +166,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
         update_cm_stats(ss, moved_piece(ttMove), to_sq(ttMove), penalty);
       }
     }
-    return ttValue;
+    if (pos_rule50_count() < 90)
+      return ttValue;
   }
 
   // Step 5. Tablebase probe
@@ -260,12 +261,13 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     return PvNode ? qsearch_PV_false(pos, ss, alpha, beta, 0)
                   : qsearch_NonPV_false(pos, ss, alpha, 0);
 
-  improving =   ss->staticEval >= (ss-2)->staticEval
-             || (ss-2)->staticEval == VALUE_NONE;
+  improving =  (ss-2)->staticEval == VALUE_NONE
+             ? (ss->staticEval >= (ss-4)->staticEval || (ss-4)->staticEval == VALUE_NONE)
+             :  ss->staticEval >= (ss-2)->staticEval;
 
   // Step 8. Futility pruning: child node
   if (   !PvNode
-      &&  depth < 7
+      &&  depth < 6
       &&  eval - futility_margin(depth, improving) >= beta
       &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
     return eval; // - futility_margin(depth); (do not do the right thing)
@@ -273,10 +275,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 9. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && (ss-1)->currentMove != MOVE_NULL
-      && (ss-1)->statScore < 22661
+      && (ss-1)->statScore < 23397
       && eval >= beta
       && eval >= ss->staticEval
-      && ss->staticEval >= beta - 33 * depth + 299 - improving * 30
+      && ss->staticEval >= beta - 32 * depth + 292 - improving * 30
       && !excludedMove
       && non_pawn_material_c(pos_stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
@@ -284,7 +286,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = ((835 + 70 * depth) / 256 + min((eval - beta) / 185, 3));
+    Depth R = ((854 + 68 * depth) / 258 + min((eval - beta) / 192, 3));
 
     ss->currentMove = MOVE_NULL;
     ss->history = &(*pos->counterMoveHistory)[0][0][0][0];
@@ -325,7 +327,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       &&  depth >= 5
       &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
   {
-    Value rbeta = min(beta + 191 - 46 * improving, VALUE_INFINITE);
+    Value rbeta = min(beta + 189 - 45 * improving, VALUE_INFINITE);
     Depth rdepth = depth - 4;
 
     assert(rdepth >= 1);
@@ -453,16 +455,20 @@ moves_loop: // When in check search starts from here.
         // Futility pruning: parent node
         if (   lmrDepth < 6
             && !inCheck
-            && ss->staticEval + 250 + 211 * lmrDepth <= alpha)
+            && ss->staticEval + 255 + 182 * lmrDepth <= alpha
+            &&  (*pos->history)[pos_stm()][from_to(move)]
+              + (*cmh )[movedPiece][to_sq(move)]
+              + (*fmh )[movedPiece][to_sq(move)]
+              + (*fmh2)[movedPiece][to_sq(move)] < 30000)
           continue;
 
         // Prune moves with negative SEE at low depths and below a decreasing
         // threshold at higher depths.
-        if (!see_test(pos, move, -(31 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
+        if (!see_test(pos, move, -(32 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
           continue;
       }
       else if (   !(givesCheck && extension)
-               && !see_test(pos, move, -199 * depth))
+               && !see_test(pos, move, -194 * depth))
         continue;
     }
 
@@ -501,7 +507,7 @@ moves_loop: // When in check search starts from here.
       // assume that this expected cut-node is not singular, i.e. multiple
       // moves fail high. We therefore prune the whole subtree by returning
       // a soft bound.
-      else if (eval >= beta && singularBeta >= beta)
+      else if (singularBeta >= beta)
         return singularBeta;
 
       // The call to search_NonPV with the same value of ss messed up our
@@ -522,8 +528,7 @@ moves_loop: // When in check search starts from here.
       extension = 1;
 
     // Last captures extension
-    else if (   PvNode
-             && PieceValue[EG][captured_piece()] > PawnValueEg
+    else if (   PieceValue[EG][captured_piece()] > PawnValueEg
              && non_pawn_material() <= 2 * RookValueMg)
       extension = 1;
 
@@ -562,12 +567,12 @@ moves_loop: // When in check search starts from here.
             || moveCountPruning
             || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha
             || cutNode
-            || pos->ttHitAverage < 384 * ttHitAverageResolution * ttHitAverageWindow / 1024))
+            || pos->ttHitAverage < 375 * ttHitAverageResolution * ttHitAverageWindow / 1024))
     {
       Depth r = reduction(improving, depth, moveCount);
 
       // Decrease reduction if the ttHit runing average is large
-      if (pos->ttHitAverage > 544 * ttHitAverageResolution * ttHitAverageWindow / 1024)
+      if (pos->ttHitAverage > 500 * ttHitAverageResolution * ttHitAverageWindow / 1024)
         r--;
 
       // Decrease reduction if position is or has been on the PV
@@ -575,7 +580,7 @@ moves_loop: // When in check search starts from here.
         r -= 2;
 
       // Decrease reduction if opponent's move count is high
-      if ((ss-1)->moveCount > 15)
+      if ((ss-1)->moveCount > 14)
         r -= 1;
 
       // Decrease reduction if ttMove has been singularly extended
@@ -603,7 +608,7 @@ moves_loop: // When in check search starts from here.
                        + (*fmh )[movedPiece][to_sq(move)]
                        + (*fmh2)[movedPiece][to_sq(move)]
                        + (*pos->history)[pos_stm() ^ 1][from_to(move)]
-                       - 4729;
+                       - 4926;
 
         // Reset statScore if negative and most stats show >= 0
         if (    ss->statScore < 0
@@ -613,10 +618,10 @@ moves_loop: // When in check search starts from here.
           ss->statScore = 0;
 
         // Decrease/increase reduction by comparing with opponent's stat score.
-        if (ss->statScore >= -99 && (ss-1)->statScore < -116)
+        if (ss->statScore >= -102 && (ss-1)->statScore < -114)
           r -= 1;
 
-        else if ((ss-1)->statScore >= -117 && ss->statScore < -144)
+        else if ((ss-1)->statScore >= -116 && ss->statScore < -154)
           r += 1;
 
         // Decrease/increase reduction for moves with a good/bad history.

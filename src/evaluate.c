@@ -164,7 +164,7 @@ static const Score SliderOnQueen      = S( 59, 18);
 static const Score ThreatByKing       = S( 24, 89);
 static const Score ThreatByPawnPush   = S( 48, 39);
 static const Score ThreatBySafePawn   = S(173, 94);
-static const Score TrappedRook        = S( 47,  4);
+static const Score TrappedRook        = S( 52, 10);
 static const Score WeakQueen          = S( 49, 15);
 
 #undef S
@@ -187,9 +187,10 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   // Find our pawns on the first two ranks, and those which are blocked
   Bitboard b = pieces_cp(Us, PAWN) & (shift_bb(Down, pieces()) | LowRanks);
 
-  // Squares occupied by those pawns, by our king or queen, or controlled by
-  // enemy pawns are excluded from the mobility area
-  ei->mobilityArea[Us] = ~(b | pieces_cpp(Us, KING, QUEEN) | ei->pe->pawnAttacks[Them]);
+  // Squares occupied by those pawns, by our king or queen, by blockers to
+  // attacks on our king or controlled by enemy pawns are excluded from the
+  // mobility area
+  ei->mobilityArea[Us] = ~(b | pieces_cpp(Us, KING, QUEEN) | blockers_for_king(pos, Us) | ei->pe->pawnAttacks[Them]);
 
   // Initialise attackedBy[] for kings and pawns
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
@@ -567,8 +568,8 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
       Square blockSq = s + Up;
 
       // Adjust bonus based on the king's proximity
-      ebonus +=  capped_distance(square_of(Them, KING), blockSq) * 5 * w
-               - capped_distance(square_of(Us, KING), blockSq) * 2 * w;
+      ebonus += ( (capped_distance(square_of(Them, KING), blockSq) * 19) / 4
+                 - capped_distance(square_of(Us, KING), blockSq) * 2 ) * w;
 
       // If blockSq is not the queening square then consider also a second push
       if (r != RANK_7)
@@ -664,6 +665,10 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
 
   int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                    - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
+
+  bool infiltration =   rank_of(square_of(WHITE, KING)) > RANK_4
+                     || rank_of(square_of(BLACK, KING)) < RANK_5;
+
   bool bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
 
   bool almostUnwinnable =   !passedCount
@@ -674,10 +679,11 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
   int initiative =   9 * passedCount
                   + 11 * popcount(pieces_p(PAWN))
                   +  9 * outflanking
+                  + 12 * infiltration
                   + 21 * bothFlanks
                   + 51 * !non_pawn_material()
                   - 43 * almostUnwinnable
-                  - 95;
+                  - 100;
 
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the midgame or endgame values, and that we carefully cap the
