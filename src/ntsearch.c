@@ -57,7 +57,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue;
-  int ttHit, ttPv, inCheck, givesCheck, improving, doLMR;
+  int ttHit, ttPv, inCheck, givesCheck, improving, didLMR;
   bool doFullDepthSearch, moveCountPruning;
   bool ttCapture, priorCapture, captureOrPromotion, singularLMR;
   Piece movedPiece;
@@ -475,13 +475,6 @@ moves_loop: // When in check search starts from here.
              && (is_discovery_check_on_king(pos, pos_stm() ^ 1, move) || see_test(pos, move, 0)))
       extension = 1;
 
-    // Shuffle extension
-    else if (   PvNode
-             && pos_rule50_count() > 18
-             && depth < 3
-             && ++pos->shuffleExts < pos->nodes / 4)
-      extension = 1;
-
     // Passed pawn extension
     else if (   move == ss->killers[0]
              && advanced_pawn_push(pos, move)
@@ -626,16 +619,16 @@ moves_loop: // When in check search starts from here.
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 
-      doFullDepthSearch = (value > alpha && d != newDepth), doLMR = true;
+      doFullDepthSearch = (value > alpha && d != newDepth), didLMR = true;
 
     } else
-      doFullDepthSearch = !PvNode || moveCount > 1, doLMR = false;
+      doFullDepthSearch = !PvNode || moveCount > 1, didLMR = false;
 
     // Step 17. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch) {
       value = -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
 
-      if (doLMR && !captureOrPromotion) {
+      if (didLMR && !captureOrPromotion) {
         int bonus = value > alpha ?  stat_bonus(newDepth)
                                   : -stat_bonus(newDepth);
 

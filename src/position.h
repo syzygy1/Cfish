@@ -154,7 +154,6 @@ struct Pos {
   Stack *stack;
   uint64_t nodes;
   uint64_t tbHits;
-  uint64_t shuffleExts;
   int pvIdx, pvLast;
   int selDepth, nmpPly, nmpOdd;
   Depth rootDepth;

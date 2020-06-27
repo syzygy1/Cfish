@@ -175,10 +175,11 @@ static const Score WeakQueen          = S( 49, 15);
 INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
-  const int Up   = (Us == WHITE ? NORTH : SOUTH);
   const int Down = (Us == WHITE ? SOUTH : NORTH);
   const Bitboard LowRanks = (Us == WHITE ? Rank2BB | Rank3BB
                                          : Rank7BB | Rank6BB);
+
+  const Square ksq = square_of(Us, KING);
 
   Bitboard dblAttackByPawn = pawn_double_attacks_bb(pieces_cp(Us, PAWN), Us);
 
@@ -196,15 +197,9 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const int Us)
   ei->attackedBy2[Us]   = (b & ei->attackedBy[Us][PAWN]) | dblAttackByPawn;
 
   // Init our king safety tables only if we are going to use them
-  ei->kingRing[Us] = b;
-  if (relative_rank_s(Us, square_of(Us, KING)) == RANK_1)
-    ei->kingRing[Us] |= shift_bb(Up, b);
-
-  if (file_of(square_of(Us, KING)) == FILE_H)
-    ei->kingRing[Us] |= shift_bb(WEST, ei->kingRing[Us]);
-
-  else if (file_of(square_of(Us, KING)) == FILE_A)
-    ei->kingRing[Us] |= shift_bb(EAST, ei->kingRing[Us]);
+  Square s = make_square(clamp(file_of(ksq), FILE_B, FILE_G),
+                         clamp(rank_of(ksq), RANK_2, RANK_7));
+  ei->kingRing[Us] = PseudoAttacks[KING][s] | sq_bb(s);
 
   ei->kingAttackersCount[Them] = popcount(ei->kingRing[Us] & ei->pe->pawnAttacks[Them]);
   ei->kingRing[Us] &= ~dblAttackByPawn;
@@ -417,16 +412,16 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   int kingFlankAttacks = popcount(b1) + popcount(b2);
 
   kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
-               +  69 * ei->kingAttacksCount[Them]
                + 185 * popcount(ei->kingRing[Us] & weak)
-               - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
-               -  35 * !!(ei->attackedBy[Us][BISHOP] & ei->attackedBy[Us][KING])
                + 148 * popcount(unsafeChecks)
                +  98 * popcount(blockers_for_king(pos, Us))
-               - 873 * !pieces_cp(Them, QUEEN)
-               -   6 * mg_value(score) / 8
-               +       mg_value(mobility[Them] - mobility[Us])
+               +  69 * ei->kingAttacksCount[Them]
                +   3 * kingFlankAttacks * kingFlankAttacks / 8
+               +       mg_value(mobility[Them] - mobility[Us])
+               - 873 * !pieces_cp(Them, QUEEN)
+               - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
+               -  35 * !!(ei->attackedBy[Us][BISHOP] & ei->attackedBy[Us][KING])
+               -   6 * mg_value(score) / 8
                -   7;
 
   // Transform the kingDanger units into a Score, and subtract it from
@@ -673,13 +668,13 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
                          && !bothFlanks;
 
   // Compute the initiative bonus for the attacking side
-  int initiative =    9 * passedCount
-                  +  11 * popcount(pieces_p(PAWN))
-                  +   9 * outflanking
-                  +  18 * bothFlanks
-                  +  49 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK))
-                  -  36 * almostUnwinnable
-                  - 103;
+  int initiative =   9 * passedCount
+                  + 11 * popcount(pieces_p(PAWN))
+                  +  9 * outflanking
+                  + 21 * bothFlanks
+                  + 51 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK))
+                  - 43 * almostUnwinnable
+                  - 95;
 
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the midgame or endgame values, and that we carefully cap the

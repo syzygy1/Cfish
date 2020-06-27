@@ -48,7 +48,7 @@ int TB_RootInTB;
 int TB_UseRule50;
 Depth TB_ProbeDepth;
 
-static Score base_ct;
+static int base_ct;
 
 // Different node types, used as a template parameter
 #define NonPV 0
@@ -450,7 +450,7 @@ void thread_search(Pos *pos)
         beta  = min(previousScore + delta,  VALUE_INFINITE);
 
         // Adjust contempt based on root move's previousScore
-        int ct = base_ct + 86 * previousScore / (abs(previousScore) + 176);
+        int ct = base_ct + (111 - base_ct / 2) * previousScore / (abs(previousScore) + 176);
         pos->contempt = pos_stm() == WHITE ?  make_score(ct, ct / 2)
                                            : -make_score(ct, ct / 2);
       }
@@ -988,7 +988,7 @@ void start_thinking(Pos *root)
     pos->selDepth = 0;
     pos->nmpPly = pos->nmpOdd = 0;
     pos->rootDepth = 0;
-    pos->shuffleExts = pos->nodes = pos->tbHits = 0;
+    pos->nodes = pos->tbHits = 0;
     RootMoves *rm = pos->rootMoves;
     rm->size = end - list;
     for (int i = 0; i < rm->size; i++) {

@@ -107,7 +107,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot safely advance.
     backward =   !(neighbours & forward_ranks_bb(Them, rank_of(s + Up)))
-              &&  (stoppers & (leverPush | blocked));
+              &&  (leverPush | blocked);
 
     // Compute additional span if pawn is neither backward nor blocked
     if (!backward && !blocked)
