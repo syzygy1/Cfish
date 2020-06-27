@@ -110,7 +110,7 @@ static Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha, Depth depth);
 static Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha, Depth depth);
 
 static Value value_to_tt(Value v, int ply);
-static Value value_from_tt(Value v, int ply);
+static Value value_from_tt(Value v, int ply, int r50c);
 static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus);
 static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, int bonus);
@@ -128,8 +128,8 @@ void search_init(void)
     Reductions[i] = (23.4 + log(Threads.numThreads)) * log(i);
 
   for (int d = 0; d < 16; ++d) {
-    FutilityMoveCounts[0][d] = (5 + d * d) / 2;
-    FutilityMoveCounts[1][d] = 5 + d * d;
+    FutilityMoveCounts[0][d] = (5 + d * d) / 2 - 1;
+    FutilityMoveCounts[1][d] = 5 + d * d - 1;
   }
 }
 
@@ -669,11 +669,11 @@ static Value value_to_tt(Value v, int ply)
 // from the transposition table (which refers to the plies to mate/be mated
 // from current position) to "plies to mate/be mated from the root".
 
-static Value value_from_tt(Value v, int ply)
+static Value value_from_tt(Value v, int ply, int r50c)
 {
   return  v == VALUE_NONE             ? VALUE_NONE
-        : v >= VALUE_MATE_IN_MAX_PLY  ? v - ply
-        : v <= VALUE_MATED_IN_MAX_PLY ? v + ply : v;
+        : v >= VALUE_MATE_IN_MAX_PLY  ? VALUE_MATE - v > 99 - r50c ? VALUE_MATE_IN_MAX_PLY : v - ply
+        : v <= VALUE_MATED_IN_MAX_PLY ? VALUE_MATE + v > 99 - r50c ? VALUE_MATED_IN_MAX_PLY : v + ply : v;
 }
 
 

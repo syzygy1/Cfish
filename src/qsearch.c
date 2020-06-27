@@ -60,7 +60,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   // Transposition table lookup
   posKey = pos_key();
   tte = tt_probe(posKey, &ttHit);
-  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
+  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, pos_rule50_count()) : VALUE_NONE;
   ttMove = ttHit ? tte_move(tte) : 0;
   ttPv = ttHit ? tte_is_pv(tte) : 0;
 

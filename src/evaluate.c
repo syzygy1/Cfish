@@ -140,6 +140,11 @@ static const Value PassedRank[][8] = {
   { V(0), V(28), V(33), V(41), V(72), V(177), V(260) }
 };
 
+// OutpostRank[Rank] contains a bonus according to the rank of the outpost
+static const Score OutpostRank[8] = {
+  S(0, 0), S(0, 0), S(0, 0), S(28, 18), S(30, 24), S(32, 19)
+};
+
 // PassedFile[File] contains a bonus according to the file of a passed pawn
 static const Score PassedFile[8] = {
   S( 0,  0), S(11,  8), S(22, 16), S(33, 24),
@@ -251,7 +256,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       // Bonus for outpost squares
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += Outpost * (Pt == KNIGHT ? 2 : 1);
+        score += OutpostRank[relative_rank_s(Us, s)] * (Pt == KNIGHT ? 2 : 1);
 
       else if (Pt == KNIGHT && bb & b & ~pieces_c(Us))
         score += Outpost;
@@ -348,7 +353,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                          : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
 
   const Square ksq = square_of(Us, KING);
-  Bitboard weak, b, b1, b2, safe, unsafeChecks = 0;
+  Bitboard weak, b, b1, b2, b3, safe, unsafeChecks = 0;
   int kingDanger = 0;
 
   // King shelter and enemy pawns storm
@@ -404,19 +409,22 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   else
     unsafeChecks |= b;
 
-  // Find the squares that opponent attacks in our king flank and the squares
-  // which are attacked twice in that flank.
+  // Find the squares that opponent attacks in our king flank, the squares
+  // which they attack twice in that flank, and the squares that we defend.
   b1 = ei->attackedBy[Them][0] & KingFlank[file_of(ksq)] & Camp;
   b2 = b1 & ei->attackedBy2[Them];
+  b3 = ei->attackedBy[Us][0] & KingFlank[file_of(ksq)] & Camp;
 
-  int kingFlankAttacks = popcount(b1) + popcount(b2);
+  int kingFlankAttack = popcount(b1) + popcount(b2);
+  int kingFlankDefense = popcount(b3);
 
   kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
                + 185 * popcount(ei->kingRing[Us] & weak)
                + 148 * popcount(unsafeChecks)
                +  98 * popcount(blockers_for_king(pos, Us))
                +  69 * ei->kingAttacksCount[Them]
-               +   3 * kingFlankAttacks * kingFlankAttacks / 8
+               +   4 * (kingFlankAttack - kingFlankDefense)
+               +   3 * kingFlankAttack * kingFlankAttack / 8
                +       mg_value(mobility[Them] - mobility[Us])
                - 873 * !pieces_cp(Them, QUEEN)
                - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
@@ -434,7 +442,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     score -= PawnlessFlank;
 
   // Penalty if king flank is under attack, potentially moving toward the king
-  score -= FlankAttacks * kingFlankAttacks;
+  score -= FlankAttacks * kingFlankAttack;
 
   return score;
 }

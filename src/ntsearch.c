@@ -133,7 +133,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   posKey = pos_key() ^ (Key)((int32_t)excludedMove << 16);
 #endif
   tte = tt_probe(posKey, &ttHit);
-  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
+  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, pos_rule50_count()) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
   ttPv = PvNode ? 4 : (ttHit ? tte_is_pv(tte) : 0);
@@ -426,7 +426,49 @@ moves_loop: // When in check search starts from here.
 
     givesCheck = gives_check(pos, ss, move);
 
-    // Step 13. Singular and Gives Check Extensions
+    // Calculate new depth for this move
+    newDepth = depth - 1;
+
+    // Step 13. Pruning at shallow depth
+    if (  !rootNode
+        && pos_non_pawn_material(pos_stm())
+        && bestValue > VALUE_MATED_IN_MAX_PLY)
+    {
+      // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
+      moveCountPruning = moveCount >= FutilityMoveCounts[improving][depth];
+
+      if (   !captureOrPromotion
+          && !givesCheck
+          && (   !PvNode
+              || !advanced_pawn_push(pos, move)
+              ||  pos_non_pawn_material(pos_stm() ^ 1) > BishopValueMg))
+      {
+        // Reduced depth of the next LMR search
+        int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), 0);
+
+        // Countermoves based pruning
+        if (   lmrDepth < 4 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
+            && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
+            && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
+          continue;
+
+        // Futility pruning: parent node
+        if (   lmrDepth < 6
+            && !inCheck
+            && ss->staticEval + 250 + 211 * lmrDepth <= alpha)
+          continue;
+
+        // Prune moves with negative SEE at low depths and below a decreasing
+        // threshold at higher depths.
+        if (!see_test(pos, move, -(31 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
+          continue;
+      }
+      else if (   !(givesCheck && extension)
+               && !see_test(pos, move, -199 * depth))
+        continue;
+    }
+
+    // Step 14. Extensions
 
     // Singular extension search. If all moves but one fail low on a search
     // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
@@ -485,51 +527,8 @@ moves_loop: // When in check search starts from here.
     if (type_of_m(move) == CASTLING)
       extension = 1;
 
-    // Calculate new depth for this move
-    newDepth = depth - 1 + extension;
-
-    // Step 14. Pruning at shallow depth
-    if (  !rootNode
-        && pos_non_pawn_material(pos_stm())
-        && bestValue > VALUE_MATED_IN_MAX_PLY)
-    {
-      // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
-      moveCountPruning = depth < 16
-                && moveCount >= FutilityMoveCounts[improving][depth];
-
-      if (   !captureOrPromotion
-          && !givesCheck
-          && (   !advanced_pawn_push(pos, move)
-              || pos_non_pawn_material(pos_stm() ^ 1) > BishopValueMg))
-      {
-        // Move count based pruning
-        if (moveCountPruning)
-          continue;
-
-        // Reduced depth of the next LMR search
-        int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), 0);
-
-        // Countermoves based pruning
-        if (   lmrDepth < 4 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
-            && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
-            && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
-          continue;
-
-        // Futility pruning: parent node
-        if (   lmrDepth < 6
-            && !inCheck
-            && ss->staticEval + 250 + 211 * lmrDepth <= alpha)
-          continue;
-
-        // Prune moves with negative SEE at low depths and below a decreasing
-        // threshold at higher depths.
-        if (!see_test(pos, move, -(31 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
-          continue;
-      }
-      else if (   !(givesCheck && extension)
-               && !see_test(pos, move, -199 * depth))
-        continue;
-    }
+    // Add extension to new depth
+    newDepth += extension;
 
     // Speculative prefetch as early as possible
     prefetch(tt_first_entry(key_after(pos, move)));
