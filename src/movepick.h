@@ -60,7 +60,7 @@ enum {
   ST_PROBCUT, ST_PROBCUT_INIT, ST_PROBCUT_2
 };
 
-Move next_move(const Pos *pos, int skipQuiets);
+Move next_move(const Pos *pos, bool skipQuiets);
 
 // Initialisation of move picker data.
 

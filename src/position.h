@@ -322,7 +322,7 @@ INLINE int opposite_bishops(const Pos *pos)
 #endif
 }
 
-INLINE int is_capture_or_promotion(const Pos *pos, Move m)
+INLINE bool is_capture_or_promotion(const Pos *pos, Move m)
 {
   assert(move_is_ok(m));
   return type_of_m(m) != NORMAL ? type_of_m(m) != CASTLING : !is_empty(to_sq(m));

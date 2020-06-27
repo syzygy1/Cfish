@@ -155,7 +155,7 @@ static const Score KingProtector      = S(  7,  8);
 static const Score KnightOnQueen      = S( 16, 12);
 static const Score LongDiagonalBishop = S( 45,  0);
 static const Score MinorBehindPawn    = S( 18,  3);
-static const Score Outpost            = S( 16,  5);
+static const Score Outpost            = S( 32, 10);
 static const Score PawnlessFlank      = S( 17, 95);
 static const Score RestrictedPiece    = S(  7,  7);
 static const Score RookOnQueenFile    = S(  7,  6);
@@ -256,10 +256,10 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       // Bonus for outpost squares
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += Outpost * (Pt == KNIGHT ? 4 : 2);
-
-      else if (bb & b & ~pieces_c(Us))
         score += Outpost * (Pt == KNIGHT ? 2 : 1);
+
+      else if (Pt == KNIGHT && bb & b & ~pieces_c(Us))
+        score += Outpost;
 
       // Knight and Bishop bonus for being right behind a pawn
       if (shift_bb(Down, pieces_p(PAWN)) & sq_bb(s))

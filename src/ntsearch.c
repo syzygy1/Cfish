@@ -58,10 +58,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue;
   int ttHit, ttPv, inCheck, givesCheck, improving, doLMR;
-  int captureOrPromotion, doFullDepthSearch, moveCountPruning;
-  bool ttCapture, priorCapture;
+  bool doFullDepthSearch, moveCountPruning;
+  bool ttCapture, priorCapture, captureOrPromotion, singularLMR;
   Piece movedPiece;
-  int moveCount, captureCount, quietCount, singularLMR;
+  int moveCount, captureCount, quietCount;
 
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
@@ -286,7 +286,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     Depth R = ((835 + 70 * depth) / 256 + min((eval - beta) / 185, 3));
 
     ss->currentMove = MOVE_NULL;
-    ss->history = &(*pos->counterMoveHistory)[0][0][0];
+    ss->history = &(*pos->counterMoveHistory)[0][0][0][0];
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
@@ -334,9 +334,14 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     int probCutCount = 2 + 2 * cutNode;
     while ((move = next_move(pos, 0)) && probCutCount)
       if (move != excludedMove && is_legal(pos, move)) {
+        assert(is_capture_or_promotion(pos, move));
+        assert(depth >= 5);
+
+        captureOrPromotion = true;
         probCutCount--;
+
         ss->currentMove = move;
-        ss->history = &(*pos->counterMoveHistory)[priorCapture][moved_piece(move)][to_sq(move)];
+        ss->history = &(*pos->counterMoveHistory)[inCheck][captureOrPromotion][moved_piece(move)][to_sq(move)];
         givesCheck = gives_check(pos, ss, move);
         do_move(pos, move, givesCheck);
 
@@ -375,10 +380,9 @@ moves_loop: // When in check search starts from here.
 
   mp_init(pos, ttMove, depth);
 
-  value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
-  moveCountPruning = 0;
+  value = bestValue;
+  singularLMR = moveCountPruning = false;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
-  singularLMR = 0;
 
   // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
@@ -449,9 +453,7 @@ moves_loop: // When in check search starts from here.
 
       if (value < singularBeta) {
         extension = 1;
-        singularLMR++;
-        if (value < singularBeta - min(4 * depth, 36))
-          singularLMR++;
+        singularLMR = true;
       }
 
       // Multi-cut pruning. Our ttMove is assumed to fail high, and now we
@@ -548,7 +550,7 @@ moves_loop: // When in check search starts from here.
     // Update the current move (this must be done after singular extension
     // search)
     ss->currentMove = move;
-    ss->history = &(*pos->counterMoveHistory)[priorCapture][movedPiece][to_sq(move)];
+    ss->history = &(*pos->counterMoveHistory)[inCheck][captureOrPromotion][movedPiece][to_sq(move)];
 
     // Step 15. Make the move.
     do_move(pos, move, givesCheck);
@@ -576,7 +578,8 @@ moves_loop: // When in check search starts from here.
         r -= 1;
 
       // Decrease reduction if ttMove has been singularly extended
-      r -= singularLMR;
+      if (singularLMR)
+        r -= 2;
 
       if (!captureOrPromotion) {
         // Increase reduction if ttMove is a capture

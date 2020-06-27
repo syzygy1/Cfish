@@ -122,7 +122,7 @@ static void score_evasions(const Pos *pos)
 
 // next_move() returns the next pseudo-legal move to be searched.
 
-Move next_move(const Pos *pos, int skipQuiets)
+Move next_move(const Pos *pos, bool skipQuiets)
 {
   Stack *st = pos->st;
   Move move;
