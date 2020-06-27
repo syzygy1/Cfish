@@ -149,9 +149,10 @@ void search_clear(void)
   for (int i = 0; i < numCmhTables; i++)
     if (cmhTables[i]) {
       stats_clear(cmhTables[i]);
-      for (int j = 0; j < 16; j++)
-        for (int k = 0; k < 64; k++)
-          (*cmhTables[i])[0][0][j][k] = CounterMovePruneThreshold - 1;
+      for (int c = 0; c < 2; c++)
+        for (int j = 0; j < 16; j++)
+          for (int k = 0; k < 64; k++)
+            (*cmhTables[i])[c][0][0][j][k] = CounterMovePruneThreshold - 1;
     }
 
   for (int idx = 0; idx < Threads.numThreads; idx++) {
@@ -374,7 +375,7 @@ void thread_search(Pos *pos)
   (ss-1)->endMoves = pos->moveList;
 
   for (int i = -7; i < 0; i++)
-    ss[i].history = &(*pos->counterMoveHistory)[0][0]; // Use as sentinel
+    ss[i].history = &(*pos->counterMoveHistory)[0][0][0]; // Use as sentinel
 
   for (int i = 0; i <= MAX_PLY; i++)
     ss[i].ply = i;
@@ -443,7 +444,7 @@ void thread_search(Pos *pos)
       // Reset aspiration window starting size
       if (pos->rootDepth >= 4) {
         Value previousScore = rm->move[pvIdx].previousScore;
-        delta = 23;
+        delta = 21 + abs(previousScore) / 128;
         alpha = max(previousScore - delta, -VALUE_INFINITE);
         beta  = min(previousScore + delta,  VALUE_INFINITE);
 

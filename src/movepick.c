@@ -91,11 +91,11 @@ static void score_quiets(const Pos *pos)
     uint32_t move = m->move & 4095;
     Square to = move & 63;
     Square from = move >> 6;
-    m->value =  (*cmh)[piece_on(from)][to]
-              + (*fmh)[piece_on(from)][to]
-              + (*fmh2)[piece_on(from)][to]
-              + (*fmh3)[piece_on(from)][to] / 2
-              + (*history)[c][move];
+    m->value =      (*history)[c][move]
+              + 2 * (*cmh)[piece_on(from)][to]
+              + 2 * (*fmh)[piece_on(from)][to]
+              + 2 * (*fmh2)[piece_on(from)][to]
+              +     (*fmh3)[piece_on(from)][to];
   }
 }
 
@@ -183,7 +183,7 @@ Move next_move(const Pos *pos, int skipQuiets)
       st->cur = st->endBadCaptures;
       st->endMoves = generate_quiets(pos, st->cur);
       score_quiets(pos);
-      partial_insertion_sort(st->cur, st->endMoves, -4000 * st->depth);
+      partial_insertion_sort(st->cur, st->endMoves, -3000 * st->depth);
     }
     st->stage++;
     /* fallthrough */

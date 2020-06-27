@@ -59,12 +59,13 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Value bestValue, value, ttValue, eval, maxValue;
   int ttHit, ttPv, inCheck, givesCheck, improving, doLMR;
   int captureOrPromotion, doFullDepthSearch, moveCountPruning;
-  bool ttCapture;
+  bool ttCapture, priorCapture;
   Piece movedPiece;
   int moveCount, captureCount, quietCount, singularLMR;
 
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
+  priorCapture = captured_piece();
   moveCount = captureCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
   maxValue = VALUE_INFINITE;
@@ -153,7 +154,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
         // Extra penalty for a quiet TT or main killer move in previous ply
         // when it gets refuted
-        if ((ss-1)->moveCount <= 2 && !captured_piece())
+        if ((ss-1)->moveCount <= 2 && !priorCapture)
           update_cm_stats(ss-1, piece_on(prevSq), prevSq,
               -stat_bonus(depth + 1));
       }
@@ -285,7 +286,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
     Depth R = ((835 + 70 * depth) / 256 + min((eval - beta) / 185, 3));
 
     ss->currentMove = MOVE_NULL;
-    ss->history = &(*pos->counterMoveHistory)[0][0];
+    ss->history = &(*pos->counterMoveHistory)[0][0][0];
 
     do_null_move(pos);
     ss->endMoves = (ss-1)->endMoves;
@@ -335,7 +336,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       if (move != excludedMove && is_legal(pos, move)) {
         probCutCount--;
         ss->currentMove = move;
-        ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
+        ss->history = &(*pos->counterMoveHistory)[priorCapture][moved_piece(move)][to_sq(move)];
         givesCheck = gives_check(pos, ss, move);
         do_move(pos, move, givesCheck);
 
@@ -547,7 +548,7 @@ moves_loop: // When in check search starts from here.
     // Update the current move (this must be done after singular extension
     // search)
     ss->currentMove = move;
-    ss->history = &(*pos->counterMoveHistory)[movedPiece][to_sq(move)];
+    ss->history = &(*pos->counterMoveHistory)[priorCapture][movedPiece][to_sq(move)];
 
     // Step 15. Make the move.
     do_move(pos, move, givesCheck);
@@ -751,13 +752,13 @@ moves_loop: // When in check search starts from here.
     // Extra penalty for a quiet TT or main killer move in previous ply
     // when it gets refuted
     if (  ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0])
-        && !captured_piece())
+        && !priorCapture)
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
           -stat_bonus(depth + 1));
   }
   // Bonus for prior countermove that caused the fail low
   else if (   (depth >= 3 || PvNode)
-           && !captured_piece())
+           && !priorCapture)
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
   if (PvNode && bestValue > maxValue)

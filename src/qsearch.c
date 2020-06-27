@@ -32,6 +32,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   Key posKey;
   Move ttMove, move, bestMove;
   Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
+  bool priorCapture;
   int ttHit, ttPv, givesCheck, evasionPrunable;
   Depth ttDepth;
   int moveCount;
@@ -43,6 +44,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
   }
 
   bestMove = 0;
+  priorCapture = captured_piece();
   moveCount = 0;
 
   // Check for an instant draw or if the maximum ply has been reached
@@ -107,7 +109,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     futilityBase = bestValue + 153;
   }
 
-  ss->history = &(*pos->counterMoveHistory)[0][0];
+  ss->history = &(*pos->counterMoveHistory)[0][0][0];
 
   // Initialize move picker data for the current position, and prepare
   // to search the moves. Because the depth is <= 0 here, only captures,
@@ -165,7 +167,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     }
 
     ss->currentMove = move;
-    ss->history = &(*pos->counterMoveHistory)[moved_piece(move)][to_sq(move)];
+    ss->history = &(*pos->counterMoveHistory)[priorCapture][moved_piece(move)][to_sq(move)];
 
     // Make and search the move
     do_move(pos, move, givesCheck);

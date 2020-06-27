@@ -68,7 +68,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   const int Up    = (Us == WHITE ? NORTH      : SOUTH);
 
   Bitboard neighbours, stoppers, doubled, support, phalanx, opposed;
-  Bitboard lever, leverPush;
+  Bitboard lever, leverPush, blocked;
   Square s;
   bool backward, passed;
   Score score = SCORE_ZERO;
@@ -78,10 +78,10 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
   Bitboard doubleAttackThem = pawn_double_attacks_bb(theirPawns, Them);
 
-  e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
+  e->passedPawns[Us] = 0;
   e->semiopenFiles[Us] = 0xFF;
   e->kingSquares[Us] = SQ_NONE;
-  e->pawnAttacks[Us] = pawn_attacks_bb(ourPawns, Us);
+  e->pawnAttacks[Us] = e->pawnAttacksSpan[Us] = pawn_attacks_bb(ourPawns, Us);
   e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
 
@@ -95,6 +95,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 
     // Flag the pawn
     opposed    = theirPawns & forward_file_bb(Us, s);
+    blocked    = theirPawns & sq_bb(s + Up);
     stoppers   = theirPawns & passed_pawn_span(Us, s);
     lever      = theirPawns & PawnAttacks[Us][s];
     leverPush  = theirPawns & PawnAttacks[Us][s + Up];
@@ -104,20 +105,13 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     support    = neighbours & rank_bb_s(s - Up);
 
     // A pawn is backward when it is behind all pawns of the same color on
-    // the adjacent files and cannot safely advance. Phalanx and isolated
-    // pawns will be excluded when the pawn is scored.
-    backward =   !(neighbours & forward_ranks_bb(Them, rank_of(s)))
-              &&  (stoppers & (leverPush | sq_bb(s + Up)));
+    // the adjacent files and cannot safely advance.
+    backward =   !(neighbours & forward_ranks_bb(Them, rank_of(s + Up)))
+              &&  (stoppers & (leverPush | blocked));
 
-    // Span of backward pawns and span behind opposing pawns are not included
-    // in the pawnAttacksSpan bitboard.
-    if (!backward || phalanx) {
-      if (opposed)
-        e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s) &
-                                 ~pawn_attack_span(Us, frontmost_sq(Them, opposed));
-      else
-        e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s);
-    }
+    // Compute additional span if pawn is neither backward nor blocked
+    if (!backward && !blocked)
+      e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s);
 
     // A pawn is passed if one of the three following conditions is true:
     // (a) there are no stoppers except some levers
@@ -126,7 +120,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     passed =   !(stoppers ^ lever)
             || (   !(stoppers ^ leverPush)
                 && popcount(phalanx) >= popcount(leverPush))
-            || (   stoppers == sq_bb(s + Up) && relative_rank_s(Us, s) >= RANK_5
+            || (   stoppers == blocked && relative_rank_s(Us, s) >= RANK_5
                 && (shift_bb(Up, support) & ~(theirPawns | doubleAttackThem)));
 
     // Passed pawns will be properly scored later in evaluation when we have
