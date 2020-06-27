@@ -54,6 +54,9 @@ static int base_ct;
 #define NonPV 0
 #define PV 1
 
+static const uint64_t ttHitAverageWindow     = 4096;
+static const uint64_t ttHitAverageResolution = 1024;
+
 static const int RazorMargin = 661;
 
 INLINE int futility_margin(Depth d, int improving) {
@@ -398,6 +401,7 @@ void thread_search(Pos *pos)
 
   RootMoves *rm = pos->rootMoves;
   multiPV = min(multiPV, rm->size);
+  pos->ttHitAverage = ttHitAverageWindow * ttHitAverageResolution / 2;
 
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.

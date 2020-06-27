@@ -1527,8 +1527,8 @@ static int check_pos(Pos *pos)
     npm_w += piece_count(WHITE, i) * PieceValue[MG][i];
     npm_b += piece_count(BLACK, i) * PieceValue[MG][i];
   }
-  assert(npm_w == pos_non_pawn_material(WHITE));
-  assert(npm_b == pos_non_pawn_material(BLACK));
+  assert(npm_w == non_pawn_material_c(WHITE));
+  assert(npm_b == non_pawn_material_c(BLACK));
 
   assert(key == pos->st->key);
   assert(pawnKey == pos->st->pawnKey);

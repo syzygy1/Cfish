@@ -59,13 +59,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Value bestValue, value, ttValue, eval, maxValue;
   int ttHit, ttPv, inCheck, givesCheck, improving, didLMR;
   bool doFullDepthSearch, moveCountPruning;
-  bool ttCapture, priorCapture, captureOrPromotion, singularLMR;
+  bool ttCapture, captureOrPromotion, singularLMR;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
 
   // Step 1. Initialize node
   inCheck = !!pos_checkers();
-  priorCapture = captured_piece();
   moveCount = captureCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
   maxValue = VALUE_INFINITE;
@@ -137,6 +136,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
   ttPv = PvNode ? 4 : (ttHit ? tte_is_pv(tte) : 0);
+  // pos->ttHitAverage can be used to approximate the running average of ttHit
+  pos->ttHitAverage = (ttHitAverageWindow - 1) * pos->ttHitAverage / ttHitAverageWindow + ttHitAverageResolution * !!ttHit;
 
   // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
@@ -154,7 +155,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
         // Extra penalty for a quiet TT or main killer move in previous ply
         // when it gets refuted
-        if ((ss-1)->moveCount <= 2 && !priorCapture)
+        if ((ss-1)->moveCount <= 2 && !captured_piece())
           update_cm_stats(ss-1, piece_on(prevSq), prevSq,
               -stat_bonus(depth + 1));
       }
@@ -277,7 +278,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && eval >= ss->staticEval
       && ss->staticEval >= beta - 33 * depth + 299 - improving * 30
       && !excludedMove
-      && pos_non_pawn_material(pos_stm())
+      && non_pawn_material_c(pos_stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
   {
     assert(eval - beta >= 0);
@@ -431,17 +432,14 @@ moves_loop: // When in check search starts from here.
 
     // Step 13. Pruning at shallow depth
     if (  !rootNode
-        && pos_non_pawn_material(pos_stm())
+        && non_pawn_material_c(pos_stm())
         && bestValue > VALUE_MATED_IN_MAX_PLY)
     {
       // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
       moveCountPruning = moveCount >= FutilityMoveCounts[improving][depth];
 
       if (   !captureOrPromotion
-          && !givesCheck
-          && (   !PvNode
-              || !advanced_pawn_push(pos, move)
-              ||  pos_non_pawn_material(pos_stm() ^ 1) > BishopValueMg))
+          && !givesCheck)
       {
         // Reduced depth of the next LMR search
         int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), 0);
@@ -523,6 +521,12 @@ moves_loop: // When in check search starts from here.
              && pawn_passed(pos, pos_stm(), to_sq(move)))
       extension = 1;
 
+    // Last captures extension
+    else if (   PvNode
+             && PieceValue[EG][captured_piece()] > PawnValueEg
+             && non_pawn_material() <= 2 * RookValueMg)
+      extension = 1;
+
     // Castling extension
     if (type_of_m(move) == CASTLING)
       extension = 1;
@@ -557,9 +561,14 @@ moves_loop: // When in check search starts from here.
         && (   !captureOrPromotion
             || moveCountPruning
             || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha
-            || cutNode))
+            || cutNode
+            || pos->ttHitAverage < 384 * ttHitAverageResolution * ttHitAverageWindow / 1024))
     {
       Depth r = reduction(improving, depth, moveCount);
+
+      // Decrease reduction if the ttHit runing average is large
+      if (pos->ttHitAverage > 544 * ttHitAverageResolution * ttHitAverageWindow / 1024)
+        r--;
 
       // Decrease reduction if position is or has been on the PV
       if (ttPv)
@@ -747,13 +756,13 @@ moves_loop: // When in check search starts from here.
     // Extra penalty for a quiet TT or main killer move in previous ply
     // when it gets refuted
     if (  ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0])
-        && !priorCapture)
+        && !captured_piece())
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
           -stat_bonus(depth + 1));
   }
   // Bonus for prior countermove that caused the fail low
   else if (   (depth >= 3 || PvNode)
-           && !priorCapture)
+           && !captured_piece())
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
   if (PvNode && bestValue > maxValue)

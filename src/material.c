@@ -52,18 +52,18 @@ static const int QuadraticTheirs[][8] = {
 static bool is_KXK(const Pos *pos, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
-        && pos_non_pawn_material(us) >= RookValueMg;
+        && non_pawn_material_c(us) >= RookValueMg;
 }
 
 static bool is_KBPsK(const Pos *pos, int us)
 {
-  return   pos_non_pawn_material(us) == BishopValueMg
+  return   non_pawn_material_c(us) == BishopValueMg
         && pieces_cp(us, PAWN);
 }
 
 static bool is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
-        && pos_non_pawn_material(us) == QueenValueMg
+        && non_pawn_material_c(us) == QueenValueMg
         && piece_count(us ^ 1, ROOK) == 1
         && pieces_cp(us ^ 1, PAWN);
 }
@@ -107,7 +107,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   e->key = key;
   e->factor[WHITE] = e->factor[BLACK] = (uint8_t)SCALE_FACTOR_NORMAL;
 
-  Value npm = pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK);
+  Value npm = non_pawn_material();
   npm = clamp(npm, EndgameLimit, MidgameLimit);
   e->gamePhase = ((npm - EndgameLimit) * PHASE_MIDGAME) / (MidgameLimit - EndgameLimit);
 
@@ -146,8 +146,8 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
       e->scal_func[c] = 20; // ScaleKQKRPs
   }
 
-  Value npm_w = pos_non_pawn_material(WHITE);
-  Value npm_b = pos_non_pawn_material(BLACK);
+  Value npm_w = non_pawn_material_c(WHITE);
+  Value npm_b = non_pawn_material_c(BLACK);
 
   if (npm_w + npm_b == 0 && pieces_p(PAWN)) { // Only pawns on the board.
     if (!pieces_cp(BLACK, PAWN)) {

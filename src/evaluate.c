@@ -140,11 +140,6 @@ static const Value PassedRank[][8] = {
   { V(0), V(28), V(33), V(41), V(72), V(177), V(260) }
 };
 
-// OutpostRank[Rank] contains a bonus according to the rank of the outpost
-static const Score OutpostRank[8] = {
-  S(0, 0), S(0, 0), S(0, 0), S(28, 18), S(30, 24), S(32, 19)
-};
-
 // PassedFile[File] contains a bonus according to the file of a passed pawn
 static const Score PassedFile[8] = {
   S( 0,  0), S(11,  8), S(22, 16), S(33, 24),
@@ -160,9 +155,10 @@ static const Score KingProtector      = S(  7,  8);
 static const Score KnightOnQueen      = S( 16, 12);
 static const Score LongDiagonalBishop = S( 45,  0);
 static const Score MinorBehindPawn    = S( 18,  3);
-static const Score Outpost            = S( 32, 10);
+static const Score Outpost            = S( 30, 21);
 static const Score PawnlessFlank      = S( 17, 95);
 static const Score RestrictedPiece    = S(  7,  7);
+static const Score ReachableOutpost   = S( 32, 10);
 static const Score RookOnQueenFile    = S(  7,  6);
 static const Score SliderOnQueen      = S( 59, 18);
 static const Score ThreatByKing       = S( 24, 89);
@@ -256,10 +252,10 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       // Bonus for outpost squares
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += OutpostRank[relative_rank_s(Us, s)] * (Pt == KNIGHT ? 2 : 1);
+        score += Outpost * (Pt == KNIGHT ? 2 : 1);
 
       else if (Pt == KNIGHT && bb & b & ~pieces_c(Us))
-        score += Outpost;
+        score += ReachableOutpost;
 
       // Knight and Bishop bonus for being right behind a pawn
       if (shift_bb(Down, pieces_p(PAWN)) & sq_bb(s))
@@ -423,14 +419,13 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                + 148 * popcount(unsafeChecks)
                +  98 * popcount(blockers_for_king(pos, Us))
                +  69 * ei->kingAttacksCount[Them]
-               +   4 * (kingFlankAttack - kingFlankDefense)
                +   3 * kingFlankAttack * kingFlankAttack / 8
                +       mg_value(mobility[Them] - mobility[Us])
                - 873 * !pieces_cp(Them, QUEEN)
                - 100 * !!(ei->attackedBy[Us][KNIGHT] & ei->attackedBy[Us][KING])
-               -  35 * !!(ei->attackedBy[Us][BISHOP] & ei->attackedBy[Us][KING])
                -   6 * mg_value(score) / 8
-               -   7;
+               -   4 * kingFlankDefense
+               +  37;
 
   // Transform the kingDanger units into a Score, and subtract it from
   // the evaluation
@@ -680,7 +675,7 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
                   + 11 * popcount(pieces_p(PAWN))
                   +  9 * outflanking
                   + 21 * bothFlanks
-                  + 51 * !(pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK))
+                  + 51 * !non_pawn_material()
                   - 43 * almostUnwinnable
                   - 95;
 
@@ -704,8 +699,8 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
   // If scale is not already specific, scale down via general heuristics
   if (sf == SCALE_FACTOR_NORMAL) {
     if (   opposite_bishops(pos)
-        && pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) == 2 * BishopValueMg)
-      sf = 16 + 4 * ei->pe->passedCount;
+        && non_pawn_material() == 2 * BishopValueMg)
+      sf = 22;
     else
       sf = min(sf, 36 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN));
     sf = max(0, sf - (pos_rule50_count() - 12) / 4);
@@ -746,7 +741,7 @@ Value evaluate(const Pos *pos)
 
   // Early exit if score is high
   v = (mg_value(score) + eg_value(score)) / 2;
-  if (abs(v) > LazyThreshold + (pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK)) / 64)
+  if (abs(v) > LazyThreshold + non_pawn_material() / 64)
     return pos_stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.
@@ -771,7 +766,7 @@ Value evaluate(const Pos *pos)
           - evaluate_passed_pawns(pos, &ei, BLACK);
 
   // Evaluate space for both sides, only during opening
-  if (pos_non_pawn_material(WHITE) + pos_non_pawn_material(BLACK) >= SpaceThreshold)
+  if (non_pawn_material() >= SpaceThreshold)
       score +=  evaluate_space(pos, &ei, WHITE)
               - evaluate_space(pos, &ei, BLACK);
 

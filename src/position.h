@@ -154,6 +154,7 @@ struct Pos {
   Stack *stack;
   uint64_t nodes;
   uint64_t tbHits;
+  uint64_t ttHitAverage;
   int pvIdx, pvLast;
   int selDepth, nmpPly, nmpOdd;
   Depth rootDepth;
@@ -279,7 +280,8 @@ PURE bool has_game_cycle(const Pos *pos, int ply);
 #define pos_nodes_searched() (pos->nodes)
 #define pos_rule50_count() (pos->st->rule50)
 #define pos_psq_score() (pos->st->psq)
-#define pos_non_pawn_material(c) (pos->st->nonPawnMaterial[c])
+#define non_pawn_material_c(c) (pos->st->nonPawnMaterial[c])
+#define non_pawn_material() (non_pawn_material_c(WHITE) + non_pawn_material_c(BLACK))
 #define pos_pawns_only() (!pos->st->nonPawn)
 
 INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)

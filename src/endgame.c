@@ -61,7 +61,7 @@ static const int KRPPKRPScaleFactors[8] = { 0, 9, 10, 14, 21, 44, 0, 0 };
 #ifndef NDEBUG
 static bool verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
 {
-  return   pos_non_pawn_material(c) == npm
+  return   non_pawn_material(c) == npm
         && piece_count(c, PAWN) == pawnsCnt;
 }
 #endif
@@ -174,7 +174,7 @@ static Value EvaluateKXK(const Pos *pos, unsigned strongSide)
   Square winnerKSq = square_of(strongSide, KING);
   Square loserKSq = square_of(weakSide, KING);
 
-  Value result =  pos_non_pawn_material(strongSide)
+  Value result =  non_pawn_material_c(strongSide)
                 + piece_count(strongSide, PAWN) * PawnValueEg
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
@@ -403,7 +403,7 @@ int ScaleKBPsK(const Pos *pos, unsigned strongSide)
 {
   unsigned weakSide = strongSide ^ 1;
 
-  assert(pos_non_pawn_material(strongSide) == BishopValueMg);
+  assert(non_pawn_material_c(strongSide) == BishopValueMg);
   assert(pieces_cp(strongSide, PAWN));
 
   // No assertions about the material of weakSide, because we want draws to
@@ -428,7 +428,7 @@ int ScaleKBPsK(const Pos *pos, unsigned strongSide)
   // If all the pawns are on the same B or G file, then it's potentially a draw
   if (    (pawnsFile == FILE_B || pawnsFile == FILE_G)
       && !(pieces_p(PAWN) & ~file_bb(pawnsFile))
-      && pos_non_pawn_material(weakSide) == 0
+      && non_pawn_material_c(weakSide) == 0
       && piece_count(weakSide, PAWN)) {
 
     // Get weakSide pawn that is closest to the home rank
@@ -675,7 +675,7 @@ static int ScaleKPsK(const Pos *pos, unsigned strongSide)
 {
   unsigned weakSide = strongSide ^ 1;
 
-  assert(pos_non_pawn_material(strongSide) == 0);
+  assert(non_pawn_material_c(strongSide) == 0);
   assert(piece_count(strongSide, PAWN) >= 2);
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
 
