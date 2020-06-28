@@ -387,6 +387,26 @@ moves_loop: // When in check search starts from here.
   singularLMR = moveCountPruning = false;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
 
+  // Check for a breadcrumb and leave one if none found
+  _Atomic uint64_t *crumb = NULL;
+  bool marked = false;
+  if (ss->ply < 8) {
+    crumb = &breadcrumbs[posKey & 1023];
+    // The next line assumes there are at most 65535 search threads
+    uint64_t v = (posKey & ~0xffffULL) | (pos->threadIdx + 1), expected = 0ULL;
+    // If no crumb is in place yet, leave ours
+    if (!atomic_compare_exchange_strong_explicit(crumb, &expected, v,
+          memory_order_relaxed, memory_order_relaxed))
+    {
+      // Some crumb was in place already. Its value is now in expected.
+      crumb = NULL;
+      // Was the crumb is for the same position and was left by another thread?
+      v ^= expected;
+      if (v != 0 && (v & ~0xffffULL) == 0)
+        marked = true;
+    }
+  }
+
   // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
   // cutoff occurs
@@ -507,8 +527,10 @@ moves_loop: // When in check search starts from here.
       // assume that this expected cut-node is not singular, i.e. multiple
       // moves fail high. We therefore prune the whole subtree by returning
       // a soft bound.
-      else if (singularBeta >= beta)
+      else if (singularBeta >= beta) {
+        if (crumb) store_rlx(*crumb, 0);
         return singularBeta;
+      }
 
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.
@@ -574,6 +596,10 @@ moves_loop: // When in check search starts from here.
       // Decrease reduction if the ttHit runing average is large
       if (pos->ttHitAverage > 500 * ttHitAverageResolution * ttHitAverageWindow / 1024)
         r--;
+
+      // Reduction if other threads are searching this position.
+      if (marked)
+        r++;
 
       // Decrease reduction if position is or has been on the PV
       if (ttPv)
@@ -680,8 +706,10 @@ moves_loop: // When in check search starts from here.
     // Finished searching the move. If a stop occurred, the return value of
     // the search cannot be trusted, and we return immediately without
     // updating best move, PV and TT.
-    if (load_rlx(Signals.stop))
+    if (load_rlx(Signals.stop)) {
+      if (crumb) store_rlx(*crumb, 0);
       return 0;
+    }
 
     if (rootNode) {
       RootMove *rm = NULL;
@@ -738,6 +766,8 @@ moves_loop: // When in check search starts from here.
     else if (captureOrPromotion && move != bestMove && captureCount < 32)
       capturesSearched[captureCount++] = move;
   }
+
+  if (crumb) store_rlx(*crumb, 0);
 
   // The following condition would detect a stop only after move loop has
   // been completed. But in this case bestValue is valid because we have

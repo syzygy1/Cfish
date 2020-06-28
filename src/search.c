@@ -102,7 +102,8 @@ struct Skill {
 //  Move best = 0;
 };
 
-//static CounterMoveHistoryStat CounterMoveHistory;
+// Breadcrumbs are used to mark nodes as being search by a given thread
+static _Atomic uint64_t breadcrumbs[1024];
 
 static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
 static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode);
@@ -979,6 +980,9 @@ void start_thinking(Pos *root)
 
   Signals.stopOnPonderhit = Signals.stop = 0;
   Threads.increaseDepth = true;
+
+  for (int i = 0; i < 1024; i++)
+    store_rlx(breadcrumbs[i], 0);
 
   // Generate all legal moves.
   ExtMove list[MAX_MOVES];
