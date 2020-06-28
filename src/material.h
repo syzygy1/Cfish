@@ -57,7 +57,7 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key);
 
 INLINE MaterialEntry *material_probe(const Pos *pos)
 {
-  Key key = pos_material_key();
+  Key key = material_key();
   MaterialEntry *e = &pos->materialTable[key >> (64-13)];
 
   if (unlikely(e->key != key))

@@ -39,10 +39,10 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Dive into quiescense search when the depth reaches zero
   if (depth < 1)
     return  PvNode
-          ?   pos_checkers()
+          ?   checkers()
             ? qsearch_PV_true(pos, ss, alpha, beta, 0)
             : qsearch_PV_false(pos, ss, alpha, beta, 0)
-          :   pos_checkers()
+          :   checkers()
             ? qsearch_NonPV_true(pos, ss, alpha, 0)
             : qsearch_NonPV_false(pos, ss, alpha, 0);
 
@@ -64,7 +64,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   int moveCount, captureCount, quietCount;
 
   // Step 1. Initialize node
-  inCheck = !!pos_checkers();
+  inCheck = !!checkers();
   moveCount = captureCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
   maxValue = VALUE_INFINITE;
@@ -127,12 +127,12 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // use a different position key in case of an excluded move.
   excludedMove = ss->excludedMove;
 #ifdef BIG_TT
-  posKey = pos_key() ^ (Key)excludedMove;
+  posKey = key() ^ (Key)excludedMove;
 #else
-  posKey = pos_key() ^ (Key)((int32_t)excludedMove << 16);
+  posKey = key() ^ (Key)((int32_t)excludedMove << 16);
 #endif
   tte = tt_probe(posKey, &ttHit);
-  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, pos_rule50_count()) : VALUE_NONE;
+  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
   ttPv = PvNode ? 4 : (ttHit ? tte_is_pv(tte) : 0);
@@ -162,11 +162,11 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       // Penalty for a quiet ttMove that fails low
       else if (!is_capture_or_promotion(pos, ttMove)) {
         Value penalty = -stat_bonus(depth);
-        history_update(*pos->history, pos_stm(), ttMove, penalty);
+        history_update(*pos->history, stm(), ttMove, penalty);
         update_cm_stats(ss, moved_piece(ttMove), to_sq(ttMove), penalty);
       }
     }
-    if (pos_rule50_count() < 90)
+    if (rule50_count() < 90)
       return ttValue;
   }
 
@@ -176,7 +176,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     if (    piecesCnt <= TB_Cardinality
         && (piecesCnt <  TB_Cardinality || depth >= TB_ProbeDepth)
-        &&  pos_rule50_count() == 0
+        &&  rule50_count() == 0
         && !can_castle_any())
     {
       int found, wdl = TB_probe_wdl(pos, &found);
@@ -280,7 +280,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && eval >= ss->staticEval
       && ss->staticEval >= beta - 32 * depth + 292 - improving * 30
       && !excludedMove
-      && non_pawn_material_c(pos_stm())
+      && non_pawn_material_c(stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
   {
     assert(eval - beta >= 0);
@@ -434,7 +434,7 @@ moves_loop: // When in check search starts from here.
 
     // Step 13. Pruning at shallow depth
     if (  !rootNode
-        && non_pawn_material_c(pos_stm())
+        && non_pawn_material_c(stm())
         && bestValue > VALUE_MATED_IN_MAX_PLY)
     {
       // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
@@ -455,11 +455,11 @@ moves_loop: // When in check search starts from here.
         // Futility pruning: parent node
         if (   lmrDepth < 6
             && !inCheck
-            && ss->staticEval + 255 + 182 * lmrDepth <= alpha
-            &&  (*pos->history)[pos_stm()][from_to(move)]
+            && ss->staticEval + 235 + 172 * lmrDepth <= alpha
+            &&  (*pos->history)[stm()][from_to(move)]
               + (*cmh )[movedPiece][to_sq(move)]
               + (*fmh )[movedPiece][to_sq(move)]
-              + (*fmh2)[movedPiece][to_sq(move)] < 30000)
+              + (*fmh2)[movedPiece][to_sq(move)] < 25000)
           continue;
 
         // Prune moves with negative SEE at low depths and below a decreasing
@@ -518,13 +518,13 @@ moves_loop: // When in check search starts from here.
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
     }
     else if (    givesCheck
-             && (is_discovery_check_on_king(pos, pos_stm() ^ 1, move) || see_test(pos, move, 0)))
+             && (is_discovery_check_on_king(pos, stm() ^ 1, move) || see_test(pos, move, 0)))
       extension = 1;
 
     // Passed pawn extension
     else if (   move == ss->killers[0]
              && advanced_pawn_push(pos, move)
-             && pawn_passed(pos, pos_stm(), to_sq(move)))
+             && pawn_passed(pos, stm(), to_sq(move)))
       extension = 1;
 
     // Last captures extension
@@ -561,7 +561,7 @@ moves_loop: // When in check search starts from here.
     // Step 16. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3
-        &&  moveCount > 1 + 2 * rootNode
+        &&  moveCount > 1 + rootNode + (rootNode && bestValue < alpha)
         && (!rootNode || best_move_count(pos, move) == 0)
         && (   !captureOrPromotion
             || moveCountPruning
@@ -607,14 +607,14 @@ moves_loop: // When in check search starts from here.
         ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
                        + (*fmh )[movedPiece][to_sq(move)]
                        + (*fmh2)[movedPiece][to_sq(move)]
-                       + (*pos->history)[pos_stm() ^ 1][from_to(move)]
+                       + (*pos->history)[stm() ^ 1][from_to(move)]
                        - 4926;
 
         // Reset statScore if negative and most stats show >= 0
         if (    ss->statScore < 0
             && (*cmh )[movedPiece][to_sq(move)] >= 0
             && (*fmh )[movedPiece][to_sq(move)] >= 0
-            && (*pos->history)[pos_stm() ^ 1][from_to(move)] >= 0)
+            && (*pos->history)[stm() ^ 1][from_to(move)] >= 0)
           ss->statScore = 0;
 
         // Decrease/increase reduction by comparing with opponent's stat score.
@@ -628,7 +628,12 @@ moves_loop: // When in check search starts from here.
         r -= ss->statScore / 16384;
       }
 
-      Depth d = max(newDepth - max(r, 0), 1);
+      // Increase reduction for captures/promotions if late move and at low
+      // depth
+      else if (depth < 8 && moveCount > 2)
+        r++;
+
+      Depth d = clamp(newDepth - r, 1, newDepth);
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 

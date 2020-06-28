@@ -77,7 +77,7 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth d)
   st->mpKillers[0] = st->killers[0];
   st->mpKillers[1] = st->killers[1];
 
-  st->stage = pos_checkers() ? ST_EVASION : ST_MAIN_SEARCH;
+  st->stage = checkers() ? ST_EVASION : ST_MAIN_SEARCH;
   st->ttMove = ttm;
   if (!ttm || !is_pseudo_legal(pos, ttm)) {
     st->stage++;
@@ -91,7 +91,7 @@ INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 
   Stack *st = pos->st;
 
-  st->stage = pos_checkers() ? ST_EVASION : ST_QSEARCH;
+  st->stage = checkers() ? ST_EVASION : ST_QSEARCH;
   st->ttMove =   ttm
               && is_pseudo_legal(pos, ttm)
               && (d > DEPTH_QS_RECAPTURES || to_sq(ttm) == s) ? ttm : 0;
@@ -103,7 +103,7 @@ INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 
 INLINE void mp_init_pc(const Pos *pos, Move ttm, Value th)
 {
-  assert(!pos_checkers());
+  assert(!checkers());
 
   Stack *st = pos->st;
 

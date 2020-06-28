@@ -221,8 +221,8 @@ uint64_t perft(Pos *pos, Depth depth)
 void mainthread_search(void)
 {
   Pos *pos = Threads.pos[0];
-  int us = pos_stm();
-  time_init(us, pos_game_ply());
+  int us = stm();
+  time_init(us, game_ply());
   tt_new_search();
   char buf[16];
   bool playBookMove = false;
@@ -290,7 +290,7 @@ void mainthread_search(void)
     pos->rootMoves->move[0].pvSize = 1;
     pos->rootMoves->size++;
     printf("info depth 0 score %s\n",
-           uci_value(buf, pos_checkers() ? -VALUE_MATE : VALUE_DRAW));
+           uci_value(buf, checkers() ? -VALUE_MATE : VALUE_DRAW));
     fflush(stdout);
   }
 
@@ -412,6 +412,7 @@ void thread_search(Pos *pos)
   RootMoves *rm = pos->rootMoves;
   multiPV = min(multiPV, rm->size);
   pos->ttHitAverage = ttHitAverageWindow * ttHitAverageResolution / 2;
+  int searchAgainCounter = 0;
 
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.
@@ -430,10 +431,13 @@ void thread_search(Pos *pos)
     for (int idx = 0; idx < rm->size; idx++)
       rm->move[idx].previousScore = rm->move[idx].score;
 
-    pos->contempt = pos_stm() == WHITE ?  make_score(base_ct, base_ct / 2)
-                                       : -make_score(base_ct, base_ct / 2);
+    pos->contempt = stm() == WHITE ?  make_score(base_ct, base_ct / 2)
+                                   : -make_score(base_ct, base_ct / 2);
 
     int pvFirst = 0, pvLast = 0;
+
+    if (!Threads.increaseDepth)
+      searchAgainCounter++;
 
     // MultiPV loop. We perform a full root search for each PV line
     for (int pvIdx = 0; pvIdx < multiPV && !Signals.stop; pvIdx++) {
@@ -465,8 +469,8 @@ void thread_search(Pos *pos)
 
         // Adjust contempt based on root move's previousScore
         int ct = base_ct + (102 - base_ct / 2) * previousScore / (abs(previousScore) + 157);
-        pos->contempt = pos_stm() == WHITE ?  make_score(ct, ct / 2)
-                                           : -make_score(ct, ct / 2);
+        pos->contempt = stm() == WHITE ?  make_score(ct, ct / 2)
+                                       : -make_score(ct, ct / 2);
       }
 
       // Start with a small aspiration window and, in the case of a fail
@@ -474,7 +478,7 @@ void thread_search(Pos *pos)
       // high/low anymore.
       int failedHighCnt = 0;
       while (true) {
-        Depth adjustedDepth = max(1, pos->rootDepth - failedHighCnt);
+        Depth adjustedDepth = max(1, pos->rootDepth - failedHighCnt - searchAgainCounter);
         bestValue = search_PV(pos, ss, alpha, beta, adjustedDepth);
 
         // Bring the best move to the front. It is critical that sorting
@@ -585,7 +589,12 @@ skip_search:
           Signals.stopOnPonderhit = 1;
         else
           Signals.stop = 1;
-      }
+      } else if (Threads.increaseDepth
+          && !Limits.ponder
+          && time_elapsed() > time_optimum() * fallingEval * reduction * bestMoveInstability * 0.6)
+        Threads.increaseDepth = false;
+      else
+        Threads.increaseDepth = true;
     }
 
     mainThread.iterValue[iterIdx] = bestValue;
@@ -628,9 +637,6 @@ static int best_move_count(Pos *pos, Move move)
 // search function when the remaining depth is zero (or, to be more precise,
 // less than one).
 
-#define true 1
-#define false 0
-
 #define NT PV
 #define InCheck false
 #include "qsearch.c"
@@ -647,9 +653,6 @@ static int best_move_count(Pos *pos, Move move)
 #include "qsearch.c"
 #undef InCheck
 #undef NT
-
-#undef true
-#undef false
 
 #define rm_lt(m1,m2) ((m1).tbRank != (m2).tbRank ? (m1).tbRank < (m2).tbRank : (m1).score != (m2).score ? (m1).score < (m2).score : (m1).previousScore < (m2).previousScore)
 
@@ -752,7 +755,7 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
     ss->killers[0] = move;
   }
 
-  int c = pos_stm();
+  int c = stm();
   history_update(*pos->history, c, move, bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 
@@ -900,7 +903,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
     return 0;
 
   do_move(pos, rm->pv[0], gives_check(pos, pos->st, rm->pv[0]));
-  TTEntry *tte = tt_probe(pos_key(), &ttHit);
+  TTEntry *tte = tt_probe(key(), &ttHit);
 
   if (ttHit) {
     Move m = tte_move(tte); // Local copy to be SMP safe
@@ -975,6 +978,7 @@ void start_thinking(Pos *root)
     thread_wait_until_sleeping(threads_main());
 
   Signals.stopOnPonderhit = Signals.stop = 0;
+  Threads.increaseDepth = true;
 
   // Generate all legal moves.
   ExtMove list[MAX_MOVES];

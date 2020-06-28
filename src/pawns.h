@@ -60,7 +60,7 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key k);
 
 INLINE PawnEntry *pawn_probe(const Pos *pos)
 {
-  Key key = pos_pawn_key();
+  Key key = pawn_key();
   PawnEntry *e = &pos->pawnTable[key & (PAWN_ENTRIES - 1)];
 
   if (unlikely(e->key != key))

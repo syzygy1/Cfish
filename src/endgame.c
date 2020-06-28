@@ -162,10 +162,10 @@ static Value EvaluateKXK(const Pos *pos, unsigned strongSide)
   unsigned weakSide = strongSide ^ 1;
 
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
-  assert(!pos_checkers()); // Eval is never called when in check
+  assert(!checkers()); // Eval is never called when in check
 
   // Stalemate detection with lone king
-  if (pos_stm() == weakSide) {
+  if (stm() == weakSide) {
     ExtMove list[MAX_MOVES];
     if (generate_legal(pos, list) == list)
       return VALUE_DRAW;
@@ -186,7 +186,7 @@ static Value EvaluateKXK(const Pos *pos, unsigned strongSide)
           && (pieces_p(BISHOP) & bb & LightSquares)))
     result = min(result + VALUE_KNOWN_WIN, VALUE_MATE_IN_MAX_PLY - 1);
 
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -215,7 +215,7 @@ static Value EvaluateKBNK(const Pos *pos, unsigned strongSide)
                 + PushClose[distance(winnerKSq, loserKSq)]
                 + PushToCorners[loserKSq];
 
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -232,14 +232,14 @@ static Value EvaluateKPK(const Pos *pos, unsigned strongSide)
   Square bksq = normalize(pos, strongSide, square_of(weakSide, KING));
   Square psq  = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
 
-  unsigned us = strongSide == pos_stm() ? WHITE : BLACK;
+  unsigned us = strongSide == stm() ? WHITE : BLACK;
 
   if (!bitbases_probe(wksq, psq, bksq, us))
     return VALUE_DRAW;
 
   Value result = VALUE_KNOWN_WIN + PawnValueEg + (Value)(rank_of(psq));
 
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -268,7 +268,7 @@ static Value EvaluateKRKP(const Pos *pos, unsigned strongSide)
 
   // If the weaker side's king is too far from the pawn and the rook,
   // it's a win.
-  else if (   distance(bksq, psq) >= 3 + (pos_stm() == weakSide)
+  else if (   distance(bksq, psq) >= 3 + (stm() == weakSide)
            && distance(bksq, rsq) >= 3)
     result = RookValueEg - distance(wksq, psq);
 
@@ -277,7 +277,7 @@ static Value EvaluateKRKP(const Pos *pos, unsigned strongSide)
   else if (   rank_of(bksq) <= RANK_3
            && distance(bksq, psq) == 1
            && rank_of(wksq) >= RANK_4
-           && distance(wksq, psq) > 2 + (pos_stm() == strongSide))
+           && distance(wksq, psq) > 2 + (stm() == strongSide))
     result = (Value)(80) - 8 * distance(wksq, psq);
 
   else
@@ -285,7 +285,7 @@ static Value EvaluateKRKP(const Pos *pos, unsigned strongSide)
                                   - distance(bksq, psq + SOUTH)
                                   - distance(psq, queeningSq));
 
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -299,7 +299,7 @@ static Value EvaluateKRKB(const Pos *pos, unsigned strongSide)
   assert(verify_material(pos, weakSide, BishopValueMg, 0));
 
   Value result = (Value)PushToEdges[square_of(weakSide, KING)];
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -315,7 +315,7 @@ static Value EvaluateKRKN(const Pos *pos, unsigned strongSide)
   Square bksq = square_of(weakSide, KING);
   Square bnsq = lsb(pieces_p(KNIGHT));
   Value result = (Value)PushToEdges[bksq] + PushAway[distance(bksq, bnsq)];
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -341,7 +341,7 @@ static Value EvaluateKQKP(const Pos *pos, unsigned strongSide)
       || !((FileABB | FileCBB | FileFBB | FileHBB) & sq_bb(pawnSq)))
     result += QueenValueEg - PawnValueEg;
 
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -365,7 +365,7 @@ static Value EvaluateKQKR(const Pos *pos, unsigned strongSide)
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
 
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -381,7 +381,7 @@ static Value EvaluateKNNKP(const Pos *pos, unsigned strongSide)
                 - PawnValueEg
                 + PushToEdges[square_of(weakSide, KING)];
 
-  return strongSide == pos_stm() ? result : -result;
+  return strongSide == stm() ? result : -result;
 }
 
 
@@ -512,7 +512,7 @@ static int ScaleKRPKR(const Pos *pos, unsigned strongSide)
   File f = file_of(wpsq);
   Rank r = rank_of(wpsq);
   Square queeningSq = make_square(f, RANK_8);
-  signed tempo = (pos_stm() == strongSide);
+  signed tempo = (stm() == strongSide);
 
   // If the pawn is not too far advanced and the defending king defends
   // the queening square, use the third-rank defence.
@@ -878,7 +878,7 @@ static int ScaleKPKP(const Pos *pos, unsigned strongSide)
   Square bksq = normalize(pos, strongSide, square_of(weakSide, KING));
   Square psq  = normalize(pos, strongSide, square_of(strongSide, PAWN));
 
-  unsigned us = strongSide == pos_stm() ? WHITE : BLACK;
+  unsigned us = strongSide == stm() ? WHITE : BLACK;
 
   // If the pawn has advanced to the fifth rank or further, and is not a
   // rook pawn, it is too dangerous to assume that it is at least a draw.

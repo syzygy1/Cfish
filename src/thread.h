@@ -85,6 +85,7 @@ struct ThreadPool {
 #else
   HANDLE event;
 #endif
+  atomic_bool increaseDepth;
 };
 
 typedef struct ThreadPool ThreadPool;

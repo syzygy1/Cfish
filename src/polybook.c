@@ -444,7 +444,7 @@ static Key polyglot_key(const Pos *pos)
   if (ep_square())
     key ^= PG.Zobrist.enpassant[file_of(ep_square())];
 
-  if (pos_stm() == WHITE)
+  if (stm() == WHITE)
     key ^= PG.Zobrist.turn;
 
   return key;
@@ -572,7 +572,7 @@ static bool check_do_search(const Pos *pos)
                     || akt_position == last_position
                     || akt_anz_pieces > last_anz_pieces
                     || akt_anz_pieces < last_anz_pieces - 2
-                    || pos_key() == 0xB4D30CD15A43432D;
+                    || key() == 0xB4D30CD15A43432D;
 
   // Reset do_search and book depth counter if postion changed more
   // than one move can do or in initial position

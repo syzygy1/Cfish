@@ -1169,7 +1169,7 @@ INLINE int fill_squares(Pos *pos, uint8_t *pc, bool flip, int mirror, int *p,
 INLINE int probe_table(Pos *pos, int s, int *success, const int type)
 {
   // Obtain the position's material-signature key
-  Key key = pos_material_key();
+  Key key = material_key();
 
   // Test for KvK
   if (type == WDL && key == 2ULL)
@@ -1209,13 +1209,13 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
   bool bside, flip;
   if (!be->symmetric) {
     flip = key != be->key;
-    bside = (pos_stm() == WHITE) == flip;
+    bside = (stm() == WHITE) == flip;
     if (type == DTM && be->hasPawns && PAWN(be)->dtmSwitched) {
       flip = !flip;
       bside = !bside;
     }
   } else {
-    flip = pos_stm() != WHITE;
+    flip = stm() != WHITE;
     bside = false;
   }
 
@@ -1325,7 +1325,7 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
   // Generate (at least) all legal captures including (under)promotions.
   // It is OK to generate more, as long as they are filtered out below.
   ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *end = !pos_checkers()
+  ExtMove *end = !checkers()
                 ? add_underprom_caps(pos, m, generate_captures(pos, m))
                 : generate_evasions(pos, m);
   pos->st->endMoves = end;
@@ -1371,7 +1371,7 @@ int TB_probe_wdl(Pos *pos, int *success)
 
   // Generate (at least) all legal captures including (under)promotions.
   ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *end = !pos_checkers()
+  ExtMove *end = !checkers()
                 ? add_underprom_caps(pos, m, generate_captures(pos, m))
                 : generate_evasions(pos, m);
   pos->st->endMoves = end;
@@ -1437,7 +1437,7 @@ int TB_probe_wdl(Pos *pos, int *success)
       if (type_of_m(move) == ENPASSANT) continue;
       if (is_legal(pos, move)) break;
     }
-    if (m == end && !pos_checkers()) {
+    if (m == end && !checkers()) {
       end = generate_quiets(pos, end);
       for (; m < end; m++) {
         Move move = m->move;
@@ -1467,7 +1467,7 @@ static Value probe_dtm_dc(Pos *pos, int won, int *success)
   ExtMove *end, *m = (pos->st-1)->endMoves;
 
   // Generate at least all legal captures including (under)promotions
-  if (!pos_checkers()) {
+  if (!checkers()) {
     end = generate_captures(pos, m);
     end = add_underprom_caps(pos, m, end);
   } else
@@ -1507,8 +1507,8 @@ static Value probe_dtm_loss(Pos *pos, int *success)
 
   // Generate at least all legal captures including (under)promotions
   ExtMove *end, *m = (pos->st-1)->endMoves;
-  end = pos_checkers() ? generate_evasions(pos, m)
-                       : add_underprom_caps(pos, m, generate_captures(pos, m));
+  end = checkers() ? generate_evasions(pos, m)
+                   : add_underprom_caps(pos, m, generate_captures(pos, m));
   pos->st->endMoves = end;
 
   for (; m < end; m++) {
@@ -1540,8 +1540,8 @@ static Value probe_dtm_win(Pos *pos, int *success)
 
   // Generate all moves
   ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *end = pos_checkers() ? generate_evasions(pos, m)
-                                : generate_non_evasions(pos, m);
+  ExtMove *end = checkers() ? generate_evasions(pos, m)
+                            : generate_non_evasions(pos, m);
   pos->st->endMoves = end;
 
   // Perform a 1-ply search
@@ -1586,7 +1586,7 @@ Value TB_probe_dtm2(Pos *pos, int wdl, int *success)
   ExtMove *end, *m = (pos->st-1)->endMoves;
 
   // Generate at least all legal captures including (under)promotions
-  if (!pos_checkers()) {
+  if (!checkers()) {
     end = generate_captures(pos, m);
     end = add_underprom_caps(pos, m, end);
   } else
@@ -1685,7 +1685,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     // Generate at least all legal non-capturing pawn moves
     // including non-capturing promotions.
     // (The following calls in fact generate all moves.)
-    end = !pos_checkers()
+    end = !checkers()
          ? generate_non_evasions(pos, m)
          : generate_evasions(pos, m);
     pos->st->endMoves = end;
@@ -1725,7 +1725,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     // In case of mate, this will cause -1 to be returned.
     best = WdlToDtz[wdl + 2];
     // If wdl < 0, we still have to generate all moves.
-    if (!pos_checkers())
+    if (!checkers())
       end = generate_non_evasions(pos, m);
     else
       end = generate_evasions(pos, m);
@@ -1743,7 +1743,7 @@ int TB_probe_dtz(Pos *pos, int *success)
     do_move(pos, move, gives_check(pos, pos->st, move));
     int v = -TB_probe_dtz(pos, success);
     if (   v == 1
-        && pos_checkers()
+        && checkers()
         && generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
       best = 1;
     else if (wdl > 0) {
@@ -1766,7 +1766,7 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
   int v, success;
 
   // Obtain 50-move counter for the root position.
-  int cnt50 = pos_rule50_count();
+  int cnt50 = rule50_count();
 
   // Check whether a position was repeated since the last zeroing move.
   // In that case, we need to be careful and play DTZ-optimal moves if
@@ -1784,7 +1784,7 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
     do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
 
     // Calculate dtz for the current move counting from the root position.
-    if (pos_rule50_count() == 0) {
+    if (rule50_count() == 0) {
       // If the move resets the 50-move counter, dtz is -101/-1/0/1/101.
       v = -TB_probe_wdl(pos, &success);
       v = WdlToDtz[v + 2];
@@ -1795,7 +1795,7 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
       else if (v < 0) v--;
     }
     // Make sure that a mating move gets value 1.
-    if (pos_checkers() && v == 2) {
+    if (checkers() && v == 2) {
       if (generate_legal(pos, (pos->st-1)->endMoves) == (pos->st-1)->endMoves)
         v = 1;
     }

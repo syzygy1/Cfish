@@ -277,19 +277,19 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
         // squares
         if (more_than_one(attacks_bb_bishop(s, pieces_p(PAWN)) & Center))
           score += LongDiagonalBishop;
-      }
 
-      // An important Chess960 pattern: A cornered bishop blocked by a friendly
-      // pawn diagonally in front of it is a very serious problem, especially
-      // when that pawn is also blocked.
-      if (   Pt == BISHOP
-          && is_chess960()
-          && (s == relative_square(Us, SQ_A1) || s == relative_square(Us, SQ_H1))) {
-        Square d = pawn_push(Us) + (file_of(s) == FILE_A ? EAST : WEST);
-        if (piece_on(s + d) == make_piece(Us, PAWN))
-          score -=  piece_on(s + d + pawn_push(Us))             ? CorneredBishop * 4
-                  : piece_on(s + d + d) == make_piece(Us, PAWN) ? CorneredBishop * 2
-                                                                : CorneredBishop;
+        // An important Chess960 pattern: a cornered bishop blocked by a
+        // friendly pawn diagonally in front of it is a very serious problem,
+        // especially when that pawn is also blocked.
+        if (   is_chess960()
+            && (s == relative_square(Us, SQ_A1) || s == relative_square(Us, SQ_H1)))
+        {
+          Square d = pawn_push(Us) + (file_of(s) == FILE_A ? EAST : WEST);
+          if (piece_on(s + d) == make_piece(Us, PAWN))
+            score -=  piece_on(s + d + pawn_push(Us))             ? CorneredBishop * 4
+                    : piece_on(s + d + d) == make_piece(Us, PAWN) ? CorneredBishop * 2
+                                                                  : CorneredBishop;
+        }
       }
     }
 
@@ -709,7 +709,7 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
       sf = 22;
     else
       sf = min(sf, 36 + (opposite_bishops(pos) ? 2 : 7) * piece_count(strongSide, PAWN));
-    sf = max(0, sf - (pos_rule50_count() - 12) / 4);
+    sf = max(0, sf - (rule50_count() - 12) / 4);
   }
 
   return sf;
@@ -721,7 +721,7 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
 
 Value evaluate(const Pos *pos)
 {
-  assert(!pos_checkers());
+  assert(!checkers());
 
   Score mobility[2] = { SCORE_ZERO, SCORE_ZERO };
   Value v;
@@ -739,7 +739,7 @@ Value evaluate(const Pos *pos)
   // in the position struct (material + piece square tables) and the
   // material imbalance. Score is computed internally from the white point
   // of view.
-  Score score = pos_psq_score() + material_imbalance(ei.me) + pos->contempt;
+  Score score = psq_score() + material_imbalance(ei.me) + pos->contempt;
 
   // Probe the pawn hash table
   ei.pe = pawn_probe(pos);
@@ -748,7 +748,7 @@ Value evaluate(const Pos *pos)
   // Early exit if score is high
   v = (mg_value(score) + eg_value(score)) / 2;
   if (abs(v) > LazyThreshold + non_pawn_material() / 64)
-    return pos_stm() == WHITE ? v : -v;
+    return stm() == WHITE ? v : -v;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);
@@ -789,5 +789,5 @@ Value evaluate(const Pos *pos)
 
   v /= PHASE_MIDGAME;
 
-  return (pos_stm() == WHITE ? v : -v) + Tempo; // Side to move point of view
+  return (stm() == WHITE ? v : -v) + Tempo; // Side to move point of view
 }

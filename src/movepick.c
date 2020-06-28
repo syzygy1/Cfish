@@ -85,7 +85,7 @@ static void score_quiets(const Pos *pos)
   PieceToHistory *fmh2 = (st-4)->history;
   PieceToHistory *fmh3 = (st-6)->history;
 
-  Color c = pos_stm();
+  Color c = stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++) {
     uint32_t move = m->move & 4095;
@@ -107,7 +107,7 @@ static void score_evasions(const Pos *pos)
 
   ButterflyHistory *history = pos->history;
   PieceToHistory *cmh = (st-1)->history;
-  Color c = pos_stm();
+  Color c = stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
