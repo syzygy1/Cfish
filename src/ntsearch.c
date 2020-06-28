@@ -186,9 +186,9 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
         int drawScore = TB_UseRule50 ? 1 : 0;
 
-        value =  wdl < -drawScore ? -VALUE_MATE + MAX_MATE_PLY + 1 + ss->ply
-               : wdl >  drawScore ?  VALUE_MATE - MAX_MATE_PLY - 1 - ss->ply
-                                  :  VALUE_DRAW + 2 * wdl * drawScore;
+        value =  wdl < -drawScore ? VALUE_MATED_IN_MAX_PLY + ss->ply + 1
+               : wdl >  drawScore ? VALUE_MATE_IN_MAX_PLY  - ss->ply - 1
+                                  : VALUE_DRAW + 2 * wdl * drawScore;
 
         int b =  wdl < -drawScore ? BOUND_UPPER
                : wdl >  drawScore ? BOUND_LOWER : BOUND_EXACT;
@@ -262,8 +262,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
                   : qsearch_NonPV_false(pos, ss, alpha, 0);
 
   improving =  (ss-2)->staticEval == VALUE_NONE
-             ? (ss->staticEval >= (ss-4)->staticEval || (ss-4)->staticEval == VALUE_NONE)
-             :  ss->staticEval >= (ss-2)->staticEval;
+             ? (ss->staticEval > (ss-4)->staticEval || (ss-4)->staticEval == VALUE_NONE)
+             :  ss->staticEval > (ss-2)->staticEval;
 
   // Step 8. Futility pruning: child node
   if (   !PvNode
@@ -278,7 +278,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && (ss-1)->statScore < 23397
       && eval >= beta
       && eval >= ss->staticEval
-      && ss->staticEval >= beta - 32 * depth + 292 - improving * 30
+      && ss->staticEval >= beta - 32 * depth - 30 * improving + 120 * !!ttPv + 292
       && !excludedMove
       && non_pawn_material_c(stm())
       && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
@@ -298,7 +298,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
 
     if (nullValue >= beta) {
       // Do not return unproven mate scores
-      if (nullValue >= VALUE_MATE_IN_MAX_PLY)
+      if (nullValue >= VALUE_TB_WIN_IN_MAX_PLY)
         nullValue = beta;
 
       if (   (depth < 13 || pos->nmpPly)
@@ -325,7 +325,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // much above beta, we can (almost) safely prune the previous move.
   if (   !PvNode
       &&  depth >= 5
-      &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
+      &&  abs(beta) < VALUE_TB_WIN_IN_MAX_PLY)
   {
     Value rbeta = min(beta + 189 - 45 * improving, VALUE_INFINITE);
     Depth rdepth = depth - 4;
@@ -455,7 +455,7 @@ moves_loop: // When in check search starts from here.
     // Step 13. Pruning at shallow depth
     if (  !rootNode
         && non_pawn_material_c(stm())
-        && bestValue > VALUE_MATED_IN_MAX_PLY)
+        && bestValue > VALUE_TB_LOSS_IN_MAX_PLY)
     {
       // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
       moveCountPruning = moveCount >= FutilityMoveCounts[improving][depth];
@@ -509,7 +509,7 @@ moves_loop: // When in check search starts from here.
         &&  tte_depth(tte) >= depth - 3
         &&  is_legal(pos, move))
     {
-      Value singularBeta = ttValue - 2 * depth;
+      Value singularBeta = ttValue - (((ttPv && !PvNode) + 4) * depth) / 2;
       Depth halfDepth = depth / 2;
       ss->excludedMove = move;
       Move cm = ss->countermove;
@@ -583,7 +583,7 @@ moves_loop: // When in check search starts from here.
     // Step 16. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3
-        &&  moveCount > 1 + rootNode + (rootNode && bestValue < alpha)
+        &&  moveCount > 1 + 2 * rootNode
         && (!rootNode || best_move_count(pos, move) == 0)
         && (   !captureOrPromotion
             || moveCountPruning
@@ -628,7 +628,7 @@ moves_loop: // When in check search starts from here.
         // because the destination square is empty.
         else if (   type_of_m(move) == NORMAL
                  && !see_test(pos, reverse_move(move), 0))
-          r -= 2;
+          r -= 2 + !!ttPv;
 
         ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
                        + (*fmh )[movedPiece][to_sq(move)]

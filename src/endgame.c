@@ -184,7 +184,7 @@ static Value EvaluateKXK(const Pos *pos, unsigned strongSide)
       || ((pieces_p(BISHOP) & bb) && (pieces_p(KNIGHT) & bb))
       || (   (pieces_p(BISHOP) & bb & DarkSquares)
           && (pieces_p(BISHOP) & bb & LightSquares)))
-    result = min(result + VALUE_KNOWN_WIN, VALUE_MATE_IN_MAX_PLY - 1);
+    result = min(result + VALUE_KNOWN_WIN, VALUE_TB_WIN_IN_MAX_PLY - 1);
 
   return strongSide == stm() ? result : -result;
 }
@@ -377,9 +377,9 @@ static Value EvaluateKNNKP(const Pos *pos, unsigned strongSide)
   assert(verify_material(pos, strongSide, 2 * KnightValueMg, 0));
   assert(verify_material(pos, weakSide, VALUE_ZERO, 1));
 
-  Value result =  2 * KnightValueEg
-                - PawnValueEg
-                + PushToEdges[square_of(weakSide, KING)];
+  Value result =      PawnValueEg
+                +  2 * PushToEdges[square_of(weakSide, KING)]
+                - 10 * relative_rank_s(weakSide, square_of(weakSide, PAWN));
 
   return strongSide == stm() ? result : -result;
 }

@@ -660,9 +660,6 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 // Since only eg is involved, we return a Value and not a Score.
 INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
 {
-  Value mg = mg_value(score);
-  Value eg = eg_value(score);
-
   int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                    - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
 
@@ -679,11 +676,14 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
   int initiative =   9 * passedCount
                   + 11 * popcount(pieces_p(PAWN))
                   +  9 * outflanking
-                  + 12 * infiltration
+                  + 24 * infiltration
                   + 21 * bothFlanks
                   + 51 * !non_pawn_material()
                   - 43 * almostUnwinnable
-                  - 100;
+                  - 110;
+
+  Value mg = mg_value(score);
+  Value eg = eg_value(score);
 
   // Now apply the bonus: note that we find the attacking side by extracting
   // the sign of the midgame or endgame values, and that we carefully cap the

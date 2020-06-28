@@ -146,7 +146,7 @@ Value name_NT_InCheck(qsearch)(Pos* pos, Stack* ss, Value alpha, BETA_ARG
     // Detect non-capture evasions that are candidates to be pruned
     evasionPrunable =    InCheck
                      && (depth != 0 || moveCount > 2)
-                     &&  bestValue > VALUE_MATED_IN_MAX_PLY
+                     &&  bestValue > VALUE_TB_LOSS_IN_MAX_PLY
                      && !is_capture(pos, move);
 
     // Don't search moves with negative SEE values

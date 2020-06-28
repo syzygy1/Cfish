@@ -132,8 +132,8 @@ void search_init(void)
     Reductions[i] = (24.8 + log(Threads.numThreads)) * log(i);
 
   for (int d = 0; d < 16; ++d) {
-    FutilityMoveCounts[0][d] = (5 + d * d) / 2 - 1;
-    FutilityMoveCounts[1][d] = 5 + d * d - 1;
+    FutilityMoveCounts[0][d] = (4 + d * d) / 2;
+    FutilityMoveCounts[1][d] = 4 + d * d;
   }
 }
 
@@ -330,11 +330,11 @@ void mainthread_search(void)
     for (int idx = 1; idx < Threads.numThreads; idx++) {
       Pos *p = Threads.pos[idx];
       for (i = 0; mvs[i] != p->rootMoves->move[0].pv[0]; i++);
-      if (bestThread->rootMoves->move[0].score >= VALUE_MATE_IN_MAX_PLY) {
+      if (bestThread->rootMoves->move[0].score >= VALUE_TB_WIN_IN_MAX_PLY) {
         // Make sure we pick the shortest mate
         if (p->rootMoves->move[0].score > bestThread->rootMoves->move[0].score)
           bestThread = p;
-      } else if (p->rootMoves->move[0].score >= VALUE_MATE_IN_MAX_PLY
+      } else if (p->rootMoves->move[0].score >= VALUE_TB_WIN_IN_MAX_PLY
           || votes[i] > bestVote) {
         bestVote = votes[i];
         bestThread = p;
@@ -681,8 +681,8 @@ static Value value_to_tt(Value v, int ply)
 {
   assert(v != VALUE_NONE);
 
-  return  v >= VALUE_MATE_IN_MAX_PLY  ? v + ply
-        : v <= VALUE_MATED_IN_MAX_PLY ? v - ply : v;
+  return  v >= VALUE_TB_WIN_IN_MAX_PLY  ? v + ply
+        : v <= VALUE_TB_LOSS_IN_MAX_PLY ? v - ply : v;
 }
 
 
@@ -692,9 +692,22 @@ static Value value_to_tt(Value v, int ply)
 
 static Value value_from_tt(Value v, int ply, int r50c)
 {
-  return  v == VALUE_NONE             ? VALUE_NONE
-        : v >= VALUE_MATE_IN_MAX_PLY  ? VALUE_MATE - v > 99 - r50c ? VALUE_MATE_IN_MAX_PLY : v - ply
-        : v <= VALUE_MATED_IN_MAX_PLY ? VALUE_MATE + v > 99 - r50c ? VALUE_MATED_IN_MAX_PLY : v + ply : v;
+  if (v == VALUE_NONE)
+    return VALUE_NONE;
+
+  if (v >= VALUE_TB_WIN_IN_MAX_PLY) {
+    if (v >= VALUE_MATE_IN_MAX_PLY && VALUE_MATE - v > 99 - r50c)
+      return VALUE_MATE_IN_MAX_PLY - 1;
+    return v - ply;
+  }
+
+  if (v <= VALUE_TB_LOSS_IN_MAX_PLY) {
+    if (v <= VALUE_MATED_IN_MAX_PLY && VALUE_MATE + v > 99 - r50c)
+      return VALUE_MATED_IN_MAX_PLY + 1;
+    return v + ply;
+  }
+
+  return v;
 }
 
 
@@ -852,7 +865,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
     Depth d = updated ? depth : depth - 1;
     Value v = updated ? rm->move[i].score : rm->move[i].previousScore;
 
-    bool tb = TB_RootInTB && abs(v) < VALUE_MATE - MAX_MATE_PLY;
+    bool tb = TB_RootInTB && abs(v) < VALUE_MATE_IN_MAX_PLY;
     if (tb)
       v = rm->move[i].tbScore;
 
