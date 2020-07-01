@@ -63,14 +63,18 @@ INLINE int futility_margin(Depth d, int improving) {
   return 217 * (d - improving);
 }
 
-// Futility and reductions lookup tables, initialized at startup
-static int FutilityMoveCounts[2][16]; // [improving][depth]
+// Reductions lookup table, initialized at startup
 static int Reductions[MAX_MOVES]; // [depth or moveNumber]
 
 INLINE Depth reduction(int i, Depth d, int mn)
 {
   int r = Reductions[d] * Reductions[mn];
   return ((r + 511) / 1024 + (!i && r > 1007));
+}
+
+INLINE int futility_move_count(bool improving, Depth depth)
+{
+  return improving ? 5 + depth  * depth - 1 : (5 + depth * depth) / 2 - 1;
 }
 
 // History and stats update bonus, based on depth
@@ -130,11 +134,6 @@ void search_init(void)
 {
   for (int i = 1; i < MAX_MOVES; i++)
     Reductions[i] = (24.8 + log(Threads.numThreads)) * log(i);
-
-  for (int d = 0; d < 16; ++d) {
-    FutilityMoveCounts[0][d] = (5 + d * d) / 2 - 1;
-    FutilityMoveCounts[1][d] = 5 + d * d - 1;
-  }
 }
 
 

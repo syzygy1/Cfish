@@ -57,8 +57,8 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue;
-  int ttHit, ttPv, inCheck, givesCheck, improving, didLMR;
-  bool doFullDepthSearch, moveCountPruning;
+  int ttHit, ttPv, inCheck, givesCheck, didLMR;
+  bool improving, doFullDepthSearch, moveCountPruning;
   bool ttCapture, captureOrPromotion, singularLMR;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
@@ -228,7 +228,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
   // Step 6. Static evaluation of the position
   if (inCheck) {
     ss->staticEval = eval = VALUE_NONE;
-    improving = 0;
+    improving = false;
     goto moves_loop; // Skip early pruning when in check
   } else if (ttHit) {
     // Never assume anything about values stored in TT
@@ -458,7 +458,7 @@ moves_loop: // When in check search starts from here.
         && bestValue > VALUE_MATED_IN_MAX_PLY)
     {
       // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
-      moveCountPruning = moveCount >= FutilityMoveCounts[improving][depth];
+      moveCountPruning = moveCount >= futility_move_count(improving, depth);
 
       if (   !captureOrPromotion
           && !givesCheck)
