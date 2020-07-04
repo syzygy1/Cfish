@@ -82,22 +82,23 @@ struct Stack {
   // Original search stack data
   Move* pv;
   PieceToHistory *history;
-  uint8_t ply;
   Move currentMove;
   Move excludedMove;
   Move killers[2];
   Value staticEval;
   Value statScore;
   int moveCount;
+  uint8_t ply;
 
   // MovePicker data
+  uint8_t stage;
+  uint8_t recaptureSquare;
+  uint8_t mp_ply;
   Move countermove;
   Depth depth;
   Move ttMove;
   Value threshold;
   Move mpKillers[2];
-  uint8_t stage;
-  uint8_t recaptureSquare;
   ExtMove *cur, *endMoves, *endBadCaptures;
 
   // CheckInfo data
@@ -164,6 +165,7 @@ struct Pos {
   // Pointers to thread-specific tables.
   CounterMoveStat *counterMoves;
   ButterflyHistory *history;
+  LowPlyHistory *lowPlyHistory;
   CapturePieceToHistory *captureHistory;
   PawnEntry *pawnTable;
   MaterialEntry *materialTable;

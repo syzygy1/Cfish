@@ -61,7 +61,7 @@ static const int KRPPKRPScaleFactors[8] = { 0, 9, 10, 14, 21, 44, 0, 0 };
 #ifndef NDEBUG
 static bool verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
 {
-  return   non_pawn_material(c) == npm
+  return   non_pawn_material_c(c) == npm
         && piece_count(c, PAWN) == pawnsCnt;
 }
 #endif

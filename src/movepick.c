@@ -79,6 +79,7 @@ static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
   ButterflyHistory *history = pos->history;
+  LowPlyHistory *lph = pos->lowPlyHistory;
 
   PieceToHistory *cmh = (st-1)->history;
   PieceToHistory *fmh = (st-2)->history;
@@ -95,7 +96,8 @@ static void score_quiets(const Pos *pos)
               + 2 * (*cmh)[piece_on(from)][to]
               + 2 * (*fmh)[piece_on(from)][to]
               + 2 * (*fmh2)[piece_on(from)][to]
-              +     (*fmh3)[piece_on(from)][to];
+              +     (*fmh3)[piece_on(from)][to]
+              + (st->mp_ply < MAX_LPH ? 4 * (*lph)[st->mp_ply][move] : 0);
   }
 }
 

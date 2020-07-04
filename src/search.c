@@ -121,7 +121,8 @@ static Value value_to_tt(Value v, int ply);
 static Value value_from_tt(Value v, int ply, int r50c);
 static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus);
-static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets, int quietsCnt, int bonus);
+static void update_quiet_stats(const Pos *pos, Stack *ss, Move move, int bonus,
+    Depth depth);
 static void update_capture_stats(const Pos *pos, Move move, Move *captures, int captureCnt, int bonus);
 static void check_time(void);
 static void stable_sort(RootMove *rm, int num);
@@ -164,6 +165,7 @@ void search_clear(void)
     stats_clear(pos->counterMoves);
     stats_clear(pos->history);
     stats_clear(pos->captureHistory);
+    stats_clear(pos->lowPlyHistory);
   }
 
   mainThread.previousScore = VALUE_INFINITE;
@@ -416,7 +418,7 @@ void thread_search(Pos *pos)
 
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.
-  while (   (pos->rootDepth += 1) < MAX_PLY
+  while (   ++pos->rootDepth < MAX_PLY
          && !Signals.stop
          && !(   Limits.depth
               && pos->threadIdx == 0
@@ -742,6 +744,14 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
   ttPv = PvNode ? 4 : (ttHit ? tte_is_pv(tte) : 0);
+
+  if (   ttPv
+      && depth > 12
+      && ss->ply - 1 < MAX_LPH
+      && !captured_piece()
+      && move_is_ok((ss-1)->currentMove))
+    lph_update(*pos->lowPlyHistory, ss->ply - 1, (ss-1)->currentMove, stat_bonus(depth - 5));
+
   // pos->ttHitAverage can be used to approximate the running average of ttHit
   pos->ttHitAverage = (ttHitAverageWindow - 1) * pos->ttHitAverage / ttHitAverageWindow + ttHitAverageResolution * !!ttHit;
 
@@ -757,7 +767,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
     if (ttMove) {
       if (ttValue >= beta) {
         if (!is_capture_or_promotion(pos, ttMove))
-          update_stats(pos, ss, ttMove, NULL, 0, stat_bonus(depth));
+          update_quiet_stats(pos, ss, ttMove, stat_bonus(depth), depth);
 
         // Extra penalty for a quiet TT or main killer move in previous ply
         // when it gets refuted
@@ -987,7 +997,7 @@ moves_loop: // When in check search starts from here.
   PieceToHistory *fmh  = (ss-2)->history;
   PieceToHistory *fmh2 = (ss-4)->history;
 
-  mp_init(pos, ttMove, depth);
+  mp_init(pos, ttMove, depth, depth > 12 && ttPv ? ss->ply : MAX_PLY);
 
   value = bestValue;
   singularLMR = moveCountPruning = false;
@@ -1140,7 +1150,7 @@ moves_loop: // When in check search starts from here.
 
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.
-      mp_init(pos, ttMove, depth);
+      mp_init(pos, ttMove, depth, depth > 12 && ttPv ? ss->ply : MAX_PLY);
       ss->stage++;
       ss->countermove = cm; // pedantic
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
@@ -1222,7 +1232,7 @@ moves_loop: // When in check search starts from here.
       if (!captureOrPromotion) {
         // Increase reduction if ttMove is a capture
         if (ttCapture)
-          r += 1;
+          r++;
 
         // Increase reduction for cut nodes
         if (cutNode)
@@ -1251,10 +1261,10 @@ moves_loop: // When in check search starts from here.
 
         // Decrease/increase reduction by comparing with opponent's stat score.
         if (ss->statScore >= -102 && (ss-1)->statScore < -114)
-          r -= 1;
+          r--;
 
         else if ((ss-1)->statScore >= -116 && ss->statScore < -154)
-          r += 1;
+          r++;
 
         // Decrease/increase reduction for moves with a good/bad history.
         r -= ss->statScore / 16384;
@@ -1392,9 +1402,17 @@ moves_loop: // When in check search starts from here.
                :     inCheck ? mated_in(ss->ply) : VALUE_DRAW;
   else if (bestMove) {
     // Quiet best move: update move sorting heuristics
-    if (!is_capture_or_promotion(pos, bestMove))
-      update_stats(pos, ss, bestMove, quietsSearched, quietCount,
-          stat_bonus(depth + (bestValue > beta + PawnValueMg)));
+    if (!is_capture_or_promotion(pos, bestMove)) {
+      int bonus = stat_bonus(depth + (bestValue > beta + PawnValueMg));
+      update_quiet_stats(pos, ss, bestMove, bonus, depth);
+
+      // Decrease all the other played quiet moves
+      for (int i = 0; i < quietCount; i++) {
+        history_update(*pos->history, stm(), quietsSearched[i], -bonus);
+        update_cm_stats(ss, moved_piece(quietsSearched[i]),
+            to_sq(quietsSearched[i]), -bonus);
+      }
+    }
 
     update_capture_stats(pos, bestMove, capturesSearched, captureCount,
         stat_bonus(depth + 1));
@@ -1447,7 +1465,7 @@ INLINE Value qsearch_node(Pos *pos, Stack *ss, Value alpha, Value beta,
 {
   const bool PvNode = NT == PV;
 
-  assert(InCheck == checkers());
+  assert(InCheck == (bool)checkers());
   assert(alpha >= -VALUE_INFINITE && alpha < beta && beta <= VALUE_INFINITE);
   assert(PvNode || (alpha == beta - 1));
   assert(depth <= 0);
@@ -1763,11 +1781,11 @@ static void update_capture_stats(const Pos *pos, Move move, Move *captures,
   }
 }
 
-// update_stats() updates killers, history, countermove and countermove
+// update_quiet_stats() updates killers, history, countermove and countermove
 // plus follow-up move history when a new quiet best move is found.
 
-static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
-    int quietsCnt, int bonus)
+static void update_quiet_stats(const Pos *pos, Stack *ss, Move move, int bonus,
+    Depth depth)
 {
   if (ss->killers[0] != move) {
     ss->killers[1] = ss->killers[0];
@@ -1786,11 +1804,8 @@ static void update_stats(const Pos *pos, Stack *ss, Move move, Move *quiets,
     (*pos->counterMoves)[piece_on(prevSq)][prevSq] = move;
   }
 
-  // Decrease all the other played quiet moves
-  for (int i = 0; i < quietsCnt; i++) {
-    history_update(*pos->history, c, quiets[i], -bonus);
-    update_cm_stats(ss, moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
-  }
+  if (depth > 12 && ss->ply < MAX_LPH)
+    lph_update(*pos->lowPlyHistory, ss->ply, move, stat_bonus(depth - 7));
 }
 
 #if 0
@@ -2032,6 +2047,7 @@ void start_thinking(Pos *root)
     pos->nmpPly = pos->nmpOdd = 0;
     pos->rootDepth = 0;
     pos->nodes = pos->tbHits = 0;
+    stats_clear(pos->lowPlyHistory);
     RootMoves *rm = pos->rootMoves;
     rm->size = end - list;
     for (int i = 0; i < rm->size; i++) {
