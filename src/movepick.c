@@ -97,7 +97,7 @@ static void score_quiets(const Pos *pos)
               + 2 * (*fmh)[piece_on(from)][to]
               + 2 * (*fmh2)[piece_on(from)][to]
               +     (*fmh3)[piece_on(from)][to]
-              + (st->mp_ply < MAX_LPH ? 4 * (*lph)[st->mp_ply][move] : 0);
+              + (st->mp_ply < MAX_LPH ? min(4, st->depth / 3) * (*lph)[st->mp_ply][move] : 0);
   }
 }
 

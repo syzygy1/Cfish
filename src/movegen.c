@@ -28,7 +28,7 @@ enum { CAPTURES, QUIETS, QUIET_CHECKS, EVASIONS, NON_EVASIONS, LEGAL };
 
 
 INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
-                                const int Type, const int Direction)
+    const int Type, const int Direction)
 {
   if (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS)
     (list++)->move = make_promotion(to - Direction, to, QUEEN);
@@ -50,8 +50,7 @@ INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
 
 
 INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
-                                    Bitboard target, const int Us,
-                                    const int Type)
+    Bitboard target, const int Us, const int Type)
 {
   // Compute our parametrized parameters at compile time, named according to
   // the point of view of white side.
@@ -172,20 +171,20 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 }
 
 
-INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
-                               Bitboard target, const int Pt, const bool Checks)
+INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, Bitboard target,
+    const int Us, const int Pt, const bool Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
   Square from;
 
-  loop_through_pieces(us, Pt, from) {
+  loop_through_pieces(Us, Pt, from) {
     if (Checks) {
       if (    (Pt == BISHOP || Pt == ROOK || Pt == QUEEN)
           && !(PseudoAttacks[Pt][from] & target & pos->st->checkSquares[Pt]))
           continue;
 
-      if (blockers_for_king(pos, us ^ 1) & sq_bb(from))
+      if (blockers_for_king(pos, Us ^ 1) & sq_bb(from))
         continue;
     }
 
@@ -203,17 +202,17 @@ INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
 
 
 INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
-                             const int Us, const int Type)
+    const int Us, const int Type)
 {
   const int OO = make_castling_right(Us, KING_SIDE);
   const int OOO = make_castling_right(Us, QUEEN_SIDE);
   const bool Checks = Type == QUIET_CHECKS;
 
   list = generate_pawn_moves(pos, list, target, Us, Type);
-  list = generate_moves(pos, list, Us, target, KNIGHT, Checks);
-  list = generate_moves(pos, list, Us, target, BISHOP, Checks);
-  list = generate_moves(pos, list, Us, target, ROOK, Checks);
-  list = generate_moves(pos, list, Us, target, QUEEN, Checks);
+  list = generate_moves(pos, list, target, Us, KNIGHT, Checks);
+  list = generate_moves(pos, list, target, Us, BISHOP, Checks);
+  list = generate_moves(pos, list, target, Us, ROOK  , Checks);
+  list = generate_moves(pos, list, target, Us, QUEEN , Checks);
 
   if (Type != QUIET_CHECKS && Type != EVASIONS) {
     Square ksq = square_of(Us, KING);

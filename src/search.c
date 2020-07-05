@@ -403,6 +403,10 @@ void thread_search(Pos *pos)
         mainThread.iterValue[i] = mainThread.previousScore;
   }
 
+  memmove(&((*pos->lowPlyHistory)[0]), &((*pos->lowPlyHistory)[2]),
+      (MAX_LPH - 2) * sizeof((*pos->lowPlyHistory)[0]));
+  memset(&((*pos->lowPlyHistory)[MAX_LPH - 2]), 0, 2 * sizeof((*pos->lowPlyHistory)[0]));
+
   int multiPV = option_value(OPT_MULTI_PV);
 #if 0
   Skill skill(option_value(OPT_SKILL_LEVEL));
@@ -564,9 +568,8 @@ skip_search:
     // Do we have time for the next iteration? Can we stop searching now?
     if (    use_time_management()
         && !Signals.stop
-        && !Signals.stopOnPonderhit) {
-      // Stop the search if only one legal move is available, or if all
-      // of the available time has been used.
+        && !Signals.stopOnPonderhit)
+    {
       double fallingEval = (332 + 6 * (mainThread.previousScore - bestValue)
                                 + 6 * (mainThread.iterValue[iterIdx] - bestValue)) / 704.0;
       fallingEval = clamp(fallingEval, 0.5, 1.5);
@@ -584,9 +587,10 @@ skip_search:
 
       double bestMoveInstability = 1 + totBestMoveChanges / Threads.numThreads;
 
-      if (   rm->size == 1
-          || time_elapsed() > time_optimum() * fallingEval * reduction * bestMoveInstability)
-      {
+      double totalTime = rm->size == 1 ? 0 : time_optimum() * fallingEval * reduction * bestMoveInstability;
+
+      // Stop the search if we have exceeded the totalTime (at least 1ms)
+      if (time_elapsed() > totalTime) {
         // If we are allowed to ponder do not stop the search now but
         // keep pondering until the GUI sends "ponderhit" or "stop".
         if (Limits.ponder)
@@ -595,7 +599,7 @@ skip_search:
           Signals.stop = 1;
       } else if (Threads.increaseDepth
           && !Limits.ponder
-          && time_elapsed() > time_optimum() * fallingEval * reduction * bestMoveInstability * 0.6)
+          && time_elapsed() > totalTime * 0.6)
         Threads.increaseDepth = false;
       else
         Threads.increaseDepth = true;
@@ -670,7 +674,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   Value bestValue, value, ttValue, eval, maxValue;
   int ttHit, ttPv, givesCheck, didLMR;
   bool improving, inCheck, doFullDepthSearch, moveCountPruning;
-  bool ttCapture, captureOrPromotion, singularLMR;
+  bool ttCapture, captureOrPromotion, singularQuietLMR;
   Piece movedPiece;
   int moveCount, captureCount, quietCount;
 
@@ -1003,10 +1007,10 @@ moves_loop: // When in check search starts from here.
   PieceToHistory *fmh  = (ss-2)->history;
   PieceToHistory *fmh2 = (ss-4)->history;
 
-  mp_init(pos, ttMove, depth, depth > 12 ? ss->ply : MAX_PLY);
+  mp_init(pos, ttMove, depth, ss->ply);
 
   value = bestValue;
-  singularLMR = moveCountPruning = false;
+  singularQuietLMR = moveCountPruning = false;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
   bool formerPv = ttPv && !PvNode;
 
@@ -1119,6 +1123,7 @@ moves_loop: // When in check search starts from here.
         // Futility pruning for captures
         if (   !givesCheck
             && lmrDepth < 6
+            && !(PvNode && abs(bestValue) < 2)
             && !inCheck
             && ss->staticEval + 270 + 384 * lmrDepth + PieceValue[MG][type_of_p(piece_on(to_sq(move)))] <= alpha)
           continue;
@@ -1156,7 +1161,7 @@ moves_loop: // When in check search starts from here.
 
       if (value < singularBeta) {
         extension = 1;
-        singularLMR = true;
+        singularQuietLMR = !ttCapture;
       }
 
       // Multi-cut pruning. Our ttMove is assumed to fail high, and now we
@@ -1173,7 +1178,7 @@ moves_loop: // When in check search starts from here.
       // there is another move that pushes it over beta. If so, we prune.
       else if (ttValue >= beta) {
         // Fix up our move picker data
-        mp_init(pos, ttMove, depth, depth > 12 ? ss->ply : MAX_PLY);
+        mp_init(pos, ttMove, depth, ss->ply);
         ss->stage++;
         ss->countermove = cm; // pedantic
         ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
@@ -1190,7 +1195,7 @@ moves_loop: // When in check search starts from here.
 
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.
-      mp_init(pos, ttMove, depth, depth > 12 ? ss->ply : MAX_PLY);
+      mp_init(pos, ttMove, depth, ss->ply);
       ss->stage++;
       ss->countermove = cm; // pedantic
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
@@ -1278,7 +1283,7 @@ moves_loop: // When in check search starts from here.
         r--;
 
       // Decrease reduction if ttMove has been singularly extended
-      if (singularLMR)
+      if (singularQuietLMR)
         r -= 1 + formerPv;
 
       if (!captureOrPromotion) {
@@ -2098,7 +2103,6 @@ void start_thinking(Pos *root)
     pos->nmpPly = pos->nmpOdd = 0;
     pos->rootDepth = 0;
     pos->nodes = pos->tbHits = 0;
-    stats_clear(pos->lowPlyHistory);
     RootMoves *rm = pos->rootMoves;
     rm->size = end - list;
     for (int i = 0; i < rm->size; i++) {

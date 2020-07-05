@@ -31,10 +31,13 @@
 // Pawn penalties
 static const Score Backward        = S( 9, 24);
 static const Score Doubled         = S(11, 56);
-static const Score DoubledIsolated = S(15, 57);
 static const Score Isolated        = S( 5, 15);
 static const Score WeakLever       = S( 0, 56);
 static const Score WeakUnopposed   = S(13, 27);
+
+static const int BlockedStorm[8][2] = {
+  {0, 0}, {0, 0}, {76, 78}, {-10, 15}, {-7, 10}, {-4, 6}, {-1, 2}
+};
 
 // Connected pawn bonus
 static const int Connected[8] = { 0, 7, 8, 12, 29, 48, 86 };
@@ -85,6 +88,8 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   e->pawnAttacks[Us] = e->pawnAttacksSpan[Us] = pawn_attacks_bb(ourPawns, Us);
   e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
+  e->blockedCount += popcount(  shift_bb(Up, ourPawns)
+                              & (theirPawns | doubleAttackThem));
 
   // Loop through all pawns of the current color and score each pawn
   loop_through_pieces(Us, PAWN, s) {
@@ -104,8 +109,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
     support    = neighbours & rank_bb_s(s - Up);
-
-    e->blockedCount += blocked || more_than_one(leverPush);
 
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot safely advance.
@@ -142,12 +145,13 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     }
 
     else if (!neighbours) {
-      score -= Isolated + (opposed ? 0 : WeakUnopposed);
-
-      if (   (ourPawns & forward_file_bb(Them, s))
+      if (    opposed
+          && (ourPawns & forward_file_bb(Them, s))
           && popcount(opposed) == 1
           && !(theirPawns & adjacent_files_bb(f)))
-        score -= DoubledIsolated;
+        score -= Doubled;
+      else
+        score -= Isolated + (opposed ? 0 : WeakUnopposed);
     }
 
     else if (backward)
@@ -178,13 +182,13 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 // evaluate_shelter() calculates the shelter bonus and the storm penalty
 // for a king, by looking at the king file and the two closest files.
 
-INLINE void evaluate_shelter(const Pos *pos, Square ksq, Score *shelter,
-                             const int Us)
+INLINE void evaluate_shelter(const PawnEntry *pe, const Pos *pos, Square ksq,
+    Score *shelter, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   
   Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
-  Bitboard ourPawns = b & pieces_c(Us);
+  Bitboard ourPawns = b & pieces_c(Us) & ~pe->pawnAttacks[Them];
   Bitboard theirPawns = b & pieces_c(Them);
   Value bonus[] = { 5, 5 };
 
@@ -201,8 +205,8 @@ INLINE void evaluate_shelter(const Pos *pos, Square ksq, Score *shelter,
     bonus[MG] += ShelterStrength[d][ourRank];
 
     if (ourRank && (ourRank == theirRank - 1)) {
-      bonus[MG] -= 82 * (theirRank == RANK_3);
-      bonus[EG] -= 82 * (theirRank == RANK_3);
+      bonus[MG] -= BlockedStorm[theirRank][MG];
+      bonus[EG] -= BlockedStorm[theirRank][EG];
     } else
       bonus[MG] -= UnblockedStorm[d][theirRank];
   }
@@ -233,14 +237,14 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
             minPawnDist++);
 
   Score shelter = make_score(-VALUE_INFINITE, 0);
-  evaluate_shelter(pos, ksq, &shelter, Us);
+  evaluate_shelter(pe, pos, ksq, &shelter, Us);
 
   // If we can castle use the bonus after the castling if it is bigger
   if (can_castle_cr(make_castling_right(Us, KING_SIDE)))
-    evaluate_shelter(pos, relative_square(Us, SQ_G1), &shelter, Us);
+    evaluate_shelter(pe, pos, relative_square(Us, SQ_G1), &shelter, Us);
 
   if (can_castle_cr(make_castling_right(Us, QUEEN_SIDE)))
-    evaluate_shelter(pos, relative_square(Us, SQ_C1), &shelter, Us);
+    evaluate_shelter(pe, pos, relative_square(Us, SQ_C1), &shelter, Us);
 
   return shelter - make_score(0, 16 * minPawnDist);
 }
