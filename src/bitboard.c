@@ -110,8 +110,9 @@ void print_pretty(Bitboard b)
     for (int f = 0; f <= 7; f++)
       printf((b & sq_bb(8 * r + f)) ? "| X " : "|   ");
 
-    printf("|\n+---+---+---+---+---+---+---+---+\n");
+    printf("| %d\n+---+---+---+---+---+---+---+---+\n", 1 + r);
   }
+  printf("  a   b   c   d   e   f   g   h\n");
 }
 
 

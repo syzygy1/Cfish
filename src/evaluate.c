@@ -679,33 +679,31 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
 }
 
 
-// evaluate_initiative() computes the initiative correction value for the
-// position, i.e., second order bonus/malus based on the known
-// attacking/defending status of the players.
-
-// Since only eg is involved, we return a Value and not a Score.
-INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
+// evaluate_winnable() adusts the mg and eg score components based on the
+// known attacking/defending status of the players.
+// A single value is derived from the mg and eg values and returned.
+INLINE Value evaluate_winnable(const Pos *pos, EvalInfo *ei, Score score)
 {
   int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                    - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
 
+  bool pawnsOnBothFlanks =   (pieces_p(PAWN) & QueenSide)
+                          && (pieces_p(PAWN) & KingSide);
+
+  bool almostUnwinnable =   outflanking < 0
+                         && !pawnsOnBothFlanks;
+
   bool infiltration =   rank_of(square_of(WHITE, KING)) > RANK_4
                      || rank_of(square_of(BLACK, KING)) < RANK_5;
 
-  bool bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
-
-  bool almostUnwinnable =   outflanking < 0
-                         && !bothFlanks;
-
-  // Compute the initiative bonus for the attacking side
-  int initiative =   9 * passedCount
+  // Compute the complexity bonus for the attacking side
+  int complexity =   9 * ei->pe->passedCount
                   + 12 * popcount(pieces_p(PAWN))
                   +  9 * outflanking
+                  + 21 * pawnsOnBothFlanks
                   + 24 * infiltration
-                  + 21 * bothFlanks
                   + 51 * !non_pawn_material()
                   - 43 * almostUnwinnable
-                  -  2 * rule50_count()
                   - 110;
 
   Value mg = mg_value(score);
@@ -715,16 +713,13 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
   // the sign of the midgame or endgame values, and that we carefully cap the
   // bonus so that the midgame and endgame scores will never change sign after
   // the bonus.
-  int u = ((mg > 0) - (mg < 0)) * max(min(initiative + 50, 0), -abs(mg));
-  int v = ((eg > 0) - (eg < 0)) * max(initiative, -abs(eg));
+  int u = ((mg > 0) - (mg < 0)) * clamp(complexity + 50, -abs(mg), 0);
+  int v = ((eg > 0) - (eg < 0)) * max(complexity, -abs(eg));
 
-  return make_score(u, v);
-}
+  mg += u;
+  eg += v;
 
-// evaluate_scale_factor() computes the scale factor for the winning side
-
-INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
-{
+  // Compute the scale factor for the winning side
   int strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
   int sf = material_scale_factor(ei->me, pos, strongSide);
 
@@ -740,7 +735,12 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
       sf = min(sf, 36 + 7 * piece_count(strongSide, PAWN));
   }
 
-  return sf;
+  // Interpolate between the middlegame and the scaled endgame score
+  v =  mg * ei->me->gamePhase
+     + eg * (PHASE_MIDGAME - ei->me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
+  v /= PHASE_MIDGAME;
+
+  return v;
 }
 
 
@@ -804,18 +804,17 @@ Value evaluate(const Pos *pos)
       score +=  evaluate_space(pos, &ei, WHITE)
               - evaluate_space(pos, &ei, BLACK);
 
-  // Evaluate position potential for the winning side
-  score += evaluate_initiative(pos, ei.pe->passedCount, score);
+  // Derive single value from the mg and eg parts of the score
+  v = evaluate_winnable(pos, &ei, score);
 
-  // Evaluate scale factor for the winning side
-  //int sf = evaluate_scale_factor(pos, &ei, eg_value(score));
-  int sf = evaluate_scale_factor(pos, &ei, eg_value(score));
+  // Evaluation grain
+  v = (v / 16) * 16;
 
-  // Interpolate between a middlegame and a (scaled by 'sf') endgame score
-  v =  mg_value(score) * ei.me->gamePhase
-     + eg_value(score) * (PHASE_MIDGAME - ei.me->gamePhase) * sf / SCALE_FACTOR_NORMAL;
+  // Side to move point of view
+  v = (stm() == WHITE ? v : -v) + Tempo;
 
-  v /= PHASE_MIDGAME;
+  // Damp down the evalation linearly when shuffling
+  v = v * (100 - rule50_count()) / 100;
 
-  return (stm() == WHITE ? v : -v) + Tempo; // Side to move point of view
+  return v;
 }

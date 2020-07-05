@@ -124,10 +124,10 @@ void print_pos(Pos *pos)
     for (int f = 0; f <= 7; f++)
       printf(" | %c", PieceToChar[pos->board[8 * r + f]]);
 
-    printf(" |\n +---+---+---+---+---+---+---+---+\n");
+    printf(" | %d\n +---+---+---+---+---+---+---+---+\n", r + 1);
   }
 
-  printf("\nFen: %s\nKey: %16"PRIX64"\nCheckers: ", fen, key());
+  printf("   a   b   c   d   e   f   g   h\n\nFen: %s\nKey: %16"PRIX64"\nCheckers: ", fen, key());
 
   char buf[16];
   for (Bitboard b = checkers(); b; )

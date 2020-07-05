@@ -91,11 +91,7 @@ static void on_book_depth(Option *opt)
 }
 
 #ifdef IS_64BIT
-#ifdef BIG_TT
-#define MAXHASHMB (1024 * 1024)
-#else
-#define MAXHASHMB 131072
-#endif
+#define MAXHASHMB 33554432
 #else
 #define MAXHASHMB 2048
 #endif

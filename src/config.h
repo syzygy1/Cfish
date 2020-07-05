@@ -14,7 +14,4 @@
 //#define AVX2_BITBOARD
 #endif
 
-//#define BIG_TT
-
 #endif
-
