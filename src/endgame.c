@@ -27,36 +27,15 @@
 
 // Table used to drive the king towards the edge of the board
 // in KX vs K and KQ vs KR endgames.
-static const int PushToEdges[64] = {
-  100, 90, 80, 70, 70, 80, 90, 100,
-   90, 70, 60, 50, 50, 60, 70,  90,
-   80, 60, 40, 30, 30, 40, 60,  80,
-   70, 50, 30, 20, 20, 30, 50,  70,
-   70, 50, 30, 20, 20, 30, 50,  70,
-   80, 60, 40, 30, 30, 40, 60,  80,
-   90, 70, 60, 50, 50, 60, 70,  90,
-  100, 90, 80, 70, 70, 80, 90, 100
-};
+static int PushToEdges[64];
 
 // Table used to drive the king towards a corner square of the
 // right color in KBN vs K endgames.
-static const int PushToCorners[64] = {
-  6400, 6080, 5760, 5440, 5120, 4800, 4480, 4160,
-  6080, 5760, 5440, 5120, 4800, 4480, 4160, 4480,
-  5760, 5440, 4960, 4480, 4480, 4000, 4480, 4800,
-  5440, 5120, 4480, 3840, 3520, 4480, 4800, 5120,
-  5120, 4800, 4480, 3520, 3840, 4480, 5120, 5440,
-  4800, 4480, 4000, 4480, 4480, 4960, 5440, 5760,
-  4480, 4160, 4480, 4800, 5120, 5440, 5760, 6080,
-  4160, 4480, 4800, 5120, 5440, 5760, 6080, 6400
-};
+static int PushToCorners[64];
 
 // Tables used to drive a piece towards or away from another piece
-static const int PushClose[8] = { 0, 0, 100, 80, 60, 40, 20, 10 };
-static const int PushAway [8] = { 0, 5, 20, 40, 60, 80, 90, 100 };
-
-// Pawn Rank based scaling factors used in KRPPKRP endgame
-static const int KRPPKRPScaleFactors[8] = { 0, 9, 10, 14, 21, 44, 0, 0 };
+static const int PushClose[8] = { 140, 120, 100, 80, 60, 40, 20, 0 };
+static const int PushAway [8] = { -20, 0, 20, 40, 60, 80, 100, 120 };
 
 #ifndef NDEBUG
 static bool verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
@@ -103,9 +82,9 @@ static EgFunc EvaluateKPK, EvaluateKNNK, EvaluateKNNKP, EvaluateKBNK,
               EvaluateKRKP, EvaluateKRKB, EvaluateKRKN, EvaluateKQKP,
               EvaluateKQKR, EvaluateKXK;
 
-static EgFunc ScaleKNPK, ScaleKNPKB, ScaleKRPKR, ScaleKRPKB,
-              ScaleKBPKB, ScaleKBPKN, ScaleKBPPKB, ScaleKRPPKRP,
-              ScaleKBPsK, ScaleKQKRPs, ScaleKPKP, ScaleKPsK;
+static EgFunc ScaleKNPK, ScaleKRPKR, ScaleKRPKB, ScaleKBPKB, ScaleKBPKN,
+              ScaleKBPPKB, ScaleKRPPKRP, ScaleKBPsK, ScaleKQKRPs, ScaleKPKP,
+              ScaleKPsK;
 
 EgFunc *endgame_funcs[NUM_EVAL + NUM_SCALING + 6] = {
   NULL,
@@ -120,19 +99,18 @@ EgFunc *endgame_funcs[NUM_EVAL + NUM_SCALING + 6] = {
   &EvaluateKQKP,   // 8
   &EvaluateKQKR,   // 9
   &EvaluateKXK,    // 10
-// Entries 11-22 are scaling functions.
+// Entries 11-21 are scaling functions.
   &ScaleKNPK,      // 11
-  &ScaleKNPKB,     // 12
-  &ScaleKRPKR,     // 13
-  &ScaleKRPKB,     // 14
-  &ScaleKBPKB,     // 15
-  &ScaleKBPKN,     // 16
-  &ScaleKBPPKB,    // 17
-  &ScaleKRPPKRP,   // 18
-  &ScaleKBPsK,     // 19
-  &ScaleKQKRPs,    // 20
-  &ScaleKPsK,      // 21
-  &ScaleKPKP       // 22
+  &ScaleKRPKR,     // 12
+  &ScaleKRPKB,     // 13
+  &ScaleKBPKB,     // 14
+  &ScaleKBPKN,     // 15
+  &ScaleKBPPKB,    // 16
+  &ScaleKRPPKRP,   // 17
+  &ScaleKBPsK,     // 18
+  &ScaleKQKRPs,    // 19
+  &ScaleKPsK,      // 20
+  &ScaleKPKP       // 21
 };
 
 Key endgame_keys[NUM_EVAL + NUM_SCALING][2];
@@ -140,8 +118,8 @@ Key endgame_keys[NUM_EVAL + NUM_SCALING][2];
 static const char *endgame_codes[NUM_EVAL + NUM_SCALING] = {
   // Codes for evaluation functions 1-9.
   "KPk", "KNNk", "KNNkp", "KBNk", "KRkp", "KRkb", "KRkn", "KQkp", "KQkr",
-  // Codes for scaling functions 11-18.
-  "KNPk", "KNPkb", "KRPkr", "KRPkb", "KBPkb", "KBPkn", "KBPPkb", "KRPPkrp"
+  // Codes for scaling functions 11-17.
+  "KNPk", "KRPkr", "KRPkb", "KBPkb", "KBPkn", "KBPPkb", "KRPPkrp"
 };
 
 void endgames_init(void)
@@ -149,6 +127,13 @@ void endgames_init(void)
   for (int i = 0; i < NUM_EVAL + NUM_SCALING; i++) {
     endgame_keys[i][WHITE] = calc_key(endgame_codes[i], WHITE);
     endgame_keys[i][BLACK] = calc_key(endgame_codes[i], BLACK);
+  }
+
+  for (int s = 0; s < 64; s++) {
+    int f = file_of(s), r = rank_of(s);
+    int fd = min(f, 7 - f), rd = min(r, 7 - r);
+    PushToEdges[s] = 90 - (7 * fd * fd / 2 + 7 * rd * rd / 2);
+    PushToCorners[s] = 420 * abs(7 - r - f);
   }
 }
 
@@ -203,15 +188,14 @@ static Value EvaluateKBNK(const Pos *pos, unsigned strongSide)
   Square loserKSq = square_of(weakSide, KING);
   Square bishopSq = lsb(pieces_p(BISHOP));
 
-  // kbnk_mate_table() tries to drive toward corners A1 or H8. If we have a
-  // bishop that cannot reach the above squares, we flip the kings in order
-  // to drive the enemy toward corners A8 or H1.
+  // If our bishop does not attack A1/H8, we flip the enemy king square
+  // to drive to opposite corners (A8/H1)
   if (opposite_colors(bishopSq, SQ_A1)) {
     winnerKSq = winnerKSq ^ 0x38;
     loserKSq  = loserKSq ^ 0x38;
   }
 
-  Value result =  VALUE_KNOWN_WIN
+  Value result =  VALUE_KNOWN_WIN + 3520
                 + PushClose[distance(winnerKSq, loserKSq)]
                 + PushToCorners[loserKSq];
 
@@ -338,7 +322,7 @@ static Value EvaluateKQKP(const Pos *pos, unsigned strongSide)
 
   if (   relative_rank_s(weakSide, pawnSq) != RANK_7
       || distance(loserKSq, pawnSq) != 1
-      || !((FileABB | FileCBB | FileFBB | FileHBB) & sq_bb(pawnSq)))
+      || ((FileBBB | FileDBB | FileEBB | FileGBB) & sq_bb(pawnSq)))
     result += QueenValueEg - PawnValueEg;
 
   return strongSide == stm() ? result : -result;
@@ -662,7 +646,7 @@ static int ScaleKRPPKRP(const Pos *pos, unsigned strongSide)
       && distance_f(bksq, wpsq2) <= 1
       && relative_rank_s(strongSide, bksq) > r) {
     assert(r > RANK_1 && r < RANK_7);
-    return KRPPKRPScaleFactors[r];
+    return 7 * r;
   }
   return SCALE_FACTOR_NONE;
 }
@@ -836,25 +820,6 @@ static int ScaleKNPK(const Pos *pos, unsigned strongSide)
 
   if (pawnSq == SQ_A7 && distance(SQ_A8, weakKingSq) <= 1)
     return SCALE_FACTOR_DRAW;
-
-  return SCALE_FACTOR_NONE;
-}
-
-
-// KNP vs KB. If knight can block bishop from taking pawn, it is a win.
-// Otherwise the position is drawn.
-static int ScaleKNPKB(const Pos *pos, unsigned strongSide)
-{
-  unsigned weakSide = strongSide ^ 1;
-
-  Square pawnSq = lsb(pieces_p(PAWN));
-  Square bishopSq = lsb(pieces_p(BISHOP));
-  Square weakKingSq = square_of(weakSide, KING);
-
-  // King needs to get close to promoting pawn to prevent knight from blocking.
-  // Rules for this are very tricky, so just approximate.
-  if (forward_file_bb(strongSide, pawnSq) & attacks_from_bishop(bishopSq))
-    return distance(weakKingSq, pawnSq);
 
   return SCALE_FACTOR_NONE;
 }

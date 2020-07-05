@@ -98,18 +98,18 @@ enum {
 // end game, indexed by piece type and number of attacked squares in the
 // mobility area.
 static const Score MobilityBonus[4][32] = {
-  // Knights
+  // Knight
   { S(-62,-81), S(-53,-56), S(-12,-30), S( -4,-14), S(  3,  8), S( 13, 15),
     S( 22, 23), S( 28, 27), S( 33, 33) },
-  // Bishops
+  // Bishop
   { S(-48,-59), S(-20,-23), S( 16, -3), S( 26, 13), S( 38, 24), S( 51, 42),
     S( 55, 54), S( 63, 57), S( 63, 65), S( 68, 73), S( 81, 78), S( 81, 86),
     S( 91, 88), S( 98, 97) },
-  // Rooks
+  // Rook
   { S(-58,-76), S(-27,-18), S(-15, 28), S(-10, 55), S( -5, 69), S( -2, 82),
     S(  9,112), S( 16,118), S( 30,132), S( 29,142), S( 32,155), S( 38,165),
     S( 46,166), S( 48,169), S( 58,171) },
-  // Queens
+  // Queen
   { S(-39,-36), S(-21,-15), S(  3,  8), S(  3, 18), S( 14, 34), S( 22, 54),
     S( 28, 61), S( 41, 73), S( 43, 79), S( 48, 92), S( 56, 94), S( 60,104),
     S( 60,113), S( 66,120), S( 67,123), S( 70,126), S( 71,133), S( 73,136),
@@ -125,11 +125,11 @@ static const Score RookOnFile[2] = { S(21, 4), S(47, 25) };
 // which piece type attacks which one. Attacks on lesser pieces which are
 // pawn defended are not considered.
 static const Score ThreatByMinor[8] = {
-  S(0, 0), S(6, 32), S(59, 41), S(79, 56), S(90,119), S(79,161)
+  S(0, 0), S(5, 32), S(57, 41), S(77, 56), S(88,119), S(79,161)
 };
 
 static const Score ThreatByRook[8] = {
-  S(0, 0), S(3, 44), S(38, 71), S(38, 61), S( 0, 38), S(51, 38)
+  S(0, 0), S(2, 44), S(36, 71), S(36, 61), S( 0, 38), S(51, 38)
 };
 
 // PassedRank[mg/eg][Rank] contains midgame and endgame bonuses for passed
@@ -147,25 +147,25 @@ static const Score PassedFile[8] = {
 };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BishopPawns        = S(  3,  7);
-static const Score CorneredBishop     = S( 50, 50);
-static const Score FlankAttacks       = S(  8,  0);
-static const Score Hanging            = S( 69, 36);
-static const Score KingProtector      = S(  7,  8);
-static const Score KnightOnQueen      = S( 16, 12);
-static const Score LongDiagonalBishop = S( 45,  0);
-static const Score MinorBehindPawn    = S( 18,  3);
-static const Score Outpost            = S( 30, 21);
-static const Score PawnlessFlank      = S( 17, 95);
-static const Score RestrictedPiece    = S(  7,  7);
-static const Score ReachableOutpost   = S( 32, 10);
-static const Score RookOnQueenFile    = S(  7,  6);
-static const Score SliderOnQueen      = S( 59, 18);
-static const Score ThreatByKing       = S( 24, 89);
-static const Score ThreatByPawnPush   = S( 48, 39);
-static const Score ThreatBySafePawn   = S(173, 94);
-static const Score TrappedRook        = S( 52, 10);
-static const Score WeakQueen          = S( 49, 15);
+static const Score BishopPawns         = S(  3,  7);
+static const Score CorneredBishop      = S( 50, 50);
+static const Score FlankAttacks        = S(  8,  0);
+static const Score Hanging             = S( 69, 36);
+static const Score KingProtector       = S(  7,  8);
+static const Score KnightOnQueen       = S( 16, 12);
+static const Score LongDiagonalBishop  = S( 45,  0);
+static const Score MinorBehindPawn     = S( 18,  3);
+static const Score Outpost             = S( 30, 21);
+static const Score PawnlessFlank       = S( 17, 95);
+static const Score RestrictedPiece     = S(  7,  7);
+static const Score RookOnQueenFile     = S(  7,  6);
+static const Score SliderOnQueen       = S( 59, 18);
+static const Score ThreatByKing        = S( 24, 89);
+static const Score ThreatByPawnPush    = S( 48, 39);
+static const Score ThreatBySafePawn    = S(173, 94);
+static const Score TrappedRook         = S( 52, 10);
+static const Score WeakQueen           = S( 49, 15);
+static const Score WeakQueenProtection = S( 14,  0);
 
 #undef S
 #undef V
@@ -256,7 +256,7 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
         score += Outpost * (Pt == KNIGHT ? 2 : 1);
 
       else if (Pt == KNIGHT && bb & b & ~pieces_c(Us))
-        score += ReachableOutpost;
+        score += Outpost;
 
       // Knight and Bishop bonus for being right behind a pawn
       if (shift_bb(Down, pieces_p(PAWN)) & sq_bb(s))
@@ -268,10 +268,11 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       if (Pt == BISHOP) {
         // Penalty according to number of pawns on the same color square as
         // the bishop, bigger when the center files are blocked with pawns
+        // and smaller when the bishop is outside the pawn chain
         Bitboard blocked = pieces_cp(Us, PAWN) & shift_bb(Down, pieces());
 
         score -= BishopPawns * pawns_on_same_color_squares(ei->pe, Us, s)
-                             * (1 + popcount(blocked & CenterFiles));
+                             * (!(ei->attackedBy[Us][PAWN] & sq_bb(s)) + popcount(blocked & CenterFiles));
 
         // Bonus for bishop on a long diagonal which can "see" both center
         // squares
@@ -489,6 +490,9 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const int Us)
     b =  ~ei->attackedBy[Them][0]
        | (nonPawnEnemies & ei->attackedBy2[Us]);
     score += Hanging * popcount(weak & b);
+
+    // Additional bonus if weak piece is only protected by a queen
+    score += WeakQueenProtection * popcount(weak & ei->attackedBy[Them][QUEEN]);
   }
 
   // Bonus for restricting their piece moves
@@ -605,10 +609,8 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
     } // w != 0
 
     // Scale down bonus for candidate passers which need more than one
-    // push to become passed or have a pawn in front of them.
-    if (   !pawn_passed(pos, Us, s + Up)
-        || (pieces_p(PAWN) & sq_bb(s + Up)))
-    {
+    // pawn push to become passed
+    if (!pawn_passed(pos, Us, s + Up)) {
       mbonus /= 2;
       ebonus /= 2;
     }
@@ -668,8 +670,7 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
 
   bool bothFlanks = (pieces_p(PAWN) & QueenSide) && (pieces_p(PAWN) & KingSide);
 
-  bool almostUnwinnable =   !passedCount
-                         &&  outflanking < 0
+  bool almostUnwinnable =   outflanking < 0
                          && !bothFlanks;
 
   // Compute the initiative bonus for the attacking side

@@ -331,12 +331,14 @@ void mainthread_search(void)
     for (int idx = 1; idx < Threads.numThreads; idx++) {
       Pos *p = Threads.pos[idx];
       for (i = 0; mvs[i] != p->rootMoves->move[0].pv[0]; i++);
-      if (bestThread->rootMoves->move[0].score >= VALUE_TB_WIN_IN_MAX_PLY) {
+      if (abs(bestThread->rootMoves->move[0].score) >= VALUE_TB_WIN_IN_MAX_PLY) {
         // Make sure we pick the shortest mate
         if (p->rootMoves->move[0].score > bestThread->rootMoves->move[0].score)
           bestThread = p;
       } else if (p->rootMoves->move[0].score >= VALUE_TB_WIN_IN_MAX_PLY
-          || votes[i] > bestVote) {
+          || (   p->rootMoves->move[0].score > VALUE_TB_LOSS_IN_MAX_PLY
+              && votes[i] > bestVote))
+      {
         bestVote = votes[i];
         bestThread = p;
       }
@@ -465,7 +467,7 @@ void thread_search(Pos *pos)
       // Reset aspiration window starting size
       if (pos->rootDepth >= 4) {
         Value previousScore = rm->move[pvIdx].previousScore;
-        delta = 21 + abs(previousScore) / 256;
+        delta = 21;
         alpha = max(previousScore - delta, -VALUE_INFINITE);
         beta  = min(previousScore + delta,  VALUE_INFINITE);
 
@@ -997,11 +999,12 @@ moves_loop: // When in check search starts from here.
   PieceToHistory *fmh  = (ss-2)->history;
   PieceToHistory *fmh2 = (ss-4)->history;
 
-  mp_init(pos, ttMove, depth, depth > 12 && ttPv ? ss->ply : MAX_PLY);
+  mp_init(pos, ttMove, depth, depth > 12 ? ss->ply : MAX_PLY);
 
   value = bestValue;
   singularLMR = moveCountPruning = false;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
+  bool formerPv = ttPv && !PvNode;
 
   // Check for a breadcrumb and leave one if none found
   _Atomic uint64_t *crumb = NULL;
@@ -1092,10 +1095,9 @@ moves_loop: // When in check search starts from here.
         if (   lmrDepth < 6
             && !inCheck
             && ss->staticEval + 235 + 172 * lmrDepth <= alpha
-            &&  (*pos->history)[stm()][from_to(move)]
-              + (*cmh )[movedPiece][to_sq(move)]
+            &&  (*cmh )[movedPiece][to_sq(move)]
               + (*fmh )[movedPiece][to_sq(move)]
-              + (*fmh2)[movedPiece][to_sq(move)] < 25000)
+              + (*fmh2)[movedPiece][to_sq(move)] < 27400)
           continue;
 
         // Prune moves with negative SEE at low depths and below a decreasing
@@ -1125,12 +1127,12 @@ moves_loop: // When in check search starts from here.
         &&  tte_depth(tte) >= depth - 3
         &&  is_legal(pos, move))
     {
-      Value singularBeta = ttValue - (((ttPv && !PvNode) + 4) * depth) / 2;
-      Depth halfDepth = depth / 2;
+      Value singularBeta = ttValue - ((formerPv + 4) * depth) / 2;
+      Depth singularDepth = (depth - 1 + 3 * formerPv) / 2;
       ss->excludedMove = move;
       Move cm = ss->countermove;
       Move k1 = ss->mpKillers[0], k2 = ss->mpKillers[1];
-      value = search_NonPV(pos, ss, singularBeta - 1, halfDepth, cutNode);
+      value = search_NonPV(pos, ss, singularBeta - 1, singularDepth, cutNode);
       ss->excludedMove = 0;
 
       if (value < singularBeta) {
@@ -1150,7 +1152,7 @@ moves_loop: // When in check search starts from here.
 
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.
-      mp_init(pos, ttMove, depth, depth > 12 && ttPv ? ss->ply : MAX_PLY);
+      mp_init(pos, ttMove, depth, depth > 12 ? ss->ply : MAX_PLY);
       ss->stage++;
       ss->countermove = cm; // pedantic
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
@@ -1221,13 +1223,16 @@ moves_loop: // When in check search starts from here.
       if (ttPv)
         r -= 2;
 
+      if (moveCountPruning && !formerPv)
+        r++;
+
       // Decrease reduction if opponent's move count is high
       if ((ss-1)->moveCount > 14)
-        r -= 1;
+        r--;
 
       // Decrease reduction if ttMove has been singularly extended
       if (singularLMR)
-        r -= 2;
+        r -= 1 + formerPv;
 
       if (!captureOrPromotion) {
         // Increase reduction if ttMove is a capture
@@ -1252,13 +1257,6 @@ moves_loop: // When in check search starts from here.
                        + (*pos->history)[stm() ^ 1][from_to(move)]
                        - 4926;
 
-        // Reset statScore if negative and most stats show >= 0
-        if (    ss->statScore < 0
-            && (*cmh )[movedPiece][to_sq(move)] >= 0
-            && (*fmh )[movedPiece][to_sq(move)] >= 0
-            && (*pos->history)[stm() ^ 1][from_to(move)] >= 0)
-          ss->statScore = 0;
-
         // Decrease/increase reduction by comparing with opponent's stat score.
         if (ss->statScore >= -102 && (ss-1)->statScore < -114)
           r--;
@@ -1267,22 +1265,31 @@ moves_loop: // When in check search starts from here.
           r++;
 
         // Decrease/increase reduction for moves with a good/bad history.
-        r -= ss->statScore / 16384;
-      }
+        r -= ss->statScore / 16434;
 
-      // Increase reduction for captures/promotions if late move and at low
-      // depth
-      else if (depth < 8 && moveCount > 2)
-        r++;
+      } else {
+
+        // Increase reduction for captures/promotions if late move and at
+        // low depth
+        if (depth < 8 && moveCount > 2)
+          r++;
+
+        // Unless giving check, this capture is likely bad
+        if (   !givesCheck
+            && ss->staticEval + PieceValue[EG][captured_piece()] + 200 * depth <= alpha)
+          r++;
+      }
 
       Depth d = clamp(newDepth - r, 1, newDepth);
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 
-      doFullDepthSearch = (value > alpha && d != newDepth), didLMR = true;
-
-    } else
-      doFullDepthSearch = !PvNode || moveCount > 1, didLMR = false;
+      doFullDepthSearch = (value > alpha && d != newDepth);
+      didLMR = true;
+    } else {
+      doFullDepthSearch = !PvNode || moveCount > 1;
+      didLMR = false;
+    }
 
     // Step 17. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch) {
@@ -1432,7 +1439,7 @@ moves_loop: // When in check search starts from here.
   if (PvNode && bestValue > maxValue)
      bestValue = maxValue;
 
-  if (!excludedMove)
+  if (!excludedMove && !(rootNode && pos->pvIdx))
     tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), ttPv,
         bestValue >= beta ? BOUND_LOWER :
         PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
