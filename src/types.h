@@ -333,11 +333,62 @@ struct PSQT {
 
 extern struct PSQT psqt;
 
-#ifndef _WIN32
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#endif
-#define clamp(a,b,c) ((a) < (b) ? (b) : (a) > (c) ? (c) : (a))
+#undef max
+#undef min
+
+#define MAX(T) INLINE T max_##T(T a, T b) { return a > b ? a : b; }
+MAX(int)
+MAX(uint64_t)
+MAX(unsigned)
+MAX(int64_t)
+MAX(uint8_t)
+MAX(double)
+#undef MAX
+
+#define MIN(T) INLINE T min_##T(T a, T b) { return a < b ? a : b; }
+MIN(int)
+MIN(uint64_t)
+MIN(unsigned)
+MIN(int64_t)
+MIN(uint8_t)
+MIN(double)
+#undef MIN
+
+#define CLAMP(T) INLINE T clamp_##T(T a, T b, T c) { return a < b ? b : a > c ? c : a; }
+CLAMP(int)
+CLAMP(uint64_t)
+CLAMP(unsigned)
+CLAMP(int64_t)
+CLAMP(uint8_t)
+CLAMP(double)
+#undef CLAMP
+
+#define max(a,b) _Generic((a), \
+    int: max_int,              \
+    uint64_t: max_uint64_t,    \
+    unsigned: max_unsigned,    \
+    int64_t: max_int64_t,      \
+    uint8_t: max_uint8_t,      \
+    double: max_double         \
+) (a,b)
+
+#define min(a,b) _Generic((a), \
+    int: min_int,              \
+    uint64_t: min_uint64_t,    \
+    unsigned: min_unsigned,    \
+    int64_t: min_int64_t,      \
+    uint8_t: min_uint8_t,      \
+    double: min_double         \
+) (a,b)
+
+#define clamp(a,b,c) _Generic((a), \
+    int: clamp_int,              \
+    uint64_t: clamp_uint64_t,    \
+    unsigned: clamp_unsigned,    \
+    int64_t: clamp_int64_t,      \
+    uint8_t: clamp_uint8_t,      \
+    double: clamp_double         \
+) (a,b,c)
 
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
