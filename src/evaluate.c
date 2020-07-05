@@ -608,13 +608,6 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
       }
     } // w != 0
 
-    // Scale down bonus for candidate passers which need more than one
-    // pawn push to become passed
-    if (!pawn_passed(pos, Us, s + Up)) {
-      mbonus /= 2;
-      ebonus /= 2;
-    }
-
     score += make_score(mbonus, ebonus) - PassedFile[file_of(s)];
   }
 

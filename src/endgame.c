@@ -82,9 +82,8 @@ static EgFunc EvaluateKPK, EvaluateKNNK, EvaluateKNNKP, EvaluateKBNK,
               EvaluateKRKP, EvaluateKRKB, EvaluateKRKN, EvaluateKQKP,
               EvaluateKQKR, EvaluateKXK;
 
-static EgFunc ScaleKNPK, ScaleKRPKR, ScaleKRPKB, ScaleKBPKB, ScaleKBPKN,
-              ScaleKBPPKB, ScaleKRPPKRP, ScaleKBPsK, ScaleKQKRPs, ScaleKPKP,
-              ScaleKPsK;
+static EgFunc ScaleKRPKR, ScaleKRPKB, ScaleKBPKB, ScaleKBPKN, ScaleKBPPKB,
+              ScaleKRPPKRP, ScaleKBPsK, ScaleKQKRPs, ScaleKPKP, ScaleKPsK;
 
 EgFunc *endgame_funcs[NUM_EVAL + NUM_SCALING + 6] = {
   NULL,
@@ -99,18 +98,17 @@ EgFunc *endgame_funcs[NUM_EVAL + NUM_SCALING + 6] = {
   &EvaluateKQKP,   // 8
   &EvaluateKQKR,   // 9
   &EvaluateKXK,    // 10
-// Entries 11-21 are scaling functions.
-  &ScaleKNPK,      // 11
-  &ScaleKRPKR,     // 12
-  &ScaleKRPKB,     // 13
-  &ScaleKBPKB,     // 14
-  &ScaleKBPKN,     // 15
-  &ScaleKBPPKB,    // 16
-  &ScaleKRPPKRP,   // 17
-  &ScaleKBPsK,     // 18
-  &ScaleKQKRPs,    // 19
-  &ScaleKPsK,      // 20
-  &ScaleKPKP       // 21
+// Entries 11-20 are scaling functions.
+  &ScaleKRPKR,     // 11
+  &ScaleKRPKB,     // 12
+  &ScaleKBPKB,     // 13
+  &ScaleKBPKN,     // 14
+  &ScaleKBPPKB,    // 15
+  &ScaleKRPPKRP,   // 16
+  &ScaleKBPsK,     // 17
+  &ScaleKQKRPs,    // 18
+  &ScaleKPsK,      // 19
+  &ScaleKPKP       // 20
 };
 
 Key endgame_keys[NUM_EVAL + NUM_SCALING][2];
@@ -119,7 +117,7 @@ static const char *endgame_codes[NUM_EVAL + NUM_SCALING] = {
   // Codes for evaluation functions 1-9.
   "KPk", "KNNk", "KNNkp", "KBNk", "KRkp", "KRkb", "KRkn", "KQkp", "KQkr",
   // Codes for scaling functions 11-17.
-  "KNPk", "KRPkr", "KRPkb", "KBPkb", "KBPkn", "KBPPkb", "KRPPkrp"
+  "KRPkr", "KRPkb", "KBPkb", "KBPkn", "KBPPkb", "KRPPkrp"
 };
 
 void endgames_init(void)

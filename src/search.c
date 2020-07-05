@@ -945,7 +945,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
       &&  depth >= 5
       &&  abs(beta) < VALUE_TB_WIN_IN_MAX_PLY)
   {
-    Value rbeta = min(beta + 189 - 45 * improving, VALUE_INFINITE);
+    Value rbeta = beta + 189 - 45 * improving;
     Depth rdepth = depth - 4;
 
     assert(rdepth >= 1);
@@ -1079,12 +1079,12 @@ moves_loop: // When in check search starts from here.
       // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
       moveCountPruning = moveCount >= futility_move_count(improving, depth);
 
+      // Reduced depth of the next LMR search
+      int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), 0);
+
       if (   !captureOrPromotion
           && !givesCheck)
       {
-        // Reduced depth of the next LMR search
-        int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), 0);
-
         // Countermoves based pruning
         if (   lmrDepth < 4 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
@@ -1104,10 +1104,18 @@ moves_loop: // When in check search starts from here.
         // threshold at higher depths.
         if (!see_test(pos, move, -(32 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
           continue;
+
+      } else {
+        // Capture history based pruning when the move doesn't give check
+        if (   !givesCheck
+            && lmrDepth < 1
+            && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(piece_on(to_sq(move)))] < 0)
+          continue;
+
+        // See based pruning
+        if (!see_test(pos, move, -194 * depth))
+          continue;
       }
-      else if (   !(givesCheck && extension)
-               && !see_test(pos, move, -194 * depth))
-        continue;
     }
 
     // Step 14. Extensions
