@@ -802,27 +802,6 @@ static int ScaleKBPKN(const Pos *pos, unsigned strongSide)
 }
 
 
-// KNP vs K. There is a single rule: if the pawn is a rook pawn on the
-// 7th rank and the defending king prevents the pawn from advancing, the
-// position is drawn.
-static int ScaleKNPK(const Pos *pos, unsigned strongSide)
-{
-  unsigned weakSide = strongSide ^ 1;
-
-  assert(verify_material(pos, strongSide, KnightValueMg, 1));
-  assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
-
-  // Assume strongSide is white and the pawn is on files A-D
-  Square pawnSq     = normalize(pos, strongSide, lsb(pieces_p(PAWN)));
-  Square weakKingSq = normalize(pos, strongSide, square_of(weakSide, KING));
-
-  if (pawnSq == SQ_A7 && distance(SQ_A8, weakKingSq) <= 1)
-    return SCALE_FACTOR_DRAW;
-
-  return SCALE_FACTOR_NONE;
-}
-
-
 // KP vs KP. This is done by removing the weakest side's pawn and probing
 // the KP vs K bitbase: If the weakest side has a draw without the pawn,
 // it probably has at least a draw with the pawn as well. The exception

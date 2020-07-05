@@ -84,7 +84,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   e->pawnAttacks[Us] = e->pawnAttacksSpan[Us] = pawn_attacks_bb(ourPawns, Us);
   e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
-  e->blockedCount[Us] = 0;
 
   // Loop through all pawns of the current color and score each pawn
   loop_through_pieces(Us, PAWN, s) {
@@ -105,7 +104,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     phalanx    = neighbours & rank_bb_s(s);
     support    = neighbours & rank_bb_s(s - Up);
 
-    e->blockedCount[Us] += blocked || more_than_one(leverPush);
+    e->blockedCount += blocked || more_than_one(leverPush);
 
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot safely advance.
@@ -162,6 +161,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
 void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 {
   e->key = key;
+  e->blockedCount = 0;
   e->score = pawn_evaluate(pos, e, WHITE) - pawn_evaluate(pos, e, BLACK);
   e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
   e->passedCount = popcount(e->passedPawns[WHITE] | e->passedPawns[BLACK]);

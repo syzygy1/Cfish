@@ -1116,6 +1116,13 @@ moves_loop: // When in check search starts from here.
             && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(piece_on(to_sq(move)))] < 0)
           continue;
 
+        // Futility pruning for captures
+        if (   !givesCheck
+            && lmrDepth < 6
+            && !inCheck
+            && ss->staticEval + 270 + 384 * lmrDepth + PieceValue[MG][type_of_p(piece_on(to_sq(move)))] <= alpha)
+          continue;
+
         // See based pruning
         if (!see_test(pos, move, -194 * depth))
           continue;
@@ -1794,6 +1801,9 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus)
 
   if (move_is_ok((ss-2)->currentMove))
     cms_update(*(ss-2)->history, pc, s, bonus);
+
+  if (ss->checkersBB)
+    return;
 
   if (move_is_ok((ss-4)->currentMove))
     cms_update(*(ss-4)->history, pc, s, bonus);

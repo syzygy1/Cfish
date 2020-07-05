@@ -41,9 +41,9 @@ struct PawnEntry {
   Score score;
   uint8_t kingSquares[2];
   uint8_t castlingRights[2];
-  uint8_t blockedCount[2];
   uint8_t semiopenFiles[2];
   uint8_t pawnsOnSquares[2][2]; // [color][light/dark squares]
+  uint8_t blockedCount;
   uint8_t passedCount;
   uint8_t openFiles;
 };

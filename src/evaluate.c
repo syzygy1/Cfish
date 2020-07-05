@@ -85,10 +85,10 @@ static const int KingAttackWeights[8] = { 0, 0, 81, 52, 44, 10 };
 
 // Penalties for enemy's safe checks
 enum {
-  QueenSafeCheck  = 780,
-  RookSafeCheck   = 1078,
-  BishopSafeCheck = 635,
-  KnightSafeCheck = 790
+  QueenSafeCheck  = 772,
+  RookSafeCheck   = 1084,
+  BishopSafeCheck = 645,
+  KnightSafeCheck = 792
 };
 
 #define V(v) (Value)(v)
@@ -151,11 +151,14 @@ static const Score BishopPawns         = S(  3,  7);
 static const Score CorneredBishop      = S( 50, 50);
 static const Score FlankAttacks        = S(  8,  0);
 static const Score Hanging             = S( 69, 36);
-static const Score KingProtector       = S(  7,  8);
+static const Score BishopKingProtector = S(  6,  9);
+static const Score KnightKingProtector = S(  8,  9);
 static const Score KnightOnQueen       = S( 16, 11);
 static const Score LongDiagonalBishop  = S( 45,  0);
 static const Score MinorBehindPawn     = S( 18,  3);
-static const Score Outpost             = S( 30, 21);
+static const Score KnightOutpost       = S( 56, 36);
+static const Score BishopOutpost       = S( 30, 23);
+static const Score ReachableOutpost    = S( 31, 22);
 static const Score PawnlessFlank       = S( 17, 95);
 static const Score RestrictedPiece     = S(  7,  7);
 static const Score RookOnQueenFile     = S(  5,  9);
@@ -253,17 +256,18 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       // Bonus for outpost squares
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
       if (bb & sq_bb(s))
-        score += Outpost * (Pt == KNIGHT ? 2 : 1);
+        score += Pt == KNIGHT ? KnightOutpost : BishopOutpost;
 
       else if (Pt == KNIGHT && bb & b & ~pieces_c(Us))
-        score += Outpost;
+        score += ReachableOutpost;
 
       // Knight and Bishop bonus for being right behind a pawn
       if (shift_bb(Down, pieces_p(PAWN)) & sq_bb(s))
         score += MinorBehindPawn;
 
       // Penalty if the minor is far from the king
-      score -= KingProtector * distance(s, square_of(Us, KING));
+      score -= (Pt == KNIGHT ? KnightKingProtector : BishopKingProtector) *
+                  distance(s, square_of(Us, KING));
 
       if (Pt == BISHOP) {
         // Penalty according to number of pawns on the same color square as
@@ -377,7 +381,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                        & safe
                        & ei->attackedBy[Them][ROOK];
   if (rookChecks)
-    kingDanger += more_than_one(rookChecks) ? RookSafeCheck * 3/2
+    kingDanger += more_than_one(rookChecks) ? RookSafeCheck * 175/100
                                             : RookSafeCheck;
   else
     unsafeChecks |= b1 & ei->attackedBy[Them][ROOK];
@@ -388,7 +392,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
                         & ~ei->attackedBy[Us][QUEEN]
                         & ~rookChecks;
   if (queenChecks)
-    kingDanger += more_than_one(queenChecks) ? QueenSafeCheck * 3/2
+    kingDanger += more_than_one(queenChecks) ? QueenSafeCheck * 145/100
                                              : QueenSafeCheck;
 
   // Enemy bishops checks: we count them only if they are from squares from
@@ -406,7 +410,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
   // Enemy knights checks
   Bitboard knightChecks = attacks_from_knight(ksq) & ei->attackedBy[Them][KNIGHT];
   if (knightChecks & safe)
-    kingDanger += more_than_one(knightChecks & safe) ? KnightSafeCheck * 3/2
+    kingDanger += more_than_one(knightChecks & safe) ? KnightSafeCheck * 162/100 
                                                      : KnightSafeCheck;
   else
     unsafeChecks |= knightChecks;
@@ -661,7 +665,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
   behind |= shift_bb(Down + Down, behind);
 
   int bonus = popcount(safe) + popcount(behind & safe & ~ei->attackedBy[Them][0]);
-  int weight = popcount(pieces_c(Us)) - 3 + min(ei->pe->blockedCount[WHITE] + ei->pe->blockedCount[BLACK], 9);
+  int weight = popcount(pieces_c(Us)) - 3 + min(ei->pe->blockedCount, 9);
   Score score = make_score(bonus * weight * weight / 16, 0);
 
   return score;
