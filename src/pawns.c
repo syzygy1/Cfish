@@ -139,7 +139,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       int v =  Connected[r] * (4 + 2 * !!phalanx - 2 * !!opposed - !!blocked) / 2
              + 21 * popcount(support);
       score += make_score(v, v * (r - 2) / 4);
-      printf("key = %08lx, v = %d, r = %d\n", key(), v, r);
     }
 
     else if (!neighbours)
@@ -214,11 +213,17 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
 {
   pe->kingSquares[Us] = ksq;
   pe->castlingRights[Us] = can_castle_c(Us);
-  int minKingPawnDistance = 0;
+
+  int minPawnDist;
 
   Bitboard pawns = pieces_cp(Us, PAWN);
-  if (pawns)
-    while (!(DistanceRingBB[ksq][++minKingPawnDistance] & pawns)) {}
+  if (!pawns)
+    minPawnDist = 6;
+  else if (pawns & PseudoAttacks[KING][ksq])
+    minPawnDist = 1;
+  else for (minPawnDist = 1;
+            minPawnDist < 6 && !(DistanceRingBB[ksq][minPawnDist] & pawns);
+            minPawnDist++);
 
   Score shelter = make_score(-VALUE_INFINITE, 0);
   evaluate_shelter(pos, ksq, &shelter, Us);
@@ -230,7 +235,7 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
   if (can_castle_cr(make_castling_right(Us, QUEEN_SIDE)))
     evaluate_shelter(pos, relative_square(Us, SQ_C1), &shelter, Us);
 
-  return shelter - make_score(0, 16 * minKingPawnDistance);
+  return shelter - make_score(0, 16 * minPawnDist);
 }
 
 // "template" instantiation:

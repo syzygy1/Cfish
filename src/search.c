@@ -956,7 +956,6 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
     while (  (move = next_move(pos, 0))
            && probCutCount
            && !(   move == ttMove
-                && (tte_bound(tte) & BOUND_LOWER)
                 && tte_depth(tte) >= depth - 4
                 && ttValue < rbeta))
       if (move != excludedMove && is_legal(pos, move)) {
@@ -1163,13 +1162,35 @@ moves_loop: // When in check search starts from here.
         return singularBeta;
       }
 
+      // If the eval of ttMove is greater than beta we also check whether
+      // there is another move that pushes it over beta. If so, we prune.
+      else if (ttValue >= beta) {
+        // Fix up our move picker data
+        mp_init(pos, ttMove, depth, depth > 12 ? ss->ply : MAX_PLY);
+        ss->stage++;
+        ss->countermove = cm; // pedantic
+        ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
+
+        ss->excludedMove = move;
+        value = search_NonPV(pos, ss, beta - 1, (depth + 3) / 2, cutNode);
+        ss->excludedMove = 0;
+
+        if (value >= beta) {
+          if (crumb) store_rlx(*crumb, 0);
+          return beta;
+        }
+      }
+
       // The call to search_NonPV with the same value of ss messed up our
       // move picker data. So we fix it.
       mp_init(pos, ttMove, depth, depth > 12 ? ss->ply : MAX_PLY);
       ss->stage++;
       ss->countermove = cm; // pedantic
       ss->mpKillers[0] = k1; ss->mpKillers[1] = k2;
+
     }
+
+    // Check extension
     else if (    givesCheck
              && (is_discovery_check_on_king(pos, stm() ^ 1, move) || see_test(pos, move, 0)))
       extension = 1;
