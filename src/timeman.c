@@ -62,9 +62,6 @@ void time_init(int us, int ply)
   // Maximum move horizon of 50 moves
   int mtg = Limits.movestogo ? min(Limits.movestogo, 50) : 50;
 
-  // Adjust moveOverhead if there are tiny increments
-  moveOverhead = max(10, min((int)(Limits.inc[us] / 2), moveOverhead));
-
   // Make sure that timeLeft > 0 since we may use it as a divisor
   TimePoint timeLeft = max(1, Limits.time[us] + Limits.inc[us] * (mtg - 1) - moveOverhead * (2 + mtg));
 
@@ -76,9 +73,9 @@ void time_init(int us, int ply)
   // If there is a healthy increment, timeLeft can exceed actual available
   // game time for the current move, so also cap to 20% of available game time.
   if (Limits.movestogo == 0) {
-    opt_scale = min(0.007 + pow(ply + 3.0, 0.5) / 250.0,
+    opt_scale = min(0.008 + pow(ply + 3.0, 0.5) / 250.0,
                     0.2 * Limits.time[us] / (double)timeLeft);
-    max_scale = 4 + pow(ply + 3, 0.3);
+    max_scale = 4 + min(36, ply) / 12.0;
   }
   // x moves in y seconds (+z increment)
   else {

@@ -99,8 +99,8 @@ enum {
 // mobility area.
 static const Score MobilityBonus[4][32] = {
   // Knight
-  { S(-62,-81), S(-53,-56), S(-12,-30), S( -4,-14), S(  3,  8), S( 13, 15),
-    S( 22, 23), S( 28, 27), S( 33, 33) },
+  { S(-62,-81), S(-53,-56), S(-12,-31), S( -4,-16), S(  3,  5), S( 13, 11),
+    S( 22, 17), S( 28, 20), S( 33, 25) },
   // Bishop
   { S(-48,-59), S(-20,-23), S( 16, -3), S( 26, 13), S( 38, 24), S( 51, 42),
     S( 55, 54), S( 63, 57), S( 63, 65), S( 68, 73), S( 81, 78), S( 81, 86),
@@ -566,24 +566,21 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
   const int Up   = (Us == WHITE ? NORTH : SOUTH);
   const int Down = (Us == WHITE ? SOUTH : NORTH);
 
-  Bitboard b, bb, squaresToQueen, unsafeSquares, candidatePassers, leverable;
+  Bitboard b, bb, squaresToQueen, unsafeSquares, blockedPassers, helpers;
   Score score = SCORE_ZERO;
 
   b = ei->pe->passedPawns[Us];
 
-  candidatePassers = b & shift_bb(Down, pieces_cp(Them, PAWN));
-  if (candidatePassers) {
-    // Can we lever the blocker of a candidate passer?
-    leverable =  shift_bb(Up, pieces_cp(Us, PAWN))
-               & ~pieces_c(Them)
-               & (~ei->attackedBy2[Them] | ei->attackedBy[Us][0])
-               & (~(ei->attackedBy[Them][KNIGHT] | ei->attackedBy[Them][BISHOP])
-                  | (ei->attackedBy[Us ][KNIGHT] | ei->attackedBy[Us][BISHOP]));
+  blockedPassers = b & shift_bb(Down, pieces_cp(Them, PAWN));
+  if (blockedPassers) {
+    helpers =  shift_bb(Up, pieces_cp(Us, PAWN))
+              & ~pieces_c(Them)
+              & (~ei->attackedBy2[Them] | ei->attackedBy[Us][0]);
 
-    // Remove candidate otherwise
-    b &=  ~candidatePassers
-        | shift_bb(WEST, leverable)
-        | shift_bb(EAST, leverable);
+    // Remove blocked candidate passers that don't have help to pass
+    b &=  ~blockedPassers
+        | shift_bb(WEST, helpers)
+        | shift_bb(EAST, helpers);
   }
 
   while (b) {
@@ -696,7 +693,7 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
 
   // Compute the initiative bonus for the attacking side
   int initiative =   9 * passedCount
-                  + 11 * popcount(pieces_p(PAWN))
+                  + 12 * popcount(pieces_p(PAWN))
                   +  9 * outflanking
                   + 24 * infiltration
                   + 21 * bothFlanks

@@ -29,11 +29,12 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Backward      = S( 9, 24);
-static const Score Doubled       = S(11, 56);
-static const Score Isolated      = S( 5, 15);
-static const Score WeakLever     = S( 0, 56);
-static const Score WeakUnopposed = S(13, 27);
+static const Score Backward        = S( 9, 24);
+static const Score Doubled         = S(11, 56);
+static const Score DoubledIsolated = S(15, 57);
+static const Score Isolated        = S( 5, 15);
+static const Score WeakLever       = S( 0, 56);
+static const Score WeakUnopposed   = S(13, 27);
 
 // Connected pawn bonus
 static const int Connected[8] = { 0, 7, 8, 12, 29, 48, 86 };
@@ -140,8 +141,14 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       score += make_score(v, v * (r - 2) / 4);
     }
 
-    else if (!neighbours)
+    else if (!neighbours) {
       score -= Isolated + (opposed ? 0 : WeakUnopposed);
+
+      if (   (ourPawns & forward_file_bb(Them, s))
+          && popcount(opposed) == 1
+          && !(theirPawns & adjacent_files_bb(f)))
+        score -= DoubledIsolated;
+    }
 
     else if (backward)
       score -= Backward + (opposed ? 0 : WeakUnopposed);
