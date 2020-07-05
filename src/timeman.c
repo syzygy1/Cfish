@@ -34,7 +34,6 @@ struct TimeManagement Time; // Our global time management struct
 
 void time_init(int us, int ply)
 {
-  int minThinkingTime = option_value(OPT_MIN_THINK_TIME);
   int moveOverhead    = option_value(OPT_MOVE_OVERHEAD);
   int slowMover       = option_value(OPT_SLOW_MOVER);
   int npmsec          = option_value(OPT_NODES_TIME);
@@ -75,7 +74,7 @@ void time_init(int us, int ply)
   if (Limits.movestogo == 0) {
     opt_scale = min(0.008 + pow(ply + 3.0, 0.5) / 250.0,
                     0.2 * Limits.time[us] / (double)timeLeft);
-    max_scale = 4 + min(36, ply) / 12.0;
+    max_scale = min(7.0, 4.0 + ply / 12.0);
   }
   // x moves in y seconds (+z increment)
   else {
@@ -85,7 +84,7 @@ void time_init(int us, int ply)
   }
 
   // Never use more than 80% of the available time for this move
-  Time.optimumTime = max(minThinkingTime, (int)(opt_scale * timeLeft));
+  Time.optimumTime = opt_scale * timeLeft;
   Time.maximumTime = min(0.8 * Limits.time[us] - moveOverhead, max_scale * Time.optimumTime);
 
   if (option_value(OPT_PONDER))

@@ -299,6 +299,11 @@ INLINE bool opposite_colors(Square s1, Square s2)
   return ((s >> 3) ^ s) & 1;
 }
 
+INLINE Key make_key(uint64_t seed)
+{
+  return seed * 6364136223846793005ULL + 1442695040888963407ULL;
+}
+
 typedef struct Pos Pos;
 typedef struct LimitsType LimitsType;
 typedef struct RootMove RootMove;

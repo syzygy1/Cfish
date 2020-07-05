@@ -177,14 +177,8 @@ void zob_init(void) {
   for (int f = 0; f < 8; f++)
     zob.enpassant[f] = prng_rand(&rng);
 
-  for (int cr = 0; cr < 16; cr++) {
-    zob.castling[cr] = 0;
-    Bitboard b = (Bitboard)cr;
-    while (b) {
-      Key k = zob.castling[1ULL << pop_lsb(&b)];
-      zob.castling[cr] ^= k ? k : prng_rand(&rng);
-    }
-  }
+  for (int cr = 0; cr < 16; cr++)
+    zob.castling[cr] = prng_rand(&rng);
 
   zob.side = prng_rand(&rng);
   zob.noPawns = prng_rand(&rng);
@@ -1069,9 +1063,12 @@ void do_move(Pos *pos, Move m, int givesCheck)
   if (    st->castlingRights
       && (pos->castlingRightsMask[from] | pos->castlingRightsMask[to]))
   {
-    uint32_t cr = pos->castlingRightsMask[from] | pos->castlingRightsMask[to];
-    key ^= zob.castling[st->castlingRights & cr];
-    st->castlingRights &= ~cr;
+//    uint32_t cr = pos->castlingRightsMask[from] | pos->castlingRightsMask[to];
+//    key ^= zob.castling[st->castlingRights & cr];
+//    st->castlingRights &= ~cr;
+    key ^= zob.castling[st->castlingRights];
+    st->castlingRights &= ~(pos->castlingRightsMask[from] | pos->castlingRightsMask[to]);
+    key ^= zob.castling[st->castlingRights];
   }
 
   // Move the piece. The tricky Chess960 castling is handled earlier.

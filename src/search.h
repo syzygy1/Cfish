@@ -93,8 +93,7 @@ extern int TB_RootInTB;
 
 INLINE int use_time_management(void)
 {
-  return !(Limits.mate | Limits.movetime | Limits.depth | Limits.nodes
-                       | Limits.infinite);
+  return Limits.time[WHITE] || Limits.time[BLACK];
 }
 
 void search_init(void);

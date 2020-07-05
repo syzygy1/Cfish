@@ -740,7 +740,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   // partial search to overwrite a previous full search TT value, so we
   // use a different position key in case of an excluded move.
   excludedMove = ss->excludedMove;
-  posKey = key() ^ ((Key)excludedMove << 48);
+  posKey = !excludedMove ? key() : key() ^ make_key(excludedMove);
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
@@ -845,9 +845,10 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
 
   // Step 6. Static evaluation of the position
   if (inCheck) {
+    // Skip early pruning when in check
     ss->staticEval = eval = VALUE_NONE;
     improving = false;
-    goto moves_loop; // Skip early pruning when in check
+    goto moves_loop;
   } else if (ttHit) {
     // Never assume anything about values stored in TT
     if ((eval = tte_eval(tte)) == VALUE_NONE)
@@ -1119,8 +1120,10 @@ moves_loop: // When in check search starts from here.
         if (   !givesCheck
             && lmrDepth < 6
             && !(PvNode && abs(bestValue) < 2)
+            && PieceValue[MG][type_of_p(movedPiece)] >= PieceValue[MG][type_of_p(piece_on(to_sq(move)))]
             && !inCheck
-            && ss->staticEval + 267 + 391 * lmrDepth + PieceValue[MG][type_of_p(piece_on(to_sq(move)))] <= alpha)
+            && ss->staticEval + 267 + 391 * lmrDepth
+               + PieceValue[MG][type_of_p(piece_on(to_sq(move)))] <= alpha)
           continue;
 
         // See based pruning

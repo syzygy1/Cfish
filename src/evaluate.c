@@ -147,31 +147,32 @@ static const Score PassedFile[8] = {
 };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BishopPawns         = S(  3,  7);
+static const Score BishopKingProtector = S(  6,  9);
 static const Score BishopOnKingRing    = S( 24,  0);
+static const Score BishopOutpost       = S( 30, 23);
+static const Score BishopPawns         = S(  3,  7);
 static const Score BishopXRayPawns     = S(  4,  5);
 static const Score CorneredBishop      = S( 50, 50);
 static const Score FlankAttacks        = S(  8,  0);
 static const Score Hanging             = S( 69, 36);
-static const Score BishopKingProtector = S(  6,  9);
 static const Score KnightKingProtector = S(  8,  9);
 static const Score KnightOnQueen       = S( 16, 11);
+static const Score KnightOutpost       = S( 56, 36);
 static const Score LongDiagonalBishop  = S( 45,  0);
 static const Score MinorBehindPawn     = S( 18,  3);
-static const Score KnightOutpost       = S( 56, 36);
-static const Score BishopOutpost       = S( 30, 23);
-static const Score ReachableOutpost    = S( 31, 22);
 static const Score PawnlessFlank       = S( 17, 95);
+static const Score QueenInfiltration   = S( -2, 14);
+static const Score ReachableOutpost    = S( 31, 22);
 static const Score RestrictedPiece     = S(  7,  7);
 static const Score RookOnKingRing      = S( 16,  0);
-static const Score RookOnQueenFile     = S(  5,  9);
-static const Score SliderOnQueen       = S( 59, 18);
+static const Score RookOnQueenFile     = S(  6, 11);
+static const Score SliderOnQueen       = S( 60, 18);
 static const Score ThreatByKing        = S( 24, 89);
 static const Score ThreatByPawnPush    = S( 48, 39);
 static const Score ThreatBySafePawn    = S(173, 94);
 static const Score TrappedRook         = S( 55, 13);
-static const Score WeakQueen           = S( 51, 14);
-static const Score WeakQueenProtection = S( 15,  0);
+static const Score WeakQueen           = S( 56, 15);
+static const Score WeakQueenProtection = S( 14,  0);
 
 #undef S
 #undef V
@@ -331,6 +332,10 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
       Bitboard pinners;
       if (slider_blockers(pos, pieces_cpp(Them, ROOK, BISHOP), s, &pinners))
           score -= WeakQueen;
+
+      // Bonus for queen on weak square in enemy camp
+      if (relative_rank_s(Us, s) > RANK_4 && (~ei->pe->pawnAttacksSpan[Them] & sq_bb(s)))
+        score += QueenInfiltration;
     }
   }
 
@@ -731,7 +736,16 @@ INLINE Value evaluate_winnable(const Pos *pos, EvalInfo *ei, Score score)
         sf = 18 + 4 * popcount(ei->pe->passedPawns[strongSide]);
       else
         sf = 22 + 3 * popcount(pieces_c(strongSide));
-    } else
+    } else if (   non_pawn_material_c(WHITE) == RookValueMg
+               && non_pawn_material_c(BLACK) == RookValueMg
+               && piece_count(strongSide, PAWN) - piece_count(strongSide ^ 1, PAWN) <= 1
+               && !(KingSide & pieces_cp(strongSide, PAWN)) != !(QueenSide & pieces_cp(strongSide, PAWN))
+               && (attacks_from_king(square_of(strongSide ^ 1, KING)) & pieces_cp(strongSide ^ 1, PAWN)))
+      sf = 36;
+    else if (popcount(pieces_p(QUEEN)) == 1)
+      sf = 37 + 3 * (pieces_cp(WHITE, QUEEN) ? piece_count(BLACK, BISHOP) + piece_count(BLACK, KNIGHT)
+                                             : piece_count(WHITE, BISHOP) + piece_count(WHITE, KNIGHT));
+    else
       sf = min(sf, 36 + 7 * piece_count(strongSide, PAWN));
   }
 
