@@ -35,8 +35,8 @@ static const Score Isolated      = S( 5, 15);
 static const Score WeakLever     = S( 0, 56);
 static const Score WeakUnopposed = S(13, 27);
 
-// Connected pawn bonus by opposed, phalanx, #support and rank
-static Score Connected[2][2][3][8];
+// Connected pawn bonus
+static const int Connected[8] = { 0, 7, 8, 12, 29, 48, 86 };
 
 // Strength of pawn shelter for our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
@@ -84,13 +84,14 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   e->pawnAttacks[Us] = e->pawnAttacksSpan[Us] = pawn_attacks_bb(ourPawns, Us);
   e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
   e->pawnsOnSquares[Us][WHITE] = popcount(ourPawns & LightSquares);
+  e->blockedCount[Us] = 0;
 
   // Loop through all pawns of the current color and score each pawn
   loop_through_pieces(Us, PAWN, s) {
     assert(piece_on(s) == make_piece(Us, PAWN));
 
-    uint32_t f = file_of(s);
-
+    int f = file_of(s);
+    int r = relative_rank_s(Us, s);
     e->semiopenFiles[Us] &= ~(1 << f);
 
     // Flag the pawn
@@ -103,6 +104,8 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
     support    = neighbours & rank_bb_s(s - Up);
+
+    e->blockedCount[Us] += blocked || more_than_one(leverPush);
 
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot safely advance.
@@ -117,10 +120,11 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     // (a) there are no stoppers except some levers
     // (b) the only stoppers are the leverPush, but we outnumber them
     // (c) there is only one front stopper which can be levered
+    //     (Refined in evaluation_passed())
     passed =   !(stoppers ^ lever)
             || (   !(stoppers ^ leverPush)
                 && popcount(phalanx) >= popcount(leverPush))
-            || (   stoppers == blocked && relative_rank_s(Us, s) >= RANK_5
+            || (   stoppers == blocked && r >= RANK_5
                 && (shift_bb(Up, support) & ~(theirPawns | doubleAttackThem)));
 
     passed &= !(forward_file_bb(Us, s) & ourPawns);
@@ -131,8 +135,12 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
       e->passedPawns[Us] |= sq_bb(s);
 
     // Score this pawn
-    if (support | phalanx)
-      score += Connected[!!opposed][!!phalanx][popcount(support)][relative_rank_s(Us, s)];
+    if (support | phalanx) {
+      int v =  Connected[r] * (4 + 2 * !!phalanx - 2 * !!opposed - !!blocked) / 2
+             + 21 * popcount(support);
+      score += make_score(v, v * (r - 2) / 4);
+      printf("key = %08lx, v = %d, r = %d\n", key(), v, r);
+    }
 
     else if (!neighbours)
       score -= Isolated + (opposed ? 0 : WeakUnopposed);
@@ -146,22 +154,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
   }
 
   return score;
-}
-
-
-// pawn_init() initializes some tables needed by evaluation.
-
-void pawn_init(void)
-{
-  static const int Seed[7] = { 0, 7, 8, 12, 29, 48, 86 };
-
-  for (int opposed = 0; opposed < 2; opposed++)
-    for (int phalanx = 0; phalanx < 2; phalanx++)
-      for (int support = 0; support <= 2; support++)
-        for (int r = RANK_2; r < RANK_8; ++r) {
-          int v = Seed[r] * (2 + (!!phalanx) - opposed) + 21 * support;
-          Connected[opposed][phalanx][support][r] = make_score(v, v * (r-2) / 4);
-      }
 }
 
 

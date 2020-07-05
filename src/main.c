@@ -39,7 +39,6 @@ int main(int argc, char **argv)
   bitboards_init();
   zob_init();
   bitbases_init();
-  pawn_init();
   endgames_init();
   threads_init();
   options_init();

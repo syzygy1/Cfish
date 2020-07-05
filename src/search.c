@@ -953,7 +953,12 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
     mp_init_pc(pos, ttMove, rbeta - ss->staticEval);
 
     int probCutCount = 2 + 2 * cutNode;
-    while ((move = next_move(pos, 0)) && probCutCount)
+    while (  (move = next_move(pos, 0))
+           && probCutCount
+           && !(   move == ttMove
+                && (tte_bound(tte) & BOUND_LOWER)
+                && tte_depth(tte) >= depth - 4
+                && ttValue < rbeta))
       if (move != excludedMove && is_legal(pos, move)) {
         assert(is_capture_or_promotion(pos, move));
         assert(depth >= 5);
@@ -1183,6 +1188,12 @@ moves_loop: // When in check search starts from here.
     // Castling extension
     if (type_of_m(move) == CASTLING)
       extension = 1;
+
+    // Late irreversible move extension
+    if (   move == ttMove
+        && rule50_count() > 80
+        && (captureOrPromotion || type_of_p(movedPiece) == PAWN))
+      extension = 2;
 
     // Add extension to new depth
     newDepth += extension;
@@ -1490,7 +1501,7 @@ INLINE Value qsearch_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   Key posKey;
   Move ttMove, move, bestMove;
   Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
-  int ttHit, ttPv, givesCheck, evasionPrunable;
+  int ttHit, ttPv, givesCheck;
   Depth ttDepth;
   int moveCount;
 
@@ -1601,14 +1612,8 @@ INLINE Value qsearch_node(Pos *pos, Stack *ss, Value alpha, Value beta,
       }
     }
 
-    // Detect non-capture evasions that are candidates to be pruned
-    evasionPrunable =    InCheck
-                     && (depth != 0 || moveCount > 2)
-                     &&  bestValue > VALUE_TB_LOSS_IN_MAX_PLY
-                     && !is_capture(pos, move);
-
     // Don't search moves with negative SEE values
-    if ((!InCheck || evasionPrunable) && !see_test(pos, move, 0))
+    if (!InCheck && !see_test(pos, move, 0))
       continue;
 
     // Speculative prefetch as early as possible

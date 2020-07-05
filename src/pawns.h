@@ -41,6 +41,7 @@ struct PawnEntry {
   Score score;
   uint8_t kingSquares[2];
   uint8_t castlingRights[2];
+  uint8_t blockedCount[2];
   uint8_t semiopenFiles[2];
   uint8_t pawnsOnSquares[2][2]; // [color][light/dark squares]
   uint8_t passedCount;
@@ -96,7 +97,5 @@ INLINE Score king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
   else
     return pe->kingSafety[BLACK] = do_king_safety_black(pe, pos, ksq);
 }
-
-void pawn_init(void);
 
 #endif

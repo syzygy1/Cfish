@@ -552,11 +552,27 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const int Us)
 {
   const int Them = (Us == WHITE ? BLACK : WHITE);
   const int Up   = (Us == WHITE ? NORTH : SOUTH);
+  const int Down = (Us == WHITE ? SOUTH : NORTH);
 
-  Bitboard b, bb, squaresToQueen, unsafeSquares;
+  Bitboard b, bb, squaresToQueen, unsafeSquares, candidatePassers, leverable;
   Score score = SCORE_ZERO;
 
   b = ei->pe->passedPawns[Us];
+
+  candidatePassers = b & shift_bb(Down, pieces_cp(Them, PAWN));
+  if (candidatePassers) {
+    // Can we lever the blocker of a candidate passer?
+    leverable =  shift_bb(Up, pieces_cp(Us, PAWN))
+               & ~pieces_c(Them)
+               & (~ei->attackedBy2[Them] | ei->attackedBy[Us][0])
+               & (~(ei->attackedBy[Them][KNIGHT] | ei->attackedBy[Them][BISHOP])
+                  | (ei->attackedBy[Us ][KNIGHT] | ei->attackedBy[Us][BISHOP]));
+
+    // Remove candidate otherwise
+    b &=  ~candidatePassers
+        | shift_bb(WEST, leverable)
+        | shift_bb(EAST, leverable);
+  }
 
   while (b) {
     Square s = pop_lsb(&b);
@@ -641,7 +657,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const int Us)
   behind |= shift_bb(Down + Down, behind);
 
   int bonus = popcount(safe) + popcount(behind & safe & ~ei->attackedBy[Them][0]);
-  int weight = popcount(pieces_c(Us)) - 1;
+  int weight = popcount(pieces_c(Us)) - 3 + min(ei->pe->blockedCount[WHITE] + ei->pe->blockedCount[BLACK], 9);
   Score score = make_score(bonus * weight * weight / 16, 0);
 
   return score;

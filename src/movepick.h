@@ -84,12 +84,10 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth d, int ply)
   st->mpKillers[0] = st->killers[0];
   st->mpKillers[1] = st->killers[1];
 
-  st->stage = checkers() ? ST_EVASION : ST_MAIN_SEARCH;
   st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm)) {
+  st->stage = checkers() ? ST_EVASION : ST_MAIN_SEARCH;
+  if (!ttm || !is_pseudo_legal(pos, ttm))
     st->stage++;
-    st->ttMove = 0;
-  }
 }
 
 INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
@@ -98,11 +96,12 @@ INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 
   Stack *st = pos->st;
 
+  st->ttMove = ttm;
   st->stage = checkers() ? ST_EVASION : ST_QSEARCH;
-  st->ttMove =   ttm
-              && is_pseudo_legal(pos, ttm)
-              && (d > DEPTH_QS_RECAPTURES || to_sq(ttm) == s) ? ttm : 0;
-  st->stage += (st->ttMove == 0);
+  if (   !ttm
+      || !is_pseudo_legal(pos, ttm)
+      || !(d > DEPTH_QS_RECAPTURES || to_sq(ttm) == s))
+    st->stage++;
 
   st->depth = d;
   st->recaptureSquare = s;
@@ -116,13 +115,14 @@ INLINE void mp_init_pc(const Pos *pos, Move ttm, Value th)
 
   st->threshold = th;
 
+  st->ttMove = ttm;
   st->stage = ST_PROBCUT;
 
   // In ProbCut we generate captures with SEE higher than the given
   // threshold.
-  st->ttMove =   ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-              && see_test(pos, ttm, th) ? ttm : 0;
-  if (st->ttMove == 0) st->stage++;
+  if (!(ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
+            && see_test(pos, ttm, th)))
+    st->stage++;
 }
 
 #endif
