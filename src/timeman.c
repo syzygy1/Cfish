@@ -27,57 +27,10 @@
 
 struct TimeManagement Time; // Our global time management struct
 
-typedef enum { OptimumTime, MaxTime } TimeType;
-
-// Plan time management at most this many moves ahead
-static const int MoveHorizon = 50;
-// When in trouble, we can step over reserved time with this ratio
-static const double MaxRatio = 7.3;
-// But we must not steal time from remaining moves over this ratio
-static const double StealRatio = 0.34;
-
-// move_importance() is a skew-logistic function based on naive statistical
-// analysis of "how many games are still undecided after n half moves".
-// The game is considered "undecided" as long as neither side has >275cp
-// advantage. Data was extracted from the CCRL game database with some
-// simple filtering criteria.
-
-static double move_importance(int ply) {
-  const double XScale = 6.85;
-  const double XShift = 64.5;
-  const double Skew   = 0.171;
-
-  return pow((1 + exp((ply - XShift) / XScale)), -Skew) + DBL_MIN;
-}
-
-static int remaining(int myTime, int movesToGo, int ply, int slowMover,
-                     const TimeType T)
-{
-  const double TMaxRatio   = (T == OptimumTime ? 1 : MaxRatio);
-  const double TStealRatio = (T == OptimumTime ? 0 : StealRatio);
-
-  double moveImportance = (move_importance(ply) * slowMover) / 100;
-  double otherMovesImportance = 0;
-
-  for (int i = 1; i < movesToGo; i++)
-    otherMovesImportance += move_importance(ply + 2 * i);
-
-  double ratio1 = (TMaxRatio * moveImportance) /
-                  (TMaxRatio * moveImportance + otherMovesImportance);
-  double ratio2 = (moveImportance + TStealRatio * otherMovesImportance) /
-                  (moveImportance + otherMovesImportance);
-
-  return myTime * min(ratio1, ratio2);
-}
-
 // tm_init() is called at the beginning of the search and calculates the
-// allowed thinking time out of the time control and current game ply. We
-// support four different kinds of time controls, set in 'Limits'.
-//
-//  inc == 0 && movestogo == 0 means: x basetime  [sudden death!]
-//  inc == 0 && movestogo != 0 means: x moves in y minutes
-//  inc >  0 && movestogo == 0 means: x basetime + z increment
-//  inc >  0 && movestogo != 0 means: x moves in y minutes + z increment
+// time bounds allowed for the current game ply. We currently support:
+// 1) x basetime (+z increment)
+// 2) x moves in y seconds (+z increment)
 
 void time_init(int us, int ply)
 {
@@ -85,6 +38,10 @@ void time_init(int us, int ply)
   int moveOverhead    = option_value(OPT_MOVE_OVERHEAD);
   int slowMover       = option_value(OPT_SLOW_MOVER);
   int npmsec          = option_value(OPT_NODES_TIME);
+
+  // opt_scale is a percentage of available time to use for the current move.
+  // max_scale is a multiplier applied to optimumTime.
+  double opt_scale, max_scale;
 
   // If we have to play in 'nodes as time' mode, then convert from time
   // to nodes, and use resulting values in time management formulas.
@@ -101,30 +58,38 @@ void time_init(int us, int ply)
   }
 
   Time.startTime = Limits.startTime;
-  Time.optimumTime = Time.maximumTime = max(Limits.time[us], minThinkingTime);
 
-  const int MaxMTG = Limits.movestogo ? min(Limits.movestogo, MoveHorizon)
-                                      : MoveHorizon;
+  // Maximum move horizon of 50 moves
+  int mtg = Limits.movestogo ? min(Limits.movestogo, 50) : 50;
 
-  // We calculate optimum time usage for different hypothetical "moves to go"
-  // values and choose the minimum of calculated search time values. sUsually
-  // the greatest hypMTG gives the minimum values.
-  for (int hypMTG = 1; hypMTG <= MaxMTG; hypMTG++) {
-    // Calculate thinking time for hypothetical "moves to go" value
-    int hypMyTime =  Limits.time[us]
-                   + Limits.inc[us] * (hypMTG - 1)
-                   - moveOverhead * (2 + min(hypMTG, 40));
+  // Adjust moveOverhead if there are tiny increments
+  moveOverhead = max(10, min((int)(Limits.inc[us] / 2), moveOverhead));
 
-    hypMyTime = max(hypMyTime, 0);
+  // Make sure that timeLeft > 0 since we may use it as a divisor
+  TimePoint timeLeft = max(1, Limits.time[us] + Limits.inc[us] * (mtg - 1) - moveOverhead * (2 + mtg));
 
-    int t1 =  minThinkingTime
-            + remaining(hypMyTime, hypMTG, ply, slowMover, OptimumTime);
-    int t2 =  minThinkingTime
-            + remaining(hypMyTime, hypMTG, ply, slowMover, MaxTime);
+  // A user may scale time usage by setting UCI option "Slow Mover".
+  // Default is 100 and changing this value will probably lose Elo.
+  timeLeft = slowMover * timeLeft / 100;
 
-    Time.optimumTime = min(t1, Time.optimumTime);
-    Time.maximumTime = min(t2, Time.maximumTime);
+  // x basetime (+z increment)
+  // If there is a healthy increment, timeLeft can exceed actual available
+  // game time for the current move, so also cap to 20% of available game time.
+  if (Limits.movestogo == 0) {
+    opt_scale = min(0.007 + pow(ply + 3.0, 0.5) / 250.0,
+                    0.2 * Limits.time[us] / (double)timeLeft);
+    max_scale = 4 + pow(ply + 3, 0.3);
   }
+  // x moves in y seconds (+z increment)
+  else {
+    opt_scale = min((0.8 + ply / 120.0) / mtg,
+                     0.8 * Limits.time[us] / (double)timeLeft);
+    max_scale = min(6.3, 1.5 + 0.11 * mtg);
+  }
+
+  // Never use more than 80% of the available time for this move
+  Time.optimumTime = max(minThinkingTime, (int)(opt_scale * timeLeft));
+  Time.maximumTime = min(0.8 * Limits.time[us] - moveOverhead, max_scale * Time.optimumTime);
 
   if (option_value(OPT_PONDER))
     Time.optimumTime += Time.optimumTime / 4;
