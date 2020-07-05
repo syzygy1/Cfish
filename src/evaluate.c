@@ -148,6 +148,7 @@ static const Score PassedFile[8] = {
 
 // Assorted bonuses and penalties used by evaluation
 static const Score BishopPawns         = S(  3,  7);
+static const Score BishopXRayPawns     = S(  4,  5);
 static const Score CorneredBishop      = S( 50, 50);
 static const Score FlankAttacks        = S(  8,  0);
 static const Score Hanging             = S( 69, 36);
@@ -277,6 +278,9 @@ INLINE Score evaluate_piece(const Pos *pos, EvalInfo *ei, Score *mobility,
 
         score -= BishopPawns * pawns_on_same_color_squares(ei->pe, Us, s)
                              * (!(ei->attackedBy[Us][PAWN] & sq_bb(s)) + popcount(blocked & CenterFiles));
+
+        // Penalty for all enemy pawns x-rayed
+        score -= BishopXRayPawns * popcount(PseudoAttacks[BISHOP][s] & pieces_cp(Them, PAWN));
 
         // Bonus for bishop on a long diagonal which can "see" both center
         // squares
@@ -698,6 +702,7 @@ INLINE Value evaluate_initiative(const Pos *pos, int passedCount, Score score)
                   + 21 * bothFlanks
                   + 51 * !non_pawn_material()
                   - 43 * almostUnwinnable
+                  -  2 * rule50_count()
                   - 110;
 
   Value mg = mg_value(score);
@@ -725,13 +730,11 @@ INLINE int evaluate_scale_factor(const Pos *pos, EvalInfo *ei, Value eg)
     if (opposite_bishops(pos)) {
       if (   non_pawn_material_c(WHITE) == BishopValueMg
           && non_pawn_material_c(BLACK) == BishopValueMg)
-        sf = 22;
+        sf = 18 + 4 * popcount(ei->pe->passedPawns[strongSide]);
       else
         sf = 22 + 3 * popcount(pieces_c(strongSide));
     } else
       sf = min(sf, 36 + 7 * piece_count(strongSide, PAWN));
-
-    sf = max(0, sf - (rule50_count() - 12) / 4);
   }
 
   return sf;

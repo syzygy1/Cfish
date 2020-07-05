@@ -177,7 +177,7 @@ enum {
 };
 
 enum {
-  PawnValueMg   = 128,   PawnValueEg   = 213,
+  PawnValueMg   = 124,   PawnValueEg   = 206,
   KnightValueMg = 781,   KnightValueEg = 854,
   BishopValueMg = 825,   BishopValueEg = 915,
   RookValueMg   = 1276,  RookValueEg   = 1380,
