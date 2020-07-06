@@ -35,6 +35,9 @@ static const Score Isolated        = S( 5, 15);
 static const Score WeakLever       = S( 0, 56);
 static const Score WeakUnopposed   = S(13, 27);
 
+// Bonus for blocked pawns at 5th or 6th rank
+static const Score BlockedPawn[2] = { S(-10, -3), S(-3, 3) };
+
 static const int BlockedStorm[8][2] = {
   {0, 0}, {0, 0}, {76, 78}, {-10, 15}, {-7, 10}, {-4, 6}, {-1, 2}
 };
@@ -160,6 +163,9 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     if (!support)
       score -=  (doubled ? Doubled : 0)
               + (more_than_one(lever) ? WeakLever : 0);
+
+    if (blocked && r > RANK_4)
+      score += BlockedPawn[r - 4];
   }
 
   return score;
