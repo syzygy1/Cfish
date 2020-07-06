@@ -193,7 +193,7 @@ ifeq ($(COMP),gcc)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
 		endif
-	ifeq ($(ARCH),armv8)
+	elifeq ($(ARCH),armv8)
 	  ifeq ($(OS),Android)
 		  CFLAGS += -m$(bits)
 		  LDFLAGS += -m$(bits)
