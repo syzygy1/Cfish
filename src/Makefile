@@ -187,15 +187,17 @@ ifeq ($(COMP),gcc)
 	CFLAGS += -pedantic -Wextra -Wshadow
 	ifeq ($(ARCH),armv7)
 	CFLAGS += -mcpu=native -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=native
-	  ifeq ($(OS),Android)
-		  CFLAGS += -m$(bits)
-		  LDFLAGS += -m$(bits)
-	  endif
-	  elifeq ($(ARCH),armv8)
+	endif
+	ifeq ($(ARCH),armv7)
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
 		endif
+	else ifeq ($(ARCH),armv8)
+	  ifeq ($(OS),Android)
+		  CFLAGS += -m$(bits)
+		  LDFLAGS += -m$(bits)
+	  endif
 	else
 		CFLAGS += -m$(bits)
 		LDFLAGS += -m$(bits)
@@ -581,4 +583,3 @@ icc-profile-use:
 	-@$(CC) $(DEPENDFLAGS) -MM $(OBJS:.o=.c) > $@ 2> /dev/null
 
 -include .depend
-
