@@ -35,13 +35,13 @@ PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
 
 ### Built-in benchmark for pgo-builds
-PGOBENCH = ./$(EXE) bench 16 1 15
+PGOBENCH = ./$(EXE) bench 16 1 12
 
 ### Object files
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 	material.o misc.o movegen.o movepick.o pawns.o position.o psqt.o \
 	search.o tbprobe.o thread.o timeman.o tt.o uci.o ucioption.o \
-        numa.o settings.o polybook.o
+        settings.o polybook.o
 
 ### ==========================================================================
 ### Section 2. High-level Configuration
@@ -76,9 +76,20 @@ popcnt = yes
 sse = yes
 pext = no
 native = yes
-numa = yes
+numa = no
 lto = no
 extra = no
+ifeq ($(KERNEL),Darwin)
+	## for my personal setup, change to "no" if it doesn't work for you
+	clang = yes
+	ifeq ($(clang),yes)
+		llvm=llvm-profdata-mp-7.0
+		else
+		llvm=llvm-profdata
+	endif
+	else
+	llvm=llvm-profdata
+endif
 
 ### 2.2 Architecture specific
 
@@ -128,6 +139,7 @@ endif
 ifeq ($(ARCH),armv7)
 	arch = armv7
 	bits = 32
+	prefetch = yes
 	sse = no
 	popcnt = no
 endif
@@ -173,11 +185,19 @@ ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
 	CFLAGS += -pedantic -Wextra -Wshadow
-	ifeq ($(ARCH),$(filter $(ARCH),armv7 armv8))
+	ifeq ($(ARCH),armv7)
+	CFLAGS += -mcpu=native -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=native
+	endif
+	ifeq ($(ARCH),armv7)
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
 		endif
+	ifeq ($(ARCH),armv8)
+	  ifeq ($(OS),Android)
+		  CFLAGS += -m$(bits)
+		  LDFLAGS += -m$(bits)
+	  endif
 	else
 		CFLAGS += -m$(bits)
 		LDFLAGS += -m$(bits)
@@ -187,14 +207,14 @@ ifeq ($(COMP),gcc)
 		LDFLAGS += -Wl,--no-as-needed
 	endif
 
-	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
+	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Haiku))
 		CFLAGS += -Wno-pedantic-ms-format
 	endif
 endif
 
 ifeq ($(COMP),mingw)
 	comp=mingw
-	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format -m$(bits)
+	CFLAGS += -pedantic -Wextra -Wshadow  -m$(bits)
 	LDFLAGS += -m$(bits)
 	ifeq ($(KERNEL),Linux)
 		ifeq ($(bits),64)
@@ -226,6 +246,7 @@ ifeq ($(COMP),clang)
 	CC=clang
 	CFLAGS += -pedantic -Wextra -Wshadow -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
 	ifeq ($(ARCH),armv7)
+	CFLAGS += -mcpu=mative -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=native
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
@@ -242,7 +263,7 @@ ifeq ($(COMP),clang)
 endif
 
 ifneq ($(COMP),mingw)
-ifeq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
+ifeq ($(KERNEL),$(filter $(KERNEL),Linux Haiku))
 	CFLAGS += -D_POSIX_C_SOURCE=199506L
 endif
 endif
@@ -530,7 +551,7 @@ clang-profile-make:
 	all
 
 clang-profile-use:
-	llvm-profdata merge -output=cfish.profdata *.profraw
+	$(llvm) merge -output=cfish.profdata *.profraw
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
 	EXTRACFLAGS='-fprofile-instr-use=cfish.profdata' \
 	EXTRALDFLAGS='-fprofile-use ' \
@@ -562,4 +583,3 @@ icc-profile-use:
 	-@$(CC) $(DEPENDFLAGS) -MM $(OBJS:.o=.c) > $@ 2> /dev/null
 
 -include .depend
-

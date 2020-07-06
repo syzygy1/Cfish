@@ -1,4 +1,4 @@
-#include "numa.h"
+//#include "numa.h"
 #include "search.h"
 #include "settings.h"
 #include "thread.h"
