@@ -56,16 +56,8 @@ void tt_free(void)
 
 void tt_allocate(size_t mbSize)
 {
-#ifdef BIG_TT
-  size_t count = ((size_t)1) << msb((mbSize * 1024 * 1024) / sizeof(Cluster));
-#else
-  size_t count = mbSize * 1024 * 1024 / sizeof(Cluster);
-#endif
-
-  TT.mask = count - 1;
-  TT.clusterCount = count;
-
-  size_t size = count * sizeof(Cluster);
+  TT.clusterCount = mbSize * 1024 * 1024 / sizeof(Cluster);
+  size_t size = TT.clusterCount * sizeof(Cluster);
 
 #ifdef _WIN32
 
@@ -128,7 +120,7 @@ void tt_allocate(size_t mbSize)
 
   // Advise the kernel to allocate large pages.
   if (settings.largePages)
-    madvise(TT.table, count * sizeof(Cluster), MADV_HUGEPAGE);
+    madvise(TT.table, size, MADV_HUGEPAGE);
 
 #endif
 #endif
@@ -165,7 +157,7 @@ void tt_clear_worker(int idx)
   // Find out which part of the TT this thread should clear.
   // To each thread we assign a number of 2MB blocks.
 
-  size_t total = (TT.mask + 1) * sizeof(Cluster);
+  size_t total = TT.clusterCount * sizeof(Cluster);
   size_t slice = (total + Threads.numThreads - 1) / Threads.numThreads;
   size_t blocks = (slice + (2 * 1024 * 1024) - 1) / (2 * 1024 * 1024);
   size_t begin = idx * blocks * (2 * 1024 * 1024);
@@ -189,7 +181,7 @@ void tt_clear_worker(int idx)
 TTEntry *tt_probe(Key key, int *found)
 {
   TTEntry *tte = tt_first_entry(key);
-  uint16_t key16 = key >> 48; // Use the high 16 bits as key inside the cluster
+  uint16_t key16 = key; // Use the low 16 bits as key inside the cluster
 
   for (int i = 0; i < ClusterSize; i++)
     if (!tte[i].key16 || tte[i].key16 == key16) {

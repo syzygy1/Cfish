@@ -170,16 +170,18 @@ enum { MAX_MATE_PLY = MAX_PLY };
 #endif
 
 enum {
-  VALUE_MATE_IN_MAX_PLY  = ( VALUE_MATE - MAX_MATE_PLY - MAX_PLY),
-  VALUE_MATED_IN_MAX_PLY = (-VALUE_MATE + MAX_MATE_PLY + MAX_PLY)
+  VALUE_TB_WIN_IN_MAX_PLY  =  VALUE_MATE - 2 * MAX_PLY,
+  VALUE_TB_LOSS_IN_MAX_PLY = -VALUE_MATE + 2 * MAX_PLY,
+  VALUE_MATE_IN_MAX_PLY    =  VALUE_MATE -     MAX_PLY,
+  VALUE_MATED_IN_MAX_PLY   = -VALUE_MATE +     MAX_PLY
 };
 
 enum {
-  PawnValueMg   = 128,   PawnValueEg   = 213,
-  KnightValueMg = 782,   KnightValueEg = 865,
-  BishopValueMg = 830,   BishopValueEg = 918,
-  RookValueMg   = 1289,  RookValueEg   = 1378,
-  QueenValueMg  = 2529,  QueenValueEg  = 2687,
+  PawnValueMg   = 124,   PawnValueEg   = 206,
+  KnightValueMg = 781,   KnightValueEg = 854,
+  BishopValueMg = 825,   BishopValueEg = 915,
+  RookValueMg   = 1276,  RookValueEg   = 1380,
+  QueenValueMg  = 2538,  QueenValueEg  = 2682,
 
   MidgameLimit  = 15258, EndgameLimit = 3915
 };
@@ -192,13 +194,10 @@ enum {
 };
 
 enum {
-  ONE_PLY = 1,
-  DEPTH_ZERO          =  0 * ONE_PLY,
-  DEPTH_QS_CHECKS     =  0 * ONE_PLY,
-  DEPTH_QS_NO_CHECKS  = -1 * ONE_PLY,
-  DEPTH_QS_RECAPTURES = -5 * ONE_PLY,
-  DEPTH_NONE = -6 * ONE_PLY,
-  DEPTH_MAX = MAX_PLY * ONE_PLY,
+  DEPTH_QS_CHECKS     =  0,
+  DEPTH_QS_NO_CHECKS  = -1,
+  DEPTH_QS_RECAPTURES = -5,
+  DEPTH_NONE = -6,
 };
 
 enum {
@@ -288,15 +287,21 @@ extern uint32_t NonPawnPieceValue[16];
 #define type_of_m(m) ((m) >> 14)
 #define promotion_type(m) ((((m)>>12) & 3) + KNIGHT)
 #define make_move(from,to) ((Move)((to) | ((from) << 6)))
+#define reverse_move(m) (make_move(to_sq(m), from_sq(m)))
 #define make_promotion(from,to,pt) ((Move)((to) | ((from)<<6) | (PROMOTION<<14) | (((pt)-KNIGHT)<<12)))
 #define make_enpassant(from,to) ((Move)((to) | ((from)<<6) | (ENPASSANT<<14)))
 #define make_castling(from,to) ((Move)((to) | ((from)<<6) | (CASTLING<<14)))
 #define move_is_ok(m) (from_sq(m) != to_sq(m))
 
-INLINE int opposite_colors(Square s1, Square s2)
+INLINE bool opposite_colors(Square s1, Square s2)
 {
   Square s = s1 ^ s2;
   return ((s >> 3) ^ s) & 1;
+}
+
+INLINE Key make_key(uint64_t seed)
+{
+  return seed * 6364136223846793005ULL + 1442695040888963407ULL;
 }
 
 typedef struct Pos Pos;
@@ -306,11 +311,14 @@ typedef struct RootMoves RootMoves;
 typedef struct PawnEntry PawnEntry;
 typedef struct MaterialEntry MaterialEntry;
 
+enum { MAX_LPH = 4 };
+
 typedef Move CounterMoveStat[16][64];
 typedef int16_t PieceToHistory[16][64];
-typedef PieceToHistory CounterMoveHistoryStat[16][64];
+typedef PieceToHistory CounterMoveHistoryStat[2][2][16][64];
 typedef int16_t ButterflyHistory[2][4096];
 typedef int16_t CapturePieceToHistory[16][64][8];
+typedef int16_t LowPlyHistory[MAX_LPH][4096];
 
 struct ExtMove {
   Move move;
@@ -325,11 +333,74 @@ struct PSQT {
 
 extern struct PSQT psqt;
 
-#ifndef _WIN32
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#endif
-#define clamp(a,b,c) ((a) < (b) ? (b) : (a) > (c) ? (c) : (a))
+#undef max
+#undef min
+
+#define MAX(T) INLINE T max_##T(T a, T b) { return a > b ? a : b; }
+MAX(int)
+MAX(uint64_t)
+MAX(unsigned)
+MAX(int64_t)
+MAX(uint8_t)
+MAX(double)
+MAX(size_t)
+MAX(long)
+#undef MAX
+
+#define MIN(T) INLINE T min_##T(T a, T b) { return a < b ? a : b; }
+MIN(int)
+MIN(uint64_t)
+MIN(unsigned)
+MIN(int64_t)
+MIN(uint8_t)
+MIN(double)
+MIN(size_t)
+MIN(long)
+#undef MIN
+
+#define CLAMP(T) INLINE T clamp_##T(T a, T b, T c) { return a < b ? b : a > c ? c : a; }
+CLAMP(int)
+CLAMP(uint64_t)
+CLAMP(unsigned)
+CLAMP(int64_t)
+CLAMP(uint8_t)
+CLAMP(double)
+CLAMP(size_t)
+CLAMP(long)
+#undef CLAMP
+
+#define max(a,b) _Generic((a), \
+    int: max_int,              \
+    uint64_t: max_uint64_t,    \
+    unsigned: max_unsigned,    \
+    int64_t: max_int64_t,      \
+    uint8_t: max_uint8_t,      \
+    double: max_double,        \
+    size_t: max_size_t,        \
+    long: max_long             \
+) (a,b)
+
+#define min(a,b) _Generic((a), \
+    int: min_int,              \
+    uint64_t: min_uint64_t,    \
+    unsigned: min_unsigned,    \
+    int64_t: min_int64_t,      \
+    uint8_t: min_uint8_t,      \
+    double: min_double,        \
+    size_t: min_size_t,        \
+    long: min_long             \
+) (a,b)
+
+#define clamp(a,b,c) _Generic((a), \
+    int: clamp_int,                \
+    uint64_t: clamp_uint64_t,      \
+    unsigned: clamp_unsigned,      \
+    int64_t: clamp_int64_t,        \
+    uint8_t: clamp_uint8_t,        \
+    double: clamp_double,          \
+    size_t: clamp_size_t,          \
+    long: clamp_long          \
+) (a,b,c)
 
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)

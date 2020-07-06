@@ -370,7 +370,7 @@ void uci_loop(int argc, char **argv)
 
 char *uci_value(char *str, Value v)
 {
-  if (abs(v) < VALUE_MATE - MAX_MATE_PLY)
+  if (abs(v) < VALUE_MATE_IN_MAX_PLY)
     sprintf(str, "cp %d", v * 100 / PawnValueEg);
   else
     sprintf(str, "mate %d",

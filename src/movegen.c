@@ -28,7 +28,7 @@ enum { CAPTURES, QUIETS, QUIET_CHECKS, EVASIONS, NON_EVASIONS, LEGAL };
 
 
 INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
-                                const int Type, const int Direction)
+    const int Type, const int Direction)
 {
   if (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS)
     (list++)->move = make_promotion(to - Direction, to, QUEEN);
@@ -50,8 +50,7 @@ INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
 
 
 INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
-                                    Bitboard target, const int Us,
-                                    const int Type)
+    Bitboard target, const int Us, const int Type)
 {
   // Compute our parametrized parameters at compile time, named according to
   // the point of view of white side.
@@ -172,20 +171,20 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 }
 
 
-INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
-                               Bitboard target, const int Pt, const bool Checks)
+INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, Bitboard target,
+    const int Us, const int Pt, const bool Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
   Square from;
 
-  loop_through_pieces(us, Pt, from) {
+  loop_through_pieces(Us, Pt, from) {
     if (Checks) {
       if (    (Pt == BISHOP || Pt == ROOK || Pt == QUEEN)
           && !(PseudoAttacks[Pt][from] & target & pos->st->checkSquares[Pt]))
           continue;
 
-      if (blockers_for_king(pos, us ^ 1) & sq_bb(from))
+      if (blockers_for_king(pos, Us ^ 1) & sq_bb(from))
         continue;
     }
 
@@ -203,17 +202,17 @@ INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, int us,
 
 
 INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
-                             const int Us, const int Type)
+    const int Us, const int Type)
 {
   const int OO = make_castling_right(Us, KING_SIDE);
   const int OOO = make_castling_right(Us, QUEEN_SIDE);
   const bool Checks = Type == QUIET_CHECKS;
 
   list = generate_pawn_moves(pos, list, target, Us, Type);
-  list = generate_moves(pos, list, Us, target, KNIGHT, Checks);
-  list = generate_moves(pos, list, Us, target, BISHOP, Checks);
-  list = generate_moves(pos, list, Us, target, ROOK, Checks);
-  list = generate_moves(pos, list, Us, target, QUEEN, Checks);
+  list = generate_moves(pos, list, target, Us, KNIGHT, Checks);
+  list = generate_moves(pos, list, target, Us, BISHOP, Checks);
+  list = generate_moves(pos, list, target, Us, ROOK  , Checks);
+  list = generate_moves(pos, list, target, Us, QUEEN , Checks);
 
   if (Type != QUIET_CHECKS && Type != EVASIONS) {
     Square ksq = square_of(Us, KING);
@@ -246,9 +245,9 @@ INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
 INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
 {
   assert(Type == CAPTURES || Type == QUIETS || Type == NON_EVASIONS);
-  assert(!pos_checkers());
+  assert(!checkers());
 
-  Color us = pos_stm();
+  Color us = stm();
 
   Bitboard target =  Type == CAPTURES     ?  pieces_c(us ^ 1)
                    : Type == QUIETS       ? ~pieces()
@@ -280,9 +279,9 @@ ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
 // knight underpromotions that give check.
 ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 {
-  assert(!pos_checkers());
+  assert(!checkers());
 
-  Color us = pos_stm();
+  Color us = stm();
   Bitboard dc = blockers_for_king(pos, us ^ 1) & pieces_c(us);
 
   while (dc) {
@@ -310,12 +309,12 @@ ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 // side to move is in check.
 ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 {
-  assert(pos_checkers());
+  assert(checkers());
 
-  Color us = pos_stm();
+  Color us = stm();
   Square ksq = square_of(us, KING);
   Bitboard sliderAttacks = 0;
-  Bitboard sliders = pos_checkers() & ~pieces_pp(KNIGHT, PAWN);
+  Bitboard sliders = checkers() & ~pieces_pp(KNIGHT, PAWN);
 
   // Find all the squares attacked by slider checkers. We will remove them
   // from the king evasions in order to skip known illegal moves, which
@@ -330,11 +329,11 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
   while (b)
       (list++)->move = make_move(ksq, pop_lsb(&b));
 
-  if (more_than_one(pos_checkers()))
+  if (more_than_one(checkers()))
       return list; // Double check, only a king move can save the day
 
   // Generate blocking evasions or captures of the checking piece
-  Square checksq = lsb(pos_checkers());
+  Square checksq = lsb(checkers());
   Bitboard target = between_bb(ksq, checksq) | sq_bb(checksq);
 
   return us == WHITE ? generate_all(pos, list, target, WHITE, EVASIONS)
@@ -346,12 +345,12 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 SMALL
 ExtMove *generate_legal(const Pos *pos, ExtMove *list)
 {
-  Color us = pos_stm();
+  Color us = stm();
   Bitboard pinned = blockers_for_king(pos, us) & pieces_c(us);
   Square ksq = square_of(us, KING);
   ExtMove *cur = list;
 
-  list = pos_checkers() ? generate_evasions(pos, list)
+  list = checkers() ? generate_evasions(pos, list)
                         : generate_non_evasions(pos, list);
   while (cur != list)
     if (   (pinned || from_sq(cur->move) == ksq

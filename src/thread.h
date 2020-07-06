@@ -61,6 +61,7 @@ void thread_wait(Pos *pos, atomic_bool *b);
 struct MainThread {
   double previousTimeReduction;
   Value previousScore;
+  Value iterValue[4];
 };
 
 typedef struct MainThread MainThread;
@@ -84,6 +85,7 @@ struct ThreadPool {
 #else
   HANDLE event;
 #endif
+  atomic_bool increaseDepth;
 };
 
 typedef struct ThreadPool ThreadPool;

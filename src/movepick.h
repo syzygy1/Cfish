@@ -49,6 +49,12 @@ INLINE void cpth_update(CapturePieceToHistory history, Piece pc, Square to,
   history[pc][to][captured] += v - history[pc][to][captured] * abs(v) / 10692;
 }
 
+INLINE void lph_update(LowPlyHistory history, int ply, Move m, int v)
+{
+  m &= 4095;
+  history[ply][m] += v - history[ply][m] * abs(v) / 10692;
+}
+
 enum {
   ST_MAIN_SEARCH, ST_CAPTURES_INIT, ST_GOOD_CAPTURES, ST_KILLERS, ST_KILLERS_2,
   ST_QUIET_INIT, ST_QUIET, ST_BAD_CAPTURES,
@@ -60,42 +66,42 @@ enum {
   ST_PROBCUT, ST_PROBCUT_INIT, ST_PROBCUT_2
 };
 
-Move next_move(const Pos *pos, int skipQuiets);
+Move next_move(const Pos *pos, bool skipQuiets);
 
 // Initialisation of move picker data.
 
-INLINE void mp_init(const Pos *pos, Move ttm, Depth d)
+INLINE void mp_init(const Pos *pos, Move ttm, Depth d, int ply)
 {
-  assert(d > DEPTH_ZERO);
+  assert(d > 0);
 
   Stack *st = pos->st;
 
   st->depth = d;
+  st->mp_ply = ply;
 
   Square prevSq = to_sq((st-1)->currentMove);
   st->countermove = (*pos->counterMoves)[piece_on(prevSq)][prevSq];
   st->mpKillers[0] = st->killers[0];
   st->mpKillers[1] = st->killers[1];
 
-  st->stage = pos_checkers() ? ST_EVASION : ST_MAIN_SEARCH;
   st->ttMove = ttm;
-  if (!ttm || !is_pseudo_legal(pos, ttm)) {
+  st->stage = checkers() ? ST_EVASION : ST_MAIN_SEARCH;
+  if (!ttm || !is_pseudo_legal(pos, ttm))
     st->stage++;
-    st->ttMove = 0;
-  }
 }
 
 INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 {
-  assert(d <= DEPTH_ZERO);
+  assert(d <= 0);
 
   Stack *st = pos->st;
 
-  st->stage = pos_checkers() ? ST_EVASION : ST_QSEARCH;
-  st->ttMove =   ttm
-              && is_pseudo_legal(pos, ttm)
-              && (d > DEPTH_QS_RECAPTURES || to_sq(ttm) == s) ? ttm : 0;
-  st->stage += (st->ttMove == 0);
+  st->ttMove = ttm;
+  st->stage = checkers() ? ST_EVASION : ST_QSEARCH;
+  if (   !ttm
+      || !is_pseudo_legal(pos, ttm)
+      || !(d > DEPTH_QS_RECAPTURES || to_sq(ttm) == s))
+    st->stage++;
 
   st->depth = d;
   st->recaptureSquare = s;
@@ -103,19 +109,20 @@ INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
 
 INLINE void mp_init_pc(const Pos *pos, Move ttm, Value th)
 {
-  assert(!pos_checkers());
+  assert(!checkers());
 
   Stack *st = pos->st;
 
   st->threshold = th;
 
+  st->ttMove = ttm;
   st->stage = ST_PROBCUT;
 
   // In ProbCut we generate captures with SEE higher than the given
   // threshold.
-  st->ttMove =   ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
-              && see_test(pos, ttm, th) ? ttm : 0;
-  if (st->ttMove == 0) st->stage++;
+  if (!(ttm && is_pseudo_legal(pos, ttm) && is_capture(pos, ttm)
+            && see_test(pos, ttm, th)))
+    st->stage++;
 }
 
 #endif

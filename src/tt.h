@@ -50,20 +50,20 @@ INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
                             Move m, Value ev, uint8_t g)
 {
   // Preserve any existing move for the same position
-  if (m || (k >> 48) != tte->key16)
+  if (m || (uint16_t)k != tte->key16)
     tte->move16 = (uint16_t)m;
 
   // Don't overwrite more valuable entries
-  if (  (k >> 48) != tte->key16
-      || d / ONE_PLY + 10 > tte->depth8
+  if (  (uint16_t)k != tte->key16
+      || d + 10 > tte->depth8
    /* || g != (tte->genBound8 & 0xFC) // Matching non-zero keys are already refreshed by probe() */
       || b == BOUND_EXACT) {
-    tte->key16     = (uint16_t)(k >> 48);
+    tte->key16     = (uint16_t)k;
     tte->value16   = (int16_t)v;
     tte->eval16    = (int16_t)ev;
     tte->genBound8 = (uint8_t)(g | pn | b);
-    assert((d - DEPTH_NONE) / ONE_PLY >= 0);
-    tte->depth8    = (int8_t)((d - DEPTH_NONE) / ONE_PLY);
+    assert((d - DEPTH_NONE) >= 0);
+    tte->depth8    = (int8_t)(d - DEPTH_NONE);
   }
 }
 
@@ -84,7 +84,7 @@ INLINE Value tte_eval(TTEntry *tte)
 
 INLINE Depth tte_depth(TTEntry *tte)
 {
-  return (Depth)(tte->depth8 * ONE_PLY) + DEPTH_NONE;
+  return (Depth)(tte->depth8) + DEPTH_NONE;
 }
 
 INLINE int tte_is_pv(TTEntry *tte)
@@ -115,13 +115,7 @@ struct Cluster {
 typedef struct Cluster Cluster;
 
 struct TranspositionTable {
-#ifdef BIG_TT
-  size_t mask;         // clusterCount - 1
   size_t clusterCount;
-#else
-  size_t clusterCount;
-  size_t mask;         // clusterCount - 1
-#endif
   Cluster *table;
   void *mem;
   size_t allocSize;
@@ -146,11 +140,7 @@ INLINE uint8_t tt_generation(void)
 
 INLINE TTEntry *tt_first_entry(Key key)
 {
-#ifdef BIG_TT
-  return &TT.table[(size_t)key & TT.mask].entry[0];
-#else
-  return &TT.table[((uint32_t)key * (uint64_t)TT.clusterCount) >> 32].entry[0];
-#endif
+  return &TT.table[mul_hi64(key, TT.clusterCount)].entry[0];
 }
 
 TTEntry *tt_probe(Key key, int *found);

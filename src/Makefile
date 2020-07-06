@@ -144,6 +144,13 @@ ifeq ($(ARCH),armv7)
 	popcnt = no
 endif
 
+ifeq ($(ARCH),armv8)
+	arch = armv8-a
+	prefetch = yes
+	popcnt = yes
+	bits = 64
+endif
+
 ifeq ($(ARCH),ppc-32)
 	arch = ppc
 	bits = 32
@@ -180,6 +187,11 @@ ifeq ($(COMP),gcc)
 	CFLAGS += -pedantic -Wextra -Wshadow
 	ifeq ($(ARCH),armv7)
 	CFLAGS += -mcpu=native -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=native
+	  ifeq ($(OS),Android)
+		  CFLAGS += -m$(bits)
+		  LDFLAGS += -m$(bits)
+	  endif
+	  elifeq ($(ARCH),armv8)
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
@@ -339,7 +351,7 @@ endif
 
 ### 3.6 popcnt
 ifeq ($(popcnt),yes)
-	ifeq ($(arch),ppc64)
+	ifeq ($(arch),$(filter $(arch),ppc64 armv8-a))
 		CFLAGS += -DUSE_POPCNT
 	else
 	ifeq ($(comp),icc)
@@ -354,7 +366,7 @@ endif
 ifeq ($(pext),yes)
 	CFLAGS += -DUSE_PEXT
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
-		CFLAGS += -mbmi2
+		CFLAGS += -msse4 -mbmi2
 	endif
 endif
 
@@ -423,6 +435,7 @@ help:
 	@echo "ppc-64                  > PPC 64-bit"
 	@echo "ppc-32                  > PPC 32-bit"
 	@echo "armv7                   > ARMv7 32-bit"
+	@echo "armv8                   > ARMv8 64-bit"
 	@echo "general-64              > unspecified 64-bit"
 	@echo "general-32              > unspecified 32-bit"
 	@echo ""
@@ -516,7 +529,8 @@ config-sanity:
 	@test "$(debug)" = "yes" || test "$(debug)" = "no"
 	@test "$(optimize)" = "yes" || test "$(optimize)" = "no"
 	@test "$(arch)" = "any" || test "$(arch)" = "x86_64" || test "$(arch)" = "i386" || \
-	 test "$(arch)" = "ppc64" || test "$(arch)" = "ppc" || test "$(arch)" = "armv7"
+	 test "$(arch)" = "ppc64" || test "$(arch)" = "ppc" || \
+	 test "$(arch)" = "armv7" || test "armv8-a"
 	@test "$(bits)" = "32" || test "$(bits)" = "64"
 	@test "$(prefetch)" = "yes" || test "$(prefetch)" = "no"
 	@test "$(popcnt)" = "yes" || test "$(popcnt)" = "no"

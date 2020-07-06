@@ -79,23 +79,25 @@ static void score_quiets(const Pos *pos)
 {
   Stack *st = pos->st;
   ButterflyHistory *history = pos->history;
+  LowPlyHistory *lph = pos->lowPlyHistory;
 
   PieceToHistory *cmh = (st-1)->history;
   PieceToHistory *fmh = (st-2)->history;
   PieceToHistory *fmh2 = (st-4)->history;
   PieceToHistory *fmh3 = (st-6)->history;
 
-  Color c = pos_stm();
+  Color c = stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++) {
     uint32_t move = m->move & 4095;
     Square to = move & 63;
     Square from = move >> 6;
-    m->value =  (*cmh)[piece_on(from)][to]
-              + (*fmh)[piece_on(from)][to]
-              + (*fmh2)[piece_on(from)][to]
-              + (*fmh3)[piece_on(from)][to] / 2
-              + (*history)[c][move];
+    m->value =      (*history)[c][move]
+              + 2 * (*cmh)[piece_on(from)][to]
+              + 2 * (*fmh)[piece_on(from)][to]
+              + 2 * (*fmh2)[piece_on(from)][to]
+              +     (*fmh3)[piece_on(from)][to]
+              + (st->mp_ply < MAX_LPH ? min(4, st->depth / 3) * (*lph)[st->mp_ply][move] : 0);
   }
 }
 
@@ -107,7 +109,7 @@ static void score_evasions(const Pos *pos)
 
   ButterflyHistory *history = pos->history;
   PieceToHistory *cmh = (st-1)->history;
-  Color c = pos_stm();
+  Color c = stm();
 
   for (ExtMove *m = st->cur; m < st->endMoves; m++)
     if (is_capture(pos, m->move))
@@ -122,7 +124,7 @@ static void score_evasions(const Pos *pos)
 
 // next_move() returns the next pseudo-legal move to be searched.
 
-Move next_move(const Pos *pos, int skipQuiets)
+Move next_move(const Pos *pos, bool skipQuiets)
 {
   Stack *st = pos->st;
   Move move;
@@ -145,7 +147,7 @@ Move next_move(const Pos *pos, int skipQuiets)
     while (st->cur < st->endMoves) {
       move = pick_best(st->cur++, st->endMoves);
       if (move != st->ttMove) {
-        if (see_test(pos, move, -55 * (st->cur-1)->value / 1024))
+        if (see_test(pos, move, -69 * (st->cur-1)->value / 1024))
           return move;
 
         // Losing capture, move it to the beginning of the array.
@@ -183,7 +185,7 @@ Move next_move(const Pos *pos, int skipQuiets)
       st->cur = st->endBadCaptures;
       st->endMoves = generate_quiets(pos, st->cur);
       score_quiets(pos);
-      partial_insertion_sort(st->cur, st->endMoves, -4000 * st->depth / ONE_PLY);
+      partial_insertion_sort(st->cur, st->endMoves, -3000 * st->depth);
     }
     st->stage++;
     /* fallthrough */
