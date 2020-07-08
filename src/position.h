@@ -157,7 +157,8 @@ struct Pos {
   uint64_t tbHits;
   uint64_t ttHitAverage;
   int pvIdx, pvLast;
-  int selDepth, nmpPly, nmpOdd;
+  int selDepth, nmpMinPly;
+  Color nmpColor;
   Depth rootDepth;
   Depth completedDepth;
   Score contempt;
@@ -196,9 +197,9 @@ void print_pos(Pos *pos);
 PURE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
                               Bitboard *pinners);
 
-PURE int is_legal(const Pos *pos, Move m);
-PURE int is_pseudo_legal(const Pos *pos, Move m);
-PURE int gives_check_special(const Pos *pos, Stack *st, Move m);
+PURE bool is_legal(const Pos *pos, Move m);
+PURE bool is_pseudo_legal(const Pos *pos, Move m);
+PURE bool gives_check_special(const Pos *pos, Stack *st, Move m);
 
 // Doing and undoing moves
 void do_move(Pos *pos, Move m, int givesCheck);
@@ -207,11 +208,10 @@ void do_null_move(Pos *pos);
 INLINE void undo_null_move(Pos *pos);
 
 // Static exchange evaluation
-PURE Value see_sign(const Pos *pos, Move m);
-PURE Value see_test(const Pos *pos, Move m, int value);
+PURE bool see_test(const Pos *pos, Move m, int value);
 
 PURE Key key_after(const Pos *pos, Move m);
-PURE int is_draw(const Pos *pos);
+PURE bool is_draw(const Pos *pos);
 PURE bool has_game_cycle(const Pos *pos, int ply);
 
 // Position representation
@@ -295,18 +295,18 @@ INLINE bool is_discovery_check_on_king(const Pos *pos, uint32_t c, Move m)
   return pos->st->blockersForKing[c] & sq_bb(from_sq(m));
 }
 
-INLINE int pawn_passed(const Pos *pos, uint32_t c, Square s)
+INLINE bool pawn_passed(const Pos *pos, uint32_t c, Square s)
 {
   return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_span(c, s));
 }
 
-INLINE int advanced_pawn_push(const Pos *pos, Move m)
+INLINE bool advanced_pawn_push(const Pos *pos, Move m)
 {
   return   type_of_p(moved_piece(m)) == PAWN
         && relative_rank_s(stm(), from_sq(m)) > RANK_4;
 }
 
-INLINE int opposite_bishops(const Pos *pos)
+INLINE bool opposite_bishops(const Pos *pos)
 {
   return   piece_count(WHITE, BISHOP) == 1
         && piece_count(BLACK, BISHOP) == 1
@@ -320,17 +320,17 @@ INLINE bool is_capture_or_promotion(const Pos *pos, Move m)
   return type_of_m(m) != NORMAL ? type_of_m(m) != CASTLING : !is_empty(to_sq(m));
 }
 
-INLINE int is_capture(const Pos *pos, Move m)
+INLINE bool is_capture(const Pos *pos, Move m)
 {
   // Castling is encoded as "king captures the rook"
   assert(move_is_ok(m));
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
 }
 
-INLINE int gives_check(const Pos *pos, Stack *st, Move m)
+INLINE bool gives_check(const Pos *pos, Stack *st, Move m)
 {
   return  type_of_m(m) == NORMAL && !(blockers_for_king(pos, stm() ^ 1) & pieces_c(stm()))
-        ? !!(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
+        ? (bool)(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
         : gives_check_special(pos, st, m);
 }
 

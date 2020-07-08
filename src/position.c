@@ -517,7 +517,7 @@ Bitboard attackers_to_occ(const Pos *pos, Square s, Bitboard occupied)
 
 // is_legal() tests whether a pseudo-legal move is legal
 
-int is_legal(const Pos *pos, Move m)
+bool is_legal(const Pos *pos, Move m)
 {
   assert(move_is_ok(m));
 
@@ -651,47 +651,47 @@ int is_pseudo_legal_old(Pos *pos, Move m)
 }
 #endif
 
-int is_pseudo_legal(const Pos *pos, Move m)
+bool is_pseudo_legal(const Pos *pos, Move m)
 {
   uint64_t us = stm();
   Square from = from_sq(m);
 
   if (!(pieces_c(us) & sq_bb(from)))
-    return 0;
+    return false;
 
   if (unlikely(type_of_m(m) == CASTLING)) {
-    if (checkers()) return 0;
+    if (checkers()) return false;
     ExtMove list[MAX_MOVES];
     ExtMove *end = generate_quiets(pos, list);
     for (ExtMove *p = list; p < end; p++)
       if (p->move == m) return is_legal(pos, m);
-    return 0;
+    return false;
   }
 
   Square to = to_sq(m);
   if (pieces_c(us) & sq_bb(to))
-    return 0;
+    return false;
 
   PieceType pt = type_of_p(piece_on(from));
   if (pt != PAWN) {
     if (type_of_m(m) != NORMAL)
-      return 0;
+      return false;
     switch (pt) {
     case KNIGHT:
       if (!(attacks_from_knight(from) & sq_bb(to)))
-        return 0;
+        return false;
       break;
     case BISHOP:
       if (!(attacks_from_bishop(from) & sq_bb(to)))
-        return 0;
+        return false;
       break;
     case ROOK:
       if (!(attacks_from_rook(from) & sq_bb(to)))
-        return 0;
+        return false;
       break;
     case QUEEN:
       if (!(attacks_from_queen(from) & sq_bb(to)))
-        return 0;
+        return false;
       break;
     case KING:
       if (!(attacks_from_king(from) & sq_bb(to)))
@@ -701,28 +701,28 @@ int is_pseudo_legal(const Pos *pos, Move m)
       // square. So we need to be careful here.
       if (   checkers()
           && (attackers_to_occ(pos, to, pieces() ^ sq_bb(from)) & pieces_c(us ^ 1)))
-        return 0;
-      return 1;
+        return false;
+      return true;
     default:
-      assume(0);
+      assume(false);
       break;
     }
   } else {
     if (likely(type_of_m(m) == NORMAL)) {
       if (!((to + 0x08) & 0x30))
-        return 0;
+        return false;
       if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
           && !((from + pawn_push(us) == to) && is_empty(to))
           && !( (from + 2 * pawn_push(us) == to)
             && (rank_of(from) == relative_rank(us, RANK_2))
             && is_empty(to) && is_empty(to - pawn_push(us))))
-        return 0;
+        return false;
     }
     else if (likely(type_of_m(m) == PROMOTION)) {
       // No need to test for pawn to 8th rank.
       if (   !(attacks_from_pawn(from, us) & pieces_c(us ^ 1) & sq_bb(to))
           && !((from + pawn_push(us) == to) && is_empty(to)))
-        return 0;
+        return false;
     }
     else
       return to == ep_square() && (attacks_from_pawn(from, us) & sq_bb(to));
@@ -730,12 +730,12 @@ int is_pseudo_legal(const Pos *pos, Move m)
   if (checkers()) {
     // Again we need to be a bit careful.
     if (more_than_one(checkers()))
-      return 0;
+      return false;
     if (!((between_bb(lsb(checkers()), square_of(us, KING))
                                       | checkers()) & sq_bb(to)))
-      return 0;
+      return false;
   }
-  return 1;
+  return true;
 }
 
 #if 0
@@ -757,7 +757,7 @@ exit(1);
 // gives_check_special() is invoked by gives_check() if there are
 // discovered check candidates or the move is of a special type
 
-int gives_check_special(const Pos *pos, Stack *st, Move m)
+bool gives_check_special(const Pos *pos, Stack *st, Move m)
 {
   assert(move_is_ok(m));
   assert(color_of(moved_piece(m)) == stm());
@@ -766,20 +766,19 @@ int gives_check_special(const Pos *pos, Stack *st, Move m)
   Square to = to_sq(m);
 
   if ((blockers_for_king(pos, stm() ^ 1) & sq_bb(from)) && !aligned(m, st->ksq))
-    return 1;
+    return true;
 
   switch (type_of_m(m)) {
   case NORMAL:
-    return !!(st->checkSquares[type_of_p(piece_on(from))] & sq_bb(to));
+    return st->checkSquares[type_of_p(piece_on(from))] & sq_bb(to);
 
   case PROMOTION:
-    return !!(  attacks_bb(promotion_type(m), to, pieces() ^ sq_bb(from))
-              & sq_bb(st->ksq));
+    return attacks_bb(promotion_type(m), to, pieces() ^ sq_bb(from)) & sq_bb(st->ksq);
 
   case ENPASSANT:
   {
     if (st->checkSquares[PAWN] & sq_bb(to))
-      return 1;
+      return true;
     Square capsq = make_square(file_of(to), rank_of(from));
 //    Bitboard b = pieces() ^ sq_bb(from) ^ sq_bb(capsq) ^ sq_bb(to);
     Bitboard b = inv_sq(inv_sq(inv_sq(pieces(), from), to), capsq);
@@ -798,8 +797,8 @@ int gives_check_special(const Pos *pos, Stack *st, Move m)
           && (attacks_bb_rook(rto, pieces() ^ sq_bb(from)) & sq_bb(st->ksq));
   }
   default:
-    assume(0);
-    return 0;
+    assume(false);
+    return false;
   }
 }
 
@@ -1263,7 +1262,7 @@ Key key_after(const Pos *pos, Move m)
 
 
 // Test whether SEE >= value.
-int see_test(const Pos *pos, Move m, int value)
+bool see_test(const Pos *pos, Move m, int value)
 {
   if (unlikely(type_of_m(m) != NORMAL))
     return 0 >= value;
@@ -1273,18 +1272,18 @@ int see_test(const Pos *pos, Move m, int value)
 
   int swap = PieceValue[MG][piece_on(to)] - value;
   if (swap < 0)
-    return 0;
+    return false;
 
   swap = PieceValue[MG][piece_on(from)] - swap;
   if (swap <= 0)
-    return 1;
+    return true;
 
   occ = pieces() ^ sq_bb(from) ^ sq_bb(to);
   Color stm = color_of(piece_on(from));
   Bitboard attackers = attackers_to_occ(pos, to, occ), stmAttackers;
-  int res = 1;
+  bool res = true;
 
-  while (1) {
+  while (true) {
     stm ^= 1;
     attackers &= occ;
     if (!(stmAttackers = attackers & pieces_c(stm))) break;
@@ -1292,7 +1291,7 @@ int see_test(const Pos *pos, Move m, int value)
         && (pos->st->pinnersForKing[stm] & occ))
       stmAttackers &= ~blockers_for_king(pos, stm);
     if (!stmAttackers) break;
-    res ^= 1;
+    res = !res;
     Bitboard bb;
     if ((bb = stmAttackers & pieces_p(PAWN))) {
       if ((swap = PawnValueMg - swap) < res) break;
@@ -1320,7 +1319,7 @@ int see_test(const Pos *pos, Move m, int value)
                   | (attacks_bb_rook(to, occ) & pieces_pp(ROOK, QUEEN));
     }
     else // KING
-      return (attackers & ~pieces_c(stm)) ? res ^ 1 : res;
+      return (attackers & ~pieces_c(stm)) ? !res : res;
   }
 
   return res;
@@ -1331,13 +1330,13 @@ int see_test(const Pos *pos, Move m, int value)
 // repetition. It does not detect stalemates.
 
 __attribute__((optimize("Os")))
-int is_draw(const Pos *pos)
+bool is_draw(const Pos *pos)
 {
   Stack *st = pos->st;
 
   if (unlikely(st->rule50 > 99)) {
     if (!checkers())
-      return 1;
+      return true;
     return generate_legal(pos, (st-1)->endMoves) != (st-1)->endMoves;
   }
 
@@ -1348,11 +1347,11 @@ int is_draw(const Pos *pos)
     for (int i = 0; i <= e; i += 2) {
       stp -= 2;
       if (stp->key == st->key)
-        return 1; // Draw at first repetition
+        return true; // Draw at first repetition
     }
   }
 
-  return 0;
+  return false;
 }
 
 

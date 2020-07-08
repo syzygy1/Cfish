@@ -46,8 +46,36 @@ struct TTEntry {
 
 typedef struct TTEntry TTEntry;
 
+// A TranspositionTable consists of a power of 2 number of clusters and
+// each cluster consists of ClusterSize number of TTEntry. Each non-empty
+// entry contains information of exactly one position. The size of a
+// cluster should divide the size of a cache line size, to ensure that
+// clusters never cross cache lines. This ensures best cache performance,
+// as the cacheline is prefetched, as soon as possible.
+
+enum { CacheLineSize = 64, ClusterSize = 3 };
+
+struct Cluster {
+  TTEntry entry[ClusterSize];
+  char padding[2]; // Align to a divisor of the cache line size
+};
+
+typedef struct Cluster Cluster;
+
+struct TranspositionTable {
+  size_t clusterCount;
+  Cluster *table;
+  void *mem;
+  size_t allocSize;
+  uint8_t generation8; // Size must be not bigger than TTEntry::genBound8
+};
+
+typedef struct TranspositionTable TranspositionTable;
+
+extern TranspositionTable TT;
+
 INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
-                            Move m, Value ev, uint8_t g)
+    Move m, Value ev)
 {
   // Preserve any existing move for the same position
   if (m || (uint16_t)k != tte->key16)
@@ -61,7 +89,7 @@ INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
     tte->key16     = (uint16_t)k;
     tte->value16   = (int16_t)v;
     tte->eval16    = (int16_t)ev;
-    tte->genBound8 = (uint8_t)(g | pn | b);
+    tte->genBound8 = (uint8_t)(TT.generation8 | pn | b);
     assert((d - DEPTH_NONE) >= 0);
     tte->depth8    = (int8_t)(d - DEPTH_NONE);
   }
@@ -97,45 +125,11 @@ INLINE int tte_bound(TTEntry *tte)
   return tte->genBound8 & 0x3;
 }
 
-
-// A TranspositionTable consists of a power of 2 number of clusters and
-// each cluster consists of ClusterSize number of TTEntry. Each non-empty
-// entry contains information of exactly one position. The size of a
-// cluster should divide the size of a cache line size, to ensure that
-// clusters never cross cache lines. This ensures best cache performance,
-// as the cacheline is prefetched, as soon as possible.
-
-enum { CacheLineSize = 64, ClusterSize = 3 };
-
-struct Cluster {
-  TTEntry entry[ClusterSize];
-  char padding[2]; // Align to a divisor of the cache line size
-};
-
-typedef struct Cluster Cluster;
-
-struct TranspositionTable {
-  size_t clusterCount;
-  Cluster *table;
-  void *mem;
-  size_t allocSize;
-  uint8_t generation8; // Size must be not bigger than TTEntry::genBound8
-};
-
-typedef struct TranspositionTable TranspositionTable;
-
-extern TranspositionTable TT;
-
 void tt_free(void);
 
 INLINE void tt_new_search(void)
 {
   TT.generation8 += 8; // Lower 3 bits are used by PvNode and Bound
-}
-
-INLINE uint8_t tt_generation(void)
-{
-  return TT.generation8;
 }
 
 INLINE TTEntry *tt_first_entry(Key key)
@@ -150,4 +144,3 @@ void tt_clear(void);
 void tt_clear_worker(int idx);
 
 #endif
-
