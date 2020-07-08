@@ -150,7 +150,6 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
     else if (!neighbours) {
       if (    opposed
           && (ourPawns & forward_file_bb(Them, s))
-          && popcount(opposed) == 1
           && !(theirPawns & adjacent_files_bb(f)))
         score -= Doubled;
       else
