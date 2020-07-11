@@ -659,11 +659,9 @@ static int ScaleKPsK(const Pos *pos, Color strongSide)
   Square ksq = square_of(weakSide, KING);
   Bitboard pawns = pieces_cp(strongSide, PAWN);
 
-  // If all pawns are ahead of the king, on a single rook file and
-  // the king is within one file of the pawns, it's a draw.
-  if (   !(pawns & ~forward_ranks_bb(weakSide, rank_of(ksq)))
-      && !((pawns & ~FileABB) && (pawns & ~FileHBB))
-      &&  distance_f(ksq, lsb(pawns)) <= 1)
+  // If all pawns are ahead of the king on a single rook file, it is a draw.
+  if (   !(pawns & ~(FileABB | FileHBB))
+      && !(pawns & ~passed_pawn_span(weakSide, ksq)))
     return SCALE_FACTOR_DRAW;
 
   return SCALE_FACTOR_NONE;
