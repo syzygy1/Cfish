@@ -281,7 +281,7 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       && ss->staticEval >= beta - 32 * depth + 292 - improving * 30
       && !excludedMove
       && non_pawn_material_c(stm())
-      && (ss->ply >= pos->nmpPly || ss->ply % 2 != pos->nmpOdd))
+      && (ss->ply >= pos->nmpMinPly || stm() != pos->nmpColor))
   {
     assert(eval - beta >= 0);
 
@@ -301,19 +301,17 @@ Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, int cutNode)
       if (nullValue >= VALUE_MATE_IN_MAX_PLY)
         nullValue = beta;
 
-      if (   (depth < 13 || pos->nmpPly)
-          && abs(beta) < VALUE_KNOWN_WIN)
+      if (pos->nmpMinPly || (abs(beta) < VALUE_KNOWN_WIN && depth < 13))
         return nullValue;
 
-      // Do verification search at high depths
-      // Disable null move pruning for side to move for the first part of
-      // the remaining search tree
-      pos->nmpPly = ss->ply + 3 * (depth-R) / 4;
-      pos->nmpOdd = ss->ply & 1;
+      // Do verification search at high depths, with null move pruning
+      // disabled for us, until ply exceeds nmpMinPly
+      pos->nmpMinPly = ss->ply + 3 * (depth-R) / 4;
+      pos->nmpColor = stm();
 
       Value v = search_NonPV(pos, ss, beta-1, depth-R, 0);
 
-      pos->nmpOdd = pos->nmpPly = 0;
+      pos->nmpMinPly = 0;
 
       if (v >= beta)
         return nullValue;

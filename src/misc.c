@@ -36,7 +36,7 @@
 
 // Version number. If Version is left empty, then compile date in the format
 // DD-MM-YY and show in engine_info.
-char Version[] = "11";
+char Version[] = "11a";
 
 #ifndef _WIN32
 pthread_mutex_t ioMutex = PTHREAD_MUTEX_INITIALIZER;

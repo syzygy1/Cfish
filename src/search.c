@@ -864,7 +864,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
       TB_expand_mate(pos, &rm->move[i]);
 
     printf("info depth %d seldepth %d multipv %d score %s",
-           d, rm->move[i].selDepth, i + 1,
+           d, rm->move[i].selDepth + 1, i + 1,
            uci_value(buf, v));
 
     if (!tb && i == pvIdx)
@@ -1010,7 +1010,7 @@ void start_thinking(Pos *root)
   for (int idx = 0; idx < Threads.numThreads; idx++) {
     Pos *pos = Threads.pos[idx];
     pos->selDepth = 0;
-    pos->nmpPly = pos->nmpOdd = 0;
+    pos->nmpMinPly = 0;
     pos->rootDepth = 0;
     pos->nodes = pos->tbHits = 0;
     RootMoves *rm = pos->rootMoves;

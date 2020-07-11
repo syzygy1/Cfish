@@ -156,7 +156,8 @@ struct Pos {
   uint64_t tbHits;
   uint64_t ttHitAverage;
   int pvIdx, pvLast;
-  int selDepth, nmpPly, nmpOdd;
+  int selDepth, nmpMinPly;
+  uint32_t nmpColor;
   Depth rootDepth;
   Depth completedDepth;
   Score contempt;
