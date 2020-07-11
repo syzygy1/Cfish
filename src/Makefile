@@ -243,7 +243,7 @@ endif
 
 ifneq ($(COMP),mingw)
 ifeq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
-	CFLAGS += -D_POSIX_C_SOURCE=199506L
+	CFLAGS += -D_DEFAULT_SOURCE
 endif
 endif
 
