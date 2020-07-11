@@ -1966,7 +1966,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
       TB_expand_mate(pos, &rm->move[i]);
 
     printf("info depth %d seldepth %d multipv %d score %s",
-           d, rm->move[i].selDepth, i + 1,
+           d, rm->move[i].selDepth + 1, i + 1,
            uci_value(buf, v));
 
     if (!tb && i == pvIdx)
