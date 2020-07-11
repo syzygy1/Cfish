@@ -671,7 +671,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   Key posKey;
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
-  Value bestValue, value, ttValue, eval, maxValue;
+  Value bestValue, value, ttValue, eval, maxValue, probCutBeta;
   int ttHit, ttPv;
   bool formerPv, givesCheck, improving, didLMR;
   bool captureOrPromotion, inCheck, doFullDepthSearch, moveCountPruning;
@@ -942,23 +942,32 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
     }
   }
 
+  probCutBeta = beta + 176 - 49 * improving;
+
   // Step 10. ProbCut
   // If we have a good enough capture and a reduced search returns a value
   // much above beta, we can (almost) safely prune the previous move.
   if (   !PvNode
       &&  depth > 4
-      &&  abs(beta) < VALUE_TB_WIN_IN_MAX_PLY)
+      &&  abs(beta) < VALUE_TB_WIN_IN_MAX_PLY
+      && !(   ttHit
+           && tte_depth(tte) >= depth - 3
+           && ttValue != VALUE_NONE
+           && ttValue < probCutBeta))
   {
-    Value raisedBeta = beta + 176 - 49 * improving;
+    if (   ttHit
+        && tte_depth(tte) >= depth - 3
+        && ttValue != VALUE_NONE
+        && ttValue >= probCutBeta
+        && ttMove
+        && is_capture_or_promotion(pos, ttMove))
+      return probCutBeta;
 
-    mp_init_pc(pos, ttMove, raisedBeta - ss->staticEval);
-
+    mp_init_pc(pos, ttMove, probCutBeta - ss->staticEval);
     int probCutCount = 2 + 2 * cutNode;
+
     while (  (move = next_move(pos, 0))
-           && probCutCount
-           && !(   move == ttMove
-                && tte_depth(tte) >= depth - 4
-                && ttValue < raisedBeta))
+           && probCutCount)
       if (move != excludedMove && is_legal(pos, move)) {
         assert(is_capture_or_promotion(pos, move));
         assert(depth >= 5);
@@ -973,16 +982,19 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
 
         // Perform a preliminary qsearch to verify that the move holds
         value =   givesCheck
-               ? -qsearch_NonPV_true(pos, ss+1, -raisedBeta, 0)
-               : -qsearch_NonPV_false(pos, ss+1, -raisedBeta, 0);
+               ? -qsearch_NonPV_true(pos, ss+1, -probCutBeta, 0)
+               : -qsearch_NonPV_false(pos, ss+1, -probCutBeta, 0);
 
         // If the qsearch held, perform the regular search
-        if (value >= raisedBeta)
-          value = -search_NonPV(pos, ss+1, -raisedBeta, depth - 4, !cutNode);
+        if (value >= probCutBeta)
+          value = -search_NonPV(pos, ss+1, -probCutBeta, depth - 4, !cutNode);
 
         undo_move(pos, move);
-        if (value >= raisedBeta)
+        if (value >= probCutBeta) {
+          tte_save(tte, posKey, value_to_tt(value, ss->ply), ttPv, BOUND_LOWER,
+              depth - 3, move, ss->staticEval);
           return value;
+        }
       }
   }
 

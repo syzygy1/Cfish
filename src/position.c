@@ -291,7 +291,7 @@ void pos_set(Pos *pos, char *fen, int isChess960)
 
   // En passant square. Ignore if no pawn capture is possible.
   if (   ((col = *fen++) && (col >= 'a' && col <= 'h'))
-      && ((row = *fen++) && (row == '3' || row == '6')))
+      && ((row = *fen++) && (row == (stm() == WHITE ? '3' : '6'))))
   {
     st->epSquare = make_square(col - 'a', row - '1');
 

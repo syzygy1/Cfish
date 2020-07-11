@@ -147,6 +147,7 @@ static const Score PassedFile[8] = {
 };
 
 // Assorted bonuses and penalties used by evaluation
+static const Score BadOutpost          = S( -7, 36);
 static const Score BishopKingProtector = S(  6,  9);
 static const Score BishopOnKingRing    = S( 24,  0);
 static const Score BishopOutpost       = S( 30, 23);
@@ -217,6 +218,11 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const Color Us)
   ei->kingRing[Us] &= ~dblAttackByPawn;
 }
 
+INLINE Bitboard helper_func(Bitboard b)
+{
+  return b & (b-1) & (b-2);
+}
+
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
 // color and type.
 
@@ -265,7 +271,12 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
     if (Pt == BISHOP || Pt == KNIGHT) {
       // Bonus for outpost squares
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
-      if (bb & sq_bb(s))
+      if (   Pt == KNIGHT
+          && (bb & sq_bb(s) & ~CenterFiles)
+          && !(b & pieces_c(Them) & ~pieces_p(PAWN))
+          && !helper_func(pieces_c(Them) & ~pieces_p(PAWN) & (sq_bb(s) & QueenSide ? QueenSide : KingSide)))
+        score += BadOutpost;
+      else if (bb & sq_bb(s))
         score += Pt == KNIGHT ? KnightOutpost : BishopOutpost;
 
       else if (Pt == KNIGHT && bb & b & ~pieces_c(Us))
@@ -723,7 +734,7 @@ INLINE Value evaluate_winnable(const Pos *pos, EvalInfo *ei, Score score)
                && non_pawn_material_c(BLACK) == RookValueMg
                && piece_count(strongSide, PAWN) - piece_count(!strongSide, PAWN) <= 1
                && !(KingSide & pieces_cp(strongSide, PAWN)) != !(QueenSide & pieces_cp(strongSide, PAWN))
-               && (attacks_from_king(square_of(!strongSide, KING)) & pieces_cp(!strongSide, PAWN)))
+               && (ei->attackedBy[!strongSide][KING] & pieces_cp(!strongSide, PAWN)))
       sf = 36;
     else if (popcount(pieces_p(QUEEN)) == 1)
       sf = 37 + 3 * (pieces_cp(WHITE, QUEEN) ? piece_count(BLACK, BISHOP) + piece_count(BLACK, KNIGHT)

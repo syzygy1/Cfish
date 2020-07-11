@@ -28,22 +28,20 @@ enum { CAPTURES, QUIETS, QUIET_CHECKS, EVASIONS, NON_EVASIONS, LEGAL };
 
 
 INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
-    const int Type, const int Direction)
+    const int Type, const int D)
 {
-  if (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS)
-    (list++)->move = make_promotion(to - Direction, to, QUEEN);
-
-  if (Type == QUIETS || Type == EVASIONS || Type == NON_EVASIONS) {
-    (list++)->move = make_promotion(to - Direction, to, ROOK);
-    (list++)->move = make_promotion(to - Direction, to, BISHOP);
-    (list++)->move = make_promotion(to - Direction, to, KNIGHT);
+  if (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS) {
+    (list++)->move = make_promotion(to - D, to, QUEEN);
+    if (attacks_from_knight(to) & sq_bb(ksq))
+      (list++)->move = make_promotion(to - D, to, KNIGHT);
   }
 
-  // Knight promotion is the only promotion that can give a direct check
-  // that's not already included in the queen promotion.
-  if (   Type == QUIET_CHECKS
-      && (PseudoAttacks[KNIGHT][to] & sq_bb(ksq)))
-    (list++)->move = make_promotion(to - Direction, to, KNIGHT);
+  if (Type == QUIETS || Type == EVASIONS || Type == NON_EVASIONS) {
+    (list++)->move = make_promotion(to - D, to, ROOK);
+    (list++)->move = make_promotion(to - D, to, BISHOP);
+    if (!(attacks_from_knight(to) & sq_bb(ksq)))
+      (list++)->move = make_promotion(to - D, to, KNIGHT);
+  }
 
   return list;
 }
@@ -233,11 +231,11 @@ INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
 }
 
 
-// generate_captures() generates all pseudo-legal captures and queen
-// promotions.
+// generate_captures() generates all pseudo-legal captures plus queen and
+// checking knight promotions.
 //
 // generate_quiets() generates all pseudo-legal non-captures and
-// underpromotions.
+// underpromotions (except checking knight promotions).
 //
 // generate_non_evasions() generates all pseudo-legal captures and
 // non-captures.

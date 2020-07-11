@@ -36,7 +36,7 @@ static const Score WeakLever       = S( 0, 56);
 static const Score WeakUnopposed   = S(13, 27);
 
 // Bonus for blocked pawns at 5th or 6th rank
-static const Score BlockedPawn[2] = { S(-10, -3), S(-3, 3) };
+static const Score BlockedPawn[2] = { S(-11, -4), S(-3, 4) };
 
 static const int BlockedStorm[8][2] = {
   {0, 0}, {0, 0}, {76, 78}, {-10, 15}, {-7, 10}, {-4, 6}, {-1, 2}
@@ -142,7 +142,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const Color Us)
 
     // Score this pawn
     if (support | phalanx) {
-      int v =  Connected[r] * (4 + 2 * !!phalanx - 2 * !!opposed - !!blocked) / 2
+      int v =  Connected[r] * (2 + !!phalanx - !!opposed)
              + 21 * popcount(support);
       score += make_score(v, v * (r - 2) / 4);
     }
