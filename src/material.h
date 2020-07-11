@@ -86,7 +86,7 @@ INLINE Value material_evaluate(MaterialEntry *me, const Pos *pos)
 // because the scale factor may also be a function which should be applied to
 // the position. For instance, in KBP vs K endgames, the scaling function looks
 // for rook pawns and wrong-colored bishops.
-INLINE int material_scale_factor(MaterialEntry *me, const Pos *pos, int c)
+INLINE int material_scale_factor(MaterialEntry *me, const Pos *pos, Color c)
 {
   int sf = SCALE_FACTOR_NONE;
   if (me->scal_func[c])
@@ -95,4 +95,3 @@ INLINE int material_scale_factor(MaterialEntry *me, const Pos *pos, int c)
 }
 
 #endif
-

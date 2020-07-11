@@ -37,7 +37,7 @@ INLINE void cms_update(PieceToHistory cms, Piece pc, Square to, int v)
   cms[pc][to] += v - cms[pc][to] * abs(v) / 29952;
 }
 
-INLINE void history_update(ButterflyHistory history, int c, Move m, int v)
+INLINE void history_update(ButterflyHistory history, Color c, Move m, int v)
 {
   m &= 4095;
   history[c][m] += v - history[c][m] * abs(v) / 10692;

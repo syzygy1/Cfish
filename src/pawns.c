@@ -69,10 +69,10 @@ static const Value UnblockedStorm[4][8] = {
 #undef S
 #undef V
 
-INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const int Us)
+INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const Color Us)
 {
-  const int Them  = (Us == WHITE ? BLACK      : WHITE);
-  const int Up    = (Us == WHITE ? NORTH      : SOUTH);
+  const Color Them  = (Us == WHITE ? BLACK      : WHITE);
+  const int   Up    = (Us == WHITE ? NORTH      : SOUTH);
 
   Bitboard neighbours, stoppers, doubled, support, phalanx, opposed;
   Bitboard lever, leverPush, blocked;
@@ -188,9 +188,9 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 // for a king, by looking at the king file and the two closest files.
 
 INLINE void evaluate_shelter(const PawnEntry *pe, const Pos *pos, Square ksq,
-    Score *shelter, const int Us)
+    Score *shelter, const Color Us)
 {
-  const int Them = (Us == WHITE ? BLACK : WHITE);
+  const Color Them = (Us == WHITE ? BLACK : WHITE);
   
   Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us) & ~pe->pawnAttacks[Them];
@@ -225,7 +225,7 @@ INLINE void evaluate_shelter(const PawnEntry *pe, const Pos *pos, Square ksq,
 // when king square changes, which is about 20% of total king_safety() calls.
 
 INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
-                                   const int Us)
+    const Color Us)
 {
   pe->kingSquares[Us] = ksq;
   pe->castlingRights[Us] = can_castle_c(Us);

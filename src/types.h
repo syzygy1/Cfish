@@ -132,7 +132,7 @@ enum { MOVE_NONE = 0, MOVE_NULL = 65 };
 
 enum { NORMAL, PROMOTION, ENPASSANT, CASTLING };
 
-enum { WHITE, BLACK };
+enum { WHITE = false, BLACK = true };
 
 enum { KING_SIDE, QUEEN_SIDE };
 
@@ -225,7 +225,7 @@ enum { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8 };
 typedef uint32_t Move;
 typedef int32_t Phase;
 typedef int32_t Value;
-typedef uint32_t Color;
+typedef bool Color;
 typedef uint32_t Piece;
 typedef uint32_t PieceType;
 typedef int32_t Depth;

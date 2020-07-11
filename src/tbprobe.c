@@ -120,13 +120,13 @@ static void init_indices(void);
 // if flip == true.
 static void prt_str(Pos *pos, char *str, bool flip)
 {
-  int color = !flip ? WHITE : BLACK;
+  Color color = !flip ? WHITE : BLACK;
 
   for (int pt = KING; pt >= PAWN; pt--)
     for (int i = popcount(pieces_cp(color, pt)); i > 0; i--)
       *str++ = PieceToChar[pt];
   *str++ = 'v';
-  color ^= 1;
+  color = !color;
   for (int pt = KING; pt >= PAWN; pt--)
     for (int i = popcount(pieces_cp(color, pt)); i > 0; i--)
       *str++ = PieceToChar[pt];

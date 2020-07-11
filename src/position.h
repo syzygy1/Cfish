@@ -133,7 +133,7 @@ struct Pos {
   // Board / game representation.
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
   Bitboard byColorBB[2];
-  uint32_t sideToMove;
+  Color sideToMove;
   uint8_t chess960;
   uint8_t board[64];
 #ifdef PEDANTIC
@@ -285,19 +285,19 @@ PURE bool has_game_cycle(const Pos *pos, int ply);
 #define non_pawn_material() (non_pawn_material_c(WHITE) + non_pawn_material_c(BLACK))
 #define pawns_only() (!pos->st->nonPawn)
 
-INLINE Bitboard blockers_for_king(const Pos *pos, uint32_t c)
+INLINE Bitboard blockers_for_king(const Pos *pos, Color c)
 {
   return pos->st->blockersForKing[c];
 }
 
-INLINE bool is_discovery_check_on_king(const Pos *pos, uint32_t c, Move m)
+INLINE bool is_discovery_check_on_king(const Pos *pos, Color c, Move m)
 {
   return pos->st->blockersForKing[c] & sq_bb(from_sq(m));
 }
 
-INLINE bool pawn_passed(const Pos *pos, uint32_t c, Square s)
+INLINE bool pawn_passed(const Pos *pos, Color c, Square s)
 {
-  return !(pieces_cp(c ^ 1, PAWN) & passed_pawn_span(c, s));
+  return !(pieces_cp(!c, PAWN) & passed_pawn_span(c, s));
 }
 
 INLINE bool advanced_pawn_push(const Pos *pos, Move m)
@@ -329,7 +329,7 @@ INLINE bool is_capture(const Pos *pos, Move m)
 
 INLINE bool gives_check(const Pos *pos, Stack *st, Move m)
 {
-  return  type_of_m(m) == NORMAL && !(blockers_for_king(pos, stm() ^ 1) & pieces_c(stm()))
+  return  type_of_m(m) == NORMAL && !(blockers_for_king(pos, !stm()) & pieces_c(stm()))
         ? (bool)(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
         : gives_check_special(pos, st, m);
 }
@@ -343,7 +343,7 @@ INLINE void undo_null_move(Pos *pos)
   assert(!checkers());
 
   pos->st--;
-  pos->sideToMove ^= 1;
+  pos->sideToMove = !pos->sideToMove;
 }
 
 // Inlining this seems to slow down.

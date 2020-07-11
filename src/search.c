@@ -223,7 +223,7 @@ uint64_t perft(Pos *pos, Depth depth)
 void mainthread_search(void)
 {
   Pos *pos = Threads.pos[0];
-  int us = stm();
+  Color us = stm();
   time_init(us, game_ply());
   tt_new_search();
   char buf[16];
@@ -976,7 +976,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
                ? -qsearch_NonPV_true(pos, ss+1, -raisedBeta, 0)
                : -qsearch_NonPV_false(pos, ss+1, -raisedBeta, 0);
 
-        // If the qsearch holds perform the regular search
+        // If the qsearch held, perform the regular search
         if (value >= raisedBeta)
           value = -search_NonPV(pos, ss+1, -raisedBeta, depth - 4, !cutNode);
 
@@ -1205,7 +1205,7 @@ moves_loop: // When in check search starts from here.
 
     // Check extension
     else if (    givesCheck
-             && (is_discovery_check_on_king(pos, stm() ^ 1, move) || see_test(pos, move, 0)))
+             && (is_discovery_check_on_king(pos, !stm(), move) || see_test(pos, move, 0)))
       extension = 1;
 
     // Passed pawn extension
@@ -1306,7 +1306,7 @@ moves_loop: // When in check search starts from here.
         ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
                        + (*fmh )[movedPiece][to_sq(move)]
                        + (*fmh2)[movedPiece][to_sq(move)]
-                       + (*pos->history)[stm() ^ 1][from_to(move)]
+                       + (*pos->history)[!stm()][from_to(move)]
                        - 4826;
 
         // Decrease/increase reduction by comparing with opponent's stat score.
@@ -1848,7 +1848,7 @@ static void update_quiet_stats(const Pos *pos, Stack *ss, Move move, int bonus,
     ss->killers[0] = move;
   }
 
-  int c = stm();
+  Color c = stm();
   history_update(*pos->history, c, move, bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 

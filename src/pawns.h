@@ -70,12 +70,12 @@ INLINE PawnEntry *pawn_probe(const Pos *pos)
   return e;
 }
 
-INLINE int semiopen_file(PawnEntry *pe, int c, int f)
+INLINE int semiopen_file(PawnEntry *pe, Color c, int f)
 {
   return pe->semiopenFiles[c] & (1 << f);
 }
 
-INLINE int pawns_on_same_color_squares(PawnEntry *pe, int c, Square s)
+INLINE int pawns_on_same_color_squares(PawnEntry *pe, Color c, Square s)
 {
   return pe->pawnsOnSquares[c][!!(DarkSquares & sq_bb(s))];
 }

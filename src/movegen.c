@@ -50,11 +50,11 @@ INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
 
 
 INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
-    Bitboard target, const int Us, const int Type)
+    Bitboard target, const Color Us, const int Type)
 {
   // Compute our parametrized parameters at compile time, named according to
   // the point of view of white side.
-  const int      Them     = (Us == WHITE ? BLACK      : WHITE);
+  const Color    Them     = (Us == WHITE ? BLACK      : WHITE);
   const Bitboard TRank8BB = (Us == WHITE ? Rank8BB    : Rank1BB);
   const Bitboard TRank7BB = (Us == WHITE ? Rank7BB    : Rank2BB);
   const Bitboard TRank3BB = (Us == WHITE ? Rank3BB    : Rank6BB);
@@ -172,7 +172,7 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 
 
 INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, Bitboard target,
-    const int Us, const int Pt, const bool Checks)
+    const Color Us, const int Pt, const bool Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
@@ -202,7 +202,7 @@ INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, Bitboard target,
 
 
 INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
-    const int Us, const int Type)
+    const Color Us, const int Type)
 {
   const int OO = make_castling_right(Us, KING_SIDE);
   const int OOO = make_castling_right(Us, QUEEN_SIDE);

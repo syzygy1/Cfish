@@ -25,7 +25,7 @@
 
 typedef struct Pos Pos;
 
-typedef Value (EgFunc)(const Pos *, unsigned);
+typedef Value (EgFunc)(const Pos *, Color);
 
 #define NUM_EVAL 9
 #define NUM_SCALING 6
@@ -36,4 +36,3 @@ extern Key endgame_keys[NUM_EVAL + NUM_SCALING][2];
 void endgames_init(void);
 
 #endif
-

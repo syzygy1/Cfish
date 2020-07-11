@@ -150,7 +150,7 @@ INLINE Bitboard shift_bb(int Direction, Bitboard b)
 // pawn_attacks_bb() returns the squares attacked by pawns of the given color
 // from the squares in the given bitboard.
 
-INLINE Bitboard pawn_attacks_bb(Bitboard b, const int C)
+INLINE Bitboard pawn_attacks_bb(Bitboard b, const Color C)
 {
   return C == WHITE ? shift_bb(NORTH_WEST, b) | shift_bb(NORTH_EAST, b)
                     : shift_bb(SOUTH_WEST, b) | shift_bb(SOUTH_EAST, b);
@@ -160,7 +160,7 @@ INLINE Bitboard pawn_attacks_bb(Bitboard b, const int C)
 // pawn_double_attacks_bb() returns the pawn attacks for the given color
 // from the squares in the given bitboard.
 
-INLINE Bitboard pawn_double_attacks_bb(Bitboard b, const int C)
+INLINE Bitboard pawn_double_attacks_bb(Bitboard b, const Color C)
 {
   return C == WHITE ? shift_bb(NORTH_WEST, b) & shift_bb(NORTH_EAST, b)
                     : shift_bb(SOUTH_WEST, b) & shift_bb(SOUTH_EAST, b);
@@ -192,7 +192,7 @@ INLINE Bitboard between_bb(Square s1, Square s2)
 // given color. For instance, forward_ranks_bb(BLACK, RANK_3) will return
 // the squares on ranks 1 and 2.
 
-INLINE Bitboard forward_ranks_bb(unsigned c, unsigned r)
+INLINE Bitboard forward_ranks_bb(Color c, unsigned r)
 {
   return ForwardRanksBB[c][r];
 }
@@ -203,7 +203,7 @@ INLINE Bitboard forward_ranks_bb(unsigned c, unsigned r)
 // the given color:
 //     ForwardFileBB[c][s] = forward_ranks_bb(c, rank_of(s)) & file_bb(s)
 
-INLINE Bitboard forward_file_bb(unsigned c, Square s)
+INLINE Bitboard forward_file_bb(Color c, Square s)
 {
   return ForwardFileBB[c][s];
 }
@@ -214,7 +214,7 @@ INLINE Bitboard forward_file_bb(unsigned c, Square s)
 // its file, starting from the given square:
 //     PawnAttackSpan[c][s] = forward_ranks_bb(c, rank_of(s)) & adjacent_files_bb(s);
 
-INLINE Bitboard pawn_attack_span(unsigned c, Square s)
+INLINE Bitboard pawn_attack_span(Color c, Square s)
 {
   return PawnAttackSpan[c][s];
 }
@@ -224,7 +224,7 @@ INLINE Bitboard pawn_attack_span(unsigned c, Square s)
 // if a pawn of the given color and on the given square is a passed pawn:
 //     PassedPawnSpan[c][s] = pawn_attack_span(c, s) | forward_bb(c, s)
 
-INLINE Bitboard passed_pawn_span(unsigned c, Square s)
+INLINE Bitboard passed_pawn_span(Color c, Square s)
 {
   return PassedPawnSpan[c][s];
 }
@@ -402,12 +402,12 @@ INLINE Square pop_lsb(Bitboard* b)
 // frontmost_sq() and backmost_sq() return the square corresponding to the
 // most/least advanced bit relative to the given color.
 
-INLINE Square frontmost_sq(unsigned c, Bitboard b)
+INLINE Square frontmost_sq(Color c, Bitboard b)
 {
   return c == WHITE ? msb(b) : lsb(b);
 }
 
-INLINE Square  backmost_sq(unsigned c, Bitboard b)
+INLINE Square  backmost_sq(Color c, Bitboard b)
 {
   return c == WHITE ? lsb(b) : msb(b);
 }
