@@ -187,8 +187,7 @@ void options_free(void)
       free(opt->valString);
 }
 
-static const char *optTypeStr[] =
-{
+static const char *optTypeStr[] = {
   "check", "spin", "button", "string", "combo"
 };
 
@@ -238,7 +237,7 @@ void option_set_value(int optIdx, int value)
     opt->onChange(opt);
 }
 
-int option_set_by_name(char *name, char *value)
+bool option_set_by_name(char *name, char *value)
 {
   for (Option *opt = optionsMap; opt->name != NULL; opt++) {
     if (opt->type == OPT_TYPE_DISABLED)
@@ -252,12 +251,12 @@ int option_set_by_name(char *name, char *value)
         else if (strcmp(value, "false") == 0)
           opt->value = 0;
         else
-          return 1;
+          return true;
         break;
       case OPT_TYPE_SPIN:
         val = atoi(value);
         if (val < opt->minVal || val > opt->maxVal)
-          return 1;
+          return true;
         opt->value = val;
       case OPT_TYPE_BUTTON:
         break;
@@ -275,9 +274,9 @@ int option_set_by_name(char *name, char *value)
       }
       if (opt->onChange)
         opt->onChange(opt);
-      return 1;
+      return true;
     }
   }
 
-  return 0;
+  return false;
 }

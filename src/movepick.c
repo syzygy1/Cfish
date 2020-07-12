@@ -265,7 +265,7 @@ Move next_move(const Pos *pos, bool skipQuiets)
     break;
 
   default:
-    assume(0);
+    assume(false);
 
   }
 

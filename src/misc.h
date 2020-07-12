@@ -32,7 +32,7 @@
 
 #include "types.h"
 
-void print_engine_info(int to_uci);
+void print_engine_info(bool to_uci);
 
 // prefetch() preloads the given address in L1/L2 cache. This is
 // a non-blocking function that doesn't stall the CPU waiting for data
@@ -125,7 +125,7 @@ INLINE uint64_t mul_hi64(uint64_t a, uint64_t b)
 #endif
 }
 
-INLINE int is_little_endian(void)
+INLINE bool is_little_endian(void)
 {
   int num = 1;
   return *(uint8_t *)&num == 1;

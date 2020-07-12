@@ -46,7 +46,7 @@ static unsigned bb_index(unsigned us, Square bksq, Square wksq, Square psq)
 
 enum { RES_INVALID = 0, RES_UNKNOWN = 1, RES_DRAW = 2, RES_WIN = 4 };
 
-unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us)
+bool bitbases_probe(Square wksq, Square wpsq, Square bksq, Color us)
 {
   assert(file_of(wpsq) <= FILE_D);
 
@@ -57,7 +57,7 @@ unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us)
 static uint8_t initial(unsigned idx)
 {
   int ksq[2] = { (idx >> 0) & 0x3f, (idx >> 6) & 0x3f };
-  int us     = (idx >> 12) & 0x01;
+  Color us   = (idx >> 12) & 0x01;
   int psq    = make_square((idx >> 13) & 0x03, RANK_7 - ((idx >> 15) & 0x07));
 
   // Check if two pieces are on the same square or if a king can be captured
@@ -88,7 +88,7 @@ static uint8_t initial(unsigned idx)
 static uint8_t classify(uint8_t *db, unsigned idx)
 {
   int ksq[2] = { (idx >> 0) & 0x3f, (idx >> 6) & 0x3f };
-  int us     = (idx >> 12) & 0x01;
+  Color us   = (idx >> 12) & 0x01;
   int psq    = make_square((idx >> 13) & 0x03, RANK_7 - ((idx >> 15) & 0x07));
 
   // White to move: If one move leads to a position classified as WIN, the
@@ -101,7 +101,7 @@ static uint8_t classify(uint8_t *db, unsigned idx)
   // classified as WIN, the position is classified as WIN, otherwise the
   // current position is classified as UNKNOWN.
 
-  int them = us ^ 1;
+  Color them = !us;
   int good = (us == WHITE ? RES_WIN : RES_DRAW);
   int bad  = (us == WHITE ? RES_DRAW : RES_WIN);
 

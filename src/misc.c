@@ -50,7 +50,7 @@ static char date[] = __DATE__;
 // date when the program was compiled) or "Stockfish <Version>", depending
 // on whether Version is empty.
 
-void print_engine_info(int to_uci)
+void print_engine_info(bool to_uci)
 {
   char my_date[64];
 

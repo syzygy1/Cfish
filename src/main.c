@@ -33,7 +33,7 @@
 
 int main(int argc, char **argv)
 {
-  print_engine_info(0);
+  print_engine_info(false);
 
   psqt_init();
   bitboards_init();

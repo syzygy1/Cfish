@@ -32,7 +32,7 @@ struct TimeManagement Time; // Our global time management struct
 // 1) x basetime (+z increment)
 // 2) x moves in y seconds (+z increment)
 
-void time_init(int us, int ply)
+void time_init(Color us, int ply)
 {
   int moveOverhead    = option_value(OPT_MOVE_OVERHEAD);
   int slowMover       = option_value(OPT_SLOW_MOVER);

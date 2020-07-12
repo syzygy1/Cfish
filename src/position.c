@@ -523,7 +523,7 @@ bool is_legal(const Pos *pos, Move m)
 {
   assert(move_is_ok(m));
 
-  uint64_t us = stm();
+  Color us = stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
 
@@ -655,7 +655,7 @@ int is_pseudo_legal_old(Pos *pos, Move m)
 
 bool is_pseudo_legal(const Pos *pos, Move m)
 {
-  uint64_t us = stm();
+  Color us = stm();
   Square from = from_sq(m);
 
   if (!(pieces_c(us) & sq_bb(from)))

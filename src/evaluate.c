@@ -574,8 +574,8 @@ INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const Color Us)
   blockedPassers = b & shift_bb(Down, pieces_cp(Them, PAWN));
   if (blockedPassers) {
     helpers =  shift_bb(Up, pieces_cp(Us, PAWN))
-              & ~pieces_c(Them)
-              & (~ei->attackedBy2[Them] | ei->attackedBy[Us][0]);
+             & ~pieces_c(Them)
+             & (~ei->attackedBy2[Them] | ei->attackedBy[Us][0]);
 
     // Remove blocked candidate passers that don't have help to pass
     b &=  ~blockedPassers

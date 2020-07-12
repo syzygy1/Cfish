@@ -77,7 +77,7 @@ void print_options(void);
 int option_value(int opt);
 const char *option_string_value(int opt);
 void option_set_value(int opt, int value);
-int option_set_by_name(char *name, char *value);
+bool option_set_by_name(char *name, char *value);
 
 void setoption(char *str);
 void position(Pos *pos, char *str);

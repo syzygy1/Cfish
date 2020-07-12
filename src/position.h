@@ -146,7 +146,7 @@ struct Pos {
 #endif
   Key rootKeyFlip;
   uint16_t gamePly;
-  uint8_t hasRepeated;
+  bool hasRepeated;
 
   ExtMove *moveList;
 
@@ -195,7 +195,7 @@ void print_pos(Pos *pos);
 
 //PURE Bitboard attackers_to_occ(const Pos *pos, Square s, Bitboard occupied);
 PURE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
-                              Bitboard *pinners);
+    Bitboard *pinners);
 
 PURE bool is_legal(const Pos *pos, Move m);
 PURE bool is_pseudo_legal(const Pos *pos, Move m);

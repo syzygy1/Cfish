@@ -109,7 +109,7 @@ void position(Pos *pos, char *str)
       if ((pos->st - k)->key == (pos->st - l)->key)
         break;
     if (l <= pos->st->pliesFromNull)
-      pos->hasRepeated = 1;
+      pos->hasRepeated = true;
     else
       (pos->st - k)->key = 0;
   }
@@ -193,9 +193,9 @@ static void go(Pos *pos, char *str)
     else if (strcmp(token, "mate") == 0)
       Limits.mate = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "infinite") == 0)
-      Limits.infinite = 1;
+      Limits.infinite = true;
     else if (strcmp(token, "ponder") == 0)
-      Limits.ponder = 1;
+      Limits.ponder = true;
     else if (strcmp(token, "perft") == 0) {
       char str_buf[64];
       sprintf(str_buf, "%d %d %d current perft", option_value(OPT_HASH),
@@ -223,20 +223,20 @@ void uci_loop(int argc, char **argv)
   char str_buf[64];
   char *token;
 
-  LOCK_INIT(Signals.lock);
+  LOCK_INIT(Threads.lock);
 
-  // Signals.searching is only read and set by the UI thread.
+  // Threads.searching is only read and set by the UI thread.
   // The UI thread uses it to know whether it must still call
   // thread_wait_until_sleeping() on the main search thread.
   // (This is important for our native Windows threading implementation.)
-  Signals.searching = 0;
+  Threads.searching = 0;
 
-  // Signals.sleeping is set by the main search thread if it has run
+  // Threads.sleeping is set by the main search thread if it has run
   // out of work but must wait for a "stop" or "ponderhit" command from
   // the GUI to arrive before being allowed to output "bestmove". The main
   // thread will then go to sleep and has to be waken up by the UI thread.
-  // This variable must be accessed only after acquiring Signals.lock.
-  Signals.sleeping = 0;
+  // This variable must be accessed only after acquiring Threads.lock.
+  Threads.sleeping = 0;
 
   // Allocate 215 Stack slots.
   // Slots 100-200 form a circular buffer to be filled with game moves.
@@ -288,36 +288,36 @@ void uci_loop(int argc, char **argv)
     }
 
     // The GUI sends 'ponderhit' to tell us to ponder on the same move the
-    // opponent has played. In case Signals.stopOnPonderhit is set we are
+    // opponent has played. In case Threads.stopOnPonderhit is set we are
     // waiting for 'ponderhit' to stop the search (for instance because we
     // already ran out of time), otherwise we should continue searching but
     // switching from pondering to normal search.
     if (strcmp(token, "quit") == 0 || strcmp(token, "stop") == 0) {
-      if (Signals.searching) {
-        Signals.stop = 1;
-        LOCK(Signals.lock);
-        if (Signals.sleeping)
+      if (Threads.searching) {
+        Threads.stop = 1;
+        LOCK(Threads.lock);
+        if (Threads.sleeping)
           thread_wake_up(threads_main(), THREAD_RESUME);
-        Signals.sleeping = 0;
-        UNLOCK(Signals.lock);
+        Threads.sleeping = 0;
+        UNLOCK(Threads.lock);
       }
     }
     else if (strcmp(token, "ponderhit") == 0) {
-      Limits.ponder = 0; // Switch to normal search
-      if (Signals.stopOnPonderhit)
-        Signals.stop = 1;
-      LOCK(Signals.lock);
-      if (Signals.sleeping) {
-        Signals.stop = 1;
+      Limits.ponder = false; // Switch to normal search
+      if (Threads.stopOnPonderhit)
+        Threads.stop = 1;
+      LOCK(Threads.lock);
+      if (Threads.sleeping) {
+        Threads.stop = 1;
         thread_wake_up(threads_main(), THREAD_RESUME);
-        Signals.sleeping = 0;
+        Threads.sleeping = 0;
       }
-      UNLOCK(Signals.lock);
+      UNLOCK(Threads.lock);
     }
     else if (strcmp(token, "uci") == 0) {
       flockfile(stdout);
       printf("id name ");
-      print_engine_info(1);
+      print_engine_info(true);
       printf("\n");
       print_options();
       printf("uciok\n");
@@ -350,14 +350,14 @@ void uci_loop(int argc, char **argv)
     }
   } while (argc == 1 && strcmp(token, "quit") != 0);
 
-  if (Signals.searching)
+  if (Threads.searching)
     thread_wait_until_sleeping(threads_main());
 
   free(cmd);
   free(pos.stack);
   free(pos.moveList);
 
-  LOCK_DESTROY(Signals.lock);
+  LOCK_DESTROY(Threads.lock);
 }
 
 

@@ -1761,7 +1761,7 @@ int TB_probe_dtz(Pos *pos, int *success)
 
 // Use the DTZ tables to rank and score all root moves in the list.
 // A return value of 0 means that not all probes were successful.
-int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
+bool TB_root_probe_dtz(Pos *pos, RootMoves *rm)
 {
   int v, success;
 
@@ -1771,7 +1771,7 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
   // Check whether a position was repeated since the last zeroing move.
   // In that case, we need to be careful and play DTZ-optimal moves if
   // winning.
-  int rep = pos->hasRepeated;
+  bool rep = pos->hasRepeated;
 
   // The border between draw and win lies at rank 1 or rank 900, depending
   // on whether the 50-move rule is used.
@@ -1801,7 +1801,7 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
     }
 
     undo_move(pos, m->pv[0]);
-    if (!success) return 0;
+    if (!success) return false;
 
     // Better moves are ranked higher. Guaranteed wins are ranked equally.
     // Losing moves are ranked equally unless a 50-move draw is in sight.
@@ -1823,13 +1823,13 @@ int TB_root_probe_dtz(Pos *pos, RootMoves *rm)
                 :             -VALUE_MATE + MAX_MATE_PLY + 1;
   }
 
-  return 1;
+  return true;
 }
 
 // Use the WDL tables to rank all root moves in the list.
 // This is a fallback for the case that some or all DTZ tables are missing.
 // A return value of 0 means that not all probes were successful.
-int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
+bool TB_root_probe_wdl(Pos *pos, RootMoves *rm)
 {
   static int WdlToRank[] = { -1000, -899, 0, 899, 1000 };
   static Value WdlToValue[] = {
@@ -1850,20 +1850,20 @@ int TB_root_probe_wdl(Pos *pos, RootMoves *rm)
     do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
     v = -TB_probe_wdl(pos, &success);
     undo_move(pos, m->pv[0]);
-    if (!success) return 0;
+    if (!success) return false;
     if (!move50)
       v = v > 0 ? 2 : v < 0 ? -2 : 0;
     m->tbRank = WdlToRank[v + 2];
     m->tbScore = WdlToValue[v + 2];
   }
 
-  return 1;
+  return true;
 }
 
 // Use the DTM tables to find mate scores.
 // Either DTZ or WDL must have been probed successfully earlier.
 // A return value of 0 means that not all probes were successful.
-int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
+bool TB_root_probe_dtm(Pos *pos, RootMoves *rm)
 {
   int success;
   Value tmpScore[rm->size];
@@ -1886,7 +1886,7 @@ int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
       tmpScore[i] = wdl > 0 ? v - 1 : v + 1;
       undo_move(pos, m->pv[0]);
       if (success == 0)
-        return 0;
+        return false;
     }
   }
 
@@ -1903,7 +1903,7 @@ int TB_root_probe_dtm(Pos *pos, RootMoves *rm)
     m->tbRank = m->tbRank == 900 ? 1001 : m->tbScore;
   }
 
-  return 1;
+  return true;
 }
 
 // Use the DTM tables to complete a PV with mate score.

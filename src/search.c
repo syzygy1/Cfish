@@ -40,13 +40,11 @@
 #define load_rlx(x) atomic_load_explicit(&(x), memory_order_relaxed)
 #define store_rlx(x,y) atomic_store_explicit(&(x), y, memory_order_relaxed)
 
-SignalsType Signals;
 LimitsType Limits;
 
 int TB_Cardinality, TB_CardinalityDTM;
-int TB_RootInTB;
-int TB_UseRule50;
-Depth TB_ProbeDepth;
+static bool TB_RootInTB, TB_UseRule50;
+static Depth TB_ProbeDepth;
 
 static int base_ct;
 
@@ -265,21 +263,21 @@ void mainthread_search(void)
   }
 
   // When we reach the maximum depth, we can arrive here without a raise
-  // of Signals.stop. However, if we are pondering or in an infinite
+  // of Threads.stop. However, if we are pondering or in an infinite
   // search, the UCI protocol states that we shouldn't print the best
   // move before the GUI sends a "stop" or "ponderhit" command. We
   // therefore simply wait here until the GUI sends one of those commands
-  // (which also raises Signals.stop).
-  LOCK(Signals.lock);
-  if (!Signals.stop && (Limits.ponder || Limits.infinite)) {
-    Signals.sleeping = 1;
-    UNLOCK(Signals.lock);
-    thread_wait(pos, &Signals.stop);
+  // (which also raises Threads.stop).
+  LOCK(Threads.lock);
+  if (!Threads.stop && (Limits.ponder || Limits.infinite)) {
+    Threads.sleeping = 1;
+    UNLOCK(Threads.lock);
+    thread_wait(pos, &Threads.stop);
   } else
-    UNLOCK(Signals.lock);
+    UNLOCK(Threads.lock);
 
   // Stop the threads if not already stopped
-  Signals.stop = 1;
+  Threads.stop = 1;
 
   // Wait until all threads have finished
   if (pos->rootMoves->size > 0) {
@@ -425,7 +423,7 @@ void thread_search(Pos *pos)
   // Iterative deepening loop until requested to stop or the target depth
   // is reached.
   while (   ++pos->rootDepth < MAX_PLY
-         && !Signals.stop
+         && !Threads.stop
          && !(   Limits.depth
               && pos->threadIdx == 0
               && pos->rootDepth > Limits.depth))
@@ -448,7 +446,7 @@ void thread_search(Pos *pos)
       searchAgainCounter++;
 
     // MultiPV loop. We perform a full root search for each PV line
-    for (int pvIdx = 0; pvIdx < multiPV && !Signals.stop; pvIdx++) {
+    for (int pvIdx = 0; pvIdx < multiPV && !Threads.stop; pvIdx++) {
       pos->pvIdx = pvIdx;
       if (pvIdx == pvLast) {
         pvFirst = pvLast;
@@ -500,7 +498,7 @@ void thread_search(Pos *pos)
         // If search has been stopped, we break immediately. Sorting and
         // writing PV back to TT is safe because RootMoves is still
         // valid, although it refers to the previous iteration.
-        if (Signals.stop)
+        if (Threads.stop)
           break;
 
         // When failing high/low give some update (without cluttering
@@ -519,7 +517,7 @@ void thread_search(Pos *pos)
 
           failedHighCnt = 0;
           if (pos->threadIdx == 0)
-            Signals.stopOnPonderhit = 0;
+            Threads.stopOnPonderhit = 0;
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
           failedHighCnt++;
@@ -538,11 +536,11 @@ void thread_search(Pos *pos)
 
 skip_search:
       if (    pos->threadIdx == 0
-          && (Signals.stop || pvIdx + 1 == multiPV || time_elapsed() > 3000))
+          && (Threads.stop || pvIdx + 1 == multiPV || time_elapsed() > 3000))
         uci_print_pv(pos, pos->rootDepth, alpha, beta);
     }
 
-    if (!Signals.stop)
+    if (!Threads.stop)
       pos->completedDepth = pos->rootDepth;
 
     if (rm->move[0].pv[0] != lastBestMove) {
@@ -554,7 +552,7 @@ skip_search:
     if (   Limits.mate
         && bestValue >= VALUE_MATE_IN_MAX_PLY
         && VALUE_MATE - bestValue <= 2 * Limits.mate)
-      Signals.stop = 1;
+      Threads.stop = 1;
 
     if (pos->threadIdx != 0)
       continue;
@@ -567,8 +565,8 @@ skip_search:
 
     // Do we have time for the next iteration? Can we stop searching now?
     if (    use_time_management()
-        && !Signals.stop
-        && !Signals.stopOnPonderhit)
+        && !Threads.stop
+        && !Threads.stopOnPonderhit)
     {
       double fallingEval = (296 + 6 * (mainThread.previousScore - bestValue)
                                 + 6 * (mainThread.iterValue[iterIdx] - bestValue)) / 725.0;
@@ -594,9 +592,9 @@ skip_search:
         // If we are allowed to ponder do not stop the search now but
         // keep pondering until the GUI sends "ponderhit" or "stop".
         if (Limits.ponder)
-          Signals.stopOnPonderhit = 1;
+          Threads.stopOnPonderhit = 1;
         else
-          Signals.stop = 1;
+          Threads.stop = 1;
       } else if (Threads.increaseDepth
           && !Limits.ponder
           && time_elapsed() > totalTime * 0.56)
@@ -672,7 +670,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue, probCutBeta;
-  int ttHit, ttPv;
+  int ttHit, ttPv; // not bool on purpose
   bool formerPv, givesCheck, improving, didLMR;
   bool captureOrPromotion, inCheck, doFullDepthSearch, moveCountPruning;
   bool ttCapture, singularQuietLMR;
@@ -703,7 +701,7 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
 
   if (!rootNode) {
     // Step 2. Check for aborted search and immediate draw
-    if (load_rlx(Signals.stop) || is_draw(pos) || ss->ply >= MAX_PLY)
+    if (load_rlx(Threads.stop) || is_draw(pos) || ss->ply >= MAX_PLY)
       return  ss->ply >= MAX_PLY && !inCheck ? evaluate(pos)
                                              : value_draw(pos);
 
@@ -1393,7 +1391,7 @@ moves_loop: // When in check search starts from here.
     // Finished searching the move. If a stop occurred, the return value of
     // the search cannot be trusted, and we return immediately without
     // updating best move, PV and TT.
-    if (load_rlx(Signals.stop)) {
+    if (load_rlx(Threads.stop)) {
       if (crumb) store_rlx(*crumb, 0);
       return 0;
     }
@@ -1460,7 +1458,7 @@ moves_loop: // When in check search starts from here.
   // been completed. But in this case bestValue is valid because we have
   // fully searched our subtree, and we can anyhow save the result in TT.
   /*
-  if (Signals.stop)
+  if (Threads.stop)
     return VALUE_DRAW;
   */
 
@@ -1546,7 +1544,8 @@ INLINE Value qsearch_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   Key posKey;
   Move ttMove, move, bestMove;
   Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
-  int ttHit, pvHit, givesCheck;
+  int ttHit, pvHit; // not bool on purpose
+  bool givesCheck;
   Depth ttDepth;
   int moveCount;
 
@@ -1926,7 +1925,7 @@ static void check_time(void)
   if (   (use_time_management() && elapsed > time_maximum() - 10)
       || (Limits.movetime && elapsed >= Limits.movetime)
       || (Limits.nodes && threads_nodes_searched() >= Limits.nodes))
-        Signals.stop = 1;
+        Threads.stop = 1;
 }
 
 // uci_print_pv() prints PV information according to the UCI protocol.
@@ -2024,11 +2023,11 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
 
 static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 {
-  TB_RootInTB = 0;
+  TB_RootInTB = false;
   TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);
   TB_ProbeDepth = option_value(OPT_SYZ_PROBE_DEPTH);
   TB_Cardinality = option_value(OPT_SYZ_PROBE_LIMIT);
-  int dtz_available = 1, dtm_available = 0;
+  bool dtz_available = true, dtm_available = false;
 
   if (TB_Cardinality > TB_MaxCardinality) {
     TB_Cardinality = TB_MaxCardinality;
@@ -2045,7 +2044,7 @@ static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 
     if (!TB_RootInTB) {
       // DTZ tables are missing.
-      dtz_available = 0;
+      dtz_available = false;
 
       // Try to rank moves using WDL tables as fallback.
       TB_RootInTB = TB_root_probe_wdl(pos, rm);
@@ -2076,10 +2075,10 @@ static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 
 void start_thinking(Pos *root)
 {
-  if (Signals.searching)
+  if (Threads.searching)
     thread_wait_until_sleeping(threads_main());
 
-  Signals.stopOnPonderhit = Signals.stop = 0;
+  Threads.stopOnPonderhit = Threads.stop = 0;
   Threads.increaseDepth = true;
 
   for (int i = 0; i < 1024; i++)
@@ -2139,6 +2138,6 @@ void start_thinking(Pos *root)
   if (TB_RootInTB)
     Threads.pos[0]->tbHits = end - list;
 
-  Signals.searching = 1;
+  Threads.searching = 1;
   thread_wake_up(threads_main(), THREAD_SEARCH);
 }

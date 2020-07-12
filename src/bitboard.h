@@ -26,7 +26,7 @@
 #include "types.h"
 
 void bitbases_init(void);
-unsigned bitbases_probe(Square wksq, Square wpsq, Square bksq, unsigned us);
+bool bitbases_probe(Square wksq, Square wpsq, Square bksq, Color us);
 
 void bitboards_init(void);
 void print_pretty(Bitboard b);

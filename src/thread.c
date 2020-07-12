@@ -230,7 +230,7 @@ void thread_wait_until_sleeping(Pos *pos)
 #endif
 
   if (pos->threadIdx == 0)
-    Signals.searching = 0;
+    Threads.searching = 0;
 }
 
 
@@ -413,7 +413,7 @@ void threads_set_number(int num)
   }
 
   if (num == 0)
-    Signals.searching = 0;
+    Threads.searching = 0;
 }
 
 
