@@ -217,7 +217,7 @@ endif
 
 ifeq ($(COMP),icc)
 	comp=icc
-	CC=icpc
+	CC=icc
 	CFLAGS += -diag-disable 1476,10120 -Wcheck -Wabi -Wdeprecated -strict-ansi
 endif
 

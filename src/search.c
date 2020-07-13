@@ -262,22 +262,22 @@ void mainthread_search(void)
     }
   }
 
-  // When we reach the maximum depth, we can arrive here without a raise
-  // of Threads.stop. However, if we are pondering or in an infinite
+  // When we reach the maximum depth, we can arrive here without Threads.stop
+  // having been raised. However, if we are pondering or in an infinite
   // search, the UCI protocol states that we shouldn't print the best
   // move before the GUI sends a "stop" or "ponderhit" command. We
   // therefore simply wait here until the GUI sends one of those commands
   // (which also raises Threads.stop).
   LOCK(Threads.lock);
-  if (!Threads.stop && (Limits.ponder || Limits.infinite)) {
-    Threads.sleeping = 1;
+  if (!Threads.stop && (Threads.ponder || Limits.infinite)) {
+    Threads.sleeping = true;
     UNLOCK(Threads.lock);
     thread_wait(pos, &Threads.stop);
   } else
     UNLOCK(Threads.lock);
 
-  // Stop the threads if not already stopped
-  Threads.stop = 1;
+  // Stop the other threads if they have not stopped already
+  Threads.stop = true;
 
   // Wait until all threads have finished
   if (pos->rootMoves->size > 0) {
@@ -517,7 +517,7 @@ void thread_search(Pos *pos)
 
           failedHighCnt = 0;
           if (pos->threadIdx == 0)
-            Threads.stopOnPonderhit = 0;
+            Threads.stopOnPonderhit = false;
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
           failedHighCnt++;
@@ -552,7 +552,7 @@ skip_search:
     if (   Limits.mate
         && bestValue >= VALUE_MATE_IN_MAX_PLY
         && VALUE_MATE - bestValue <= 2 * Limits.mate)
-      Threads.stop = 1;
+      Threads.stop = true;
 
     if (pos->threadIdx != 0)
       continue;
@@ -591,13 +591,14 @@ skip_search:
       if (time_elapsed() > totalTime) {
         // If we are allowed to ponder do not stop the search now but
         // keep pondering until the GUI sends "ponderhit" or "stop".
-        if (Limits.ponder)
-          Threads.stopOnPonderhit = 1;
+        if (Threads.ponder)
+          Threads.stopOnPonderhit = true;
         else
-          Threads.stop = 1;
-      } else if (Threads.increaseDepth
-          && !Limits.ponder
-          && time_elapsed() > totalTime * 0.56)
+          Threads.stop = true;
+      }
+      else if (   Threads.increaseDepth
+               && !Threads.ponder
+               && time_elapsed() > totalTime * 0.56)
         Threads.increaseDepth = false;
       else
         Threads.increaseDepth = true;
@@ -1919,7 +1920,7 @@ static void check_time(void)
   TimePoint elapsed = time_elapsed();
 
   // An engine may not stop pondering until told so by the GUI
-  if (Limits.ponder)
+  if (Threads.ponder)
     return;
 
   if (   (use_time_management() && elapsed > time_maximum() - 10)
@@ -2073,13 +2074,15 @@ static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 // start_thinking() wakes up the main thread to start a new search,
 // then returns immediately.
 
-void start_thinking(Pos *root)
+void start_thinking(Pos *root, bool ponderMode)
 {
   if (Threads.searching)
     thread_wait_until_sleeping(threads_main());
 
-  Threads.stopOnPonderhit = Threads.stop = 0;
+  Threads.stopOnPonderhit = false;
+  Threads.stop = false;
   Threads.increaseDepth = true;
+  Threads.ponder = ponderMode;
 
   for (int i = 0; i < 1024; i++)
     store_rlx(breadcrumbs[i], 0);
@@ -2138,6 +2141,6 @@ void start_thinking(Pos *root)
   if (TB_RootInTB)
     Threads.pos[0]->tbHits = end - list;
 
-  Threads.searching = 1;
+  Threads.searching = true;
   thread_wake_up(threads_main(), THREAD_SEARCH);
 }

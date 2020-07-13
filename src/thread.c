@@ -116,7 +116,7 @@ static THREAD_FUNC thread_init(void *arg)
   Threads.pos[idx] = pos;
 
   pthread_mutex_lock(&Threads.mutex);
-  Threads.initializing = 0;
+  Threads.initializing = false;
   pthread_cond_signal(&Threads.sleepCondition);
   pthread_mutex_unlock(&Threads.mutex);
 
@@ -144,7 +144,7 @@ static void thread_create(int idx)
 
   pthread_t thread;
 
-  Threads.initializing = 1;
+  Threads.initializing = true;
   pthread_mutex_lock(&Threads.mutex);
   pthread_create(&thread, NULL, thread_init, (void *)(intptr_t)idx);
   while (Threads.initializing)
@@ -230,7 +230,7 @@ void thread_wait_until_sleeping(Pos *pos)
 #endif
 
   if (pos->threadIdx == 0)
-    Threads.searching = 0;
+    Threads.searching = false;
 }
 
 
@@ -284,7 +284,7 @@ void thread_wake_up(Pos *pos, int action)
 
 static void thread_idle_loop(Pos *pos)
 {
-  while (1) {
+  while (true) {
 #ifndef _WIN32
 
     pthread_mutex_lock(&pos->mutex);
@@ -413,7 +413,7 @@ void threads_set_number(int num)
   }
 
   if (num == 0)
-    Threads.searching = 0;
+    Threads.searching = false;
 }
 
 

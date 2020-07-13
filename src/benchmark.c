@@ -197,7 +197,7 @@ void benchmark(Pos *current, char *str)
       nodes += perft(&pos, Limits.depth);
     else {
       Limits.startTime = now();
-      start_thinking(&pos);
+      start_thinking(&pos, false);
       thread_wait_until_sleeping(threads_main());
       nodes += threads_nodes_searched();
     }

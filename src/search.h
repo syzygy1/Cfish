@@ -64,7 +64,6 @@ struct LimitsType {
   int movetime;
   int mate;
   bool infinite;
-  bool ponder;
   uint64_t nodes;
   TimePoint startTime;
   int numSearchmoves;
@@ -83,6 +82,6 @@ INLINE int use_time_management(void)
 void search_init(void);
 void search_clear(void);
 uint64_t perft(Pos *pos, Depth depth);
-void start_thinking(Pos *pos);
+void start_thinking(Pos *pos, bool ponderMode);
 
 #endif
