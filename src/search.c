@@ -174,44 +174,42 @@ void search_clear(void)
 // perft() is our utility to verify move generation. All the leaf nodes
 // up to the given depth are generated and counted, and the sum is returned.
 
-static uint64_t perft_helper(Pos *pos, Depth depth, uint64_t nodes)
-{
-  ExtMove *m = (pos->st-1)->endMoves;
-  ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
-  for (; m < last; m++) {
-    do_move(pos, m->move, gives_check(pos, pos->st, m->move));
-    if (depth == 0) {
-      nodes += generate_legal(pos, last) - last;
-    } else
-      nodes = perft_helper(pos, depth - 1, nodes);
-    undo_move(pos, m->move);
-  }
-  return nodes;
-}
+static uint64_t perft_helper(Pos *pos, Depth depth);
 
-uint64_t perft(Pos *pos, Depth depth)
+INLINE uint64_t perft_node(Pos *pos, Depth depth, const bool Root)
 {
   uint64_t cnt, nodes = 0;
-  char buf[16];
+  const bool leaf = (depth == 2);
 
-  ExtMove *m = pos->moveList;
+  ExtMove *m = Root ? pos->moveList : (pos->st-1)->endMoves;
   ExtMove *last = pos->st->endMoves = generate_legal(pos, m);
   for (; m < last; m++) {
-    if (depth <= 1) {
+    if (Root && depth <= 1) {
       cnt = 1;
       nodes++;
     } else {
       do_move(pos, m->move, gives_check(pos, pos->st, m->move));
-      if (depth == 2)
-        cnt = generate_legal(pos, last) - last;
-      else
-        cnt = perft_helper(pos, depth - 3, 0);
+      cnt = leaf ? (uint64_t)(generate_legal(pos, last) - last)
+                 : perft_helper(pos, depth - 1);
       nodes += cnt;
       undo_move(pos, m->move);
     }
-    printf("%s: %"PRIu64"\n", uci_move(buf, m->move, is_chess960()), cnt);
+    if (Root) {
+      char buf[16];
+      printf("%s: %"PRIu64"\n", uci_move(buf, m->move, is_chess960()), cnt);
+    }
   }
   return nodes;
+}
+
+static uint64_t perft_helper(Pos *pos, Depth depth)
+{
+  return perft_node(pos, depth, false);
+}
+
+uint64_t perft(Pos *pos, Depth depth)
+{
+  return perft_node(pos, depth, true);
 }
 
 // mainthread_search() is called by the main thread when the program
