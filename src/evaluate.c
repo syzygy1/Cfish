@@ -78,7 +78,11 @@ static const Bitboard KingFlank[8] = {
 };
 
 // Thresholds for lazy and space evaluation
-enum { LazyThreshold = 1400, SpaceThreshold = 12222 };
+enum {
+  LazyThreshold1 = 1400,
+  LazyThreshold2 = 1300,
+  SpaceThreshold = 12222
+};
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
 static const int KingAttackWeights[8] = { 0, 0, 81, 52, 44, 10 };
@@ -557,10 +561,10 @@ INLINE int capped_distance(Square s1, Square s2)
   return min(distance(s1, s2), 5);
 }
 
-// evaluate_passed_pawns() evaluates the passed pawns and candidate passed
+// evaluate_passed() evaluates the passed pawns and candidate passed
 // pawns of the given color.
 
-INLINE Score evaluate_passed_pawns(const Pos *pos, EvalInfo *ei, const Color Us)
+INLINE Score evaluate_passed(const Pos *pos, EvalInfo *ei, const Color Us)
 {
   const Color Them = (Us == WHITE ? BLACK : WHITE);
   const int   Up   = (Us == WHITE ? NORTH : SOUTH);
@@ -734,7 +738,7 @@ INLINE Value evaluate_winnable(const Pos *pos, EvalInfo *ei, Score score)
                && non_pawn_material_c(BLACK) == RookValueMg
                && piece_count(strongSide, PAWN) - piece_count(!strongSide, PAWN) <= 1
                && !(KingSide & pieces_cp(strongSide, PAWN)) != !(QueenSide & pieces_cp(strongSide, PAWN))
-               && (ei->attackedBy[!strongSide][KING] & pieces_cp(!strongSide, PAWN)))
+               && (attacks_from_king(square_of(!strongSide, KING)) & pieces_cp(!strongSide, PAWN)))
       sf = 36;
     else if (popcount(pieces_p(QUEEN)) == 1)
       sf = 37 + 3 * (pieces_cp(WHITE, QUEEN) ? piece_count(BLACK, BISHOP) + piece_count(BLACK, KNIGHT)
@@ -782,9 +786,9 @@ Value evaluate(const Pos *pos)
   score += ei.pe->score;
 
   // Early exit if score is high
-  v = (mg_value(score) + eg_value(score)) / 2;
-  if (abs(v) > LazyThreshold + non_pawn_material() / 64)
-    return stm() == WHITE ? v : -v;
+#define lazy_skip(v) (abs(mg_value(score) + eg_value(score)) / 2 > v + non_pawn_material() / 64)
+  if (lazy_skip(LazyThreshold1))
+    goto make_v;
 
   // Initialize attack and king safety bitboards.
   evalinfo_init(pos, &ei, WHITE);
@@ -807,18 +811,22 @@ Value evaluate(const Pos *pos)
   score +=  evaluate_king(pos, &ei, mobility, WHITE)
           - evaluate_king(pos, &ei, mobility, BLACK);
 
+  // Evaluate passed pawns, we need full attack information including king
+  score +=  evaluate_passed(pos, &ei, WHITE)
+          - evaluate_passed(pos, &ei, BLACK);
+
+  if (lazy_skip(LazyThreshold2))
+    goto make_v;
+
   // Evaluate tactical threats, we need full attack information including king
   score +=  evaluate_threats(pos, &ei, WHITE)
           - evaluate_threats(pos, &ei, BLACK);
-
-  // Evaluate passed pawns, we need full attack information including king
-  score +=  evaluate_passed_pawns(pos, &ei, WHITE)
-          - evaluate_passed_pawns(pos, &ei, BLACK);
 
   // Evaluate space for both sides, only during opening
   score +=  evaluate_space(pos, &ei, WHITE)
           - evaluate_space(pos, &ei, BLACK);
 
+make_v:
   // Derive single value from the mg and eg parts of the score
   v = evaluate_winnable(pos, &ei, score);
 

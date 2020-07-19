@@ -988,8 +988,11 @@ INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
 
         undo_move(pos, move);
         if (value >= probCutBeta) {
-          tte_save(tte, posKey, value_to_tt(value, ss->ply), ttPv, BOUND_LOWER,
-              depth - 3, move, ss->staticEval);
+          if (!(   ttHit
+                && tte_depth(tte) >= depth - 3
+                && ttValue != VALUE_NONE))
+            tte_save(tte, posKey, value_to_tt(value, ss->ply), ttPv,
+                BOUND_LOWER, depth - 3, move, ss->staticEval);
           return value;
         }
       }
