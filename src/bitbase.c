@@ -51,7 +51,7 @@ bool bitbases_probe(Square wksq, Square wpsq, Square bksq, Color us)
   assert(file_of(wpsq) <= FILE_D);
 
   unsigned idx = bb_index(us, bksq, wksq, wpsq);
-  return KPKBitbase[idx / 32] & (1 << (idx & 0x1F));
+  return KPKBitbase[idx / 32] & (1U << (idx & 0x1F));
 }
 
 static uint8_t initial(unsigned idx)
