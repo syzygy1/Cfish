@@ -202,12 +202,12 @@ INLINE uint64_t perft_node(Pos *pos, Depth depth, const bool Root)
   return nodes;
 }
 
-static uint64_t perft_helper(Pos *pos, Depth depth)
+static NOINLINE uint64_t perft_helper(Pos *pos, Depth depth)
 {
   return perft_node(pos, depth, false);
 }
 
-uint64_t perft(Pos *pos, Depth depth)
+NOINLINE uint64_t perft(Pos *pos, Depth depth)
 {
   return perft_node(pos, depth, true);
 }
@@ -1515,15 +1515,15 @@ moves_loop: // When in check search starts from here.
 }
 
 // search_PV() is the main search function for PV nodes
-static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta,
+static NOINLINE Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta,
     Depth depth)
 {
   return search_node(pos, ss, alpha, beta, depth, 0, PV);
 }
 
 // search_NonPV is the main search function for non-PV nodes
-static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth,
-    bool cutNode)
+static NOINLINE Value search_NonPV(Pos *pos, Stack *ss, Value alpha,
+    Depth depth, bool cutNode)
 {
   return search_node(pos, ss, alpha, alpha+1, depth, cutNode, NonPV);
 }
@@ -1722,24 +1722,26 @@ INLINE Value qsearch_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   return bestValue;
 }
 
-static Value qsearch_PV_true(Pos *pos, Stack *ss, Value alpha, Value beta,
-    Depth depth)
+static NOINLINE Value qsearch_PV_true(Pos *pos, Stack *ss, Value alpha,
+    Value beta, Depth depth)
 {
   return qsearch_node(pos, ss, alpha, beta, depth, PV, true);
 }
 
-static Value qsearch_PV_false(Pos *pos, Stack *ss, Value alpha, Value beta,
-    Depth depth)
+static NOINLINE Value qsearch_PV_false(Pos *pos, Stack *ss, Value alpha,
+    Value beta, Depth depth)
 {
   return qsearch_node(pos, ss, alpha, beta, depth, PV, false);
 }
 
-static Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha, Depth depth)
+static NOINLINE Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha,
+    Depth depth)
 {
   return qsearch_node(pos, ss, alpha, alpha+1, depth, NonPV, true);
 }
 
-static Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha, Depth depth)
+static NOINLINE Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha,
+    Depth depth)
 {
   return qsearch_node(pos, ss, alpha, alpha+1, depth, NonPV, false);
 }

@@ -49,19 +49,19 @@ static const int QuadraticTheirs[][8] = {
 };
 
 // Helper used to detect a given material distribution.
-static bool is_KXK(const Pos *pos, int us)
+INLINE bool is_KXK(const Pos *pos, int us)
 {
   return  !more_than_one(pieces_c(us ^ 1))
         && non_pawn_material_c(us) >= RookValueMg;
 }
 
-static bool is_KBPsK(const Pos *pos, int us)
+INLINE bool is_KBPsK(const Pos *pos, int us)
 {
   return   non_pawn_material_c(us) == BishopValueMg
         && pieces_cp(us, PAWN);
 }
 
-static bool is_KQKRPs(const Pos *pos, int us) {
+INLINE bool is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && non_pawn_material_c(us) == QueenValueMg
         && piece_count(us ^ 1, ROOK) == 1

@@ -812,17 +812,20 @@ INLINE size_t encode(int *p, struct EncInfo *ei, struct BaseEntry *be,
   return idx;
 }
 
-static size_t encode_piece(int *p, struct EncInfo *ei, struct BaseEntry *be)
+static NOINLINE size_t encode_piece(int *p, struct EncInfo *ei,
+    struct BaseEntry *be)
 {
   return encode(p, ei, be, PIECE_ENC);
 }
 
-static size_t encode_pawn_f(int *p, struct EncInfo *ei, struct BaseEntry *be)
+static NOINLINE size_t encode_pawn_f(int *p, struct EncInfo *ei,
+    struct BaseEntry *be)
 {
   return encode(p, ei, be, FILE_ENC);
 }
 
-static size_t encode_pawn_r(int *p, struct EncInfo *ei, struct BaseEntry *be)
+static NOINLINE size_t encode_pawn_r(int *p, struct EncInfo *ei,
+    struct BaseEntry *be)
 {
   return encode(p, ei, be, RANK_ENC);
 }
@@ -959,7 +962,7 @@ static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
   return d;
 }
 
-static bool init_table(struct BaseEntry *be, const char *str, int type)
+static NOINLINE bool init_table(struct BaseEntry *be, const char *str, int type)
 {
   uint8_t *data = map_tb(str, tbSuffix[type], &be->mapping[type]);
   if (!data) return false;
@@ -1285,17 +1288,17 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
   return v;
 }
 
-static int probe_wdl_table(Pos *pos, int *success)
+static NOINLINE int probe_wdl_table(Pos *pos, int *success)
 {
   return probe_table(pos, 0, success, WDL);
 }
 
-static int probe_dtm_table(Pos *pos, int won, int *success)
+static NOINLINE int probe_dtm_table(Pos *pos, int won, int *success)
 {
   return probe_table(pos, won, success, DTM);
 }
 
-static int probe_dtz_table(Pos *pos, int wdl, int *success)
+static NOINLINE int probe_dtz_table(Pos *pos, int wdl, int *success)
 {
   return probe_table(pos, wdl, success, DTZ);
 }

@@ -271,4 +271,3 @@ Move next_move(const Pos *pos, bool skipQuiets)
 
   return 0;
 }
-

@@ -255,12 +255,12 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
 }
 
 // "template" instantiation:
-Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
+NOINLINE Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   return do_king_safety(pe, pos, ksq, WHITE);
 }
 
-Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
+NOINLINE Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
 {
   return do_king_safety(pe, pos, ksq, BLACK);
 }

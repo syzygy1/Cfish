@@ -257,17 +257,17 @@ INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
 
 // "template" instantiations
 
-ExtMove *generate_captures(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_captures(const Pos *pos, ExtMove *list)
 {
   return generate(pos, list, CAPTURES);
 }
 
-ExtMove *generate_quiets(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_quiets(const Pos *pos, ExtMove *list)
 {
   return generate(pos, list, QUIETS);
 }
 
-ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
 {
   return generate(pos, list, NON_EVASIONS);
 }
@@ -275,7 +275,7 @@ ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
 
 // generate_quiet_checks() generates all pseudo-legal non-captures and
 // knight underpromotions that give check.
-ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 {
   assert(!checkers());
 
@@ -305,7 +305,7 @@ ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 
 // generate_evasions() generates all pseudo-legal check evasions when the
 // side to move is in check.
-ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 {
   assert(checkers());
 
@@ -340,8 +340,7 @@ ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 
 
 // generate_legal() generates all the legal moves in the given position
-SMALL
-ExtMove *generate_legal(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_legal(const Pos *pos, ExtMove *list)
 {
   Color us = stm();
   Bitboard pinned = blockers_for_king(pos, us) & pieces_c(us);
@@ -349,7 +348,7 @@ ExtMove *generate_legal(const Pos *pos, ExtMove *list)
   ExtMove *cur = list;
 
   list = checkers() ? generate_evasions(pos, list)
-                        : generate_non_evasions(pos, list);
+                    : generate_non_evasions(pos, list);
   while (cur != list)
     if (   (pinned || from_sq(cur->move) == ksq
                    || type_of_m(cur->move) == ENPASSANT)
