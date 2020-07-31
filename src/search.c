@@ -1153,7 +1153,7 @@ moves_loop: // When in check search starts from here.
     // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
     // that move is singular and should be extended. To verify this we do a
     // reduced search on all the other moves but the ttMove and if the
-    // result is lower than ttValue minus a margin then we extend the ttMove.
+    // result is lower than ttValue minus a margin, then we extend the ttMove.
     if (    depth >= 6
         &&  move == ttMove
         && !rootNode
@@ -1235,12 +1235,6 @@ moves_loop: // When in check search starts from here.
     if (type_of_m(move) == CASTLING)
       extension = 1;
 
-    // Late irreversible move extension
-    if (   move == ttMove
-        && rule50_count() > 80
-        && (captureOrPromotion || type_of_p(movedPiece) == PAWN))
-      extension = 2;
-
     // Add extension to new depth
     newDepth += extension;
 
@@ -1275,6 +1269,14 @@ moves_loop: // When in check search starts from here.
             || pos->ttHitAverage < 415 * ttHitAverageResolution * ttHitAverageWindow / 1024))
     {
       Depth r = reduction(improving, depth, moveCount);
+
+      // Decrease reduction at non-check cut nodes for second move at low
+      // depths
+      if (   cutNode
+          && depth <= 10
+          && moveCount <= 2
+          && !inCheck)
+        r--;
 
       // Decrease reduction if the ttHit runing average is large
       if (pos->ttHitAverage > 473 * ttHitAverageResolution * ttHitAverageWindow / 1024)

@@ -222,10 +222,6 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const Color Us)
   ei->kingRing[Us] &= ~dblAttackByPawn;
 }
 
-INLINE Bitboard helper_func(Bitboard b)
-{
-  return b & (b-1) & (b-2);
-}
 
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
 // color and type.
@@ -273,12 +269,14 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
     mobility[Us] += MobilityBonus[Pt - 2][mob];
 
     if (Pt == BISHOP || Pt == KNIGHT) {
-      // Bonus for outpost squares
+      // Bonus if the piece is on an outpost square or can reach one.
+      // Reduced bonus for knights (BadOutpost) if it has few relevant targets.
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
+      Bitboard targets = pieces_c(Them) & ~pieces_p(PAWN);
       if (   Pt == KNIGHT
-          && (bb & sq_bb(s) & ~CenterFiles)
-          && !(b & pieces_c(Them) & ~pieces_p(PAWN))
-          && !helper_func(pieces_c(Them) & ~pieces_p(PAWN) & (sq_bb(s) & QueenSide ? QueenSide : KingSide)))
+          && (bb & sq_bb(s) & ~CenterFiles) // on a side outpost
+          && !(b & targets)                 // no relevant attacks
+          && (!more_than_one(targets & (sq_bb(s) & QueenSide ? QueenSide : KingSide))))
         score += BadOutpost;
       else if (bb & sq_bb(s))
         score += Pt == KNIGHT ? KnightOutpost : BishopOutpost;
@@ -359,16 +357,15 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
   return score;
 }
 
-
 // evaluate_king() assigns bonuses and penalties to a king of a given color.
 
 INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
     const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const Bitboard Camp = (   Us == WHITE
-                         ? AllSquares ^ Rank6BB ^ Rank7BB ^ Rank8BB
-                         : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const Bitboard Camp =  Us == WHITE
+                       ? AllSquares ^ Rank6BB ^ Rank7BB ^ Rank8BB
+                       : AllSquares ^ Rank1BB ^ Rank2BB ^ Rank3BB;
 
   const Square ksq = square_of(Us, KING);
   Bitboard weak, b1, b2, b3, safe, unsafeChecks = 0;
@@ -538,17 +535,21 @@ INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const Color Us)
 
   // Bonus for impending threats against enemy queen
   if (piece_count(Them, QUEEN) == 1) {
+    bool queenImbalance = !pieces_cp(Us, QUEEN);
+
     Square s = square_of(Them, QUEEN);
-    safe = ei->mobilityArea[Us] & ~stronglyProtected;
+    safe =   ei->mobilityArea[Us]
+          & ~pieces_cp(Us, PAWN)
+          & ~stronglyProtected;
 
     b = ei->attackedBy[Us][KNIGHT] & attacks_from_knight(s);
 
-    score += KnightOnQueen * popcount(b & safe);
+    score += KnightOnQueen * popcount(b & safe) * (1 + queenImbalance);
 
     b =  (ei->attackedBy[Us][BISHOP] & attacks_from_bishop(s))
        | (ei->attackedBy[Us][ROOK  ] & attacks_from_rook(s));
 
-    score += SliderOnQueen * popcount(b & safe & ei->attackedBy2[Us]);
+    score += SliderOnQueen * popcount(b & safe & ei->attackedBy2[Us]) * (1 + queenImbalance);
   }
 
   return score;
