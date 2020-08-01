@@ -3,6 +3,7 @@
 
 #define PEDANTIC
 //#define LONG_MATES
+#define PER_THREAD_CMH
 
 #ifdef USE_PEXT
 //#define BMI2_PLAIN

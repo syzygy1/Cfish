@@ -57,24 +57,30 @@ static THREAD_FUNC thread_init(void *arg)
     node = bind_thread_to_numa_node(idx);
   else
     node = 0;
-  if (node >= numCmhTables) {
+#ifdef PER_THREAD_CMH
+  (void)node;
+  int t = idx;
+#else
+  int t = node;
+#endif
+  if (t >= numCmhTables) {
     int old = numCmhTables;
-    numCmhTables = node + 16;
+    numCmhTables = t + 16;
     cmhTables = realloc(cmhTables,
         numCmhTables * sizeof(CounterMoveHistoryStat *));
     while (old < numCmhTables)
       cmhTables[old++] = NULL;
   }
-  if (!cmhTables[node]) {
+  if (!cmhTables[t]) {
     if (settings.numaEnabled)
-      cmhTables[node] = numa_alloc(sizeof(CounterMoveHistoryStat));
+      cmhTables[t] = numa_alloc(sizeof(CounterMoveHistoryStat));
     else
-      cmhTables[node] = calloc(sizeof(CounterMoveHistoryStat), 1);
+      cmhTables[t] = calloc(sizeof(CounterMoveHistoryStat), 1);
     for (int chk = 0; chk < 2; chk++)
       for (int c = 0; c < 2; c++)
         for (int j = 0; j < 16; j++)
           for (int k = 0; k < 64; k++)
-            (*cmhTables[node])[chk][c][0][0][j][k] = CounterMovePruneThreshold - 1;
+            (*cmhTables[t])[chk][c][0][0][j][k] = CounterMovePruneThreshold - 1;
   }
 
   Pos *pos;
@@ -103,7 +109,7 @@ static THREAD_FUNC thread_init(void *arg)
     pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
   }
   pos->threadIdx = idx;
-  pos->counterMoveHistory = cmhTables[node];
+  pos->counterMoveHistory = cmhTables[t];
 
   atomic_store(&pos->resetCalls, false);
   pos->selDepth = pos->callsCnt = 0;
