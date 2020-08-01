@@ -1331,7 +1331,7 @@ bool see_test(const Pos *pos, Move m, int value)
 // is_draw() tests whether the position is drawn by 50-move rule or by
 // repetition. It does not detect stalemates.
 
-__attribute__((optimize("Os")))
+SMALL
 bool is_draw(const Pos *pos)
 {
   Stack *st = pos->st;

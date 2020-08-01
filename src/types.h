@@ -60,7 +60,17 @@
 //#define PURE __attribute__((pure))
 #define PURE
 
+#if defined __has_attribute
+#if __has_attribute(minsize)
+#define SMALL __attribute__((minsize))
+#elif __has_attribute(optimize)
 #define SMALL __attribute__((optimize("Os")))
+#endif
+#endif
+
+#ifndef SMALL
+#define SMALL
+#endif
 
 // Predefined macros hell:
 //
