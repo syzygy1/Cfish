@@ -64,7 +64,7 @@ INLINE bool is_KBPsK(const Pos *pos, int us)
 INLINE bool is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && non_pawn_material_c(us) == QueenValueMg
-        && non_pawn_material_c(!us) == RookValueMg
+        && piece_count(!us, ROOK) == 1
         && pieces_cp(!us, PAWN);
 }
 
