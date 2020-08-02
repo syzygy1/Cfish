@@ -51,7 +51,7 @@ static const int QuadraticTheirs[][8] = {
 // Helper used to detect a given material distribution.
 INLINE bool is_KXK(const Pos *pos, int us)
 {
-  return  !more_than_one(pieces_c(us ^ 1))
+  return  !more_than_one(pieces_c(!us))
         && non_pawn_material_c(us) >= RookValueMg;
 }
 
@@ -64,8 +64,8 @@ INLINE bool is_KBPsK(const Pos *pos, int us)
 INLINE bool is_KQKRPs(const Pos *pos, int us) {
   return  !piece_count(us, PAWN)
         && non_pawn_material_c(us) == QueenValueMg
-        && piece_count(us ^ 1, ROOK) == 1
-        && pieces_cp(us ^ 1, PAWN);
+        && non_pawn_material_c(!us) == RookValueMg
+        && pieces_cp(!us, PAWN);
 }
 
 // imbalance() calculates the imbalance by comparing the piece count of each
@@ -73,7 +73,7 @@ INLINE bool is_KQKRPs(const Pos *pos, int us) {
 static int imbalance(int us, int pieceCount[][8])
 {
   int *pc_us = pieceCount[us];
-  int *pc_them = pieceCount[us ^ 1];
+  int *pc_them = pieceCount[!us];
   int bonus = 0;
 
   // Second-degree polynomial material imbalance, by Tord Romstad

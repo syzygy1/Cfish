@@ -71,14 +71,14 @@ static uint8_t initial(unsigned idx)
   if (   us == WHITE
       && rank_of(psq) == RANK_7
       && ksq[us] != psq + NORTH
-      && (    distance(ksq[us ^ 1], psq + NORTH) > 1
+      && (    distance(ksq[!us], psq + NORTH) > 1
           || (PseudoAttacks[KING][ksq[us]] & sq_bb((psq + NORTH)))))
     return RES_WIN;
 
   // Immediate draw if it is a stalemate or a king captures undefended pawn
   if (   us == BLACK
-      && (  !(PseudoAttacks[KING][ksq[us]] & ~(PseudoAttacks[KING][ksq[us ^ 1]] | PawnAttacks[us ^ 1][psq]))
-          || (PseudoAttacks[KING][ksq[us]] & sq_bb(psq) & ~PseudoAttacks[KING][ksq[us ^ 1]])))
+      && (  !(PseudoAttacks[KING][ksq[us]] & ~(PseudoAttacks[KING][ksq[!us]] | PawnAttacks[!us][psq]))
+          || (PseudoAttacks[KING][ksq[us]] & sq_bb(psq) & ~PseudoAttacks[KING][ksq[!us]])))
     return RES_DRAW;
 
   // Position will be classified later

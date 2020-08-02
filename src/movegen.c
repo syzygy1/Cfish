@@ -182,7 +182,7 @@ INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, Bitboard target,
           && !(PseudoAttacks[Pt][from] & target & pos->st->checkSquares[Pt]))
           continue;
 
-      if (blockers_for_king(pos, Us ^ 1) & sq_bb(from))
+      if (blockers_for_king(pos, !Us) & sq_bb(from))
         continue;
     }
 
@@ -247,7 +247,7 @@ INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
 
   Color us = stm();
 
-  Bitboard target =  Type == CAPTURES     ?  pieces_c(us ^ 1)
+  Bitboard target =  Type == CAPTURES     ?  pieces_c(!us)
                    : Type == QUIETS       ? ~pieces()
                    : Type == NON_EVASIONS ? ~pieces_c(us) : 0;
 
@@ -280,7 +280,7 @@ NOINLINE ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
   assert(!checkers());
 
   Color us = stm();
-  Bitboard dc = blockers_for_king(pos, us ^ 1) & pieces_c(us);
+  Bitboard dc = blockers_for_king(pos, !us) & pieces_c(us);
 
   while (dc) {
     Square from = pop_lsb(&dc);
