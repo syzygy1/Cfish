@@ -162,11 +162,10 @@ static Value EvaluateKXK(const Pos *pos, Color strongSide)
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
 
-  Bitboard bb = pieces_c(strongSide);
-  if (   (pieces_pp(QUEEN, ROOK) & bb)
-      || ((pieces_p(BISHOP) & bb) && (pieces_p(KNIGHT) & bb))
-      || (   (pieces_p(BISHOP) & bb & DarkSquares)
-          && (pieces_p(BISHOP) & bb & LightSquares)))
+  if (    pieces_pp(QUEEN, ROOK)
+      || (pieces_p(BISHOP) && pieces_p(KNIGHT))
+      || (   (pieces_p(BISHOP) & DarkSquares)
+          && (pieces_p(BISHOP) & LightSquares)))
     result = min(result + VALUE_KNOWN_WIN, VALUE_TB_WIN_IN_MAX_PLY - 1);
 
   return strongSide == stm() ? result : -result;
@@ -244,18 +243,18 @@ static Value EvaluateKRKP(const Pos *pos, Color strongSide)
   Square queeningSq = make_square(file_of(psq), RANK_1);
   Value result;
 
-  // If the stronger side's king is in front of the pawn, it's a win
+  // If the stronger side's king is in front of the pawn, it is a win.
   if (forward_file_bb(WHITE, wksq) & sq_bb(psq))
     result = RookValueEg - distance(wksq, psq);
 
   // If the weaker side's king is too far from the pawn and the rook,
-  // it's a win.
+  // it is a win.
   else if (   distance(bksq, psq) >= 3 + (stm() == weakSide)
            && distance(bksq, rsq) >= 3)
     result = RookValueEg - distance(wksq, psq);
 
   // If the pawn is far advanced and supported by the defending king,
-  // the position is drawish
+  // the position is drawish.
   else if (   rank_of(bksq) <= RANK_3
            && distance(bksq, psq) == 1
            && rank_of(wksq) >= RANK_4
@@ -411,8 +410,8 @@ int ScaleKBPsK(const Pos *pos, Color strongSide)
   if (    (pawnsFile == FILE_B || pawnsFile == FILE_G)
       && !(pieces_p(PAWN) & ~file_bb(pawnsFile))
       && non_pawn_material_c(weakSide) == 0
-      && piece_count(weakSide, PAWN)) {
-
+      && piece_count(weakSide, PAWN))
+  {
     // Get weakSide pawn that is closest to the home rank
     Square weakPawnSq = backmost_sq(weakSide, pieces_cp(weakSide, PAWN));
 
@@ -637,7 +636,8 @@ static int ScaleKRPPKRP(const Pos *pos, Color strongSide)
 
   if (   distance_f(bksq, wpsq1) <= 1
       && distance_f(bksq, wpsq2) <= 1
-      && relative_rank_s(strongSide, bksq) > r) {
+      && relative_rank_s(strongSide, bksq) > r)
+  {
     assert(r > RANK_1 && r < RANK_7);
     return 7 * r;
   }

@@ -107,8 +107,9 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
   e->key = key;
   e->factor[WHITE] = e->factor[BLACK] = (uint8_t)SCALE_FACTOR_NORMAL;
 
-  Value npm = non_pawn_material();
-  npm = clamp(npm, EndgameLimit, MidgameLimit);
+  Value npm_w = non_pawn_material_c(WHITE);
+  Value npm_b = non_pawn_material_c(BLACK);
+  Value npm = clamp(npm_w + npm_b, EndgameLimit, MidgameLimit);
   e->gamePhase = ((npm - EndgameLimit) * PHASE_MIDGAME) / (MidgameLimit - EndgameLimit);
 
   // Look for a specialized evaluation function.
@@ -145,9 +146,6 @@ void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key)
     else if (is_KQKRPs(pos, c))
       e->scal_func[c] = 18; // ScaleKQKRPs
   }
-
-  Value npm_w = non_pawn_material_c(WHITE);
-  Value npm_b = non_pawn_material_c(BLACK);
 
   if (npm_w + npm_b == 0 && pieces_p(PAWN)) { // Only pawns on the board.
     if (!pieces_cp(BLACK, PAWN)) {
