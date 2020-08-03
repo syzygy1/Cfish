@@ -118,7 +118,7 @@ static void init_indices(void);
 // Given a position, produce a text string of the form KQPvKRP, where
 // "KQP" represents the white pieces if flip == false and the black pieces
 // if flip == true.
-static void prt_str(Pos *pos, char *str, bool flip)
+static void prt_str(Position *pos, char *str, bool flip)
 {
   Color color = !flip ? WHITE : BLACK;
 
@@ -1159,7 +1159,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
 // pc[i] ^ flip, where 1 = white pawn, ..., 14 = black king and pc ^ flip
 // flips between white and black if flip == true.
 // Pieces of the same type are guaranteed to be consecutive.
-INLINE int fill_squares(Pos *pos, uint8_t *pc, bool flip, int mirror, int *p,
+INLINE int fill_squares(Position *pos, uint8_t *pc, bool flip, int mirror, int *p,
     int i)
 {
   Bitboard bb = pieces_cp((pc[i] >> 3) ^ flip, pc[i] & 7);
@@ -1169,7 +1169,7 @@ INLINE int fill_squares(Pos *pos, uint8_t *pc, bool flip, int mirror, int *p,
   return i;
 }
 
-INLINE int probe_table(Pos *pos, int s, int *success, const int type)
+INLINE int probe_table(Position *pos, int s, int *success, const int type)
 {
   // Obtain the position's material-signature key
   Key key = material_key();
@@ -1288,23 +1288,23 @@ INLINE int probe_table(Pos *pos, int s, int *success, const int type)
   return v;
 }
 
-static NOINLINE int probe_wdl_table(Pos *pos, int *success)
+static NOINLINE int probe_wdl_table(Position *pos, int *success)
 {
   return probe_table(pos, 0, success, WDL);
 }
 
-static NOINLINE int probe_dtm_table(Pos *pos, int won, int *success)
+static NOINLINE int probe_dtm_table(Position *pos, int won, int *success)
 {
   return probe_table(pos, won, success, DTM);
 }
 
-static NOINLINE int probe_dtz_table(Pos *pos, int wdl, int *success)
+static NOINLINE int probe_dtz_table(Position *pos, int wdl, int *success)
 {
   return probe_table(pos, wdl, success, DTZ);
 }
 
 // Add underpromotion captures to list of captures.
-static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
+static ExtMove *add_underprom_caps(Position *pos, ExtMove *m, ExtMove *end)
 {
   ExtMove *extra = end;
 
@@ -1321,7 +1321,7 @@ static ExtMove *add_underprom_caps(Pos *pos, ExtMove *m, ExtMove *end)
 }
 
 // probe_ab() is not called for positions with en passant captures.
-static int probe_ab(Pos *pos, int alpha, int beta, int *success)
+static int probe_ab(Position *pos, int alpha, int beta, int *success)
 {
   assert(ep_square() == 0);
 
@@ -1368,7 +1368,7 @@ static int probe_ab(Pos *pos, int alpha, int beta, int *success)
 //  0 : draw
 //  1 : win, but draw under 50-move rule
 //  2 : win
-int TB_probe_wdl(Pos *pos, int *success)
+int TB_probe_wdl(Position *pos, int *success)
 {
   *success = 1;
 
@@ -1461,7 +1461,7 @@ int TB_probe_wdl(Pos *pos, int *success)
 
 #if 0
 // This will not be called for positions with en passant captures
-static Value probe_dtm_dc(Pos *pos, int won, int *success)
+static Value probe_dtm_dc(Position *pos, int won, int *success)
 {
   assert(ep_square() == 0);
 
@@ -1500,11 +1500,11 @@ static Value probe_dtm_dc(Pos *pos, int won, int *success)
 }
 #endif
 
-static Value probe_dtm_win(Pos *pos, int *success);
+static Value probe_dtm_win(Position *pos, int *success);
 
 // Probe a position known to lose by probing the DTM table and looking
 // at captures.
-static Value probe_dtm_loss(Pos *pos, int *success)
+static Value probe_dtm_loss(Position *pos, int *success)
 {
   Value v, best = -VALUE_INFINITE, numEp = 0;
 
@@ -1537,7 +1537,7 @@ static Value probe_dtm_loss(Pos *pos, int *success)
   return max(best, v);
 }
 
-static Value probe_dtm_win(Pos *pos, int *success)
+static Value probe_dtm_win(Position *pos, int *success)
 {
   Value v, best = -VALUE_INFINITE;
 
@@ -1567,7 +1567,7 @@ static Value probe_dtm_win(Pos *pos, int *success)
   return best;
 }
 
-Value TB_probe_dtm(Pos *pos, int wdl, int *success)
+Value TB_probe_dtm(Position *pos, int wdl, int *success)
 {
   assert(wdl != 0);
 
@@ -1579,7 +1579,7 @@ Value TB_probe_dtm(Pos *pos, int wdl, int *success)
 
 #if 0
 // To be called only for non-drawn positions.
-Value TB_probe_dtm2(Pos *pos, int wdl, int *success)
+Value TB_probe_dtm2(Position *pos, int wdl, int *success)
 {
   assert(wdl != 0);
 
@@ -1669,7 +1669,7 @@ static int WdlToDtz[] = { -1, -101, 0, 101, 1 };
 // In short, if a move is available resulting in dtz + 50-move-counter <= 99,
 // then do not accept moves leading to dtz + 50-move-counter == 100.
 //
-int TB_probe_dtz(Pos *pos, int *success)
+int TB_probe_dtz(Position *pos, int *success)
 {
   int wdl = TB_probe_wdl(pos, success);
   if (*success == 0) return 0;
@@ -1764,7 +1764,7 @@ int TB_probe_dtz(Pos *pos, int *success)
 
 // Use the DTZ tables to rank and score all root moves in the list.
 // A return value of 0 means that not all probes were successful.
-bool TB_root_probe_dtz(Pos *pos, RootMoves *rm)
+bool TB_root_probe_dtz(Position *pos, RootMoves *rm)
 {
   int v, success;
 
@@ -1832,7 +1832,7 @@ bool TB_root_probe_dtz(Pos *pos, RootMoves *rm)
 // Use the WDL tables to rank all root moves in the list.
 // This is a fallback for the case that some or all DTZ tables are missing.
 // A return value of 0 means that not all probes were successful.
-bool TB_root_probe_wdl(Pos *pos, RootMoves *rm)
+bool TB_root_probe_wdl(Position *pos, RootMoves *rm)
 {
   static int WdlToRank[] = { -1000, -899, 0, 899, 1000 };
   static Value WdlToValue[] = {
@@ -1866,7 +1866,7 @@ bool TB_root_probe_wdl(Pos *pos, RootMoves *rm)
 // Use the DTM tables to find mate scores.
 // Either DTZ or WDL must have been probed successfully earlier.
 // A return value of 0 means that not all probes were successful.
-bool TB_root_probe_dtm(Pos *pos, RootMoves *rm)
+bool TB_root_probe_dtm(Position *pos, RootMoves *rm)
 {
   int success;
   Value tmpScore[rm->size];
@@ -1910,7 +1910,7 @@ bool TB_root_probe_dtm(Pos *pos, RootMoves *rm)
 }
 
 // Use the DTM tables to complete a PV with mate score.
-void TB_expand_mate(Pos *pos, RootMove *move)
+void TB_expand_mate(Position *pos, RootMove *move)
 {
   int success = 1, chk = 0;
   Value v = move->score, w = 0;

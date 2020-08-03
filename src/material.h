@@ -26,8 +26,6 @@
 #include "position.h"
 #include "types.h"
 
-typedef struct Pos Pos;
-
 // MaterialEntry contains various information about a material
 // configuration. It contains a material imbalance evaluation, a function
 // pointer to a special endgame evaluation function (which in most cases
@@ -53,9 +51,9 @@ typedef struct MaterialEntry MaterialEntry;
 
 typedef MaterialEntry MaterialTable[8192];
 
-void material_entry_fill(const Pos *pos, MaterialEntry *e, Key key);
+void material_entry_fill(const Position *pos, MaterialEntry *e, Key key);
 
-INLINE MaterialEntry *material_probe(const Pos *pos)
+INLINE MaterialEntry *material_probe(const Position *pos)
 {
   Key key = material_key();
   MaterialEntry *e = &pos->materialTable[key >> (64-13)];
@@ -76,7 +74,7 @@ INLINE bool material_specialized_eval_exists(MaterialEntry *me)
   return me->eval_func != 0;
 }
 
-INLINE Value material_evaluate(MaterialEntry *me, const Pos *pos)
+INLINE Value material_evaluate(MaterialEntry *me, const Position *pos)
 {
   return endgame_funcs[me->eval_func](pos, me->eval_func_side);
 }
@@ -86,7 +84,8 @@ INLINE Value material_evaluate(MaterialEntry *me, const Pos *pos)
 // because the scale factor may also be a function which should be applied to
 // the position. For instance, in KBP vs K endgames, the scaling function looks
 // for rook pawns and wrong-colored bishops.
-INLINE int material_scale_factor(MaterialEntry *me, const Pos *pos, Color c)
+INLINE int material_scale_factor(MaterialEntry *me, const Position *pos,
+    Color c)
 {
   int sf = SCALE_FACTOR_NONE;
   if (me->scal_func[c])

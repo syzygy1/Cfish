@@ -38,7 +38,7 @@ static const int PushClose[8] = { 140, 120, 100, 80, 60, 40, 20, 0 };
 static const int PushAway [8] = { -20, 0, 20, 40, 60, 80, 100, 120 };
 
 #ifndef NDEBUG
-static bool verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
+static bool verify_material(const Position *pos, int c, Value npm, int pawnsCnt)
 {
   return   non_pawn_material_c(c) == npm
         && piece_count(c, PAWN) == pawnsCnt;
@@ -47,7 +47,7 @@ static bool verify_material(const Pos *pos, int c, Value npm, int pawnsCnt)
 
 // Map the square as if strongSide is white and strongSide's only pawn
 // is on the left half of the board.
-static Square normalize(const Pos *pos, Color strongSide, Square sq)
+static Square normalize(const Position *pos, Color strongSide, Square sq)
 {
   assert(piece_count(strongSide, PAWN) == 1);
 
@@ -140,7 +140,7 @@ void endgames_init(void)
 // king and plenty of material vs a lone king. It simply gives the
 // attacking side a bonus for driving the defending king towards the edge
 // of the board, and for keeping the distance between the two kings small.
-static Value EvaluateKXK(const Pos *pos, Color strongSide)
+static Value EvaluateKXK(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -174,7 +174,7 @@ static Value EvaluateKXK(const Pos *pos, Color strongSide)
 
 // Mate with KBN vs K. This is similar to KX vs K, but we have to drive the
 // defending king towards a corner square of the right color.
-static Value EvaluateKBNK(const Pos *pos, Color strongSide)
+static Value EvaluateKBNK(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -201,7 +201,7 @@ static Value EvaluateKBNK(const Pos *pos, Color strongSide)
 
 
 // KP vs K. This endgame is evaluated with the help of a bitbase.
-static Value EvaluateKPK(const Pos *pos, Color strongSide)
+static Value EvaluateKPK(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -228,7 +228,7 @@ static Value EvaluateKPK(const Pos *pos, Color strongSide)
 // a bitbase. The function below returns drawish scores when the pawn is
 // far advanced with support of the king, while the attacking king is far
 // away.
-static Value EvaluateKRKP(const Pos *pos, Color strongSide)
+static Value EvaluateKRKP(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -272,7 +272,7 @@ static Value EvaluateKRKP(const Pos *pos, Color strongSide)
 
 // KR vs KB. This is very simple, and always returns drawish scores.  The
 // score is slightly bigger when the defending king is close to the edge.
-static Value EvaluateKRKB(const Pos *pos, Color strongSide)
+static Value EvaluateKRKB(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -286,7 +286,7 @@ static Value EvaluateKRKB(const Pos *pos, Color strongSide)
 
 // KR vs KN. The attacking side has slightly better winning chances than
 // in KR vs KB, particularly if the king and the knight are far apart.
-static Value EvaluateKRKN(const Pos *pos, Color strongSide)
+static Value EvaluateKRKN(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -304,7 +304,7 @@ static Value EvaluateKRKN(const Pos *pos, Color strongSide)
 // few important exceptions. A pawn on 7th rank and on the A,C,F or H files
 // with a king positioned next to it can be a draw, so in that case, we only
 // use the distance between the kings.
-static Value EvaluateKQKP(const Pos *pos, Color strongSide)
+static Value EvaluateKQKP(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -331,7 +331,7 @@ static Value EvaluateKQKP(const Pos *pos, Color strongSide)
 // defending king towards the edge. If we also take care to avoid null
 // move for the defending side in the search, this is usually sufficient
 // to win KQ vs KR.
-static Value EvaluateKQKR(const Pos *pos, Color strongSide)
+static Value EvaluateKQKR(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -351,7 +351,7 @@ static Value EvaluateKQKR(const Pos *pos, Color strongSide)
 
 
 // KNN vs KP. Simply push the opposing king to the corner.
-static Value EvaluateKNNKP(const Pos *pos, Color strongSide)
+static Value EvaluateKNNKP(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -367,7 +367,7 @@ static Value EvaluateKNNKP(const Pos *pos, Color strongSide)
 
 
 // Some cases of trivial draws.
-Value EvaluateKNNK(const Pos *pos, Color strongSide)
+Value EvaluateKNNK(const Position *pos, Color strongSide)
 {
   // Avoid compiler warnings about unused variables.
   (void)pos, (void)strongSide;
@@ -380,7 +380,7 @@ Value EvaluateKNNK(const Pos *pos, Color strongSide)
 // and a bishop of the wrong color. If such a draw is detected,
 // SCALE_FACTOR_DRAW is returned. If not, the return value is
 // SCALE_FACTOR_NONE, i.e. no scaling will be used.
-int ScaleKBPsK(const Pos *pos, Color strongSide)
+int ScaleKBPsK(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -447,7 +447,7 @@ int ScaleKBPsK(const Pos *pos, Color strongSide)
 
 // KQ vs KR and one or more pawns. It tests for fortress draws with a rook
 // on the third rank defended by a pawn.
-static int ScaleKQKRPs(const Pos *pos, Color strongSide)
+static int ScaleKQKRPs(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -476,7 +476,7 @@ static int ScaleKQKRPs(const Pos *pos, Color strongSide)
 //
 // It would also be nice to rewrite the actual code for this function,
 // which is mostly copied from Glaurung 1.x, and is not very pretty.
-static int ScaleKRPKR(const Pos *pos, Color strongSide)
+static int ScaleKRPKR(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -571,7 +571,7 @@ static int ScaleKRPKR(const Pos *pos, Color strongSide)
   return SCALE_FACTOR_NONE;
 }
 
-static int ScaleKRPKB(const Pos *pos, Color strongSide)
+static int ScaleKRPKB(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -617,7 +617,7 @@ static int ScaleKRPKB(const Pos *pos, Color strongSide)
 // KRPP vs KRP. There is just a single rule: if the stronger side has no
 // passed pawns and the defending king is actively placed, the position
 // is drawish.
-static int ScaleKRPPKRP(const Pos *pos, Color strongSide)
+static int ScaleKRPPKRP(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -648,7 +648,7 @@ static int ScaleKRPPKRP(const Pos *pos, Color strongSide)
 // K and two or more pawns vs K. There is just a single rule here: If all
 // pawns are on the same rook file and are blocked by the defending king,
 // it is a draw.
-static int ScaleKPsK(const Pos *pos, Color strongSide)
+static int ScaleKPsK(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -672,7 +672,7 @@ static int ScaleKPsK(const Pos *pos, Color strongSide)
 // along the path of the pawn, and the square of the king is not of the
 // same color as the stronger side's bishop, it is a draw. If the two
 // bishops have opposite color, it's almost always a draw.
-static int ScaleKBPKB(const Pos *pos, Color strongSide)
+static int ScaleKBPKB(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -700,7 +700,7 @@ static int ScaleKBPKB(const Pos *pos, Color strongSide)
 
 
 // KBPP vs KB. It detects a few basic draws with opposite-colored bishops.
-static int ScaleKBPPKB(const Pos *pos, Color strongSide)
+static int ScaleKBPPKB(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -769,7 +769,7 @@ static int ScaleKBPPKB(const Pos *pos, Color strongSide)
 // KBP vs KN. There is a single rule: If the defending king is somewhere
 // along the path of the pawn, and the square of the king is not of the
 // same color as the stronger side's bishop, it is a draw.
-static int ScaleKBPKN(const Pos *pos, Color strongSide)
+static int ScaleKBPKN(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 
@@ -796,7 +796,7 @@ static int ScaleKBPKN(const Pos *pos, Color strongSide)
 // is when the stronger side's pawn is far advanced and not on a rook
 // file; in this case it is often possible to win
 // (e.g. 8/4k3/3p4/3P4/6K1/8/8/8 w - - 0 1).
-static int ScaleKPKP(const Pos *pos, Color strongSide)
+static int ScaleKPKP(const Position *pos, Color strongSide)
 {
   Color weakSide = !strongSide;
 

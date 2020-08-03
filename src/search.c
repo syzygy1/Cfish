@@ -84,7 +84,7 @@ static Value stat_bonus(Depth depth)
 
 // Add a small random component to draw evaluations to keep search dynamic
 // and to avoid three-fold blindness. (Yucks, ugly hack)
-static Value value_draw(Pos *pos)
+static Value value_draw(Position *pos)
 {
   return VALUE_DRAW + 2 * (pos->nodes & 1) - 1;
 }
@@ -107,25 +107,32 @@ struct Skill {
 // Breadcrumbs are used to mark nodes as being search by a given thread
 static _Atomic uint64_t breadcrumbs[1024];
 
-static Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
-static Value search_NonPV(Pos *pos, Stack *ss, Value alpha, Depth depth, bool cutNode);
+static Value search_PV(Position *pos, Stack *ss, Value alpha, Value beta,
+    Depth depth);
+static Value search_NonPV(Position *pos, Stack *ss, Value alpha, Depth depth,
+    bool cutNode);
 
-static Value qsearch_PV_true(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_PV_false(Pos *pos, Stack *ss, Value alpha, Value beta, Depth depth);
-static Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha, Depth depth);
-static Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha, Depth depth);
+static Value qsearch_PV_true(Position *pos, Stack *ss, Value alpha, Value beta,
+    Depth depth);
+static Value qsearch_PV_false(Position *pos, Stack *ss, Value alpha, Value beta,
+    Depth depth);
+static Value qsearch_NonPV_true(Position *pos, Stack *ss, Value alpha,
+    Depth depth);
+static Value qsearch_NonPV_false(Position *pos, Stack *ss, Value alpha,
+    Depth depth);
 
 static Value value_to_tt(Value v, int ply);
 static Value value_from_tt(Value v, int ply, int r50c);
 static void update_pv(Move *pv, Move move, Move *childPv);
 static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus);
-static void update_quiet_stats(const Pos *pos, Stack *ss, Move move, int bonus,
-    Depth depth);
-static void update_capture_stats(const Pos *pos, Move move, Move *captures, int captureCnt, int bonus);
+static void update_quiet_stats(const Position *pos, Stack *ss, Move move,
+    int bonus, Depth depth);
+static void update_capture_stats(const Position *pos, Move move, Move *captures,
+    int captureCnt, int bonus);
 static void check_time(void);
 static void stable_sort(RootMove *rm, int num);
-static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
-static int extract_ponder_from_tt(RootMove *rm, Pos *pos);
+static void uci_print_pv(Position *pos, Depth depth, Value alpha, Value beta);
+static int extract_ponder_from_tt(RootMove *rm, Position *pos);
 
 // search_init() is called during startup to initialize various lookup tables
 
@@ -159,7 +166,7 @@ void search_clear(void)
     }
 
   for (int idx = 0; idx < Threads.numThreads; idx++) {
-    Pos *pos = Threads.pos[idx];
+    Position *pos = Threads.pos[idx];
     stats_clear(pos->counterMoves);
     stats_clear(pos->history);
     stats_clear(pos->captureHistory);
@@ -174,9 +181,9 @@ void search_clear(void)
 // perft() is our utility to verify move generation. All the leaf nodes
 // up to the given depth are generated and counted, and the sum is returned.
 
-static uint64_t perft_helper(Pos *pos, Depth depth);
+static uint64_t perft_helper(Position *pos, Depth depth);
 
-INLINE uint64_t perft_node(Pos *pos, Depth depth, const bool Root)
+INLINE uint64_t perft_node(Position *pos, Depth depth, const bool Root)
 {
   uint64_t cnt, nodes = 0;
   const bool leaf = (depth == 2);
@@ -202,12 +209,12 @@ INLINE uint64_t perft_node(Pos *pos, Depth depth, const bool Root)
   return nodes;
 }
 
-static NOINLINE uint64_t perft_helper(Pos *pos, Depth depth)
+static NOINLINE uint64_t perft_helper(Position *pos, Depth depth)
 {
   return perft_node(pos, depth, false);
 }
 
-NOINLINE uint64_t perft(Pos *pos, Depth depth)
+NOINLINE uint64_t perft(Position *pos, Depth depth)
 {
   return perft_node(pos, depth, true);
 }
@@ -218,7 +225,7 @@ NOINLINE uint64_t perft(Pos *pos, Depth depth)
 
 void mainthread_search(void)
 {
-  Pos *pos = Threads.pos[0];
+  Position *pos = Threads.pos[0];
   Color us = stm();
   time_init(us, game_ply());
   tt_new_search();
@@ -298,7 +305,7 @@ void mainthread_search(void)
     Time.availableNodes += Limits.inc[us] - threads_nodes_searched();
 
   // Check if there are threads with a better score than main thread
-  Pos *bestThread = pos;
+  Position *bestThread = pos;
   if (    option_value(OPT_MULTI_PV) == 1
       && !playBookMove
       && !Limits.depth
@@ -312,7 +319,7 @@ void mainthread_search(void)
     for (int idx = 1; idx < Threads.numThreads; idx++)
       minScore = min(minScore, Threads.pos[idx]->rootMoves->move[0].score);
     for (int idx = 0; idx < Threads.numThreads; idx++) {
-      Pos *p = Threads.pos[idx];
+      Position *p = Threads.pos[idx];
       Move m = p->rootMoves->move[0].pv[0];
       for (i = 0; i < num; i++)
         if (mvs[i] == m) break;
@@ -325,7 +332,7 @@ void mainthread_search(void)
     }
     int64_t bestVote = votes[0];
     for (int idx = 1; idx < Threads.numThreads; idx++) {
-      Pos *p = Threads.pos[idx];
+      Position *p = Threads.pos[idx];
       for (i = 0; mvs[i] != p->rootMoves->move[0].pv[0]; i++);
       if (abs(bestThread->rootMoves->move[0].score) >= VALUE_TB_WIN_IN_MAX_PLY) {
         // Make sure we pick the shortest mate
@@ -365,7 +372,7 @@ void mainthread_search(void)
 // been consumed, the user stops the search, or the maximum search depth is
 // reached.
 
-void thread_search(Pos *pos)
+void thread_search(Position *pos)
 {
   Value bestValue, alpha, beta, delta;
   Move pv[MAX_PLY + 1];
@@ -619,7 +626,7 @@ skip_search:
 #endif
 }
 
-static int best_move_count(Pos *pos, Move move)
+static int best_move_count(Position *pos, Move move)
 {
   int idx;
   for (idx = pos->pvIdx; idx < pos->pvLast; idx++)
@@ -630,7 +637,7 @@ static int best_move_count(Pos *pos, Move move)
 
 // search_node() is the main search function template for both PV
 // and non-PV nodes
-INLINE Value search_node(Pos *pos, Stack *ss, Value alpha, Value beta,
+INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     Depth depth, bool cutNode, const int NT)
 {
   const bool PvNode = NT == PV;
@@ -1517,14 +1524,14 @@ moves_loop: // When in check search starts from here.
 }
 
 // search_PV() is the main search function for PV nodes
-static NOINLINE Value search_PV(Pos *pos, Stack *ss, Value alpha, Value beta,
-    Depth depth)
+static NOINLINE Value search_PV(Position *pos, Stack *ss, Value alpha,
+    Value beta, Depth depth)
 {
   return search_node(pos, ss, alpha, beta, depth, 0, PV);
 }
 
 // search_NonPV is the main search function for non-PV nodes
-static NOINLINE Value search_NonPV(Pos *pos, Stack *ss, Value alpha,
+static NOINLINE Value search_NonPV(Position *pos, Stack *ss, Value alpha,
     Depth depth, bool cutNode)
 {
   return search_node(pos, ss, alpha, alpha+1, depth, cutNode, NonPV);
@@ -1533,7 +1540,7 @@ static NOINLINE Value search_NonPV(Pos *pos, Stack *ss, Value alpha,
 // qsearch_node() is the quiescence search function template, which is
 // called by the main search function with zero depth, or recursively with
 // further decreasing depth per call.
-INLINE Value qsearch_node(Pos *pos, Stack *ss, Value alpha, Value beta,
+INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     Depth depth, const int NT, const bool InCheck)
 {
   const bool PvNode = NT == PV;
@@ -1724,25 +1731,25 @@ INLINE Value qsearch_node(Pos *pos, Stack *ss, Value alpha, Value beta,
   return bestValue;
 }
 
-static NOINLINE Value qsearch_PV_true(Pos *pos, Stack *ss, Value alpha,
+static NOINLINE Value qsearch_PV_true(Position *pos, Stack *ss, Value alpha,
     Value beta, Depth depth)
 {
   return qsearch_node(pos, ss, alpha, beta, depth, PV, true);
 }
 
-static NOINLINE Value qsearch_PV_false(Pos *pos, Stack *ss, Value alpha,
+static NOINLINE Value qsearch_PV_false(Position *pos, Stack *ss, Value alpha,
     Value beta, Depth depth)
 {
   return qsearch_node(pos, ss, alpha, beta, depth, PV, false);
 }
 
-static NOINLINE Value qsearch_NonPV_true(Pos *pos, Stack *ss, Value alpha,
+static NOINLINE Value qsearch_NonPV_true(Position *pos, Stack *ss, Value alpha,
     Depth depth)
 {
   return qsearch_node(pos, ss, alpha, alpha+1, depth, NonPV, true);
 }
 
-static NOINLINE Value qsearch_NonPV_false(Pos *pos, Stack *ss, Value alpha,
+static NOINLINE Value qsearch_NonPV_false(Position *pos, Stack *ss, Value alpha,
     Depth depth)
 {
   return qsearch_node(pos, ss, alpha, alpha+1, depth, NonPV, false);
@@ -1837,7 +1844,7 @@ static void update_cm_stats(Stack *ss, Piece pc, Square s, int bonus)
 // update_capture_stats() updates move sorting heuristics when a new capture
 // best move is found
 
-static void update_capture_stats(const Pos *pos, Move move, Move *captures,
+static void update_capture_stats(const Position *pos, Move move, Move *captures,
     int captureCnt, int bonus)
 {
   Piece moved_piece = moved_piece(move);
@@ -1857,8 +1864,8 @@ static void update_capture_stats(const Pos *pos, Move move, Move *captures,
 // update_quiet_stats() updates killers, history, countermove and countermove
 // plus follow-up move history when a new quiet best move is found.
 
-static void update_quiet_stats(const Pos *pos, Stack *ss, Move move, int bonus,
-    Depth depth)
+static void update_quiet_stats(const Position *pos, Stack *ss, Move move,
+    int bonus, Depth depth)
 {
   if (ss->killers[0] != move) {
     ss->killers[1] = ss->killers[0];
@@ -1938,7 +1945,7 @@ static void check_time(void)
 // UCI requires that all (if any) unsearched PV lines are sent with a
 // previous search score.
 
-static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
+static void uci_print_pv(Position *pos, Depth depth, Value alpha, Value beta)
 {
   TimePoint elapsed = time_elapsed() + 1;
   RootMoves *rm = pos->rootMoves;
@@ -2000,7 +2007,7 @@ static void uci_print_pv(Pos *pos, Depth depth, Value alpha, Value beta)
 // return to the GUI, otherwise in case of 'ponder on' we have nothing
 // to think on.
 
-static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
+static int extract_ponder_from_tt(RootMove *rm, Position *pos)
 {
   int ttHit;
 
@@ -2027,7 +2034,7 @@ static int extract_ponder_from_tt(RootMove *rm, Pos *pos)
   return rm->pvSize > 1;
 }
 
-static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
+static void TB_rank_root_moves(Position *pos, RootMoves *rm)
 {
   TB_RootInTB = false;
   TB_UseRule50 = option_value(OPT_SYZ_50_MOVE);
@@ -2079,7 +2086,7 @@ static void TB_rank_root_moves(Pos *pos, RootMoves *rm)
 // start_thinking() wakes up the main thread to start a new search,
 // then returns immediately.
 
-void start_thinking(Pos *root, bool ponderMode)
+void start_thinking(Position *root, bool ponderMode)
 {
   if (Threads.searching)
     thread_wait_until_sleeping(threads_main());
@@ -2117,7 +2124,7 @@ void start_thinking(Pos *root, bool ponderMode)
   TB_rank_root_moves(root, moves);
 
   for (int idx = 0; idx < Threads.numThreads; idx++) {
-    Pos *pos = Threads.pos[idx];
+    Position *pos = Threads.pos[idx];
     pos->selDepth = 0;
     pos->nmpMinPly = 0;
     pos->rootDepth = 0;
@@ -2133,7 +2140,7 @@ void start_thinking(Pos *root, bool ponderMode)
       rm->move[i].tbRank = moves->move[i].tbRank;
       rm->move[i].tbScore = moves->move[i].tbScore;
     }
-    memcpy(pos, root, offsetof(Pos, moveList));
+    memcpy(pos, root, offsetof(Position, moveList));
     // Copy enough of the root State buffer.
     int n = max(7, root->st->pliesFromNull);
     for (int i = 0; i <= n; i++)

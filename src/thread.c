@@ -32,7 +32,7 @@
 #include "uci.h"
 #include "tbprobe.h"
 
-static void thread_idle_loop(Pos *pos);
+static void thread_idle_loop(Position *pos);
 
 #ifndef _WIN32
 #define THREAD_FUNC void *
@@ -83,10 +83,10 @@ static THREAD_FUNC thread_init(void *arg)
             (*cmhTables[t])[chk][c][0][0][j][k] = CounterMovePruneThreshold - 1;
   }
 
-  Pos *pos;
+  Position *pos;
 
   if (settings.numaEnabled) {
-    pos = numa_alloc(sizeof(Pos));
+    pos = numa_alloc(sizeof(Position));
     pos->pawnTable = numa_alloc(PAWN_ENTRIES * sizeof(PawnEntry));
     pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
     pos->counterMoves = numa_alloc(sizeof(CounterMoveStat));
@@ -97,7 +97,7 @@ static THREAD_FUNC thread_init(void *arg)
     pos->stack = numa_alloc((MAX_PLY + 110) * sizeof(Stack));
     pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
   } else {
-    pos = calloc(sizeof(Pos), 1);
+    pos = calloc(sizeof(Position), 1);
     pos->pawnTable = calloc(PAWN_ENTRIES * sizeof(PawnEntry), 1);
     pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
     pos->counterMoves = calloc(sizeof(CounterMoveStat), 1);
@@ -171,7 +171,7 @@ static void thread_create(int idx)
 
 // thread_destroy() waits for thread termination before returning.
 
-static void thread_destroy(Pos *pos)
+static void thread_destroy(Position *pos)
 {
 #ifndef _WIN32
   pthread_mutex_lock(&pos->mutex);
@@ -199,7 +199,7 @@ static void thread_destroy(Pos *pos)
     numa_free(pos->rootMoves, sizeof(RootMoves));
     numa_free(pos->stack, (MAX_PLY + 110) * sizeof(Stack));
     numa_free(pos->moveList, 10000 * sizeof(ExtMove));
-    numa_free(pos, sizeof(Pos));
+    numa_free(pos, sizeof(Position));
   } else {
     free(pos->pawnTable);
     free(pos->materialTable);
@@ -218,7 +218,7 @@ static void thread_destroy(Pos *pos)
 // thread_wait_for_search_finished() waits on sleep condition until
 // not searching.
 
-void thread_wait_until_sleeping(Pos *pos)
+void thread_wait_until_sleeping(Position *pos)
 {
 #ifndef _WIN32
 
@@ -242,7 +242,7 @@ void thread_wait_until_sleeping(Pos *pos)
 
 // thread_wait() waits on sleep condition until condition is true.
 
-void thread_wait(Pos *pos, atomic_bool *condition)
+void thread_wait(Position *pos, atomic_bool *condition)
 {
 #ifndef _WIN32
 
@@ -262,7 +262,7 @@ void thread_wait(Pos *pos, atomic_bool *condition)
 }
 
 
-void thread_wake_up(Pos *pos, int action)
+void thread_wake_up(Position *pos, int action)
 {
 #ifndef _WIN32
 
@@ -288,7 +288,7 @@ void thread_wake_up(Pos *pos, int action)
 
 // thread_idle_loop() is where the thread is parked when it has no work to do.
 
-static void thread_idle_loop(Pos *pos)
+static void thread_idle_loop(Position *pos)
 {
   while (true) {
 #ifndef _WIN32

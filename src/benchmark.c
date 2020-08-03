@@ -102,7 +102,7 @@ static char *Defaults[] = {
 // format (defaults are the positions defined above) and the type of the
 // limit value: depth (default), time in millisecs or number of nodes.
 
-void benchmark(Pos *current, char *str)
+void benchmark(Position *current, char *str)
 {
   char *token;
   char **fens;
@@ -164,7 +164,7 @@ void benchmark(Pos *current, char *str)
   }
 
   uint64_t nodes = 0;
-  Pos pos;
+  Position pos;
   pos.stack = malloc(217 * sizeof(*pos.stack));
   pos.st = pos.stack + 7;
   pos.moveList = malloc(10000 * sizeof(*pos.moveList));

@@ -8,12 +8,12 @@ extern int TB_MaxCardinalityDTM;
 
 void TB_init(char *path);
 void TB_free(void);
-int TB_probe_wdl(Pos *pos, int *success);
-int TB_probe_dtz(Pos *pos, int *success);
-Value TB_probe_dtm(Pos *pos, int wdl, int *success);
-bool TB_root_probe_wdl(Pos *pos, RootMoves *rm);
-bool TB_root_probe_dtz(Pos *pos, RootMoves *rm);
-bool TB_root_probe_dtm(Pos *pos, RootMoves *rm);
-void TB_expand_mate(Pos *pos, RootMove *move);
+int TB_probe_wdl(Position *pos, int *success);
+int TB_probe_dtz(Position *pos, int *success);
+Value TB_probe_dtm(Position *pos, int wdl, int *success);
+bool TB_root_probe_wdl(Position *pos, RootMoves *rm);
+bool TB_root_probe_dtz(Position *pos, RootMoves *rm);
+bool TB_root_probe_dtm(Position *pos, RootMoves *rm);
+void TB_expand_mate(Position *pos, RootMove *move);
 
 #endif

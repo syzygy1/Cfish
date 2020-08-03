@@ -32,7 +32,7 @@
 #include "timeman.h"
 #include "uci.h"
 
-extern void benchmark(Pos *pos, char *str);
+extern void benchmark(Position *pos, char *str);
 
 // FEN string of the initial position, normal chess
 static const char StartFEN[] =
@@ -43,7 +43,7 @@ static const char StartFEN[] =
 // string ("fen") or the starting position ("startpos") and then makes
 // the moves given in the following move list ("moves").
 
-void position(Pos *pos, char *str)
+void position(Position *pos, char *str)
 {
   char fen[128];
   char *moves;
@@ -161,7 +161,7 @@ error:
 // the thinking time and other parameters from the input string, then starts
 // the search.
 
-static void go(Pos *pos, char *str)
+static void go(Position *pos, char *str)
 {
   char *token;
   bool ponderMode = false;
@@ -219,7 +219,7 @@ static void go(Pos *pos, char *str)
 
 void uci_loop(int argc, char **argv)
 {
-  Pos pos;
+  Position pos;
   char fen[strlen(StartFEN) + 1];
   char str_buf[64];
   char *token;
@@ -428,7 +428,7 @@ char *uci_move(char *str, Move m, int chess960)
 // uci_to_move() converts a string representing a move in coordinate
 // notation (g1f3, a7a8q) to the corresponding legal Move, if any.
 
-Move uci_to_move(const Pos *pos, char *str)
+Move uci_to_move(const Position *pos, char *str)
 {
   if (strlen(str) == 5) // Junior could send promotion piece in uppercase
     str[4] = tolower(str[4]);

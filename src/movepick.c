@@ -61,7 +61,7 @@ static Move pick_best(ExtMove *begin, ExtMove *end)
 // score() assigns a numerical value to each move in a move list. The moves with
 // highest values will be picked first.
 
-static void score_captures(const Pos *pos)
+static void score_captures(const Position *pos)
 {
   Stack *st = pos->st;
   CapturePieceToHistory *history = pos->captureHistory;
@@ -75,7 +75,7 @@ static void score_captures(const Pos *pos)
 }
 
 SMALL
-static void score_quiets(const Pos *pos)
+static void score_quiets(const Position *pos)
 {
   Stack *st = pos->st;
   ButterflyHistory *history = pos->history;
@@ -101,7 +101,7 @@ static void score_quiets(const Pos *pos)
   }
 }
 
-static void score_evasions(const Pos *pos)
+static void score_evasions(const Position *pos)
 {
   Stack *st = pos->st;
   // Try captures ordered by MVV/LVA, then non-captures ordered by
@@ -124,7 +124,7 @@ static void score_evasions(const Pos *pos)
 
 // next_move() returns the next pseudo-legal move to be searched.
 
-Move next_move(const Pos *pos, bool skipQuiets)
+Move next_move(const Position *pos, bool skipQuiets)
 {
   Stack *st = pos->st;
   Move move;

@@ -47,7 +47,7 @@ extern struct Zob zob;
 void psqt_init(void);
 void zob_init(void);
 
-// Stack struct stores information needed to restore a Pos struct to
+// Stack struct stores information needed to restore a Position struct to
 // its previous state when we retract a move.
 
 struct Stack {
@@ -123,12 +123,12 @@ typedef struct Stack Stack;
 #define SStackSize (offsetof(Stack, countermove) - offsetof(Stack, pv))
 
 
-// Pos struct stores information regarding the board representation as
+// Position struct stores information regarding the board representation as
 // pieces, side to move, hash keys, castling info, etc. The search uses
-// the functions do_move() and undo_move() on a Pos struct to traverse
+// the functions do_move() and undo_move() on a Position struct to traverse
 // the search tree.
 
-struct Pos {
+struct Position {
   Stack *st;
   // Board / game representation.
   Bitboard byTypeBB[7]; // no reason to allocate 8 here
@@ -189,30 +189,30 @@ struct Pos {
 };
 
 // FEN string input/output
-void pos_set(Pos *pos, char *fen, int isChess960);
-void pos_fen(const Pos *pos, char *fen);
-void print_pos(Pos *pos);
+void pos_set(Position *pos, char *fen, int isChess960);
+void pos_fen(const Position *pos, char *fen);
+void print_pos(Position *pos);
 
-//PURE Bitboard attackers_to_occ(const Pos *pos, Square s, Bitboard occupied);
-PURE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
+//PURE Bitboard attackers_to_occ(const Position *pos, Square s, Bitboard occupied);
+PURE Bitboard slider_blockers(const Position *pos, Bitboard sliders, Square s,
     Bitboard *pinners);
 
-PURE bool is_legal(const Pos *pos, Move m);
-PURE bool is_pseudo_legal(const Pos *pos, Move m);
-PURE bool gives_check_special(const Pos *pos, Stack *st, Move m);
+PURE bool is_legal(const Position *pos, Move m);
+PURE bool is_pseudo_legal(const Position *pos, Move m);
+PURE bool gives_check_special(const Position *pos, Stack *st, Move m);
 
 // Doing and undoing moves
-void do_move(Pos *pos, Move m, int givesCheck);
-void undo_move(Pos *pos, Move m);
-void do_null_move(Pos *pos);
-INLINE void undo_null_move(Pos *pos);
+void do_move(Position *pos, Move m, int givesCheck);
+void undo_move(Position *pos, Move m);
+void do_null_move(Position *pos);
+INLINE void undo_null_move(Position *pos);
 
 // Static exchange evaluation
-PURE bool see_test(const Pos *pos, Move m, int value);
+PURE bool see_test(const Position *pos, Move m, int value);
 
-PURE Key key_after(const Pos *pos, Move m);
-PURE bool is_draw(const Pos *pos);
-PURE bool has_game_cycle(const Pos *pos, int ply);
+PURE Key key_after(const Position *pos, Move m);
+PURE bool is_draw(const Position *pos);
+PURE bool has_game_cycle(const Position *pos, int ply);
 
 // Position representation
 #define pieces() (pos->byTypeBB[0])
@@ -285,28 +285,28 @@ PURE bool has_game_cycle(const Pos *pos, int ply);
 #define non_pawn_material() (non_pawn_material_c(WHITE) + non_pawn_material_c(BLACK))
 #define pawns_only() (!pos->st->nonPawn)
 
-INLINE Bitboard blockers_for_king(const Pos *pos, Color c)
+INLINE Bitboard blockers_for_king(const Position *pos, Color c)
 {
   return pos->st->blockersForKing[c];
 }
 
-INLINE bool is_discovery_check_on_king(const Pos *pos, Color c, Move m)
+INLINE bool is_discovery_check_on_king(const Position *pos, Color c, Move m)
 {
   return pos->st->blockersForKing[c] & sq_bb(from_sq(m));
 }
 
-INLINE bool pawn_passed(const Pos *pos, Color c, Square s)
+INLINE bool pawn_passed(const Position *pos, Color c, Square s)
 {
   return !(pieces_cp(!c, PAWN) & passed_pawn_span(c, s));
 }
 
-INLINE bool advanced_pawn_push(const Pos *pos, Move m)
+INLINE bool advanced_pawn_push(const Position *pos, Move m)
 {
   return   type_of_p(moved_piece(m)) == PAWN
         && relative_rank_s(stm(), from_sq(m)) > RANK_4;
 }
 
-INLINE bool opposite_bishops(const Pos *pos)
+INLINE bool opposite_bishops(const Position *pos)
 {
   return   piece_count(WHITE, BISHOP) == 1
         && piece_count(BLACK, BISHOP) == 1
@@ -314,31 +314,31 @@ INLINE bool opposite_bishops(const Pos *pos)
         && (pieces_p(BISHOP) & ~DarkSquares);
 }
 
-INLINE bool is_capture_or_promotion(const Pos *pos, Move m)
+INLINE bool is_capture_or_promotion(const Position *pos, Move m)
 {
   assert(move_is_ok(m));
   return type_of_m(m) != NORMAL ? type_of_m(m) != CASTLING : !is_empty(to_sq(m));
 }
 
-INLINE bool is_capture(const Pos *pos, Move m)
+INLINE bool is_capture(const Position *pos, Move m)
 {
   // Castling is encoded as "king captures the rook"
   assert(move_is_ok(m));
   return (!is_empty(to_sq(m)) && type_of_m(m) != CASTLING) || type_of_m(m) == ENPASSANT;
 }
 
-INLINE bool gives_check(const Pos *pos, Stack *st, Move m)
+INLINE bool gives_check(const Position *pos, Stack *st, Move m)
 {
   return  type_of_m(m) == NORMAL && !(blockers_for_king(pos, !stm()) & pieces_c(stm()))
         ? (bool)(st->checkSquares[type_of_p(moved_piece(m))] & sq_bb(to_sq(m)))
         : gives_check_special(pos, st, m);
 }
 
-void pos_set_check_info(Pos *pos);
+void pos_set_check_info(Position *pos);
 
 // undo_null_move is used to undo a null move.
 
-INLINE void undo_null_move(Pos *pos)
+INLINE void undo_null_move(Position *pos)
 {
   assert(!checkers());
 
@@ -355,8 +355,8 @@ INLINE void undo_null_move(Pos *pos)
 // candidates are slider blockers and are calculated by calling this
 // function.
 
-INLINE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
-                                Bitboard *pinners)
+INLINE Bitboard slider_blockers(const Position *pos, Bitboard sliders, Square s,
+    Bitboard *pinners)
 {
   Bitboard result = 0, snipers;
   *pinners = 0;
@@ -382,7 +382,8 @@ INLINE Bitboard slider_blockers(const Pos *pos, Bitboard sliders, Square s,
 // attackers_to() computes a bitboard of all pieces which attack a given
 // square. Slider attacks use the occupied bitboard to indicate occupancy.
 
-INLINE Bitboard attackers_to_occ(const Pos *pos, Square s, Bitboard occupied)
+INLINE Bitboard attackers_to_occ(const Position *pos, Square s,
+    Bitboard occupied)
 {
   return  (attacks_from_pawn(s, BLACK)    & pieces_cp(WHITE, PAWN))
         | (attacks_from_pawn(s, WHITE)    & pieces_cp(BLACK, PAWN))

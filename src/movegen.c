@@ -47,7 +47,7 @@ INLINE ExtMove *make_promotions(ExtMove *list, Square to, Square ksq,
 }
 
 
-INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
+INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
     Bitboard target, const Color Us, const int Type)
 {
   // Compute our parametrized parameters at compile time, named according to
@@ -169,8 +169,8 @@ INLINE ExtMove *generate_pawn_moves(const Pos *pos, ExtMove *list,
 }
 
 
-INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, Bitboard target,
-    const Color Us, const int Pt, const bool Checks)
+INLINE ExtMove *generate_moves(const Position *pos, ExtMove *list,
+    Bitboard target, const Color Us, const int Pt, const bool Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
@@ -199,8 +199,8 @@ INLINE ExtMove *generate_moves(const Pos *pos, ExtMove *list, Bitboard target,
 }
 
 
-INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
-    const Color Us, const int Type)
+INLINE ExtMove *generate_all(const Position *pos, ExtMove *list,
+    Bitboard target, const Color Us, const int Type)
 {
   const int OO = make_castling_right(Us, KING_SIDE);
   const int OOO = make_castling_right(Us, QUEEN_SIDE);
@@ -240,7 +240,7 @@ INLINE ExtMove *generate_all(const Pos *pos, ExtMove *list, Bitboard target,
 // generate_non_evasions() generates all pseudo-legal captures and
 // non-captures.
 
-INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
+INLINE ExtMove *generate(const Position *pos, ExtMove *list, const int Type)
 {
   assert(Type == CAPTURES || Type == QUIETS || Type == NON_EVASIONS);
   assert(!checkers());
@@ -257,17 +257,17 @@ INLINE ExtMove *generate(const Pos *pos, ExtMove *list, const int Type)
 
 // "template" instantiations
 
-NOINLINE ExtMove *generate_captures(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_captures(const Position *pos, ExtMove *list)
 {
   return generate(pos, list, CAPTURES);
 }
 
-NOINLINE ExtMove *generate_quiets(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_quiets(const Position *pos, ExtMove *list)
 {
   return generate(pos, list, QUIETS);
 }
 
-NOINLINE ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_non_evasions(const Position *pos, ExtMove *list)
 {
   return generate(pos, list, NON_EVASIONS);
 }
@@ -275,7 +275,7 @@ NOINLINE ExtMove *generate_non_evasions(const Pos *pos, ExtMove *list)
 
 // generate_quiet_checks() generates all pseudo-legal non-captures and
 // knight underpromotions that give check.
-NOINLINE ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_quiet_checks(const Position *pos, ExtMove *list)
 {
   assert(!checkers());
 
@@ -305,7 +305,7 @@ NOINLINE ExtMove *generate_quiet_checks(const Pos *pos, ExtMove *list)
 
 // generate_evasions() generates all pseudo-legal check evasions when the
 // side to move is in check.
-NOINLINE ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_evasions(const Position *pos, ExtMove *list)
 {
   assert(checkers());
 
@@ -340,7 +340,7 @@ NOINLINE ExtMove *generate_evasions(const Pos *pos, ExtMove *list)
 
 
 // generate_legal() generates all the legal moves in the given position
-NOINLINE ExtMove *generate_legal(const Pos *pos, ExtMove *list)
+NOINLINE ExtMove *generate_legal(const Position *pos, ExtMove *list)
 {
   Color us = stm();
   Bitboard pinned = blockers_for_king(pos, us) & pieces_c(us);

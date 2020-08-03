@@ -81,7 +81,7 @@ INLINE int use_time_management(void)
 
 void search_init(void);
 void search_clear(void);
-uint64_t perft(Pos *pos, Depth depth);
-void start_thinking(Pos *pos, bool ponderMode);
+uint64_t perft(Position *pos, Depth depth);
+void start_thinking(Position *pos, bool ponderMode);
 
 #endif

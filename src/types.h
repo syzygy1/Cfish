@@ -315,7 +315,7 @@ INLINE Key make_key(uint64_t seed)
   return seed * 6364136223846793005ULL + 1442695040888963407ULL;
 }
 
-typedef struct Pos Pos;
+typedef struct Position Position;
 typedef struct LimitsType LimitsType;
 typedef struct RootMove RootMove;
 typedef struct RootMoves RootMoves;

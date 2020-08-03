@@ -66,11 +66,11 @@ enum {
   ST_PROBCUT, ST_PROBCUT_INIT, ST_PROBCUT_2
 };
 
-Move next_move(const Pos *pos, bool skipQuiets);
+Move next_move(const Position *pos, bool skipQuiets);
 
 // Initialisation of move picker data.
 
-INLINE void mp_init(const Pos *pos, Move ttm, Depth d, int ply)
+INLINE void mp_init(const Position *pos, Move ttm, Depth d, int ply)
 {
   assert(d > 0);
 
@@ -90,7 +90,7 @@ INLINE void mp_init(const Pos *pos, Move ttm, Depth d, int ply)
     st->stage++;
 }
 
-INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
+INLINE void mp_init_q(const Position *pos, Move ttm, Depth d, Square s)
 {
   assert(d <= 0);
 
@@ -107,7 +107,7 @@ INLINE void mp_init_q(const Pos *pos, Move ttm, Depth d, Square s)
   st->recaptureSquare = s;
 }
 
-INLINE void mp_init_pc(const Pos *pos, Move ttm, Value th)
+INLINE void mp_init_pc(const Position *pos, Move ttm, Value th)
 {
   assert(!checkers());
 

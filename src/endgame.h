@@ -23,9 +23,7 @@
 
 #include "types.h"
 
-typedef struct Pos Pos;
-
-typedef Value (EgFunc)(const Pos *, Color);
+typedef Value (EgFunc)(const Position *, Color);
 
 #define NUM_EVAL 9
 #define NUM_SCALING 6

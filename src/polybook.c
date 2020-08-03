@@ -16,14 +16,14 @@ struct PolyHash {
   uint32_t learn;
 };
 
-static Key polyglot_key(const Pos *pos);
-static Move pg_move_to_sf_move(const Pos *pos, uint16_t pg_move);
+static Key polyglot_key(const Position *pos);
+static Move pg_move_to_sf_move(const Position *pos, uint16_t pg_move);
 
 static int find_first_key(uint64_t key);
 static int get_key_data(void);
 
-static bool check_do_search(const Pos *pos);
-static bool check_draw(Pos *pos, Move m);
+static bool check_do_search(const Position *pos);
+static bool check_draw(Position *pos, Move m);
 
 // Random numbers from PolyGlot, used to compute book hash keys
 static const union {
@@ -371,7 +371,7 @@ void pb_set_book_depth(int book_depth)
   max_book_depth = book_depth;
 }
 
-Move pb_probe(Pos *pos)
+Move pb_probe(Position *pos)
 {
   Move m1 = 0;
 
@@ -423,7 +423,7 @@ Move pb_probe(Pos *pos)
   return 0;
 }
 
-static Key polyglot_key(const Pos *pos)
+static Key polyglot_key(const Position *pos)
 {
   Key key = 0;
   Bitboard b = pieces();
@@ -466,7 +466,7 @@ static Key polyglot_key(const Pos *pos)
 // bit  6-11: origin square (from 0 to 63)
 // bit 12-13: promotion piece type - 2 (from KNIGHT-2 to QUEEN-2)
 // bit 14-15: special move flag: promotion (1), en passant (2), castling (3)
-static Move pg_move_to_sf_move(const Pos *pos, uint16_t pg_move)
+static Move pg_move_to_sf_move(const Position *pos, uint16_t pg_move)
 {
   Move move = (Move)pg_move;
 
@@ -560,7 +560,7 @@ static int get_key_data(void)
   return index_count;
 }
 
-static bool check_do_search(const Pos *pos)
+static bool check_do_search(const Position *pos)
 {
   akt_position = pieces();
   akt_anz_pieces = popcount(akt_position);
@@ -587,7 +587,7 @@ static bool check_do_search(const Pos *pos)
   return do_search;
 }
 
-static bool check_draw(Pos *pos, Move m)
+static bool check_draw(Position *pos, Move m)
 {
   do_move(pos, m, gives_check(pos, pos->st, m));
   bool draw = is_draw(pos); // 64

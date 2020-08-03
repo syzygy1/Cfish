@@ -69,7 +69,7 @@ static const Value UnblockedStorm[4][8] = {
 #undef S
 #undef V
 
-INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const Color Us)
+INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
 {
   const Color Them  = (Us == WHITE ? BLACK      : WHITE);
   const int   Up    = (Us == WHITE ? NORTH      : SOUTH);
@@ -174,7 +174,7 @@ INLINE Score pawn_evaluate(const Pos *pos, PawnEntry *e, const Color Us)
 // pawns_probe() looks up the current position's pawns configuration in
 // the pawns hash table.
 
-void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
+void pawn_entry_fill(const Position *pos, PawnEntry *e, Key key)
 {
   e->key = key;
   e->blockedCount = 0;
@@ -187,8 +187,8 @@ void pawn_entry_fill(const Pos *pos, PawnEntry *e, Key key)
 // evaluate_shelter() calculates the shelter bonus and the storm penalty
 // for a king, by looking at the king file and the two closest files.
 
-INLINE void evaluate_shelter(const PawnEntry *pe, const Pos *pos, Square ksq,
-    Score *shelter, const Color Us)
+INLINE void evaluate_shelter(const PawnEntry *pe, const Position *pos,
+    Square ksq, Score *shelter, const Color Us)
 {
   const Color Them = (Us == WHITE ? BLACK : WHITE);
   
@@ -224,7 +224,7 @@ INLINE void evaluate_shelter(const PawnEntry *pe, const Pos *pos, Square ksq,
 // do_king_safety() calculates a bonus for king safety. It is called only
 // when king square changes, which is about 20% of total king_safety() calls.
 
-INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
+INLINE Score do_king_safety(PawnEntry *pe, const Position *pos, Square ksq,
     const Color Us)
 {
   pe->kingSquares[Us] = ksq;
@@ -255,12 +255,14 @@ INLINE Score do_king_safety(PawnEntry *pe, const Pos *pos, Square ksq,
 }
 
 // "template" instantiation:
-NOINLINE Score do_king_safety_white(PawnEntry *pe, const Pos *pos, Square ksq)
+NOINLINE Score do_king_safety_white(PawnEntry *pe, const Position *pos,
+    Square ksq)
 {
   return do_king_safety(pe, pos, ksq, WHITE);
 }
 
-NOINLINE Score do_king_safety_black(PawnEntry *pe, const Pos *pos, Square ksq)
+NOINLINE Score do_king_safety_black(PawnEntry *pe, const Position *pos,
+    Square ksq)
 {
   return do_king_safety(pe, pos, ksq, BLACK);
 }

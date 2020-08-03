@@ -50,10 +50,10 @@ enum {
   THREAD_SLEEP, THREAD_SEARCH, THREAD_TT_CLEAR, THREAD_EXIT, THREAD_RESUME
 };
 
-void thread_search(Pos *pos);
-void thread_wake_up(Pos *pos, int action);
-void thread_wait_until_sleeping(Pos *pos);
-void thread_wait(Pos *pos, atomic_bool *b);
+void thread_search(Position *pos);
+void thread_wake_up(Position *pos, int action);
+void thread_wait_until_sleeping(Position *pos);
+void thread_wait(Position *pos, atomic_bool *b);
 
 
 // MainThread struct seems to exist mostly for easy move.
@@ -76,7 +76,7 @@ void mainthread_search(void);
 // access to threads data is done through this class.
 
 struct ThreadPool {
-  Pos *pos[MAX_THREADS];
+  Position *pos[MAX_THREADS];
   int numThreads;
 #ifndef _WIN32
   pthread_mutex_t mutex;
@@ -94,14 +94,14 @@ typedef struct ThreadPool ThreadPool;
 
 void threads_init(void);
 void threads_exit(void);
-void threads_start_thinking(Pos *pos, LimitsType *);
+void threads_start_thinking(Position *pos, LimitsType *);
 void threads_set_number(int num);
 uint64_t threads_nodes_searched(void);
 uint64_t threads_tb_hits(void);
 
 extern ThreadPool Threads;
 
-INLINE Pos *threads_main(void)
+INLINE Position *threads_main(void)
 {
   return Threads.pos[0];
 }

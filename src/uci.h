@@ -80,13 +80,13 @@ void option_set_value(int opt, int value);
 bool option_set_by_name(char *name, char *value);
 
 void setoption(char *str);
-void position(Pos *pos, char *str);
+void position(Position *pos, char *str);
 
 void uci_loop(int argc, char* argv[]);
 char *uci_value(char *str, Value v);
 char *uci_square(char *str, Square s);
 char *uci_move(char *str, Move m, int chess960);
-void print_pv(Pos *pos, Depth depth, Value alpha, Value beta);
-Move uci_to_move(const Pos *pos, char *str);
+void print_pv(Position *pos, Depth depth, Value alpha, Value beta);
+Move uci_to_move(const Position *pos, char *str);
 
 #endif

@@ -185,7 +185,7 @@ static const Score WeakQueenProtection = S( 14,  0);
 // eval_init() initializes king and attack bitboards for a given color
 // adding pawn attacks. To be done at the beginning of the evaluation.
 
-INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const Color Us)
+INLINE void evalinfo_init(const Position *pos, EvalInfo *ei, const Color Us)
 {
   const Color Them = (Us == WHITE ? BLACK : WHITE);
   const int   Down = (Us == WHITE ? SOUTH : NORTH);
@@ -226,7 +226,7 @@ INLINE void evalinfo_init(const Pos *pos, EvalInfo *ei, const Color Us)
 // evaluate_piece() assigns bonuses and penalties to the pieces of a given
 // color and type.
 
-INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
+INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
     const Color Us, const int Pt)
 {
   const Color Them  = (Us == WHITE ? BLACK      : WHITE);
@@ -359,7 +359,7 @@ INLINE Score evaluate_pieces(const Pos *pos, EvalInfo *ei, Score *mobility,
 
 // evaluate_king() assigns bonuses and penalties to a king of a given color.
 
-INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
+INLINE Score evaluate_king(const Position *pos, EvalInfo *ei, Score *mobility,
     const Color Us)
 {
   const Color Them = Us == WHITE ? BLACK : WHITE;
@@ -462,7 +462,7 @@ INLINE Score evaluate_king(const Pos *pos, EvalInfo *ei, Score *mobility,
 // evaluate_threats() assigns bonuses according to the types of the
 // attacking and the attacked pieces.
 
-INLINE Score evaluate_threats(const Pos *pos, EvalInfo *ei, const Color Us)
+INLINE Score evaluate_threats(const Position *pos, EvalInfo *ei, const Color Us)
 {
   const Color Them = (Us == WHITE ? BLACK : WHITE);
   const int   Up   = (Us == WHITE ? NORTH : SOUTH);
@@ -565,7 +565,7 @@ INLINE int capped_distance(Square s1, Square s2)
 // evaluate_passed() evaluates the passed pawns and candidate passed
 // pawns of the given color.
 
-INLINE Score evaluate_passed(const Pos *pos, EvalInfo *ei, const Color Us)
+INLINE Score evaluate_passed(const Position *pos, EvalInfo *ei, const Color Us)
 {
   const Color Them = (Us == WHITE ? BLACK : WHITE);
   const int   Up   = (Us == WHITE ? NORTH : SOUTH);
@@ -652,7 +652,7 @@ INLINE Score evaluate_passed(const Pos *pos, EvalInfo *ei, const Color Us)
 // twice. Finally, the space bonus is multiplied by a weight. The aim is to
 // improve play on game opening.
 
-INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const Color Us)
+INLINE Score evaluate_space(const Position *pos, EvalInfo *ei, const Color Us)
 {
   // Early exit if, for example, bot queens or 6 minor pieces have been
   // exchanged
@@ -686,7 +686,7 @@ INLINE Score evaluate_space(const Pos *pos, EvalInfo *ei, const Color Us)
 // evaluate_winnable() adusts the mg and eg score components based on the
 // known attacking/defending status of the players.
 // A single value is derived from the mg and eg values and returned.
-INLINE Value evaluate_winnable(const Pos *pos, EvalInfo *ei, Score score)
+INLINE Value evaluate_winnable(const Position *pos, EvalInfo *ei, Score score)
 {
   int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
                    - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
@@ -760,7 +760,7 @@ INLINE Value evaluate_winnable(const Pos *pos, EvalInfo *ei, Score score)
 // evaluate() is the main evaluation function. It returns a static evaluation
 // of the position from the point of view of the side to move.
 
-Value evaluate(const Pos *pos)
+Value evaluate(const Position *pos)
 {
   assert(!checkers());
 
