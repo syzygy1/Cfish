@@ -119,6 +119,9 @@ static Option optionsMap[] = {
   { "BookFile", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_book_file, 0, NULL },
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
+#ifdef NNUE
+  { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, "nn-97f742aaefcd.nnue", NULL, 0, NULL },
+#endif
   { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_large_pages, 0, NULL },
   { "NUMA", OPT_TYPE_STRING, 0, 0, 0, "all", on_numa, 0, NULL },
   { NULL }
@@ -162,8 +165,7 @@ void options_init()
     case OPT_TYPE_BUTTON:
       break;
     case OPT_TYPE_STRING:
-      opt->valString = malloc(strlen(opt->defString) + 1);
-      strcpy(opt->valString, opt->defString);
+      opt->valString = strdup(opt->defString);
       break;
     case OPT_TYPE_COMBO:
       s = strstr(opt->defString, " var");
@@ -228,6 +230,11 @@ const char *option_string_value(int optIdx)
   return optionsMap[optIdx].valString;
 }
 
+const char *option_default_string_value(int optIdx)
+{
+  return optionsMap[optIdx].defString;
+}
+
 void option_set_value(int optIdx, int value)
 {
   Option *opt = &optionsMap[optIdx];
@@ -262,13 +269,11 @@ bool option_set_by_name(char *name, char *value)
         break;
       case OPT_TYPE_STRING:
         free(opt->valString);
-        opt->valString = malloc(strlen(value) + 1);
-        strcpy(opt->valString, value);
+        opt->valString = strdup(value);
         break;
       case OPT_TYPE_COMBO:
         free(opt->valString);
-        opt->valString = malloc(strlen(value) + 1);
-        strcpy(opt->valString, value);
+        opt->valString = strdup(value);
         for (char *s = opt->valString; *s; s++)
           *s = tolower(*s);
       }

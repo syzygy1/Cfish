@@ -1,8 +1,6 @@
 /*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2004-2020 The Stockfish developers
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -22,7 +20,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
-#include <string.h>   // For memset
+#include <string.h>
 
 #include "evaluate.h"
 #include "misc.h"
@@ -66,7 +64,7 @@ static int Reductions[MAX_MOVES]; // [depth or moveNumber]
 INLINE Depth reduction(int i, Depth d, int mn)
 {
   int r = Reductions[d] * Reductions[mn];
-  return ((r + 570) / 1024 + (!i && r > 1018));
+  return (r + 570) / 1024 + (!i && r > 1018);
 }
 
 INLINE int futility_move_count(bool improving, Depth depth)
@@ -232,6 +230,12 @@ void mainthread_search(void)
   char buf[16];
   bool playBookMove = false;
 
+#ifdef NNUE
+  printf("info string NNUE evaluation using %s enabled.\n", option_string_value(OPT_EVAL_FILE));
+#else
+//  printf("info string classical evaluation enabled.\n");
+#endif
+
   base_ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
 
   const char *s = option_string_value(OPT_ANALYSIS_CONTEMPT);
@@ -382,8 +386,12 @@ void thread_search(Position *pos)
   int iterIdx = 0;
 
   Stack *ss = pos->st; // At least the seventh element of the allocated array.
-  for (int i = -7; i < 3; i++)
+  for (int i = -7; i < 3; i++) {
     memset(SStackBegin(ss[i]), 0, SStackSize);
+#ifdef NNUE
+    ss[i].accumulator.computedAccumulation = false;
+#endif
+  }
   (ss-1)->endMoves = pos->moveList;
 
   for (int i = -7; i < 0; i++)

@@ -49,7 +49,6 @@ const char PieceToChar[] = " PNBRQK  pnbrqk";
 
 int failed_step;
 
-#ifdef PEDANTIC
 INLINE void put_piece(Position *pos, Color c, Piece piece, Square s)
 {
   pos->board[s] = piece;
@@ -87,7 +86,6 @@ INLINE void move_piece(Position *pos, Color c, Piece piece, Square from,
   pos->index[to] = pos->index[from];
   pos->pieceList[pos->index[to]] = to;
 }
-#endif
 
 
 // Calculate CheckInfo data.
@@ -222,20 +220,18 @@ void pos_set(Position *pos, char *fen, int isChess960)
 {
   unsigned char col, row, token;
   Square sq = SQ_A8;
+#ifdef NNUE
+  PieceId pieceId, nextPieceId = PIECE_ID_ZERO;
+#endif
 
   Stack *st = pos->st;
   memset(pos, 0, offsetof(Position, moveList));
   pos->st = st;
   memset(st, 0, StateSize);
-#ifdef PEDANTIC
   for (int i = 0; i < 256; i++)
     pos->pieceList[i] = SQ_NONE;
   for (int i = 0; i < 16; i++)
     pos->pieceCount[i] = 16 * i;
-#else
-  for (Square s = 0; s < 64; s++)
-    CastlingRightsMask[s] = ANY_CASTLING;
-#endif
 
   // Piece placement
   while ((token = *fen++) && token != ' ') {
@@ -246,15 +242,14 @@ void pos_set(Position *pos, char *fen, int isChess960)
     else {
       for (int piece = 0; piece < 16; piece++)
         if (PieceToChar[piece] == token) {
-#ifdef PEDANTIC
-          put_piece(pos, color_of(piece), piece, sq++);
-#else
-          pos->board[sq] = piece;
-          pos->byTypeBB[0] |= sq_bb(sq);
-          pos->byTypeBB[type_of_p(piece)] |= sq_bb(sq);
-          pos->byColorBB[color_of(piece)] |= sq_bb(sq);
-          sq++;
+          put_piece(pos, color_of(piece), piece, sq);
+#ifdef NNUE
+          pieceId =  piece == W_KING ? PIECE_ID_WKING
+                   : piece == B_KING ? PIECE_ID_BKING
+                   : nextPieceId++;
+          nnue_put_piece(pos, pieceId, sq, piece);
 #endif
+          sq++;
           break;
         }
     }
@@ -331,7 +326,6 @@ static void set_castling_right(Position *pos, Color c, Square rfrom)
 
   pos->st->castlingRights |= cr;
 
-#ifdef PEDANTIC
   pos->castlingRightsMask[kfrom] |= cr;
   pos->castlingRightsMask[rfrom] |= cr;
   pos->castlingRookSquare[cr] = rfrom;
@@ -343,27 +337,6 @@ static void set_castling_right(Position *pos, Color c, Square rfrom)
   for (Square s = min(kfrom, kto); s <= max(kfrom, kto); s++)
     if (s != kfrom && s != rfrom)
       pos->castlingPath[cr] |= sq_bb(s);
-#else
-  CastlingRightsMask[kfrom] &= ~cr;
-  CastlingRightsMask[rfrom] &= ~cr;
-//  CastlingToSquare[rfrom & 0x0f] = kto;
-  Piece rook = make_piece(c, ROOK);
-  CastlingHash[kto & 0x0f] = zob.psq[rook][rto] ^ zob.psq[rook][rfrom];
-  CastlingPSQ[kto & 0x0f] = psqt.psq[rook][rto] - psqt.psq[rook][rfrom];
-  CastlingBits[kto & 0x0f] = sq_bb(rto) ^ sq_bb(rfrom);
-  // need 2nd set of from/to, maybe... for undo
-  CastlingRookFrom[kto & 0x0f] = rfrom != kto ? rfrom : rto;
-  CastlingRookTo[kto & 0x0f] = rto;
-  CastlingRookSquare[cr] = rfrom;
-
-  for (Square s = min(rfrom, rto); s <= max(rfrom, rto); s++)
-    if (s != kfrom && s != rfrom)
-      CastlingPath[cr] |= sq_bb(s);
-
-  for (Square s = min(kfrom, kto); s <= max(kfrom, kto); s++)
-    if (s != kfrom && s != rfrom)
-      CastlingPath[cr] |= sq_bb(s);
-#endif
 }
 
 
@@ -790,12 +763,8 @@ bool gives_check_special(const Position *pos, Stack *st, Move m)
   }
   case CASTLING:
   {
-#ifdef PEDANTIC
     // Castling is encoded as 'King captures the rook'
     Square rto = relative_square(stm(), to > from ? SQ_F1 : SQ_D1);
-#else
-    Square rto = CastlingRookTo[to & 0x0f];
-#endif
     return   (PseudoAttacks[ROOK][rto] & sq_bb(st->ksq))
           && (attacks_bb_rook(rto, pieces() ^ sq_bb(from)) & sq_bb(st->ksq));
   }
@@ -807,159 +776,7 @@ bool gives_check_special(const Position *pos, Stack *st, Move m)
 
 
 // do_move() makes a move. The move is assumed to be legal.
-#ifndef PEDANTIC
-void do_move(Position *pos, Move m, int givesCheck)
-{
-  assert(move_is_ok(m));
 
-  Stack *st = ++pos->st;
-  st->pawnKey = (st-1)->pawnKey;
-  st->materialKey = (st-1)->materialKey;
-  st->psqnpm = (st-1)->psqnpm; // psq and nonPawnMaterial
-
-  Square from = from_sq(m);
-  Square to = to_sq(m);
-  Key key = (st-1)->key ^ zob.side;
-
-  // Update castling rights
-  st->castlingRights =  (st-1)->castlingRights
-                      & CastlingRightsMask[from]
-                      & CastlingRightsMask[to];
-  key ^= zob.castling[st->castlingRights ^ (st-1)->castlingRights];
-
-  Piece captPiece = pos->board[to];
-  Color us = pos->sideToMove;
-
-  // Clear en passant
-  st->epSquare = 0;
-  if (unlikely((st-1)->epSquare)) {
-    key ^= zob.enpassant[(st-1)->epSquare & 7];
-    if (type_of_m(m) == ENPASSANT)
-      captPiece = B_PAWN ^ (us << 3);
-  }
-
-  Piece piece = piece_on(from);
-  Piece prom_piece;
-
-  // Move the piece or carry out a promotion
-  if (likely(type_of_m(m) != PROMOTION)) {
-    // In Chess960, the king might seem to capture the friendly rook
-    if (type_of_m(m) == CASTLING)
-      captPiece = 0;
-    pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from) ^ sq_bb(to);
-    st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
-    key ^= zob.psq[piece][from] ^ zob.psq[piece][to];
-    if (type_of_p(piece) == PAWN)
-      st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
-    prom_piece = piece;
-  } else {
-    prom_piece = promotion_type(m);
-    pos->byTypeBB[type_of_p(piece)] ^= sq_bb(from);
-    pos->byTypeBB[prom_piece] ^= sq_bb(to);
-    prom_piece |= piece & 8;
-    st->psq += psqt.psq[prom_piece][to] - psqt.psq[piece][to];
-    st->nonPawn += NonPawnPieceValue[prom_piece];
-    st->materialKey += matKey[prom_piece] - matKey[piece];
-    key ^= zob.psq[piece][from] ^ zob.psq[prom_piece][to];
-    st->pawnKey ^= zob.psq[piece][from];
-  }
-  pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
-  pos->board[from] = 0;
-  pos->board[to] = prom_piece;
-
-  if (captPiece) {
-    st->rule50 = 0;
-    if ((captPiece & 7) == PAWN) {
-      if (type_of_m(m) == ENPASSANT) {
-        to += (us == WHITE ? -8 : 8);
-        pos->board[to] = 0;
-      }
-      st->pawnKey ^= zob.psq[captPiece][to];
-    }
-    st->capturedPiece = captPiece;
-    st->psq -= psqt.psq[captPiece][to];
-    st->nonPawn -= NonPawnPieceValue[captPiece];
-    st->materialKey -= matKey[captPiece];
-    pos->byTypeBB[captPiece & 7] ^= sq_bb(to);
-    pos->byColorBB[!us] ^= sq_bb(to);
-    key ^= zob.psq[captPiece][to];
-  } else { // Not a capture.
-    st->capturedPiece = 0;
-    st->rule50 = (st-1)->rule50 + 1;
-    if ((piece & 7) == PAWN) {
-      st->rule50 = 0;
-      if ((from ^ to) == 16) {
-        if (EPMask[to - SQ_A4] & pos->byTypeBB[PAWN] & pos->byColorBB[!us]) {
-          st->epSquare = to + (us == WHITE ? -8 : 8);
-          key ^= zob.enpassant[to & 7];
-        }
-      }
-    } else if (type_of_m(m) == CASTLING) {
-      key ^= CastlingHash[to & 0x0f];
-      pos->byTypeBB[ROOK] ^= CastlingBits[to & 0x0f];
-      pos->byColorBB[us] ^= CastlingBits[to & 0x0f];
-      pos->board[CastlingRookFrom[to & 0x0f]] = 0;
-      pos->board[CastlingRookTo[to & 0x0f]] = ROOK | (to & 0x08);
-      st->psq += CastlingPSQ[to & 0x0f];
-    }
-  }
-  st->key = key;
-  pos->byTypeBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
-
-  st->checkersBB =  givesCheck
-                  ? attackers_to(square_of(!us, KING)) & pieces_c(us) : 0;
-
-  st->pliesFromNull = (st-1)->pliesFromNull + 1;
-
-  pos->sideToMove = !pos->sideToMove;
-  pos->nodes++;
-
-  set_check_info(pos);
-
-  check_pos(pos);
-}
-
-void undo_move(Position *pos, Move m)
-{
-  Square from = from_sq(m);
-  Square to = to_sq(m);
-  Piece piece = pos->board[to];
-  Stack *st = pos->st--;
-  pos->sideToMove = !pos->sideToMove;
-  Color us = pos->sideToMove;
-
-  if (likely(type_of_m(m) != PROMOTION)) {
-    pos->byTypeBB[piece & 7] ^= sq_bb(from) ^ sq_bb(to);
-  } else {
-    pos->byTypeBB[piece & 7] ^= sq_bb(to);
-    pos->byTypeBB[PAWN] ^= sq_bb(from);
-    piece = PAWN | (piece & 8);
-  }
-  pos->byColorBB[us] ^= sq_bb(from) ^ sq_bb(to);
-  pos->board[from] = piece;
-
-  Piece captPiece = st->capturedPiece;
-  pos->board[to] = captPiece;
-  if (captPiece) {
-    if (type_of_m(m) == ENPASSANT) {
-      pos->board[to] = 0;
-      to = (st-1)->epSquare + (us == WHITE ? -8 : 8);
-      pos->board[to] = captPiece;
-    }
-    pos->byTypeBB[captPiece & 7] ^= sq_bb(to);
-    pos->byColorBB[!us] ^= sq_bb(to);
-  }
-  else if (type_of_m(m) == CASTLING) {
-    pos->byTypeBB[ROOK] ^= CastlingBits[to & 0x0f];
-    pos->byColorBB[us] ^= CastlingBits[to & 0x0f];
-    pos->board[CastlingRookTo[to & 0x0f]] = 0;
-    pos->board[CastlingRookFrom[to & 0x0f]] = ROOK | (to & 0x08);
-  }
-  pos->byTypeBB[0] = pos->byColorBB[0] | pos->byColorBB[1];
-
-  check_pos(pos);
-}
-#else
 void do_move(Position *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
@@ -976,6 +793,14 @@ void do_move(Position *pos, Move m, int givesCheck)
   // Increment ply counters. Note that rule50 will be reset to zero later
   // on in case of a capture or a pawn move.
   st->plyCounters += 0x101; // Increment both rule50 and pliesFromNull
+
+#ifdef NNUE
+  st->accumulator.computedAccumulation = false;
+  PieceId dp0 = PIECE_ID_NONE;
+  PieceId dp1 = PIECE_ID_NONE;
+  DirtyPiece *dp = &(st->dirtyPiece);
+  dp->dirtyNum = 1;
+#endif
 
   Color us = stm();
   Color them = !us;
@@ -1000,6 +825,20 @@ void do_move(Position *pos, Move m, int givesCheck)
     rfrom = to; // Castling is encoded as "king captures friendly rook"
     rto = relative_square(us, kingSide ? SQ_F1 : SQ_D1);
     to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
+
+#ifdef NNUE
+    dp->dirtyNum = 2;
+    dp0 = piece_id_on(from);
+    dp1 = piece_id_on(rfrom);
+    dp->pieceId[0] = dp0;
+    nnue_copy_piece(pos, dp->oldPiece[0], dp0);
+    nnue_put_piece(pos, dp0, to, piece);
+    nnue_copy_piece(pos, dp->newPiece[0], dp0);
+    dp->pieceId[1] = dp1;
+    nnue_copy_piece(pos, dp->oldPiece[1], dp1);
+    nnue_put_piece(pos, dp1, rto, captured);
+    nnue_copy_piece(pos, dp->newPiece[1], dp1);
+#endif
 
     // Remove both pieces first since squares could overlap in Chess960
     remove_piece(pos, us, piece, from);
@@ -1034,6 +873,15 @@ void do_move(Position *pos, Move m, int givesCheck)
       st->pawnKey ^= zob.psq[captured][capsq];
     } else
       st->nonPawn -= NonPawnPieceValue[captured];
+
+#ifdef NNUE
+    dp->dirtyNum = 2; // 2 pieces moved
+    dp1 = piece_id_on(capsq);
+    dp->pieceId[1] = dp1;
+    nnue_copy_piece(pos, dp->oldPiece[1], dp1);
+    nnue_put_piece(pos, dp1, capsq, 0);
+    nnue_copy_piece(pos, dp->newPiece[1], dp1);
+#endif
 
     // Update board and piece lists
     remove_piece(pos, them, captured, capsq);
@@ -1074,8 +922,16 @@ void do_move(Position *pos, Move m, int givesCheck)
   }
 
   // Move the piece. The tricky Chess960 castling is handled earlier.
-  if (likely(type_of_m(m) != CASTLING))
+  if (likely(type_of_m(m) != CASTLING)) {
+#ifdef NNUE
+    dp0 = piece_id_on(from);
+    dp->pieceId[0] = dp0;
+    nnue_copy_piece(pos, dp->oldPiece[0], dp0);
+    nnue_put_piece(pos, dp0, to, piece);
+    nnue_copy_piece(pos, dp->newPiece[0], dp0);
+#endif
     move_piece(pos, us, piece, from, to);
+  }
 
   // If the moving piece is a pawn do some special extra work
   if (type_of_p(piece) == PAWN) {
@@ -1085,16 +941,21 @@ void do_move(Position *pos, Move m, int givesCheck)
     {
       st->epSquare = to ^ 8;
       key ^= zob.enpassant[file_of(st->epSquare)];
-    } else if (type_of_m(m) == PROMOTION) {
-      PieceType promotion = promotion_type(m);
+    }
+    else if (type_of_m(m) == PROMOTION) {
+      Piece promotion = make_piece(us, promotion_type(m));
 
       assert(relative_rank_s(us, to) == RANK_8);
-      assert(promotion >= KNIGHT && promotion <= QUEEN);
-
-      promotion = make_piece(us, promotion);
+      assert(type_of_p(promotion) >= KNIGHT && type_of_p(promotion) <= QUEEN);
 
       remove_piece(pos, us, piece, to);
       put_piece(pos, us, promotion, to);
+
+#ifdef NNUE
+      dp0 = piece_id_on(to);
+      nnue_put_piece(pos, dp0, to, promotion);
+      nnue_copy_piece(pos, dp->newPiece[0], dp0);
+#endif
 
       // Update hash keys
       key ^= zob.psq[piece][to] ^ zob.psq[promotion][to];
@@ -1157,19 +1018,19 @@ void undo_move(Position *pos, Move m)
   Color us = stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
-  Piece piece = piece_on(to);
+  Piece pc = piece_on(to);
 
   assert(is_empty(from) || type_of_m(m) == CASTLING);
   assert(type_of_p(pos->st->capturedPiece) != KING);
 
   if (unlikely(type_of_m(m) == PROMOTION)) {
     assert(relative_rank_s(us, to) == RANK_8);
-    assert(type_of_p(piece) == promotion_type(m));
-    assert(type_of_p(piece) >= KNIGHT && type_of_p(piece) <= QUEEN);
+    assert(type_of_p(pc) == promotion_type(m));
+    assert(type_of_p(pc) >= KNIGHT && type_of_p(pc) <= QUEEN);
 
-    remove_piece(pos, us, piece, to);
-    piece = make_piece(us, PAWN);
-    put_piece(pos, us, piece, to);
+    remove_piece(pos, us, pc, to);
+    pc = make_piece(us, PAWN);
+    put_piece(pos, us, pc, to);
   }
 
   if (unlikely(type_of_m(m) == CASTLING)) {
@@ -1178,17 +1039,30 @@ void undo_move(Position *pos, Move m)
     rfrom = to; // Castling is encoded as "king captures friendly rook"
     rto = relative_square(us, kingSide ? SQ_F1 : SQ_D1);
     to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
-
-    // Remove both pieces first since squares could overlap in Chess960
     Piece king = make_piece(us, KING);
     Piece rook = make_piece(us, ROOK);
+
+#ifdef NNUE
+    pos->st->dirtyPiece.dirtyNum = 2;
+    PieceId dp0 = piece_id_on(to);
+    PieceId dp1 = piece_id_on(rto);
+    nnue_put_piece(pos, dp0, from, king);
+    nnue_put_piece(pos, dp1, rfrom, rook);
+#endif
+
+    // Remove both pieces first since squares could overlap in Chess960
     remove_piece(pos, us, king, to);
     remove_piece(pos, us, rook, rto);
     pos->board[to] = pos->board[rto] = 0;
     put_piece(pos, us, king, from);
     put_piece(pos, us, rook, rfrom);
   } else {
-    move_piece(pos, us, piece, to, from); // Put the piece back at the source square
+    move_piece(pos, us, pc, to, from); // Put the piece back at the source square
+
+#ifdef NNUE
+    PieceId dp0 = pos->st->dirtyPiece.pieceId[0];
+    nnue_put_piece(pos, dp0, from, pc);
+#endif
 
     if (pos->st->capturedPiece) {
       Square capsq = to;
@@ -1196,7 +1070,7 @@ void undo_move(Position *pos, Move m)
       if (unlikely(type_of_m(m) == ENPASSANT)) {
         capsq ^= 8;
 
-        assert(type_of_p(piece) == PAWN);
+        assert(type_of_p(pc) == PAWN);
         assert(to == (pos->st-1)->epSquare);
         assert(relative_rank_s(us, to) == RANK_6);
         assert(is_empty(capsq));
@@ -1204,6 +1078,11 @@ void undo_move(Position *pos, Move m)
       }
 
       put_piece(pos, !us, pos->st->capturedPiece, capsq); // Restore the captured piece
+
+#ifdef NNUE
+      PieceId dp1 = pos->st->dirtyPiece.pieceId[1];
+      nnue_put_piece(pos, dp1, capsq, pos->st->capturedPiece);
+#endif
     }
   }
 
@@ -1212,7 +1091,6 @@ void undo_move(Position *pos, Move m)
 
   assert(pos_is_ok(pos, &failed_step));
 }
-#endif
 
 
 // do_null_move() is used to do a null move
@@ -1223,6 +1101,9 @@ void do_null_move(Position *pos)
 
   Stack *st = ++pos->st;
   memcpy(st, st - 1, (StateSize + 7) & ~7);
+#ifdef NNUE
+  st->accumulator = (st-1)->accumulator;
+#endif
 
   if (unlikely(st->epSquare)) {
     st->key ^= zob.enpassant[file_of(st->epSquare)];
@@ -1398,7 +1279,6 @@ void pos_set_check_info(Position *pos)
 // pos_is_ok() performs some consistency checks for the position object.
 // This is meant to be helpful when debugging.
 
-#ifdef PEDANTIC
 #ifndef NDEBUG
 static int pos_is_ok(Position *pos, int *failedStep)
 {
@@ -1471,70 +1351,4 @@ static int pos_is_ok(Position *pos, int *failedStep)
 
   return 1;
 }
-#endif
-#else
-static int pos_is_ok(Position *pos, int *failedStep)
-{
-(void)pos;
-(void)failedStep;
-  return 1;
-}
-
-#ifndef NDEBUG
-static int check_pos(Position *pos)
-{
-  Bitboard colorBB[2];
-  Bitboard pieceBB[8];
-
-  colorBB[0] = colorBB[1] = 0;
-  for (int i = 0; i < 8; i++)
-    pieceBB[i] = 0;
-
-  for (int sq = 0; sq < 64; sq++)
-    if (pos->board[sq]) {
-      colorBB[pos->board[sq] >> 3] |= sq_bb(sq);
-      pieceBB[pos->board[sq] & 7] |= sq_bb(sq);
-    }
-
-  for (int i = PAWN; i <= KING; i++)
-    assert(pos->byTypeBB[i] == pieceBB[i]);
-
-  assert(pos->byColorBB[0] == colorBB[0]);
-  assert(pos->byColorBB[1] == colorBB[1]);
-  assert(pos->byTypeBB[0] == (colorBB[0] | colorBB[1]));
-
-  Key key = 0, pawnKey = 0, matKey = 0;
-
-  for (int c = 0; c < 2; c++)
-    for (int i = PAWN; i <= KING; i++)
-       matKey += matKey[8 * c + i] * piece_count(c, i);
-
-  for (int sq = 0; sq < 64; sq++)
-    if (pos->board[sq])
-      key ^= zob.psq[pos->board[sq]][sq];
-  if (pos->sideToMove == BLACK)
-    key ^= zob.side;
-  if (pos->st->epSquare)
-    key ^= zob.enpassant[pos->st->epSquare & 7];
-  key ^= zob.castling[pos->st->castlingRights];
-
-  for (int sq = 0; sq < 64; sq++)
-    if ((pos->board[sq] & 7) == PAWN)
-      pawnKey ^= zob.psq[pos->board[sq]][sq];
-
-  int npm_w = 0, npm_b = 0;
-  for (int i = KNIGHT; i <= KING; i++) {
-    npm_w += piece_count(WHITE, i) * PieceValue[MG][i];
-    npm_b += piece_count(BLACK, i) * PieceValue[MG][i];
-  }
-  assert(npm_w == non_pawn_material_c(WHITE));
-  assert(npm_b == non_pawn_material_c(BLACK));
-
-  assert(key == pos->st->key);
-  assert(pawnKey == pos->st->pawnKey);
-  assert(matKey == pos->st->materialKey);
-
-  return 1;
-}
-#endif
 #endif

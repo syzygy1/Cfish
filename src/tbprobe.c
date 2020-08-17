@@ -351,8 +351,7 @@ void TB_init(char *path)
   const char *p = path;
   if (strlen(p) == 0 || !strcmp(p, "<empty>")) return;
 
-  pathString = malloc(strlen(p) + 1);
-  strcpy(pathString, p);
+  pathString = strdup(p);
   numPaths = 0;
   for (int i = 0;; i++) {
     if (pathString[i] != SEP_CHAR)

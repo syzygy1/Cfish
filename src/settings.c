@@ -1,3 +1,6 @@
+#ifdef NNUE
+#include "nnue.h"
+#endif
 #include "numa.h"
 #include "search.h"
 #include "settings.h"
@@ -13,7 +16,7 @@ void process_delayed_settings(void)
 {
   bool ttChange = delayedSettings.ttSize != settings.ttSize;
   bool lpChange = delayedSettings.largePages != settings.largePages;
-  bool numaChange =   (settings.numaEnabled != delayedSettings.numaEnabled)
+  bool numaChange =   settings.numaEnabled != delayedSettings.numaEnabled
                    || (   settings.numaEnabled
                        && !masks_equal(settings.mask, delayedSettings.mask));
 
@@ -45,4 +48,8 @@ void process_delayed_settings(void)
     delayedSettings.clear = false;
     search_clear();
   }
+
+#ifdef NNUE
+  nnue_init();
+#endif
 }

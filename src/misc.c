@@ -73,8 +73,7 @@ void print_engine_info(bool to_uci)
   printf("%s%s%s%s\n", Is64Bit ? " 64" : ""
                      , HasPext ? " BMI2" : (HasPopCnt ? " POPCNT" : "")
                      , HasNuma ? " NUMA" : ""
-                     , to_uci ? "\nid author T. Romstad, M. Costalba, "
-                                "J. Kiiski, G. Linscott"
+                     , to_uci ? "\nid author The Stockfish developers"
                               : " by Syzygy based on Stockfish");
   fflush(stdout);
 }

@@ -23,6 +23,9 @@
 #include "bitboard.h"
 #include "evaluate.h"
 #include "material.h"
+#ifdef NNUE
+#include "nnue.h"
+#endif
 #include "pawns.h"
 
 // Struct EvalInfo contains various information computed and collected
@@ -757,10 +760,10 @@ INLINE Value evaluate_winnable(const Position *pos, EvalInfo *ei, Score score)
 }
 
 
-// evaluate() is the main evaluation function. It returns a static evaluation
-// of the position from the point of view of the side to move.
+// evaluate_classic() is the classic evaluation function. It returns a static
+// evaluation of the position from the point of view of the side to move.
 
-Value evaluate(const Position *pos)
+static Value evaluate_classic(const Position *pos)
 {
   assert(!checkers());
 
@@ -841,4 +844,13 @@ make_v:
   v = v * (100 - rule50_count()) / 100;
 
   return v;
+}
+
+Value evaluate(const Position *pos)
+{
+#ifdef NNUE
+  return nnue_evaluate(pos);
+#else
+  return evaluate_classic(pos);
+#endif
 }

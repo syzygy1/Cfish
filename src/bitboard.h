@@ -68,19 +68,6 @@ extern Bitboard PawnAttackSpan[2][64];
 extern Bitboard PseudoAttacks[8][64];
 extern Bitboard PawnAttacks[2][64];
 
-#ifndef PEDANTIC
-extern Bitboard EPMask[16];
-extern Bitboard CastlingPath[64];
-extern uint8_t CastlingRightsMask[64];
-extern uint8_t CastlingRookSquare[16];
-extern uint8_t CastlingToSquare[16]; // To correct the KxR encoding.
-extern Key CastlingHash[16];
-extern Bitboard CastlingBits[16];
-extern Score CastlingPSQ[16];
-extern uint8_t CastlingRookFrom[16];
-extern uint8_t CastlingRookTo[16];
-#endif
-
 
 INLINE __attribute__((pure)) Bitboard sq_bb(Square s)
 {

@@ -32,6 +32,10 @@
 #include "bitboard.h"
 #include "types.h"
 
+#ifdef NNUE
+#include "nnue.h"
+#endif
+
 extern const char PieceToChar[];
 extern Key matKey[16];
 
@@ -64,7 +68,6 @@ struct Stack {
     };
     uint64_t psqnpm;
   };
-  uint8_t castlingRights;
   union {
     struct {
       uint8_t pliesFromNull;
@@ -72,6 +75,7 @@ struct Stack {
     };
     uint16_t plyCounters;
   };
+  uint8_t castlingRights;
 
   // Not copied when making a move
   uint8_t capturedPiece;
@@ -113,6 +117,12 @@ struct Stack {
     };
   };
   Square ksq;
+
+#ifdef NNUE
+  // NNUE data
+  Accumulator accumulator;
+  DirtyPiece dirtyPiece;
+#endif
 };
 
 typedef struct Stack Stack;
@@ -136,17 +146,20 @@ struct Position {
   Color sideToMove;
   uint8_t chess960;
   uint8_t board[64];
-#ifdef PEDANTIC
   uint8_t pieceCount[16];
   uint8_t pieceList[256];
   uint8_t index[64];
   uint8_t castlingRightsMask[64];
   uint8_t castlingRookSquare[16];
   Bitboard castlingPath[16];
-#endif
   Key rootKeyFlip;
   uint16_t gamePly;
   bool hasRepeated;
+
+#ifdef NNUE
+  PieceId pieceIdList[64];
+  PieceSquare pieceListFw[32], pieceListFb[32];
+#endif
 
   ExtMove *moveList;
 
@@ -224,33 +237,20 @@ PURE bool has_game_cycle(const Position *pos, int ply);
 #define piece_on(s) (pos->board[s])
 #define ep_square() (pos->st->epSquare)
 #define is_empty(s) (!piece_on(s))
-#ifdef PEDANTIC
 #define piece_count(c,p) (pos->pieceCount[8 * (c) + (p)] - (8*(c)+(p)) * 16)
 #define piece_list(c,p) (&pos->pieceList[16 * (8 * (c) + (p))])
 #define square_of(c,p) (pos->pieceList[16 * (8 * (c) + (p))])
 #define loop_through_pieces(c,p,s) \
   const uint8_t *pl = piece_list(c,p); \
   while ((s = *pl++) != SQ_NONE)
-#else
-#define piece_count(c,p) (popcount(pieces_cp(c, p)))
-#define square_of(c,p) (lsb(pieces_cp(c,p)))
-#define loop_through_pieces(c,p,s) \
-  Bitboard pcs = pieces_cp(c,p); \
-  while (pcs && (s = pop_lsb(&pcs), 1))
-#endif
 #define piece_count_mk(c, p) (((material_key()) >> (20 * (c) + 4 * (p) + 4)) & 15)
 
 // Castling
 #define can_castle_cr(cr) (pos->st->castlingRights & (cr))
 #define can_castle_c(c) can_castle_cr((WHITE_OO | WHITE_OOO) << (2 * (c)))
 #define can_castle_any() (pos->st->castlingRights)
-#ifdef PEDANTIC
 #define castling_impeded(cr) (pieces() & pos->castlingPath[cr])
 #define castling_rook_square(cr) (pos->castlingRookSquare[cr])
-#else
-#define castling_impeded(cr) (pieces() & CastlingPath[cr])
-#define castling_rook_square(cr) (CastlingRookSquare[cr])
-#endif
 
 // Checking
 #define checkers() (pos->st->checkersBB)
@@ -392,5 +392,34 @@ INLINE Bitboard attackers_to_occ(const Position *pos, Square s,
         | (attacks_bb_bishop(s, occupied) & pieces_pp(BISHOP, QUEEN))
         | (attacks_from_king(s)           & pieces_p(KING));
 }
+
+#ifdef NNUE
+
+#define piece_id_on(s) (pos->pieceIdList[s])
+
+extern ExtPieceSquare KppBoardIndex[];
+
+INLINE void nnue_put_piece(Position *pos, PieceId pieceId, Square s,
+    Piece pc)
+{
+  if (pc != 0) {
+    pos->pieceListFw[pieceId] = KppBoardIndex[pc][WHITE] + s;
+    pos->pieceListFb[pieceId] = KppBoardIndex[pc][BLACK] + (s ^ 0x3f);
+    pos->pieceIdList[s] = pieceId;
+  } else {
+    pos->pieceListFw[pieceId] = PS_NONE;
+    pos->pieceListFb[pieceId] = PS_NONE;
+    pos->pieceIdList[s] = pieceId;
+  }
+}
+
+INLINE void nnue_copy_piece(const Position *pos, ExtPieceSquare pc,
+    PieceId dp)
+{
+  pc[WHITE] = pos->pieceListFw[dp];
+  pc[BLACK] = pos->pieceListFb[dp];
+}
+
+#endif
 
 #endif

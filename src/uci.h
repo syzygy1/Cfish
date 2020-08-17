@@ -57,6 +57,9 @@ enum {
   OPT_BOOK_FILE,
   OPT_BOOK_BEST_MOVE,
   OPT_BOOK_DEPTH,
+#ifdef NNUE
+  OPT_EVAL_FILE,
+#endif
   OPT_LARGE_PAGES,
   OPT_NUMA
 };
@@ -76,6 +79,7 @@ void options_free(void);
 void print_options(void);
 int option_value(int opt);
 const char *option_string_value(int opt);
+const char *option_default_string_value(int opt);
 void option_set_value(int opt, int value);
 bool option_set_by_name(char *name, char *value);
 

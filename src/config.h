@@ -1,7 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define PEDANTIC
 //#define LONG_MATES
 #define PER_THREAD_CMH
 

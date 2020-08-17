@@ -43,6 +43,7 @@ Supported compilers:
 Further options:
 
 <table>
+<tr><td><code>nnue=no</code></td><td>Use classical evaluation</td></tr>
 <tr><td><code>numa=no</code></td><td>Disable NUMA support</td></tr>
 <tr><td><code>native=no</code></td><td>Disable -march=native compiler setting</td></tr>
 <tr><td><code>lto=yes</code></td><td>Compile with link-time optimization</td></tr>
