@@ -82,9 +82,10 @@ static const Bitboard KingFlank[8] = {
 
 // Thresholds for lazy and space evaluation
 enum {
-  LazyThreshold1 = 1400,
-  LazyThreshold2 = 1300,
-  SpaceThreshold = 12222
+  LazyThreshold1 =  1400,
+  LazyThreshold2 =  1300,
+  SpaceThreshold = 12222,
+  NNUEThreshold  =   500
 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -169,7 +170,6 @@ static const Score KnightOutpost       = S( 56, 36);
 static const Score LongDiagonalBishop  = S( 45,  0);
 static const Score MinorBehindPawn     = S( 18,  3);
 static const Score PawnlessFlank       = S( 17, 95);
-static const Score QueenInfiltration   = S( -2, 14);
 static const Score ReachableOutpost    = S( 31, 22);
 static const Score RestrictedPiece     = S(  7,  7);
 static const Score RookOnKingRing      = S( 16,  0);
@@ -350,10 +350,6 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
       Bitboard pinners;
       if (slider_blockers(pos, pieces_cpp(Them, ROOK, BISHOP), s, &pinners))
           score -= WeakQueen;
-
-      // Bonus for queen on weak square in enemy camp
-      if (relative_rank_s(Us, s) > RANK_4 && (~ei->pe->pawnAttacksSpan[Them] & sq_bb(s)))
-        score += QueenInfiltration;
     }
   }
 
@@ -846,11 +842,19 @@ make_v:
   return v;
 }
 
+bool pureNNUE;
+
 Value evaluate(const Position *pos)
 {
 #ifdef NNUE
-  return nnue_evaluate(pos);
-#else
-  return evaluate_classic(pos);
+  if (pureNNUE)
+    return nnue_evaluate(pos) + Tempo;
+
+  Value balance = non_pawn_material_c(WHITE) - non_pawn_material_c(BLACK);
+  balance += 200 * (piece_count(WHITE, PAWN) - piece_count(BLACK, PAWN));
+  // Take NNUE eval only on balanced positions
+  if (abs(balance) < NNUEThreshold)
+    return nnue_evaluate(pos) + Tempo;
 #endif
+  return evaluate_classic(pos);
 }

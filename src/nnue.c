@@ -760,6 +760,8 @@ static char *loadedFile = NULL;
 
 void nnue_init(void)
 {
+  pureNNUE = option_value(OPT_PURE_NNUE);
+
   const char *evalFile = option_string_value(OPT_EVAL_FILE);
   if (loadedFile && strcmp(evalFile, loadedFile) == 0)
     return;

@@ -1081,6 +1081,10 @@ moves_loop: // When in check search starts from here.
         continue;
     }
 
+    // Check for legality just before making the move
+    if (!rootNode && !is_legal(pos, move))
+      continue;
+
     ss->moveCount = ++moveCount;
 
     if (rootNode && pos->threadIdx == 0 && time_elapsed() > 3000) {
@@ -1255,12 +1259,6 @@ moves_loop: // When in check search starts from here.
 
     // Speculative prefetch as early as possible
     prefetch(tt_first_entry(key_after(pos, move)));
-
-    // Check for legality just before making the move
-    if (!rootNode && !is_legal(pos, move)) {
-      ss->moveCount = --moveCount;
-      continue;
-    }
 
     // Update the current move (this must be done after singular extension
     // search)
