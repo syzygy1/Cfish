@@ -901,7 +901,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
   // Step 8. Futility pruning: child node
   if (   !PvNode
-      &&  depth < 6
+      &&  depth < 8
       &&  eval - futility_margin(depth, improving) >= beta
       &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
     return eval; // - futility_margin(depth); (do not do the right thing)
@@ -1129,7 +1129,7 @@ moves_loop: // When in check search starts from here.
           continue;
 
         // Futility pruning: parent node
-        if (   lmrDepth < 6
+        if (   lmrDepth < 8
             && !inCheck
             && ss->staticEval + 284 + 188 * lmrDepth <= alpha
             &&  (*cmh )[movedPiece][to_sq(move)]
@@ -1180,8 +1180,7 @@ moves_loop: // When in check search starts from here.
      /* &&  ttValue != VALUE_NONE implicit in the next condition */
         &&  abs(ttValue) < VALUE_KNOWN_WIN
         && (tte_bound(tte) & BOUND_LOWER)
-        &&  tte_depth(tte) >= depth - 3
-        &&  is_legal(pos, move))
+        &&  tte_depth(tte) >= depth - 3)
     {
       Value singularBeta = ttValue - ((formerPv + 4) * depth) / 2;
       Depth singularDepth = (depth - 1 + 3 * formerPv) / 2;
@@ -1253,6 +1252,12 @@ moves_loop: // When in check search starts from here.
     // Castling extension
     if (type_of_m(move) == CASTLING)
       extension = 1;
+
+    // Late irreversible move extension
+    if (   move == ttMove
+        && rule50_count() > 80
+        && (captureOrPromotion || type_of_p(movedPiece) == PAWN))
+      extension = 2;
 
     // Add extension to new depth
     newDepth += extension;

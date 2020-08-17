@@ -85,7 +85,7 @@ enum {
   LazyThreshold1 =  1400,
   LazyThreshold2 =  1300,
   SpaceThreshold = 12222,
-  NNUEThreshold  =   500
+  NNUEThreshold  =   520
 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -275,6 +275,8 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
       // Bonus if the piece is on an outpost square or can reach one.
       // Reduced bonus for knights (BadOutpost) if it has few relevant targets.
       bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
+      bb = OutpostRanks & (ei->attackedBy[Us][PAWN] | shift_bb(Down, pieces_p(PAWN)))
+                        & ~ei->pe->pawnAttacksSpan[Them];
       Bitboard targets = pieces_c(Them) & ~pieces_p(PAWN);
       if (   Pt == KNIGHT
           && (bb & sq_bb(s) & ~CenterFiles) // on a side outpost
@@ -847,14 +849,16 @@ bool pureNNUE;
 Value evaluate(const Position *pos)
 {
 #ifdef NNUE
+
   if (pureNNUE)
     return nnue_evaluate(pos) + Tempo;
 
-  Value balance = non_pawn_material_c(WHITE) - non_pawn_material_c(BLACK);
-  balance += 200 * (piece_count(WHITE, PAWN) - piece_count(BLACK, PAWN));
   // Take NNUE eval only on balanced positions
-  if (abs(balance) < NNUEThreshold)
+  Vale v = eg_value(psq_score());
+  if (abs(v) < NNUEThreshold)
     return nnue_evaluate(pos) + Tempo;
+
 #endif
+
   return evaluate_classic(pos);
 }
