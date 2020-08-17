@@ -242,7 +242,8 @@ void uci_loop(int argc, char **argv)
   // Slots 0-99 make room for prepending the part of game history relevant
   // for repetition detection.
   // Slots 201-214 may be used by TB root probing.
-  pos.stack = aligned_alloc(64, 215 * sizeof(Stack));
+  pos.stackAllocation = malloc(63 + 215 * sizeof(Stack));
+  pos.stack = (Stack *)(((uintptr_t)pos.stackAllocation + 0x3f) & ~0x3f);
   pos.moveList = malloc(1000 * sizeof(ExtMove));
   pos.st = pos.stack + 100;
   pos.st[-1].endMoves = pos.moveList;
@@ -353,7 +354,7 @@ void uci_loop(int argc, char **argv)
     thread_wait_until_sleeping(threads_main());
 
   free(cmd);
-  free(pos.stack);
+  free(pos.stackAllocation);
   free(pos.moveList);
 
   LOCK_DESTROY(Threads.lock);
