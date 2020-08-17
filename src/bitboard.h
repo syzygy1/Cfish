@@ -53,6 +53,11 @@ void print_pretty(Bitboard b);
 #define Rank7BB (Rank1BB << (8 * 6))
 #define Rank8BB (Rank1BB << (8 * 7))
 
+#define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
+#define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
+#define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
+#define Center      ((FileDBB | FileEBB) & (Rank4BB | Rank5BB))
+
 extern uint8_t SquareDistance[64][64];
 
 extern Bitboard SquareBB[64];

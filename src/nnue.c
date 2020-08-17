@@ -175,6 +175,24 @@ static int32_t hidden1_biases[32];
 static int32_t hidden2_biases[32];
 static int32_t output_biases [1];
 
+#if defined(USE_AVX2)
+#if defined(__GNUC__ ) && (__GNUC__ < 9) && (defined(__MINGW32__) || defined(__MINGW64__))
+#define _mm256_loadA_si256  _mm256_loadu_si256
+#define _mm256_storeA_si256 _mm256_storeu_si256
+#else
+#define _mm256_loadA_si256  _mm256_load_si256
+#define _mm256_storeA_si256 _mm256_store_si256
+#endif
+#endif
+
+#if defined(USE_AVX512)
+#if defined(__GNUC__ ) && (__GNUC__ < 9) && (defined(__MINGW32__) || defined(__MINGW64__))
+#define _mm512_loadA_si512  _mm512_loadu_si512
+#else
+#define _mm512_loadA_si512  _mm512_load_si512
+#endif
+#endif
+
 void affine_propagate(uint8_t *input, int32_t *output, unsigned paddedInDims,
     unsigned outDims, int32_t biases[], int8_t weights[])
 {
@@ -206,12 +224,7 @@ void affine_propagate(uint8_t *input, int32_t *output, unsigned paddedInDims,
     __m512i *row = (__m512i *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
 
-#if defined(__MINGW32__) || defined(__MINGW64__)
-      __m512i product = _mm512_maddubs_epi16(_mm512_loadu_si512(&inVec[j]), _mm512_load_si512(&row[j]));
-#else
-      __m512i product = _mm512_maddubs_epi16(_mm512_load_si512(&inVec[j]), _mm512_load_si512(&row[j]));
-#endif
-
+      __m512i product = _mm512_maddubs_epi16(_mm512_loadA_si512(&inVec[j]), _mm512_load_si512(&row[j]));
       product = _mm512_madd_epi16(product, kOnes);
       sum = _mm512_add_epi32(sum, product);
     }
@@ -226,12 +239,7 @@ void affine_propagate(uint8_t *input, int32_t *output, unsigned paddedInDims,
       __m256i *row_256 = (__m256i *)&weights[offset];
       int j = kNumChunks * 2;
 
-#if defined(__MINGW32__) || defined(__MINGW64__)  // See HACK comment below in AVX2.
-      __m256i sum256 = _mm256_maddubs_epi16(_mm256_loadu_si256(&iv_256[j]), _mm256_load_si256(&row_256[j]));
-#else
-      __m256i sum256 = _mm256_maddubs_epi16(_mm256_load_si256(&iv_256[j]), _mm256_load_si256(&row_256[j]));
-#endif
-
+      __m256i sum256 = _mm256_maddubs_epi16(_mm256_loadA_si256(&iv_256[j]), _mm256_load_si256(&row_256[j]));
       sum256 = _mm256_madd_epi16(sum256, _mm256_set1_epi16(1));
       sum256 = _mm256_hadd_epi32(sum256, sum256);
       sum256 = _mm256_hadd_epi32(sum256, sum256);
@@ -244,18 +252,7 @@ void affine_propagate(uint8_t *input, int32_t *output, unsigned paddedInDims,
     __m256i sum = _mm256_setzero_si256();
     __m256i *row = (__m256i *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
-      __m256i product = _mm256_maddubs_epi16(
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-          // HACK: Use _mm256_loadu_si256() instead of _mm256_load_si256. Because the binary
-          //       compiled with g++ in MSYS2 crashes here because the output memory is not aligned
-          //       even though alignas is specified.
-          _mm256_loadu_si256
-#else
-          _mm256_load_si256
-#endif
-
-          (&inVec[j]), _mm256_load_si256(&row[j]));
+      __m256i product = _mm256_maddubs_epi16(_mm256_loadA_si256(&inVec[j]), _mm256_load_si256(&row[j]));
       product = _mm256_madd_epi16(product, kOnes);
       sum = _mm256_add_epi32(sum, product);
     }
@@ -269,8 +266,7 @@ void affine_propagate(uint8_t *input, int32_t *output, unsigned paddedInDims,
     __m128i sum = _mm_cvtsi32_si128(biases[i]);
     __m128i *row = (__m128i *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
-      __m128i product = _mm_maddubs_epi16(
-          _mm_load_si128(&inVec[j]), _mm_load_si128(&row[j]));
+      __m128i product = _mm_maddubs_epi16(_mm_load_si128(&inVec[j]), _mm_load_si128(&row[j]));
       product = _mm_madd_epi16(product, kOnes);
       sum = _mm_add_epi32(sum, product);
     }
@@ -308,51 +304,13 @@ void clip_propagate(int32_t *input, uint8_t *output, unsigned numDims)
   __m256i *out = (__m256i *)output;
   for (unsigned i = 0; i < kNumChunks; i++) {
     const __m256i words0 = _mm256_srai_epi16(_mm256_packs_epi32(
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-          // HACK: Use _mm256_loadu_si256() instead of _mm256_load_si256. Because the binary
-          //       compiled with g++ in MSYS2 crashes here because the output memory is not aligned
-          //       even though alignas is specified.
-          _mm256_loadu_si256
-#else
-          _mm256_load_si256
-#endif
-
-          (&in[i * 4 + 0]),
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-          _mm256_loadu_si256
-#else
-          _mm256_load_si256
-#endif
-
-          (&in[i * 4 + 1])), kWeightScaleBits);
+          _mm256_loadA_si256(&in[i * 4 + 0]),
+          _mm256_loadA_si256(&in[i * 4 + 1])), kWeightScaleBits);
     const __m256i words1 = _mm256_srai_epi16(_mm256_packs_epi32(
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-          _mm256_loadu_si256
-#else
-          _mm256_load_si256
-#endif
-
-          (&in[i * 4 + 2]),
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-          _mm256_loadu_si256
-#else
-          _mm256_load_si256
-#endif
-
-          (&in[i * 4 + 3])), kWeightScaleBits);
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-      _mm256_storeu_si256
-#else
-      _mm256_store_si256
-#endif
-
-      (&out[i], _mm256_permutevar8x32_epi32(_mm256_max_epi8(
-                                                            _mm256_packs_epi16(words0, words1), kZero), kOffsets));
+          _mm256_loadA_si256(&in[i * 4 + 2]),
+          _mm256_loadA_si256(&in[i * 4 + 3])), kWeightScaleBits);
+      _mm256_storeA_si256(&out[i], _mm256_permutevar8x32_epi32(_mm256_max_epi8(
+          _mm256_packs_epi16(words0, words1), kZero), kOffsets));
   }
   const unsigned kStart = kNumChunks * kSimdWidth;
 
@@ -442,11 +400,7 @@ void refresh_accumulator(const Position *pos)
       __m256i *column = (__m256i *)(&ft_weights[offset]);
       const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
       for (unsigned j = 0; j < kNumChunks; j++)
-#if defined(__MINGW32__) || defined(__MINGW64__)
-        _mm256_storeu_si256(&accumulation[j], _mm256_add_epi16(_mm256_loadu_si256(&accumulation[j]), column[j]));
-#else
-        accumulation[j] = _mm256_add_epi16(accumulation[j], column[j]);
-#endif
+        _mm256_storeA_si256(&accumulation[j], _mm256_add_epi16(_mm256_loadA_si256(&accumulation[j]), column[j]));
 
 #elif defined(USE_SSE2)
       __m128i *accumulation = (__m128i *)(&accumulator->accumulation[c][0]);
@@ -510,35 +464,12 @@ void transform(const Position *pos, uint8_t *output, bool refresh)
 #if defined(USE_AVX2)
     __m256i *out = (__m256i *)(&output[offset]);
     for (unsigned i = 0; i < kNumChunks; i++) {
-      __m256i sum0 =
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-        // HACK: Use _mm256_loadu_si256() instead of _mm256_load_si256. Because the binary
-        //       compiled with g++ in MSYS2 crashes here because the output memory is not aligned
-        //       even though alignas is specified.
-        _mm256_loadu_si256
-#else
-        _mm256_load_si256
-#endif
-
-        (&((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 0]);
-      __m256i sum1 =
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-        _mm256_loadu_si256
-#else
-        _mm256_load_si256
-#endif
-
-        (&((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 1]);
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-      _mm256_storeu_si256
-#else
-        _mm256_store_si256
-#endif
-
-        (&out[i], _mm256_permute4x64_epi64(_mm256_max_epi8(_mm256_packs_epi16(sum0, sum1), kZero), kControl));
+      __m256i sum0 = _mm256_loadA_si256(
+          &((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 0]);
+      __m256i sum1 = _mm256_loadA_si256(
+          &((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 1]);
+      _mm256_storeA_si256(&out[i], _mm256_permute4x64_epi64(_mm256_max_epi8(
+          _mm256_packs_epi16(sum0, sum1), kZero), kControl));
     }
 
 #elif defined(USE_SSSE3)

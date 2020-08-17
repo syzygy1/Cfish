@@ -912,7 +912,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
       && (ss-1)->statScore < 23824
       && eval >= beta
       && eval >= ss->staticEval
-      && ss->staticEval >= beta - 33 * depth - 33 * improving + 112 * !!ttPv + 311
+      && ss->staticEval >= beta - 28 * depth - 28 * improving + 94 * !!ttPv + 200
       && !excludedMove
       && non_pawn_material_c(stm())
       && (ss->ply >= pos->nmpMinPly || stm() != pos->nmpColor))
@@ -1156,7 +1156,7 @@ moves_loop: // When in check search starts from here.
             && !(PvNode && abs(bestValue) < 2)
             && PieceValue[MG][type_of_p(movedPiece)] >= PieceValue[MG][type_of_p(piece_on(to_sq(move)))]
             && !inCheck
-            && ss->staticEval + 267 + 391 * lmrDepth
+            && ss->staticEval + 178 + 261 * lmrDepth
                + PieceValue[MG][type_of_p(piece_on(to_sq(move)))] <= alpha)
           continue;
 
@@ -1173,7 +1173,7 @@ moves_loop: // When in check search starts from here.
     // that move is singular and should be extended. To verify this we do a
     // reduced search on all the other moves but the ttMove and if the
     // result is lower than ttValue minus a margin, then we extend the ttMove.
-    if (    depth >= 6
+    if (    depth >= 7
         &&  move == ttMove
         && !rootNode
         && !excludedMove // No recursive singular search
@@ -1250,7 +1250,8 @@ moves_loop: // When in check search starts from here.
       extension = 1;
 
     // Castling extension
-    if (type_of_m(move) == CASTLING)
+    if (   type_of_m(move) == CASTLING
+        && popcount(pieces_c(stm()) & ~pieces_p(PAWN) & (to_sq(move) & 0x03 ? KingSide : QueenSide)) <= 3)
       extension = 1;
 
     // Late irreversible move extension
@@ -1278,7 +1279,7 @@ moves_loop: // When in check search starts from here.
     // Step 16. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3
-        &&  moveCount > 1 + 2 * rootNode
+        &&  moveCount > 1 + 2 * rootNode + 2 * (PvNode && abs(bestValue) < 2)
         && (!rootNode || best_move_count(pos, move) == 0)
         && (   !captureOrPromotion
             || moveCountPruning

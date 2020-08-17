@@ -70,11 +70,6 @@ struct EvalInfo {
 
 typedef struct EvalInfo EvalInfo;
 
-#define Center      ((FileDBB | FileEBB) & (Rank4BB | Rank5BB))
-#define QueenSide   (FileABB | FileBBB | FileCBB | FileDBB)
-#define CenterFiles (FileCBB | FileDBB | FileEBB | FileFBB)
-#define KingSide    (FileEBB | FileFBB | FileGBB | FileHBB)
-
 static const Bitboard KingFlank[8] = {
   QueenSide ^ FileDBB, QueenSide, QueenSide, CenterFiles,
   CenterFiles, KingSide, KingSide, KingSide ^ FileEBB
@@ -85,7 +80,7 @@ enum {
   LazyThreshold1 =  1400,
   LazyThreshold2 =  1300,
   SpaceThreshold = 12222,
-  NNUEThreshold  =   520
+  NNUEThreshold  =   575
 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -854,7 +849,7 @@ Value evaluate(const Position *pos)
     return nnue_evaluate(pos) + Tempo;
 
   // Take NNUE eval only on balanced positions
-  Vale v = eg_value(psq_score());
+  Value v = eg_value(psq_score());
   if (abs(v) < NNUEThreshold)
     return nnue_evaluate(pos) + Tempo;
 

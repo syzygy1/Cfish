@@ -120,7 +120,7 @@ static Option optionsMap[] = {
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
 #ifdef NNUE
-  { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, "nn-9931db908a9b.nnue", NULL, 0, NULL },
+  { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, "nn-112bb1c8cdb5.nnue", NULL, 0, NULL },
   { "Pure NNUE", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
 #endif
   { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_large_pages, 0, NULL },

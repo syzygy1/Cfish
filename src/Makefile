@@ -264,6 +264,9 @@ ifeq ($(COMP),gcc)
 	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
 		CFLAGS += -Wno-pedantic-ms-format
 	endif
+
+	gccversion = $(shell $(CC) --version)
+	gccisclang = $(findstring clang,$(gccversion))
 endif
 
 ifeq ($(COMP),mingw)
