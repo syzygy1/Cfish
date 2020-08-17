@@ -7,7 +7,7 @@
 #include "types.h"
 
 typedef struct {
-  alignas(32) int16_t accumulation[2][256];
+  alignas(64) int16_t accumulation[2][256];
   Value score;
   bool computedAccumulation;
 } Accumulator;

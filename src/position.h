@@ -199,6 +199,7 @@ struct Position {
   HANDLE nativeThread;
   HANDLE startEvent, stopEvent;
 #endif
+  void *stackAllocation;
 };
 
 // FEN string input/output
