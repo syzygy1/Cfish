@@ -87,6 +87,7 @@ debug = no
 sanitize = no
 bits = 64
 prefetch = no
+nnue_noint8 = no
 popcnt = no
 mmx = no
 sse = no
@@ -127,6 +128,7 @@ ifeq ($(ARCH),x86-64)
 	arch = x86_64
 	prefetch = yes
 	sse = yes
+	nnue_noint8 = yes
 endif
 
 ifeq ($(ARCH),x86-64-sse3-popcnt)
@@ -426,6 +428,10 @@ ifeq ($(popcnt),yes)
 	endif
 endif
 
+ifeq ($(nnue_noint8),yes)
+	CFLAGS += -DNNUE_NOINT8
+endif
+
 ### 3.7 pext
 ifeq ($(pext),yes)
 	CFLAGS += -DUSE_PEXT
@@ -689,6 +695,7 @@ config-sanity:
 	@echo "kernel: '$(KERNEL)'"
 	@echo "os: '$(OS)'"
 	@echo "prefetch: '$(prefetch)'"
+	@echo "nnue_noint8: '$(nnue_noint8)'"
 	@echo "popcnt: '$(popcnt)'"
 	@echo "sse: '$(sse)'"
 	@echo "ssse3: '$(ssse3)'"
@@ -701,7 +708,7 @@ config-sanity:
 	@echo ""
 	@echo "Flags:"
 	@echo "CXX: $(CXX)"
-	@echo "CXXFLAGS: $(CXXFLAGS)"
+	@echo "CFLAGS: $(CFLAGS)"
 	@echo "LDFLAGS: $(LDFLAGS)"
 	@echo ""
 	@echo "Testing config sanity. If this fails, try 'make help' ..."
@@ -714,6 +721,7 @@ config-sanity:
 	 test "$(arch)" = "armv7" || test "$(arch)" = "armv8-a" || test "$(arch)" = "arm64"
 	@test "$(bits)" = "32" || test "$(bits)" = "64"
 	@test "$(prefetch)" = "yes" || test "$(prefetch)" = "no"
+	@test "$(nnue_noint8)" = "yes" || test "$(nnue_noint8)" = "no"
 	@test "$(popcnt)" = "yes" || test "$(popcnt)" = "no"
 	@test "$(sse)" = "yes" || test "$(sse)" = "no"
 	@test "$(ssse3)" = "yes" || test "$(ssse3)" = "no"
