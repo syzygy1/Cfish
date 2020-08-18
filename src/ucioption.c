@@ -121,7 +121,8 @@ static Option optionsMap[] = {
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
 #ifdef NNUE
   { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, "nn-112bb1c8cdb5.nnue", NULL, 0, NULL },
-  { "Pure NNUE", OPT_TYPE_CHECK, 0, 0, 0, NULL, NULL, 0, NULL },
+  { "Use NNUE", OPT_TYPE_COMBO, 0, 0, 0,
+    "Hybrid var Hybrid var Pure var Classical", NULL, 0, NULL },
 #endif
   { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_large_pages, 0, NULL },
   { "NUMA", OPT_TYPE_STRING, 0, 0, 0, "all", on_numa, 0, NULL },

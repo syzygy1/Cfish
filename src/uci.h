@@ -59,7 +59,7 @@ enum {
   OPT_BOOK_DEPTH,
 #ifdef NNUE
   OPT_EVAL_FILE,
-  OPT_PURE_NNUE,
+  OPT_USE_NNUE,
 #endif
   OPT_LARGE_PAGES,
   OPT_NUMA

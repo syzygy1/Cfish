@@ -798,7 +798,9 @@ static char *loadedFile = NULL;
 
 void nnue_init(void)
 {
-  pureNNUE = option_value(OPT_PURE_NNUE);
+  const char *s = option_string_value(OPT_USE_NNUE);
+  useNNUE =  strcmp(s, "classical") == 0 ? EVAL_CLASSICAL
+           : strcmp(s, "pure"     ) == 0 ? EVAL_PURE : EVAL_HYBRID;
 
   const char *evalFile = option_string_value(OPT_EVAL_FILE);
   if (loadedFile && strcmp(evalFile, loadedFile) == 0)
@@ -812,11 +814,7 @@ void nnue_init(void)
     return;
   }
 
-  fprintf(stderr, "NNUE evaluation used, but the network file %s was not "
-                  "loaded successfully. These network evaluation paramaters "
-                  "must be available, and compatible with this version of the "
-                  "code. The UCI option EvalFile might need to specify the "
-                  "full path to the file, including the directory/folder name. "
+  fprintf(stderr, "The network file %s was not loaded successfully.\n"
                   "The default net can be downloaded from: https://tests.stock"
                   "fishchess.org/api/nn/%s\n", evalFile,
                   option_default_string_value(OPT_EVAL_FILE));

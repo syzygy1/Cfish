@@ -6,7 +6,8 @@
 enum { Tempo = 28 };
 
 #ifdef NNUE
-extern bool pureNNUE;
+enum { EVAL_HYBRID, EVAL_PURE, EVAL_CLASSICAL };
+extern int useNNUE;
 #endif
 
 Value evaluate(const Position *pos);

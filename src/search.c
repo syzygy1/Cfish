@@ -231,9 +231,17 @@ void mainthread_search(void)
   bool playBookMove = false;
 
 #ifdef NNUE
-  printf("info string NNUE evaluation using %s enabled.\n", option_string_value(OPT_EVAL_FILE));
-#else
-//  printf("info string classical evaluation enabled.\n");
+  switch (useNNUE) {
+  case EVAL_HYBRID:
+    printf("info string Hybrid NNUE evaluation using %s enabled.\n", option_string_value(OPT_EVAL_FILE));
+    break;
+  case EVAL_PURE:
+    printf("info string Pure NNUE evaluation using %s enabled.\n", option_string_value(OPT_EVAL_FILE));
+    break;
+  case EVAL_CLASSICAL:
+    printf("info string Classical evaluation enabled.\n");
+    break;
+  }
 #endif
 
   base_ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;

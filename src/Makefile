@@ -606,8 +606,13 @@ help:
 	@echo "x86-64-ssse3            > x86 64-bit with ssse3 support"
 	@echo "x86-64-sse3-popcnt      > x86 64-bit with sse3 and popcnt support"
 	@echo "x86-64                  > x86 64-bit generic"
-	@echo "x86-32                  > x86 32-bit (also enables MMX and SSE)"
-	@echo "x86-32-old              > x86 32-bit fall back for old hardware"
+	@echo "x86-32-vnni             |"
+	@echo "x86-32-...              | same as for x86-64"
+	@echo "x86-32-sse3-popcnt      |"
+	@echo "x86-32-sse2             > x86 32-bit with sse2 support"
+	@echo "x86-32-mmx-sse          > x86 32-bit with mmx and sse support"
+	@echo "x86-32-mmx              > x86 32-bit with mmx support"
+	@echo "x86-32                  > x86 32-bit generic"
 	@echo "ppc-64                  > PPC 64-bit"
 	@echo "ppc-32                  > PPC 32-bit"
 	@echo "armv7                   > ARMv7 32-bit"
@@ -631,7 +636,7 @@ help:
 	@echo "Advanced examples, for experienced users looking for performance: "
 	@echo ""
 	@echo "make    help  ARCH=x86-64-bmi2"
-	@echo "make -j profile-build ARCH=x86-64-bmi2 COMP=gcc COMPCXX=g++-9.0"
+	@echo "make -j profile-build ARCH=x86-64-bmi2 COMP=gcc COMPC=gcc-9.0"
 	@echo "make -j build ARCH=x86-64-ssse3 COMP=clang"
 	@echo ""
 ifneq ($(empty_arch),yes)
@@ -648,7 +653,7 @@ endif
 build: config-sanity
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) all
 
-profile-build: config-sanity objclean profileclean
+profile-build: net config-sanity objclean profileclean
 	@echo ""
 	@echo "Step 1/4. Building instrumented executable ..."
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_make)
@@ -675,7 +680,7 @@ clean: objclean profileclean
 	@rm -f .depend core
 
 net:
-	$(eval nnuenet := $(shell grep EvalFile ucioption.c | grep Option | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
+	$(eval nnuenet := $(shell grep EvalFile ucioption.c | grep OPT_TYPE_STRING | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
 	@echo "Default net: $(nnuenet)"
 	$(eval nnuedownloadurl := https://tests.stockfishchess.org/api/nn/$(nnuenet))
 	$(eval curl_or_wget := $(shell if hash curl 2>/dev/null; then echo "curl -skL"; elif hash wget 2>/dev/null; then echo "wget -qO-"; fi))

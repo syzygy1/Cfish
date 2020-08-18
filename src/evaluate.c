@@ -753,10 +753,11 @@ INLINE Value evaluate_winnable(const Position *pos, EvalInfo *ei, Score score)
 }
 
 
-// evaluate_classic() is the classic evaluation function. It returns a static
-// evaluation of the position from the point of view of the side to move.
+// evaluate_classical() is the classical evaluation function. It returns
+// a static evaluation of the position from the point of view of the side
+// to move.
 
-static Value evaluate_classic(const Position *pos)
+static Value evaluate_classical(const Position *pos)
 {
   assert(!checkers());
 
@@ -839,21 +840,28 @@ make_v:
   return v;
 }
 
-bool pureNNUE;
+#ifdef NNUE
+int useNNUE;
+#endif
 
 Value evaluate(const Position *pos)
 {
 #ifdef NNUE
 
-  if (pureNNUE)
+  if (useNNUE == EVAL_HYBRID) {
+    // Take NNUE eval only on balanced positions
+    Value v = eg_value(psq_score());
+    if (abs(v) < NNUEThreshold)
+      return nnue_evaluate(pos) + Tempo;
+    else
+      return evaluate_classical(pos);
+  }
+  else if (useNNUE == EVAL_PURE) {
     return nnue_evaluate(pos) + Tempo;
-
-  // Take NNUE eval only on balanced positions
-  Value v = eg_value(psq_score());
-  if (abs(v) < NNUEThreshold)
-    return nnue_evaluate(pos) + Tempo;
+  }
 
 #endif
 
-  return evaluate_classic(pos);
+  return evaluate_classical(pos);
+
 }

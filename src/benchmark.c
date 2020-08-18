@@ -23,7 +23,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "evaluate.h"
 #include "misc.h"
+#ifdef NNUE
+#include "nnue.h"
+#endif
 #include "position.h"
 #include "search.h"
 #include "settings.h"
@@ -95,12 +99,14 @@ static char *Defaults[] = {
 };
 
 // benchmark() runs a simple benchmark by letting Stockfish analyze a set
-// of positions for a given limit each. There are five parameters: the
-// transposition table size, the number of search threads that should
-// be used, the limit value spent for each position (optional, default is
-// depth 13), an optional file name where to look for positions in FEN
-// format (defaults are the positions defined above) and the type of the
-// limit value: depth (default), time in millisecs or number of nodes.
+// of positions for a given limit each. There are six optional parameters:
+// - Transposition table size. Default is 16 MB.
+// - Number of search threads to use. Default is 1 thread.
+// - Limit value for each search. Default is (depth) 13.
+// - File name with the positions to search in FEN format. The default
+//   positions are listed above.
+// - Type of the limit value: depth (default), time (in msecs), nodes.
+// - Evaluation: classical, nnue (hybrid), pure (NNUE only), mixed (default).
 
 void benchmark(Position *current, char *str)
 {
@@ -113,8 +119,11 @@ void benchmark(Position *current, char *str)
   int ttSize      = (token = strtok(str , " ")) ? atoi(token)  : 16;
   int threads     = (token = strtok(NULL, " ")) ? atoi(token)  : 1;
   int64_t limit   = (token = strtok(NULL, " ")) ? atoll(token) : 13;
-  char *fenFile   = (token = strtok(NULL, " ")) ? token        : NULL;
-  char *limitType = (token = strtok(NULL, " ")) ? token        : "";
+  char *fenFile   = (token = strtok(NULL, " ")) ? token        : "default";
+  char *limitType = (token = strtok(NULL, " ")) ? token        : "depth";
+#ifdef NNUE
+  char *evalType  = (token = strtok(NULL, " ")) ? token        : "mixed";
+#endif
 
   delayedSettings.ttSize = ttSize;
   delayedSettings.numThreads = threads;
@@ -130,11 +139,11 @@ void benchmark(Position *current, char *str)
   else
     Limits.depth = limit;
 
-  if (!fenFile || strcmp(fenFile, "default") == 0) {
+  if (strcasecmp(fenFile, "default") == 0) {
     fens = Defaults;
     numFens = sizeof(Defaults) / sizeof(char *);
   }
-  else if (strcmp(fenFile, "current") == 0) {
+  else if (strcasecmp(fenFile, "current") == 0) {
     fens = malloc(sizeof(*fens));
     fens[0] = malloc(128);
     pos_fen(current, fens[0]);
@@ -194,9 +203,20 @@ void benchmark(Position *current, char *str)
 
     fprintf(stderr, "\nPosition: %d/%d\n", ++j, numFens - numOpts);
 
-    if (strcmp(limitType, "perft") == 0)
+    if (strcasecmp(limitType, "perft") == 0)
       nodes += perft(&pos, Limits.depth);
     else {
+#ifdef NNUE
+      if (strcasecmp(evalType, "classical") == 0)
+        useNNUE = EVAL_CLASSICAL;
+      else if (strcasecmp(evalType, "nnue") == 0)
+        useNNUE = EVAL_HYBRID;
+      else if (strcasecmp(evalType, "pure") == 0)
+        useNNUE = EVAL_PURE;
+      else if (strcasecmp(evalType, "mixed") == 0)
+        useNNUE = j & 1 ? EVAL_CLASSICAL : EVAL_HYBRID;
+#endif
+
       Limits.startTime = now();
       start_thinking(&pos, false);
       thread_wait_until_sleeping(threads_main());
