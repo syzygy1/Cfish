@@ -55,13 +55,14 @@ static const size_t kSimdWidth = 16;
 
 //static const size_t kMaxSimdWidth = 32;
 
-// NNUEClamped_t is a type used in internal calculations for NNUE-clamped values.
-#ifdef NNUE_NOINT8
-typedef int16_t NNUEClamped_t; //SSE2 has no int8 multiply.
-typedef int16_t NNUEWeights_t;
+// clamped_t is a type used in internal calculations for NNUE-clamped values.
+
+#if defined(USE_SSE2) && !defined(USE_SSSE3)
+typedef int16_t clamped_t; //SSE2 has no int8 multiply.
+typedef int16_t weight_t;
 #else
-typedef uint8_t NNUEClamped_t;
-typedef int8_t NNUEWeights_t;
+typedef uint8_t clamped_t;
+typedef int8_t weight_t;
 #endif
 
 enum {
@@ -71,7 +72,7 @@ enum {
   kHalfDimensions = kTransformedFeatureDimensions,
   FtInDims = kDimensions,
   FtOutDims = kHalfDimensions * 2,
-  FtBufferSize = FtOutDims * sizeof(NNUEClamped_t)
+  FtBufferSize = FtOutDims * sizeof(clamped_t)
 };
 
 static uint32_t read_uint32_t(FILE *F)
@@ -131,16 +132,14 @@ static void half_kp_append_changed_indices(const Position *pos, Color c,
   }
 }
 
-// from feature_set.h
-static void append_active_indices(const Position *pos, //TriggerEvent trigger,
-    IndexList active[2])
+static void append_active_indices(const Position *pos, IndexList active[2])
 {
   for (unsigned c = 0; c < 2; c++)
     half_kp_append_active_indices(pos, c, &(active[c]));
 }
 
-static void append_changed_indices(const Position *pos, //TriggerEvent trigger,
-    IndexList removed[2], IndexList added[2], bool reset[2])
+static void append_changed_indices(const Position *pos, IndexList removed[2],
+    IndexList added[2], bool reset[2])
 {
   const DirtyPiece *dp = &(pos->st->dirtyPiece);
   if (dp->dirtyNum == 0) return;
@@ -155,41 +154,38 @@ static void append_changed_indices(const Position *pos, //TriggerEvent trigger,
 }
 
 // InputLayer = InputSlice<256 * 2>
-// NNUEClamped_t out, 512 dimensions
+// clamped_t out, 512 dimensions
 // kBufferSize = 0
 
 // Hidden1Layer = ClippedReLu<AffineTransform<InputLayer, 32>>
-// Affine: NNUEClamped_t in, int32_t out, 32 out dimensions
+// Affine: clamped_t in, int32_t out, 32 out dimensions
 // kPaddedInputDimensions = ROUND_UP(512, kMaxSimdWidth) = 512
 // kBufferSize = ROUND_UP(32 * sizeof(int32_t), kCacheLineSize) = 128
-// Clipped: int32_t in, NNUEClamped_t out, 32 dimensions
+// Clipped: int32_t in, clamped_t out, 32 dimensions
 // NNUE_NOINT8 not defined:
 // kBufferSize = ROUND_UP(32 * 1, kCachelineSize) = 32 -> 64
 // Otherwise: 64, too
 
 // Hidden2Layer = ClippedReLu<AffineTransform<hidden1, 32>>
-// Affine: NNUEClamped_t in, int32_t out
+// Affine: clamped_t in, int32_t out
 // kPaddedInputDimensions = ROUND_UP(32, kMaxSimdWidth) = 32
 // kOutputDimensions = 32
 // kBufferSize = ROUND_UP(32 * sizeof(int32_t), kCacheLineSize) = 128
-// Clipped: int32_t in, NNUEClamped_t out, 32 dimensions
+// Clipped: int32_t in, clamped_t out, 32 dimensions
 // NNUE_NOINT8 not defined:
 // kBufferSize = ROUND_UP(32 * 1, kCachelineSize) = 32 -> 64
 // Otherwise: 64, too
 
 // OutputLayer = AffineTransform<HiddenLayer2, 1>
-// NNUEClamped_t in, int32_t out, 1 dimension
+// clamped_t in, int32_t out, 1 dimension
 // kPaddedInputDimensions = ROUND_UP(32, kMaxSimdWidth) = 32
 // kBufferSize = ROUND_UP(1 * sizeof(int32_t), kCacheLineSize) = 4 -> 64
-#ifdef NNUE_NOINT8
-enum { NetBufferSize = 128 + 64 + 128 + 64 + 64 };
-#else
-enum { NetBufferSize = 128 + 64 + 128 + 64 + 64 }; //same for now
-#endif
 
-static alignas(64) NNUEWeights_t hidden1_weights[32 * 512];
-static alignas(64) NNUEWeights_t hidden2_weights[32 * 32];
-static alignas(64) NNUEWeights_t output_weights [1 * 32];
+enum { NetBufferSize = 128 + 64 + 128 + 64 + 64 };
+
+static alignas(64) weight_t hidden1_weights[32 * 512];
+static alignas(64) weight_t hidden2_weights[32 * 32];
+static alignas(64) weight_t output_weights [1 * 32];
 
 static int32_t hidden1_biases[32];
 static int32_t hidden2_biases[32];
@@ -215,10 +211,9 @@ static int32_t output_biases [1];
 #endif
 #endif
 
-void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDims,
-    unsigned outDims, int32_t biases[], NNUEWeights_t weights[])
+void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
+    unsigned outDims, int32_t biases[], weight_t weights[])
 {
-#ifndef NNUE_NOINT8
 #if defined(USE_AVX512)
   const unsigned kNumChunks = paddedInDims / (kSimdWidth * 2);
   __m512i kOnes = _mm512_set1_epi16(1);
@@ -229,13 +224,13 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
   __m256i kOnes = _mm256_set1_epi16(1);
   __m256i *inVec = (__m256i *)input;
 
-#elif defined(USE_SSE2)
+#elif defined(USE_SSSE3)
   const unsigned kNumChunks = paddedInDims / kSimdWidth;
-#ifndef USE_SSSE3
-  __m128i kZeros = _mm_setzero_si128();
-#else
   __m128i kOnes = _mm_set1_epi16(1);
-#endif
+  __m128i *inVec = (__m128i *)input;
+
+#elif defined(USE_SSE2)
+  const unsigned kNumChunks = paddedInDims / (kSimdWidth / 2);
   __m128i *inVec = (__m128i *)input;
 
 #elif defined(USE_MMX)
@@ -246,17 +241,13 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
 #elif defined(USE_NEON)
   const unsigned kNumChunks = paddedInDims / kSimdWidth;
   int8x8_t *inVec = (int8x8_t *)input;
-#endif
-#elif defined(USE_SSE2) // NNUE_NOINT8 is defined
-  const unsigned kNumChunks = paddedInDims / (kSimdWidth / 2);
-  __m128i *inVec = (__m128i *)input;
 
-#endif // NNUE_NOINT8
+#endif
 
   for (unsigned i = 0; i < outDims; ++i) {
     unsigned offset = i * paddedInDims;
 
-#if defined(USE_AVX512) && !defined(NNUE_NOINT8)
+#if defined(USE_AVX512)
     __m512i sum = _mm512_setzero_si512();
     __m512i *row = (__m512i *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
@@ -276,7 +267,7 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
     }
     output[i] = _mm512_reduce_add_epi32(sum) + biases[i];
 
-#elif defined(USE_AVX2) && !defined(NNUE_NOINT8)
+#elif defined(USE_AVX2)
     __m256i sum = _mm256_setzero_si256();
     __m256i *row = (__m256i *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
@@ -289,7 +280,7 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     output[i] = _mm_cvtsi128_si32(sum128) + biases[i];
 
-#elif defined(USE_SSSE3) && !defined(NNUE_NOINT8)
+#elif defined(USE_SSSE3)
     __m128i sum = _mm_setzero_si128();
     __m128i *row = (__m128i *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks - 1; j += 2) {
@@ -308,7 +299,8 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x4E)); //_MM_PERM_BADC
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xB1)); //_MM_PERM_CDAB
     output[i] = _mm_cvtsi128_si32(sum) + biases[i];
-#elif defined(USE_SSE2) && defined(NNUE_NOINT8)
+
+#elif defined(USE_SSE2)
     __m128i sum = _mm_setzero_si128();
     __m128i sum1 = sum;
     __m128i *row = (__m128i *)&weights[offset];
@@ -326,31 +318,7 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
     sum = _mm_add_epi32(sum, _mm_shufflelo_epi16(sum, 0xE));
     output[i] = _mm_cvtsi128_si32(sum) + biases[i];
 
-#elif defined(USE_SSE2) && !defined(NNUE_NOINT8)
-    __m128i sum_lo = _mm_cvtsi32_si128(biases[i]);
-    __m128i sum_hi = kZeros;
-    __m128i *row = (__m128i *)(&weights[offset]);
-    for (unsigned j = 0; j < kNumChunks; j++) {
-      __m128i row_j = _mm_load_si128(&row[j]);
-      __m128i input_j = _mm_load_si128(&inVec[j]);
-      __m128i row_signs = _mm_cmpgt_epi8(kZeros, row_j);
-      __m128i extended_row_lo = _mm_unpacklo_epi8(row_j, row_signs);
-      __m128i extended_row_hi = _mm_unpackhi_epi8(row_j, row_signs);
-      __m128i extended_input_lo = _mm_unpacklo_epi8(input_j, kZeros);
-      __m128i extended_input_hi = _mm_unpackhi_epi8(input_j, kZeros);
-      __m128i product_lo = _mm_madd_epi16(extended_row_lo, extended_input_lo);
-      __m128i product_hi = _mm_madd_epi16(extended_row_hi, extended_input_hi);
-      sum_lo = _mm_add_epi32(sum_lo, product_lo);
-      sum_hi = _mm_add_epi32(sum_hi, product_hi);
-    }
-    __m128i sum = _mm_add_epi32(sum_lo, sum_hi);
-    __m128i sum_high_64 = _mm_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2));
-    sum = _mm_add_epi32(sum, sum_high_64);
-    __m128i sum_second_32 = _mm_shufflelo_epi16(sum, _MM_SHUFFLE(1, 0, 3, 2));
-    sum = _mm_add_epi32(sum, sum_second_32);
-    output[i] = _mm_cvtsi128_si32(sum);
-
-#elif defined(USE_MMX) && !defined(NNUE_NOINT8)
+#elif defined(USE_MMX)
     __m64 sum_lo = _mm_cvtsi32_si64(biases[i]);
     __m64 sum_hi = kZeros;
     __m64 *row = (__m64 *)&weights[offset];
@@ -371,7 +339,7 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
     sum = _mm_add_pi32(sum, _mm_unpackhi_pi32(sum, sum));
     output[i] = _mm_cvtsi64_si32(sum);
 
-#elif defined(USE_NEON) && !defined(NNUE_NOINT8)
+#elif defined(USE_NEON)
     int32x4_t sum = {biases[i]};
     int8x8_t *row = (int8x8_t *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
@@ -394,9 +362,8 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
 #endif
 }
 
-void clip_propagate(int32_t *input, NNUEClamped_t *output, unsigned numDims)
+void clip_propagate(int32_t *input, clamped_t *output, unsigned numDims)
 {
-#ifndef NNUE_NOINT8
 #if defined(USE_AVX2)
   const unsigned kNumChunks = numDims / kSimdWidth;
   const __m256i kZero = _mm256_setzero_si256();
@@ -476,15 +443,12 @@ void clip_propagate(int32_t *input, NNUEClamped_t *output, unsigned numDims)
 #else
   const unsigned kStart = 0;
 #endif
-#else // NNUE_NOINT8
-  const unsigned kStart = 0;
-#endif
 
   for (unsigned i = kStart; i < numDims; i++)
     output[i] = max(0, min(127, input[i] >> kWeightScaleBits));
 }
 
-void propagate(NNUEClamped_t *tf, NNUEClamped_t *buffer)
+void propagate(clamped_t *tf, clamped_t *buffer)
 {
   affine_propagate(tf, (int32_t *)buffer, 512, 32, hidden1_biases, hidden1_weights);
   clip_propagate((int32_t *)buffer, buffer + 128, 32);
@@ -679,46 +643,46 @@ bool update_accumulator_if_possible(const Position *pos)
 }
 
 // Convert input features
-void transform(const Position *pos, NNUEClamped_t *output)
+void transform(const Position *pos, clamped_t *output)
 {
   if (!update_accumulator_if_possible(pos))
     refresh_accumulator(pos);
 
   int16_t (*accumulation)[2][256] = &(pos->st->accumulator.accumulation);
 
-#if defined(USE_AVX2) && !defined(NNUE_NOINT8)
+#if defined(USE_AVX2)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
   const __m256i kZero = _mm256_setzero_si256();
 
+#elif defined(USE_SSE41)
+  const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
+  const __m128i kZero = _mm_setzero_si128();
+
+#elif defined(USE_SSSE3)
+  const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
+  const __m128i k0x80s = _mm_set1_epi8(-128);
+
 #elif defined(USE_SSE2)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
-
-#ifdef USE_SSE41
-  const __m128i kZero = _mm_setzero_si128();
-#else
-  const __m128i k0x80s = _mm_set1_epi8(-128);
-#endif
-
-#ifdef NNUE_NOINT8
   const __m128i k0xff80s = _mm_set1_epi16(-128);
   const __m128i k0x8000s = _mm_set1_epi16(-32768);
   const __m128i k0x7f80s = _mm_xor_si128(k0xff80s, k0x8000s);
-#endif
 
-#elif defined(USE_MMX) && !defined(NNUE_NOINT8)
+#elif defined(USE_MMX)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
   const __m64 k0x80s = _mm_set1_pi8(-128);
 
-#elif defined(USE_NEON) && !defined(NNUE_NOINT8)
+#elif defined(USE_NEON)
   const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
   const int8x8_t kZero = {0};
+
 #endif
 
   const Color perspectives[2] = { stm(), !stm() };
   for (unsigned p = 0; p < 2; p++) {
     const unsigned offset = kHalfDimensions * p;
 
-#if defined(USE_AVX2) && !defined(NNUE_NOINT8)
+#if defined(USE_AVX2)
     __m256i *out = (__m256i *)(&output[offset]);
     for (unsigned i = 0; i < kNumChunks; i++) {
       __m256i sum0 = _mm256_loadA_si256(
@@ -736,7 +700,8 @@ void transform(const Position *pos, NNUEClamped_t *output)
             (*accumulation)[perspectives[p]]))[i * 2 + 0]);
       __m128i sum1 = _mm_load_si128(&((__m128i *)(&
             (*accumulation)[perspectives[p]]))[i * 2 + 1]);
-#ifndef NNUE_NOINT8
+
+#if defined(USE_SSSE3)
       __m128i packedbytes = _mm_packs_epi16(sum0, sum1);
       _mm_store_si128(&out[i],
 #ifdef USE_SSE41
@@ -745,14 +710,15 @@ void transform(const Position *pos, NNUEClamped_t *output)
           _mm_subs_epi8(_mm_adds_epi8(packedbytes, k0x80s), k0x80s)
 #endif
       );
-#else // NNUE_NOINT8
+#else // SSE2 only
       _mm_store_si128(&out[i * 2 + 0], _mm_sub_epi16(
           _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum0,k0x8000s)),k0xff80s) );
       _mm_store_si128(&out[i * 2 + 1], _mm_sub_epi16(
           _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum1,k0x8000s)),k0xff80s) );
 #endif
     }
-#elif defined(USE_MMX) && !defined(NNUE_NOINT8)
+
+#elif defined(USE_MMX)
     __m64 *out = (__m64 *)(&output[offset]);
     for (unsigned j = 0; j < kNumChunks; j++) {
       __m64 sum0 = ((__m64 *)((*accumulation)[perspectives[p]]))[j * 2 + 0];
@@ -761,7 +727,7 @@ void transform(const Position *pos, NNUEClamped_t *output)
       out[j] = _mm_subs_pi8(_mm_adds_pi8(packedbytes, k0x80s), k0x80s);
     }
 
-#elif defined(USE_NEON) && !defined(NNUE_NOINT8)
+#elif defined(USE_NEON)
     int8x8_t *out = (int8x8_t *)(&output[offset]);
     for (unsigned i = 0; i < kNumChunks; i++) {
       int16x8_t sum = ((int16x8_t *)((*accumulation)[perspectives[p]]))[i];
@@ -773,6 +739,7 @@ void transform(const Position *pos, NNUEClamped_t *output)
       int16_t sum = (*accumulation)[perspectives[p]][i];
       output[offset + i] = max(0, min(127, sum));
     }
+
 #endif
 
   }
@@ -805,18 +772,18 @@ ExtPieceSquare KppBoardIndex[] = {
 // Calculate the evaluation value
 static Value compute_score(const Position *pos)
 {
-  alignas(kCacheLineSize) NNUEClamped_t transformed_features[FtBufferSize];
+  alignas(kCacheLineSize) clamped_t transformed_features[FtBufferSize];
   transform(pos, transformed_features);
-  alignas(kCacheLineSize) NNUEClamped_t buffer[NetBufferSize];
+  alignas(kCacheLineSize) clamped_t buffer[NetBufferSize];
   propagate(transformed_features, buffer);
 
   return *(int32_t *)(buffer + 384) / FV_SCALE;
 }
 
-bool read_weights(NNUEWeights_t* output_buf, unsigned int count, FILE* F) {
-  NNUEWeights_t * ptr =  output_buf;
+bool read_weights(weight_t* output_buf, unsigned int count, FILE* F) {
+  weight_t * ptr =  output_buf;
   for (unsigned i = 0; i < count; ++i) {
-    *ptr = (NNUEWeights_t)(int8_t) fgetc(F);
+    *ptr = (weight_t)(int8_t) fgetc(F);
     ++ptr;
   }
   return true;
@@ -846,12 +813,12 @@ bool load_eval_file(const char *evalFile)
   // Read network
   hash = read_uint32_t(F);
   if (hash != 0x63337156) return false;
-  fread(hidden1_biases , sizeof(int32_t), 32      , F);
+  fread(hidden1_biases, sizeof(int32_t), 32, F);
   read_weights(hidden1_weights, 32 * 512, F);
-  fread(hidden2_biases , sizeof(int32_t), 32      , F);
+  fread(hidden2_biases, sizeof(int32_t), 32, F);
   read_weights(hidden2_weights, 32 * 32 , F);
-  fread(output_biases  , sizeof(int32_t), 1       , F);
-  read_weights(output_weights , 1  * 32 , F);
+  fread(output_biases, sizeof(int32_t), 1 , F);
+  read_weights(output_weights, 1  * 32 , F);
 
   return true;
 //  return feof(F);

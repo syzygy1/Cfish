@@ -62,6 +62,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # popcnt = yes/no     --- -DUSE_POPCNT     --- Use popcnt asm-instruction
 # pext = yes/no       --- -DUSE_PEXT       --- Use pext x86_64 asm-instruction
 # sse = yes/no        --- -msse            --- Use Intel Streaming SIMD Extensions
+# mmx = yes/no        --- -mmmx            --- Use Intel MMX instructions
 # sse2 = yes/no       --- -msse2           --- Use Intel Streaming SIMD Extensions 2
 # ssse3 = yes/no      --- -mssse3          --- Use Intel Supplemental Streaming SIMD Extensions 3
 # sse41 = yes/no      --- -msse4.1         --- Use Intel Streaming SIMD Extensions 4.1
@@ -88,7 +89,6 @@ sanitize = no
 numa = yes
 bits = 64
 prefetch = no
-nnue_noint8 = no
 popcnt = no
 pext = no
 sse = no
@@ -394,7 +394,7 @@ else
 endif
 
 ifneq ($(sanitize),no)
-	CXXFLAGS += -g3 -fsanitize=$(sanitize)
+	CFLAGS += -g3 -fsanitize=$(sanitize)
 	LDFLAGS += -fsanitize=$(sanitize)
 endif
 
@@ -446,10 +446,6 @@ ifeq ($(popcnt),yes)
 		CFLAGS += -msse3 -mpopcnt -DUSE_POPCNT
 	endif
 	endif
-endif
-
-ifeq ($(nnue_noint8),yes)
-	CFLAGS += -DNNUE_NOINT8
 endif
 
 ### 3.7 pext
@@ -645,7 +641,7 @@ help:
 	@echo "make -j build ARCH=x86-64-ssse3 COMP=clang"
 	@echo ""
 ifneq ($(empty_arch),yes)
-	@echo "-------------------------------\n"
+	@echo "-------------------------------"
 	@echo "The selected architecture $(ARCH) will enable the following configuration: "
 	@$(MAKE) ARCH=$(ARCH) COMP=$(COMP) config-sanity
 endif
@@ -723,19 +719,20 @@ config-sanity:
 	@echo "kernel: '$(KERNEL)'"
 	@echo "os: '$(OS)'"
 	@echo "prefetch: '$(prefetch)'"
-	@echo "nnue_noint8: '$(nnue_noint8)'"
 	@echo "popcnt: '$(popcnt)'"
+	@echo "pext: '$(pext)'"
 	@echo "sse: '$(sse)'"
+	@echo "mmx: '$(mmx)'"
+	@echo "sse2: '$(sse2)'"
 	@echo "ssse3: '$(ssse3)'"
 	@echo "sse41: '$(sse41)'"
 	@echo "avx2: '$(avx2)'"
-	@echo "pext: '$(pext)'"
 	@echo "avx512: '$(avx512)'"
 	@echo "vnni: '$(vnni)'"
 	@echo "neon: '$(neon)'"
 	@echo ""
 	@echo "Flags:"
-	@echo "CXX: $(CXX)"
+	@echo "CC: $(CC)"
 	@echo "CFLAGS: $(CFLAGS)"
 	@echo "LDFLAGS: $(LDFLAGS)"
 	@echo ""
@@ -749,9 +746,10 @@ config-sanity:
 	 test "$(arch)" = "armv7" || test "$(arch)" = "armv8-a" || test "$(arch)" = "arm64"
 	@test "$(bits)" = "32" || test "$(bits)" = "64"
 	@test "$(prefetch)" = "yes" || test "$(prefetch)" = "no"
-	@test "$(nnue_noint8)" = "yes" || test "$(nnue_noint8)" = "no"
 	@test "$(popcnt)" = "yes" || test "$(popcnt)" = "no"
 	@test "$(sse)" = "yes" || test "$(sse)" = "no"
+	@test "$(mmx)" = "yes" || test "$(mmx)" = "no"
+	@test "$(sse2)" = "yes" || test "$(sse2)" = "no"
 	@test "$(ssse3)" = "yes" || test "$(ssse3)" = "no"
 	@test "$(sse41)" = "yes" || test "$(sse41)" = "no"
 	@test "$(avx2)" = "yes" || test "$(avx2)" = "no"
