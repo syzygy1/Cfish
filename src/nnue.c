@@ -690,7 +690,7 @@ void transform(const Position *pos, NNUEClamped_t *output)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
   const __m256i kZero = _mm256_setzero_si256();
 
-#elif defined(USE_SSE2) && !defined(NNUE_NOINT8)
+#elif defined(USE_SSE2)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
 
 #ifdef USE_SSE41
@@ -699,8 +699,11 @@ void transform(const Position *pos, NNUEClamped_t *output)
   const __m128i k0x80s = _mm_set1_epi8(-128);
 #endif
 
-#elif defined(USE_SSE2) && defined(NNUE_NOINT8)
-//  const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
+#ifdef NNUE_NOINT8
+  const __m128i k0xff80s = _mm_set1_epi16(-128);
+  const __m128i k0x8000s = _mm_set1_epi16(-32768);
+  const __m128i k0x7f80s = _mm_xor_si128(k0xff80s, k0x8000s);
+#endif
 
 #elif defined(USE_MMX) && !defined(NNUE_NOINT8)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
@@ -726,15 +729,15 @@ void transform(const Position *pos, NNUEClamped_t *output)
           _mm256_packs_epi16(sum0, sum1), kZero), 0xd8));
     }
 
-#elif defined(USE_SSE2) && !defined(NNUE_NOINT8)
+#elif defined(USE_SSE2)
     __m128i *out = (__m128i *)(&output[offset]);
     for (unsigned i = 0; i < kNumChunks; i++) {
       __m128i sum0 = _mm_load_si128(&((__m128i *)(&
             (*accumulation)[perspectives[p]]))[i * 2 + 0]);
       __m128i sum1 = _mm_load_si128(&((__m128i *)(&
             (*accumulation)[perspectives[p]]))[i * 2 + 1]);
+#ifndef NNUE_NOINT8
       __m128i packedbytes = _mm_packs_epi16(sum0, sum1);
-
       _mm_store_si128(&out[i],
 #ifdef USE_SSE41
           _mm_max_epi8(packedbytes, kZero)
@@ -742,8 +745,13 @@ void transform(const Position *pos, NNUEClamped_t *output)
           _mm_subs_epi8(_mm_adds_epi8(packedbytes, k0x80s), k0x80s)
 #endif
       );
+#else // NNUE_NOINT8
+      _mm_store_si128(&out[i * 2 + 0], _mm_sub_epi16(
+          _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum0,k0x8000s)),k0xff80s) );
+      _mm_store_si128(&out[i * 2 + 1], _mm_sub_epi16(
+          _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum1,k0x8000s)),k0xff80s) );
+#endif
     }
-
 #elif defined(USE_MMX) && !defined(NNUE_NOINT8)
     __m64 *out = (__m64 *)(&output[offset]);
     for (unsigned j = 0; j < kNumChunks; j++) {
