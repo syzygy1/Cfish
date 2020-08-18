@@ -62,6 +62,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # popcnt = yes/no     --- -DUSE_POPCNT     --- Use popcnt asm-instruction
 # pext = yes/no       --- -DUSE_PEXT       --- Use pext x86_64 asm-instruction
 # sse = yes/no        --- -msse            --- Use Intel Streaming SIMD Extensions
+# sse2 = yes/no       --- -msse2           --- Use Intel Streaming SIMD Extensions 2
 # ssse3 = yes/no      --- -mssse3          --- Use Intel Supplemental Streaming SIMD Extensions 3
 # sse41 = yes/no      --- -msse4.1         --- Use Intel Streaming SIMD Extensions 4.1
 # avx2 = yes/no       --- -mavx2           --- Use Intel Advanced Vector Extensions 2
@@ -81,20 +82,21 @@ endif
 
 nnue = yes
 optimize = yes
-numa = yes
 lto = no
 debug = no
 sanitize = no
+numa = yes
 bits = 64
 prefetch = no
 nnue_noint8 = no
 popcnt = no
-mmx = no
+pext = no
 sse = no
+mmx = no
+sse2 = no
 ssse3 = no
 sse41 = no
 avx2 = no
-pext = no
 avx512 = no
 vnni = no
 neon = no
@@ -102,84 +104,78 @@ ARCH = x86-64-modern
 
 ### 2.2 Architecture specific
 
-ifeq ($(ARCH),general-32)
-	arch = any
-	bits = 32
-endif
+ifeq ($(findstring x86,$(ARCH)),x86)
 
-ifeq ($(ARCH),x86-32-old)
+# x86-32/64
+
+ifeq ($(findstring x86-32,$(ARCH)),x86-32)
 	arch = i386
 	bits = 32
-endif
-
-ifeq ($(ARCH),x86-32)
-	arch = i386
-	bits = 32
-	prefetch = yes
-	mmx = yes
-	sse = yes
-endif
-
-ifeq ($(ARCH),general-64)
-	arch = any
-endif
-
-ifeq ($(ARCH),x86-64)
+else
 	arch = x86_64
-	prefetch = yes
 	sse = yes
-	nnue_noint8 = yes
+	sse2 = yes
 endif
 
-ifeq ($(ARCH),x86-64-sse3-popcnt)
-	arch = x86_64
-	prefetch = yes
+ifeq ($(findstring -sse,$(ARCH)),-sse)
 	sse = yes
+endif
+
+ifeq ($(findstring -popcnt,$(ARCH)),-popcnt)
 	popcnt = yes
 endif
 
-ifeq ($(ARCH),x86-64-ssse3)
-	arch = x86_64
-	prefetch = yes
+ifeq ($(findstring -mmx,$(ARCH)),-mmx)
+	mmx = yes
+endif
+
+ifeq ($(findstring -sse2,$(ARCH)),-sse2)
+	sse = yes
+endif
+
+ifeq ($(findstring -ssse3,$(ARCH)),-ssse3)
 	sse = yes
 	ssse3 = yes
 endif
 
-ifeq ($(ARCH),$(filter $(ARCH),x86-64-sse41-popcnt x86-64-modern))
-	arch = x86_64
-	prefetch = yes
-	popcnt = yes
+ifeq ($(findstring -sse41,$(ARCH)),-sse41)
 	sse = yes
+	sse2 = yes
 	ssse3 = yes
 	sse41 = yes
 endif
 
-ifeq ($(ARCH),x86-64-avx2)
-	arch = x86_64
-	prefetch = yes
+ifeq ($(findstring -modern,$(ARCH)),-modern)
 	popcnt = yes
 	sse = yes
+	sse2 = yes
+	ssse3 = yes
+	sse41 = yes
+endif
+
+ifeq ($(findstring -avx2,$(ARCH)),-avx2)
+	popcnt = yes
+	sse = yes
+	sse2 = yes
 	ssse3 = yes
 	sse41 = yes
 	avx2 = yes
 endif
 
-ifeq ($(ARCH),x86-64-bmi2)
-	arch = x86_64
-	prefetch = yes
+ifeq ($(findstring -bmi2,$(ARCH)),-bmi2)
 	popcnt = yes
 	sse = yes
+	sse2 = yes
 	ssse3 = yes
 	sse41 = yes
 	avx2 = yes
 	pext = yes
 endif
 
-ifeq ($(ARCH),x86-64-avx512)
-	arch = x86_64
-	prefetch = yes
+ifeq ($(findstring -avx512,$(ARCH)),-avx512)
 	popcnt = yes
 	sse = yes
+	sse2 = yes
 	ssse3 = yes
 	sse41 = yes
 	avx2 = yes
@@ -187,17 +183,38 @@ ifeq ($(ARCH),x86-64-avx512)
 	avx512 = yes
 endif
 
-ifeq ($(ARCH),x86-64-vnni)
-	arch = x86_64
-	prefetch = yes
+ifeq ($(findstring -vnni,$(ARCH)),-vnni)
 	popcnt = yes
 	sse = yes
+	sse2 = yes
 	ssse3 = yes
 	sse41 = yes
 	avx2 = yes
 	pext = yes
 	avx512 = yes
 	vnni = yes
+endif
+
+ifeq ($(sse),yes)
+	prefetch = yes
+endif
+
+# 64-bit pext is not available on x86-32
+ifeq ($(bits),32)
+	pext = no
+endif
+
+else
+
+# all other architectures
+
+ifeq ($(ARCH),general-32)
+	arch = any
+	bits = 32
+endif
+
+ifeq ($(ARCH),general-64)
+	arch = any
 endif
 
 ifeq ($(ARCH),armv7)
@@ -229,6 +246,8 @@ ifeq ($(ARCH),ppc-64)
 	arch = ppc64
 	popcnt = yes
 	prefetch = yes
+endif
+
 endif
 
 ### ==========================================================================
@@ -476,6 +495,13 @@ ifeq ($(ssse3),yes)
 	endif
 endif
 
+ifeq ($(sse2),yes)
+	CFLAGS += -DUSE_SSE2
+	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
+		CFLAGS += -msse2
+	endif
+endif
+
 ifeq ($(mmx),yes)
 	CFLAGS += -DUSE_MMX
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
@@ -485,10 +511,6 @@ endif
 
 ifeq ($(neon),yes)
 	CFLAGS += -DUSE_NEON
-endif
-
-ifeq ($(arch),x86_64)
-	CFLAGS += -msse2 -DUSE_SSE2
 endif
 
 ### native

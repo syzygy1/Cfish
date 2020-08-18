@@ -16,6 +16,9 @@
 #elif defined(USE_SSE2)
 #include <emmintrin.h>
 
+#elif defined(USE_MMX)
+#include <mmintrin.h>
+
 #elif defined(USE_NEON)
 #include <arm_neon.h>
 #endif
@@ -42,6 +45,9 @@ static const size_t kSimdWidth = 32;
 
 #elif defined(USE_SSE2)
 static const size_t kSimdWidth = 16;
+
+#elif defined(USE_MMX)
+static const size_t kSimdWidth = 8;
 
 #elif defined(USE_NEON)
 static const size_t kSimdWidth = 16;
@@ -190,7 +196,7 @@ static int32_t hidden2_biases[32];
 static int32_t output_biases [1];
 
 #if defined(USE_AVX2)
-#if defined(__GNUC__ ) && (__GNUC__ < 9) && (defined(__MINGW32__) || defined(__MINGW64__))
+#if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32)
 #define _mm256_loadA_si256  _mm256_loadu_si256
 #define _mm256_storeA_si256 _mm256_storeu_si256
 #else
@@ -200,7 +206,7 @@ static int32_t output_biases [1];
 #endif
 
 #if defined(USE_AVX512)
-#if defined(__GNUC__ ) && (__GNUC__ < 9) && (defined(__MINGW32__) || defined(__MINGW64__))
+#if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32)
 #define _mm512_loadA_si512   _mm512_loadu_si512
 #define _mm512_storeA_si512  _mm512_storeu_si512
 #else
@@ -223,10 +229,19 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
   __m256i kOnes = _mm256_set1_epi16(1);
   __m256i *inVec = (__m256i *)input;
 
-#elif defined(USE_SSSE3)
+#elif defined(USE_SSE2)
   const unsigned kNumChunks = paddedInDims / kSimdWidth;
+#ifndef USE_SSSE3
+  __m128i kZeros = _mm_setzero_si128();
+#else
   __m128i kOnes = _mm_set1_epi16(1);
+#endif
   __m128i *inVec = (__m128i *)input;
+
+#elif defined(USE_MMX)
+  const unsigned kNumChunks = paddedInDims / kSimdWidth;
+  __m64 kZeros = _mm_setzero_si64();
+  __m64 *inVec = (__m64 *)input;
 
 #elif defined(USE_NEON)
   const unsigned kNumChunks = paddedInDims / kSimdWidth;
@@ -257,8 +272,7 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
       __m256i *iv256 = (__m256i *)(&inVec[kNumChunks]);
       __m256i *row256 = (__m256i *)(&row[kNumChunks]);
       __m256i product256 = _mm256_maddubs_epi16(_mm256_loadA_si256(&iv256[0]), _mm256_load_si256(&row256[0]));
-      product256 = _mm256_madd_epi16(product256, _mm256_set1_epi16(1));
-      sum = _mm512_add_epi32(sum, _mm512_zextsi256_si512(product256));
+      sum = _mm512_add_epi32(sum, _mm512_cvtepi16_epi32(product256));
     }
     output[i] = _mm512_reduce_add_epi32(sum) + biases[i];
 
@@ -312,6 +326,51 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
     sum = _mm_add_epi32(sum, _mm_shufflelo_epi16(sum, 0xE));
     output[i] = _mm_cvtsi128_si32(sum) + biases[i];
 
+#elif defined(USE_SSE2) && !defined(NNUE_NOINT8)
+    __m128i sum_lo = _mm_cvtsi32_si128(biases[i]);
+    __m128i sum_hi = kZeros;
+    __m128i *row = (__m128i *)(&weights[offset]);
+    for (unsigned j = 0; j < kNumChunks; j++) {
+      __m128i row_j = _mm_load_si128(&row[j]);
+      __m128i input_j = _mm_load_si128(&inVec[j]);
+      __m128i row_signs = _mm_cmpgt_epi8(kZeros, row_j);
+      __m128i extended_row_lo = _mm_unpacklo_epi8(row_j, row_signs);
+      __m128i extended_row_hi = _mm_unpackhi_epi8(row_j, row_signs);
+      __m128i extended_input_lo = _mm_unpacklo_epi8(input_j, kZeros);
+      __m128i extended_input_hi = _mm_unpackhi_epi8(input_j, kZeros);
+      __m128i product_lo = _mm_madd_epi16(extended_row_lo, extended_input_lo);
+      __m128i product_hi = _mm_madd_epi16(extended_row_hi, extended_input_hi);
+      sum_lo = _mm_add_epi32(sum_lo, product_lo);
+      sum_hi = _mm_add_epi32(sum_hi, product_hi);
+    }
+    __m128i sum = _mm_add_epi32(sum_lo, sum_hi);
+    __m128i sum_high_64 = _mm_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2));
+    sum = _mm_add_epi32(sum, sum_high_64);
+    __m128i sum_second_32 = _mm_shufflelo_epi16(sum, _MM_SHUFFLE(1, 0, 3, 2));
+    sum = _mm_add_epi32(sum, sum_second_32);
+    output[i] = _mm_cvtsi128_si32(sum);
+
+#elif defined(USE_MMX) && !defined(NNUE_NOINT8)
+    __m64 sum_lo = _mm_cvtsi32_si64(biases[i]);
+    __m64 sum_hi = kZeros;
+    __m64 *row = (__m64 *)&weights[offset];
+    for (unsigned j = 0; j < kNumChunks; j++) {
+      __m64 row_j = row[j];
+      __m64 input_j = inVec[j];
+      __m64 row_signs = _mm_cmpgt_pi8(kZeros, row_j);
+      __m64 extended_row_lo = _mm_unpacklo_pi8(row_j, row_signs);
+      __m64 extended_row_hi = _mm_unpackhi_pi8(row_j, row_signs);
+      __m64 extended_input_lo = _mm_unpacklo_pi8(input_j, kZeros);
+      __m64 extended_input_hi = _mm_unpackhi_pi8(input_j, kZeros);
+      __m64 product_lo = _mm_madd_pi16(extended_row_lo, extended_input_lo);
+      __m64 product_hi = _mm_madd_pi16(extended_row_hi, extended_input_hi);
+      sum_lo = _mm_add_pi32(sum_lo, product_lo);
+      sum_hi = _mm_add_pi32(sum_hi, product_hi);
+    }
+    __m64 sum = _mm_add_pi32(sum_lo, sum_hi);
+    sum = _mm_add_pi32(sum, _mm_unpackhi_pi32(sum, sum));
+    output[i] = _mm_cvtsi64_si32(sum);
+
 #elif defined(USE_NEON) && !defined(NNUE_NOINT8)
     int32x4_t sum = {biases[i]};
     int8x8_t *row = (int8x8_t *)&weights[offset];
@@ -330,6 +389,9 @@ void affine_propagate(NNUEClamped_t *input, int32_t *output, unsigned paddedInDi
 #endif
 
   }
+#if defined(USE_MMX)
+  _mm_empty();
+#endif
 }
 
 void clip_propagate(int32_t *input, NNUEClamped_t *output, unsigned numDims)
@@ -380,6 +442,22 @@ void clip_propagate(int32_t *input, NNUEClamped_t *output, unsigned numDims)
 #endif
         );
   }
+  const unsigned kStart = kNumChunks * kSimdWidth;
+
+#elif defined(USE_MMX)
+  const unsigned kNumChunks = numDims / kSimdWidth;
+  __m64 k0x80s = _mm_set1_pi8(-128);
+  __m64 *in = (__m64 *)input;
+  __m64 *out = (__m64 *)output;
+  for (unsigned i = 0; i < kNumChunks; ++i) {
+    const __m64 words0 = _mm_srai_pi16(
+        _mm_packs_pi32(in[i * 4 + 0], in[i * 4 + 1]), kWeightScaleBits);
+    const __m64 words1 = _mm_srai_pi16(
+        _mm_packs_pi32(in[i * 4 + 2], in[i * 4 + 3]), kWeightScaleBits);
+    const __m64 packedbytes = _mm_packs_pi16(words0, words1);
+    out[i] = _mm_subs_pi8(_mm_adds_pi8(packedbytes, k0x80s), k0x80s);
+  }
+  _mm_empty();
   const unsigned kStart = kNumChunks * kSimdWidth;
 
 #elif defined(USE_NEON)
@@ -456,6 +534,13 @@ void refresh_accumulator(const Position *pos)
       for (unsigned j = 0; j < kNumChunks; j++)
         accumulation[j] = _mm_add_epi16(accumulation[j], column[j]);
 
+#elif defined(USE_MMX)
+      __m64 *accumulation = (__m64 *)(&accumulator->accumulation[c][0]);
+      __m64 *column = (__m64 *)(&ft_weights[offset]);
+      const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
+      for (unsigned j = 0; j < kNumChunks; ++j)
+        accumulation[j] = _mm_add_pi16(accumulation[j], column[j]);
+
 #elif defined(USE_NEON)
       int16x8_t *accumulation = (int16x8_t *)(
           &accumulator->accumulation[c][0]);
@@ -471,6 +556,9 @@ void refresh_accumulator(const Position *pos)
 
     }
   }
+#if defined(USE_MMX)
+  _mm_empty();
+#endif
 
   accumulator->computedAccumulation = true;
 }
@@ -492,87 +580,99 @@ bool update_accumulator_if_possible(const Position *pos)
   bool reset[2];
   append_changed_indices(pos, removed_indices, added_indices, reset);
 
-  for (unsigned perspective = 0; perspective < 2; perspective++) {
+  for (unsigned c = 0; c < 2; c++) {
 
 #if defined(USE_AVX2)
     const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
-    __m256i *accumulation = (__m256i *)(
-        &accumulator->accumulation[perspective][0]);
+    __m256i *accumulation = (__m256i *)&accumulator->accumulation[c][0];
 
 #elif defined(USE_SSE2)
     const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
-    __m128i *accumulation = (__m128i *)(
-        &accumulator->accumulation[perspective][0]);
+    __m128i *accumulation = (__m128i *)&accumulator->accumulation[c][0];
+
+#elif defined(USE_MMX)
+    const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
+    __m64 *accumulation = (__m64 *)&accumulator->accumulation[c][0];
 
 #elif defined(USE_NEON)
     const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
-    int16x8t *accumulation = (int16x8_t *)(
-        &accumulator->accumulation[perspective][0]);
+    int16x8t *accumulation = (int16x8_t *)&accumulator->accumulation[c][0];
 #endif
 
-    if (reset[perspective]) {
-      memcpy(&(accumulator->accumulation[perspective]), ft_biases,
+    if (reset[c]) {
+      memcpy(&(accumulator->accumulation[c]), ft_biases,
           kHalfDimensions * sizeof(int16_t));
     } else {
-      memcpy(&(accumulator->accumulation[perspective]),
-          &(prev_accumulator->accumulation[perspective]),
+      memcpy(&(accumulator->accumulation[c]),
+          &(prev_accumulator->accumulation[c]),
           kHalfDimensions * sizeof(int16_t));
       // Difference calculation for the deactivated features
-      for (unsigned k = 0; k < removed_indices[perspective].size; k++) {
-        unsigned index = removed_indices[perspective].values[k];
+      for (unsigned k = 0; k < removed_indices[c].size; k++) {
+        unsigned index = removed_indices[c].values[k];
         const unsigned offset = kHalfDimensions * index;
 
 #if defined(USE_AVX2)
-        __m256i *column = (__m256i *)(&ft_weights[offset]);
+        __m256i *column = (__m256i *)&ft_weights[offset];
         for (unsigned j = 0; j < kNumChunks; j++)
           accumulation[j] = _mm256_sub_epi16(accumulation[j], column[j]);
 
 #elif defined(USE_SSE2)
-        __m128i *column = (__m128i *)(&ft_weights[offset]);
+        __m128i *column = (__m128i *)&ft_weights[offset];
         for (unsigned j = 0; j < kNumChunks; j++)
           accumulation[j] = _mm_sub_epi16(accumulation[j], column[j]);
 
+#elif defined(USE_MMX)
+        __m64 *column = (__m64 *)&ft_weights[offset];
+        for (unsigned j = 0; j < kNumChunks; j++)
+          accumulation[j] = _mm_sub_pi16(accumulation[j], column[j]);
+
 #elif defined(USE_NEON)
-        int16x8_t *column = (int16x8_t *)(&ft_weights[offset]);
+        int16x8_t *column = (int16x8_t *)&ft_weights[offset];
         for (unsigned j = 0; j < kNumChunks; j++)
           accumulation[j] = vsubq_s16(accumulation[j], column[j]);
 
 #else
         for (unsigned j = 0; j < kHalfDimensions; j++)
-          accumulator->accumulation[perspective][j] -= ft_weights[offset + j];
+          accumulator->accumulation[c][j] -= ft_weights[offset + j];
 #endif
-
       }
     }
 
     // Difference calculation for the activated features
-    for (unsigned k = 0; k < added_indices[perspective].size; k++) {
-      unsigned index = added_indices[perspective].values[k];
+    for (unsigned k = 0; k < added_indices[c].size; k++) {
+      unsigned index = added_indices[c].values[k];
       const unsigned offset = kHalfDimensions * index;
 
 #if defined(USE_AVX2)
-      __m256i *column = (__m256i *)(&ft_weights[offset]);
+      __m256i *column = (__m256i *)&ft_weights[offset];
       for (unsigned j = 0; j < kNumChunks; j++)
         accumulation[j] = _mm256_add_epi16(accumulation[j], column[j]);
 
 #elif defined(USE_SSE2)
-      __m128i *column = (__m128i *)(&ft_weights[offset]);
+      __m128i *column = (__m128i *)&ft_weights[offset];
       for (unsigned j = 0; j < kNumChunks; j++)
         accumulation[j] = _mm_add_epi16(accumulation[j], column[j]);
 
+#elif defined(USE_MMX)
+      __m64 *column = (__m64 *)&ft_weights[offset];
+      for (unsigned j = 0; j < kNumChunks; j++)
+        accumulation[j] = _mm_add_pi16(accumulation[j], column[j]);
+
 #elif defined(USE_NEON)
-      int16x8_t *column = (int16x8_t *)(&ft_weights[offset]);
+      int16x8_t *column = (int16x8_t *)&ft_weights[offset];
       for (unsigned j = 0; j < kNumChunks; j++)
         accumulation[j] = vaddq_s16(accumulation[j], column[j]);
 
 #else
       for (unsigned j = 0; j < kHalfDimensions; j++)
-        accumulator->accumulation[perspective][j] += ft_weights[offset + j];
+        accumulator->accumulation[c][j] += ft_weights[offset + j];
 
 #endif
-
     }
   }
+#if defined(USE_MMX)
+  _mm_empty();
+#endif
 
   accumulator->computedAccumulation = true;
   return true;
@@ -588,10 +688,9 @@ void transform(const Position *pos, NNUEClamped_t *output)
 
 #if defined(USE_AVX2) && !defined(NNUE_NOINT8)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
-  const int kControl = 0xd8; // 0b11011000
   const __m256i kZero = _mm256_setzero_si256();
 
-#elif defined(USE_SSSE3) && !defined(NNUE_NOINT8)
+#elif defined(USE_SSE2) && !defined(NNUE_NOINT8)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
 
 #ifdef USE_SSE41
@@ -599,8 +698,14 @@ void transform(const Position *pos, NNUEClamped_t *output)
 #else
   const __m128i k0x80s = _mm_set1_epi8(-128);
 #endif
+
 #elif defined(USE_SSE2) && defined(NNUE_NOINT8)
 //  const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
+
+#elif defined(USE_MMX) && !defined(NNUE_NOINT8)
+  const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
+  const __m64 k0x80s = _mm_set1_pi8(-128);
+
 #elif defined(USE_NEON) && !defined(NNUE_NOINT8)
   const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
   const int8x8_t kZero = {0};
@@ -618,7 +723,7 @@ void transform(const Position *pos, NNUEClamped_t *output)
       __m256i sum1 = _mm256_loadA_si256(
           &((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 1]);
       _mm256_storeA_si256(&out[i], _mm256_permute4x64_epi64(_mm256_max_epi8(
-          _mm256_packs_epi16(sum0, sum1), kZero), kControl));
+          _mm256_packs_epi16(sum0, sum1), kZero), 0xd8));
     }
 
 #elif defined(USE_SSE2) && !defined(NNUE_NOINT8)
@@ -639,6 +744,15 @@ void transform(const Position *pos, NNUEClamped_t *output)
       );
     }
 
+#elif defined(USE_MMX) && !defined(NNUE_NOINT8)
+    __m64 *out = (__m64 *)(&output[offset]);
+    for (unsigned j = 0; j < kNumChunks; j++) {
+      __m64 sum0 = ((__m64 *)((*accumulation)[perspectives[p]]))[j * 2 + 0];
+      __m64 sum1 = ((__m64 *)((*accumulation)[perspectives[p]]))[j * 2 + 1];
+      const __m64 packedbytes = _mm_packs_pi16(sum0, sum1);
+      out[j] = _mm_subs_pi8(_mm_adds_pi8(packedbytes, k0x80s), k0x80s);
+    }
+
 #elif defined(USE_NEON) && !defined(NNUE_NOINT8)
     int8x8_t *out = (int8x8_t *)(&output[offset]);
     for (unsigned i = 0; i < kNumChunks; i++) {
@@ -654,6 +768,9 @@ void transform(const Position *pos, NNUEClamped_t *output)
 #endif
 
   }
+#if defined(USE_MMX)
+  _mm_empty();
+#endif
 }
 
 ExtPieceSquare KppBoardIndex[] = {
