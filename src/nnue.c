@@ -29,12 +29,47 @@
 #include "position.h"
 #include "uci.h"
 
+ExtPieceSquare KppBoardIndex[] = {
+  // convention: W - us, B - them
+  // viewed from other side, W and B are reversed
+  { PS_NONE,     PS_NONE     },
+  { PS_W_PAWN,   PS_B_PAWN   },
+  { PS_W_KNIGHT, PS_B_KNIGHT },
+  { PS_W_BISHOP, PS_B_BISHOP },
+  { PS_W_ROOK,   PS_B_ROOK   },
+  { PS_W_QUEEN,  PS_B_QUEEN  },
+  { PS_W_KING,   PS_B_KING   },
+  { PS_NONE,     PS_NONE     },
+  { PS_NONE,     PS_NONE     },
+  { PS_B_PAWN,   PS_W_PAWN   },
+  { PS_B_KNIGHT, PS_W_KNIGHT },
+  { PS_B_BISHOP, PS_W_BISHOP },
+  { PS_B_ROOK,   PS_W_ROOK   },
+  { PS_B_QUEEN,  PS_W_QUEEN  },
+  { PS_B_KING,   PS_W_KING   },
+  { PS_NONE,     PS_NONE     }
+};
+
+#if defined(USE_SSE2)
+#undef USE_MMX
+#endif
+
+#if defined(USE_SSE2) && !defined(USE_SSSE3)
+typedef int16_t clamped_t; //SSE2 has no int8 multiply.
+typedef int16_t weight_t;
+#else
+typedef uint8_t clamped_t;
+typedef int8_t weight_t;
+#endif
+
 // Version of the evaluation file
 static const uint32_t NnueVersion = 0x7AF32F16u;
 
-// Constant used in evaluation value calculation
-static const int FV_SCALE = 16;
-static const int kWeightScaleBits = 6;
+// Constants used in evaluation value calculation
+enum {
+  FV_SCALE = 16,
+  kWeightScaleBits = 6
+};
 
 // Size of cache line (in bytes)
 enum { kCacheLineSize = 64 };
@@ -51,19 +86,10 @@ static const size_t kSimdWidth = 8;
 
 #elif defined(USE_NEON)
 static const size_t kSimdWidth = 16;
+
 #endif
 
 //static const size_t kMaxSimdWidth = 32;
-
-// clamped_t is a type used in internal calculations for NNUE-clamped values.
-
-#if defined(USE_SSE2) && !defined(USE_SSSE3)
-typedef int16_t clamped_t; //SSE2 has no int8 multiply.
-typedef int16_t weight_t;
-#else
-typedef uint8_t clamped_t;
-typedef int8_t weight_t;
-#endif
 
 enum {
   kTransformedFeatureDimensions = 256,
@@ -291,11 +317,15 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
       product1 = _mm_madd_epi16(product1, kOnes);
       sum = _mm_add_epi32(sum, product1);
     }
+
+    assert(kNumChunks & 1 == 0);
+#if 0
     if (kNumChunks & 0x1) {
       __m128i product = _mm_maddubs_epi16(_mm_load_si128(&inVec[kNumChunks - 1]), _mm_load_si128(&row[kNumChunks - 1]));
       product = _mm_madd_epi16(product, kOnes);
       sum = _mm_add_epi32(sum, product);
     }
+#endif
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x4E)); //_MM_PERM_BADC
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xB1)); //_MM_PERM_CDAB
     output[i] = _mm_cvtsi128_si32(sum) + biases[i];
@@ -312,7 +342,7 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
         _mm_load_si128(&inVec[j + 1]), _mm_load_si128(&row[j + 1]));
       sum1 = _mm_add_epi32(sum1, product1);
     }
-    assert (kNumChunks & 1 == 0);
+    assert(kNumChunks & 1 == 0);
     sum = _mm_add_epi32(sum, sum1);
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xE));
     sum = _mm_add_epi32(sum, _mm_shufflelo_epi16(sum, 0xE));
@@ -354,9 +384,10 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
     for (unsigned j = 0; j < paddedInDims; j++)
       sum += weights[offset + j] * input[j];
     output[i] = sum;
-#endif
 
+#endif
   }
+
 #if defined(USE_MMX)
   _mm_empty();
 #endif
@@ -506,10 +537,9 @@ void refresh_accumulator(const Position *pos)
         accumulation[j] = _mm_add_pi16(accumulation[j], column[j]);
 
 #elif defined(USE_NEON)
-      int16x8_t *accumulation = (int16x8_t *)(
-          &accumulator->accumulation[c][0]);
+      int16x8_t *accumulation = (int16x8_t *)(&accumulator->accumulation[c][0]);
       int16x8_t *column = (int16x8_t *)(&ft_weights[offset]);
-      constr unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
+      const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
       for (unsigned j = 0; j < kNumChunks; j++)
         accumulation[j] = vaddq_s16(accumulation[j], column[j]);
 
@@ -520,6 +550,7 @@ void refresh_accumulator(const Position *pos)
 
     }
   }
+
 #if defined(USE_MMX)
   _mm_empty();
 #endif
@@ -560,7 +591,7 @@ bool update_accumulator_if_possible(const Position *pos)
 
 #elif defined(USE_NEON)
     const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
-    int16x8t *accumulation = (int16x8_t *)&accumulator->accumulation[c][0];
+    int16x8_t *accumulation = (int16x8_t *)&accumulator->accumulation[c][0];
 #endif
 
     if (reset[c]) {
@@ -634,6 +665,7 @@ bool update_accumulator_if_possible(const Position *pos)
 #endif
     }
   }
+
 #if defined(USE_MMX)
   _mm_empty();
 #endif
@@ -683,7 +715,7 @@ void transform(const Position *pos, clamped_t *output)
     const unsigned offset = kHalfDimensions * p;
 
 #if defined(USE_AVX2)
-    __m256i *out = (__m256i *)(&output[offset]);
+    __m256i *out = (__m256i *)&output[offset];
     for (unsigned i = 0; i < kNumChunks; i++) {
       __m256i sum0 = _mm256_loadA_si256(
           &((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 0]);
@@ -694,7 +726,7 @@ void transform(const Position *pos, clamped_t *output)
     }
 
 #elif defined(USE_SSE2)
-    __m128i *out = (__m128i *)(&output[offset]);
+    __m128i *out = (__m128i *)&output[offset];
     for (unsigned i = 0; i < kNumChunks; i++) {
       __m128i sum0 = _mm_load_si128(&((__m128i *)(&
             (*accumulation)[perspectives[p]]))[i * 2 + 0]);
@@ -703,23 +735,21 @@ void transform(const Position *pos, clamped_t *output)
 
 #if defined(USE_SSSE3)
       __m128i packedbytes = _mm_packs_epi16(sum0, sum1);
-      _mm_store_si128(&out[i],
-#ifdef USE_SSE41
-          _mm_max_epi8(packedbytes, kZero)
+#if defined(USE_SSE41)
+      _mm_store_si128(&out[i], _mm_max_epi8(packedbytes, kZero));
 #else
-          _mm_subs_epi8(_mm_adds_epi8(packedbytes, k0x80s), k0x80s)
+      _mm_store_si128(&out[i], _mm_subs_epi8(_mm_adds_epi8(packedbytes, k0x80s), k0x80s));
 #endif
-      );
 #else // SSE2 only
       _mm_store_si128(&out[i * 2 + 0], _mm_sub_epi16(
-          _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum0,k0x8000s)),k0xff80s) );
+          _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum0,k0x8000s)),k0xff80s));
       _mm_store_si128(&out[i * 2 + 1], _mm_sub_epi16(
-          _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum1,k0x8000s)),k0xff80s) );
+          _mm_adds_epu16(k0x7f80s,_mm_adds_epi16(sum1,k0x8000s)),k0xff80s));
 #endif
     }
 
 #elif defined(USE_MMX)
-    __m64 *out = (__m64 *)(&output[offset]);
+    __m64 *out = (__m64 *)&output[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
       __m64 sum0 = ((__m64 *)((*accumulation)[perspectives[p]]))[j * 2 + 0];
       __m64 sum1 = ((__m64 *)((*accumulation)[perspectives[p]]))[j * 2 + 1];
@@ -728,7 +758,7 @@ void transform(const Position *pos, clamped_t *output)
     }
 
 #elif defined(USE_NEON)
-    int8x8_t *out = (int8x8_t *)(&output[offset]);
+    int8x8_t *out = (int8x8_t *)&output[offset];
     for (unsigned i = 0; i < kNumChunks; i++) {
       int16x8_t sum = ((int16x8_t *)((*accumulation)[perspectives[p]]))[i];
       out[i] = vmax_s8(vqmovn_s16(sum), kZero);
@@ -743,31 +773,11 @@ void transform(const Position *pos, clamped_t *output)
 #endif
 
   }
+
 #if defined(USE_MMX)
   _mm_empty();
 #endif
 }
-
-ExtPieceSquare KppBoardIndex[] = {
-  // convention: W - us, B - them
-  // viewed from other side, W and B are reversed
-  { PS_NONE,     PS_NONE     },
-  { PS_W_PAWN,   PS_B_PAWN   },
-  { PS_W_KNIGHT, PS_B_KNIGHT },
-  { PS_W_BISHOP, PS_B_BISHOP },
-  { PS_W_ROOK,   PS_B_ROOK   },
-  { PS_W_QUEEN,  PS_B_QUEEN  },
-  { PS_W_KING,   PS_B_KING   },
-  { PS_NONE,     PS_NONE     },
-  { PS_NONE,     PS_NONE     },
-  { PS_B_PAWN,   PS_W_PAWN   },
-  { PS_B_KNIGHT, PS_W_KNIGHT },
-  { PS_B_BISHOP, PS_W_BISHOP },
-  { PS_B_ROOK,   PS_W_ROOK   },
-  { PS_B_QUEEN,  PS_W_QUEEN  },
-  { PS_B_KING,   PS_W_KING   },
-  { PS_NONE,     PS_NONE     }
-};
 
 // Calculate the evaluation value
 static Value compute_score(const Position *pos)
@@ -780,12 +790,11 @@ static Value compute_score(const Position *pos)
   return *(int32_t *)(buffer + 384) / FV_SCALE;
 }
 
-bool read_weights(weight_t* output_buf, unsigned int count, FILE* F) {
-  weight_t * ptr =  output_buf;
-  for (unsigned i = 0; i < count; ++i) {
-    *ptr = (weight_t)(int8_t) fgetc(F);
-    ++ptr;
-  }
+bool read_weights(weight_t *output_buf, unsigned count, FILE *F)
+{
+  weight_t *ptr = output_buf;
+  for (unsigned i = 0; i < count; i++)
+    *ptr++ = (weight_t)(int8_t)fgetc(F);
   return true;
 }
 
