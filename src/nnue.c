@@ -250,8 +250,7 @@ void affine_propagate(uint8_t *input, int32_t *output, unsigned paddedInDims,
       __m256i *iv256 = (__m256i *)(&inVec[kNumChunks]);
       __m256i *row256 = (__m256i *)(&row[kNumChunks]);
       __m256i product256 = _mm256_maddubs_epi16(_mm256_loadA_si256(&iv256[0]), _mm256_load_si256(&row256[0]));
-      product256 = _mm256_madd_epi16(product256, _mm256_set1_epi16(1));
-      sum = _mm512_add_epi32(sum, _mm512_zextsi256_si512(product256));
+      sum = _mm512_add_epi32(sum, _mm512_cvtepi16_epi32(product256));
     }
     output[i] = _mm512_reduce_add_epi32(sum) + biases[i];
 
