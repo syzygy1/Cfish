@@ -80,7 +80,8 @@ enum {
   LazyThreshold1 =  1400,
   LazyThreshold2 =  1300,
   SpaceThreshold = 12222,
-  NNUEThreshold  =   575
+  NNUEThreshold  =   550,
+  NNUEThreshold2 =   150
 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -834,9 +835,6 @@ make_v:
   // Side to move point of view
   v = (stm() == WHITE ? v : -v) + Tempo;
 
-  // Damp down the evalation linearly when shuffling
-  v = v * (100 - rule50_count()) / 100;
-
   return v;
 }
 
@@ -846,22 +844,33 @@ int useNNUE;
 
 Value evaluate(const Position *pos)
 {
+  Value v;
+
 #ifdef NNUE
 
   if (useNNUE == EVAL_HYBRID) {
-    // Take NNUE eval only on balanced positions
-    Value v = eg_value(psq_score());
-    if (abs(v) < NNUEThreshold)
-      return nnue_evaluate(pos) + Tempo;
-    else
-      return evaluate_classical(pos);
-  }
-  else if (useNNUE == EVAL_PURE) {
-    return nnue_evaluate(pos) + Tempo;
-  }
+    bool classical = abs(eg_value(psq_score())) * 16 >
+                              NNUEThreshold * (16 + rule50_count());
+    v =  classical
+       ? evaluate_classical(pos)
+       : nnue_evaluate(pos) * 5 / 4 + Tempo;
+
+    if (classical && abs(v) * 16 < NNUEThreshold2 * (16 + rule50_count()))
+      v = nnue_evaluate(pos) * 5 / 4 + Tempo;
+
+  } else if (useNNUE == EVAL_PURE)
+    v = nnue_evaluate(pos) * 5 / 4 + Tempo;
+  else
+    v = evaluate_classical(pos);
+
+#else
+
+  v = evaluate_classical(pos);
 
 #endif
 
-  return evaluate_classical(pos);
+  // Damp down the evalation linearly when shuffling
+  v = v * (100 - rule50_count()) / 100;
 
+  return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 }

@@ -242,8 +242,10 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
 {
 #if defined(USE_AVX512)
   const unsigned kNumChunks = paddedInDims / (kSimdWidth * 2);
-  __m512i kOnes = _mm512_set1_epi16(1);
   __m512i *inVec = (__m512i *)input;
+#if !defined(USE_VNNI)
+  __m512i kOnes = _mm512_set1_epi16(1);
+#endif
 
 #elif defined(USE_AVX2)
   const unsigned kNumChunks = paddedInDims / kSimdWidth;
@@ -277,9 +279,13 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
     __m512i sum = _mm512_setzero_si512();
     __m512i *row = (__m512i *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
+#if defined(USE_VNNI)
+      sum = _mm512_dpbusd_epi32(sum, _mm512_loadA_si512(&inVec[j]), _mm512_load_si512(&row[j]));
+#else
       __m512i product = _mm512_maddubs_epi16(_mm512_loadA_si512(&inVec[j]), _mm512_load_si512(&row[j]));
       product = _mm512_madd_epi16(product, kOnes);
       sum = _mm512_add_epi32(sum, product);
+#endif
     }
 
     // Note: Changing kMaxSimdWidth from 32 to 64 breaks loading existing
@@ -288,8 +294,14 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
     if (paddedInDims != kNumChunks * kSimdWidth * 2) {
       __m256i *iv256 = (__m256i *)(&inVec[kNumChunks]);
       __m256i *row256 = (__m256i *)(&row[kNumChunks]);
+#if defined(USE_VNNI)
+      __m256i product256 = _mm256_dpbusd_epi32(_mm512_castsi512_si256(sum),
+          _mm256_loadA_si256(&iv256[0]), _mm256_load_si256(&row256[0]));
+      sum = _mm512_inserti32x8(sum, product256, 0);
+#else
       __m256i product256 = _mm256_maddubs_epi16(_mm256_loadA_si256(&iv256[0]), _mm256_load_si256(&row256[0]));
       sum = _mm512_add_epi32(sum, _mm512_cvtepi16_epi32(product256));
+#endif
     }
     output[i] = _mm512_reduce_add_epi32(sum) + biases[i];
 
@@ -779,8 +791,8 @@ void transform(const Position *pos, clamped_t *output)
 #endif
 }
 
-// Calculate the evaluation value
-static Value compute_score(const Position *pos)
+// Evaluation function. Perform differential calculation.
+Value nnue_evaluate(const Position *pos)
 {
   alignas(kCacheLineSize) clamped_t transformed_features[FtBufferSize];
   transform(pos, transformed_features);
@@ -858,15 +870,6 @@ void nnue_init(void)
                   "fishchess.org/api/nn/%s\n", evalFile,
                   option_default_string_value(OPT_EVAL_FILE));
   exit(EXIT_FAILURE);
-}
-
-// Evaluation function. Perform differential calculation.
-Value nnue_evaluate(const Position *pos)
-{
-  Value v = compute_score(pos);
-  v = clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
-
-  return v;
 }
 
 // Proceed with the difference calculation if possible

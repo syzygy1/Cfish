@@ -887,10 +887,9 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
         && (tte_bound(tte) & (ttValue > eval ? BOUND_LOWER : BOUND_UPPER)))
       eval = ttValue;
   } else {
-    if ((ss-1)->currentMove != MOVE_NULL) {
-      int bonus = -(ss-1)->statScore / 512;
-      ss->staticEval = eval = evaluate(pos) + bonus;
-    } else
+    if ((ss-1)->currentMove != MOVE_NULL)
+      ss->staticEval = eval = evaluate(pos);
+    else
       ss->staticEval = eval = -(ss-1)->staticEval + 2 * Tempo;
 
     tte_save(tte, posKey, VALUE_NONE, ttPv, BOUND_NONE, DEPTH_NONE, 0, eval);
@@ -1246,20 +1245,9 @@ moves_loop: // When in check search starts from here.
              && (is_discovery_check_on_king(pos, !stm(), move) || see_test(pos, move, 0)))
       extension = 1;
 
-    // Passed pawn extension
-    else if (   move == ss->killers[0]
-             && advanced_pawn_push(pos, move)
-             && pawn_passed(pos, stm(), to_sq(move)))
-      extension = 1;
-
-    // Last captures extension
-    else if (   PieceValue[EG][captured_piece()] > PawnValueEg
-             && non_pawn_material() <= 2 * RookValueMg)
-      extension = 1;
-
     // Castling extension
     if (   type_of_m(move) == CASTLING
-        && popcount(pieces_c(stm()) & ~pieces_p(PAWN) & (to_sq(move) & 0x03 ? KingSide : QueenSide)) <= 3)
+        && popcount(pieces_c(stm()) & ~pieces_p(PAWN) & (to_sq(move) & 0x03 ? KingSide : QueenSide)) <= 2)
       extension = 1;
 
     // Late irreversible move extension
