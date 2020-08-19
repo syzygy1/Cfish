@@ -54,8 +54,12 @@ ExtPieceSquare KppBoardIndex[] = {
 #undef USE_MMX
 #endif
 
-#if defined(USE_SSE2) && !defined(USE_SSSE3)
-typedef int16_t clamped_t; //SSE2 has no int8 multiply.
+#if !defined(USE_SSSE3) && (defined(USE_SSE41) || defined(USE_AVX2) || defined(USE_AVX512))
+#error "USE_SSSE3 must be defined when USE_SSE41 or USE_AVX* is"
+#endif
+
+#if (defined(USE_SSE2) || defined(USE_MMX)) && !defined(USE_SSSE3)
+typedef int16_t clamped_t; //SSE2 and MMX have no int8 multiply.
 typedef int16_t weight_t;
 #else
 typedef uint8_t clamped_t;
@@ -361,17 +365,14 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
     output[i] = _mm_cvtsi128_si32(sum) + biases[i];
 
 #elif defined(USE_MMX)
-    __m64 sum_lo = _mm_cvtsi32_si64(biases[i]);
+    __m64 sum_lo = kZeros;
     __m64 sum_hi = kZeros;
     __m64 *row = (__m64 *)&weights[offset];
     for (unsigned j = 0; j < kNumChunks; j++) {
-      __m64 row_j = row[j];
-      __m64 input_j = inVec[j];
-      __m64 row_signs = _mm_cmpgt_pi8(kZeros, row_j);
-      __m64 extended_row_lo = _mm_unpacklo_pi8(row_j, row_signs);
-      __m64 extended_row_hi = _mm_unpackhi_pi8(row_j, row_signs);
-      __m64 extended_input_lo = _mm_unpacklo_pi8(input_j, kZeros);
-      __m64 extended_input_hi = _mm_unpackhi_pi8(input_j, kZeros);
+      __m64 extended_row_lo = row[2 * j + 0];
+      __m64 extended_row_hi = row[2 * j + 1];
+      __m64 extended_input_lo = inVec[2 * j + 0];
+      __m64 extended_input_hi = inVec[2 * j + 1];
       __m64 product_lo = _mm_madd_pi16(extended_row_lo, extended_input_lo);
       __m64 product_hi = _mm_madd_pi16(extended_row_hi, extended_input_hi);
       sum_lo = _mm_add_pi32(sum_lo, product_lo);
@@ -379,7 +380,7 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
     }
     __m64 sum = _mm_add_pi32(sum_lo, sum_hi);
     sum = _mm_add_pi32(sum, _mm_unpackhi_pi32(sum, sum));
-    output[i] = _mm_cvtsi64_si32(sum);
+    output[i] = _mm_cvtsi64_si32(sum) + biases[i];
 
 #elif defined(USE_NEON)
     int32x4_t sum = {biases[i]};
@@ -454,7 +455,7 @@ void clip_propagate(int32_t *input, clamped_t *output, unsigned numDims)
   }
   const unsigned kStart = kNumChunks * kSimdWidth;
 
-#elif defined(USE_MMX)
+#elif 0 && defined(USE_MMX) // this is an int8 implementation, disabled
   const unsigned kNumChunks = numDims / kSimdWidth;
   __m64 k0x80s = _mm_set1_pi8(-128);
   __m64 *in = (__m64 *)input;
@@ -714,7 +715,9 @@ void transform(const Position *pos, clamped_t *output)
 
 #elif defined(USE_MMX)
   const unsigned kNumChunks = kHalfDimensions / kSimdWidth;
-  const __m64 k0x80s = _mm_set1_pi8(-128);
+  const __m64 k0xff80s = _mm_set1_pi16(-128);
+  const __m64 k0x8000s = _mm_set1_pi16(-32768);
+  const __m64 k0x7f80s = _mm_xor_si64(k0xff80s, k0x8000s);
 
 #elif defined(USE_NEON)
   const unsigned kNumChunks = kHalfDimensions / (kSimdWidth / 2);
@@ -765,8 +768,10 @@ void transform(const Position *pos, clamped_t *output)
     for (unsigned j = 0; j < kNumChunks; j++) {
       __m64 sum0 = ((__m64 *)((*accumulation)[perspectives[p]]))[j * 2 + 0];
       __m64 sum1 = ((__m64 *)((*accumulation)[perspectives[p]]))[j * 2 + 1];
-      const __m64 packedbytes = _mm_packs_pi16(sum0, sum1);
-      out[j] = _mm_subs_pi8(_mm_adds_pi8(packedbytes, k0x80s), k0x80s);
+      out[j * 2 + 0] = _mm_sub_pi16(
+          _mm_adds_pu16(k0x7f80s,_mm_adds_pi16(sum0,k0x8000s)),k0xff80s);
+      out[j * 2 + 1] = _mm_sub_pi16(
+          _mm_adds_pu16(k0x7f80s,_mm_adds_pi16(sum1,k0x8000s)),k0xff80s);
     }
 
 #elif defined(USE_NEON)
