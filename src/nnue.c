@@ -277,7 +277,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     output[i] = _mm_cvtsi128_si32(sum) + biases[i];
 
 #elif defined(USE_SSE2)
-    const __m128i sum = _mm_setzero_si128(), sum1 = sum;
+    __m128i sum = _mm_setzero_si128(), sum1 = sum;
     __m128i *row = (__m128i *)&weights[offset];
     for (unsigned j = 0; j < numChunks; j++) {
       __m128i product0 = _mm_madd_epi16(inVec[2 * j], row[2 * j]);
