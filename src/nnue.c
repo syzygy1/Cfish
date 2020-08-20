@@ -75,9 +75,6 @@ enum {
   SHIFT = 6
 };
 
-// Size of cache line (in bytes)
-enum { kCacheLineSize = 64 };
-
 enum {
   kTransformedFeatureDimensions = 256,
   kDimensions = 64 * PS_END, // HalfKP
@@ -182,26 +179,6 @@ static int32_t hidden1_biases[32];
 static int32_t hidden2_biases[32];
 static int32_t output_biases [1];
 
-#if defined(USE_AVX2)
-#if 0 && defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32)
-#define _mm256_loadA_si256  _mm256_loadu_si256
-#define _mm256_storeA_si256 _mm256_storeu_si256
-#else
-#define _mm256_loadA_si256  _mm256_load_si256
-#define _mm256_storeA_si256 _mm256_store_si256
-#endif
-#endif
-
-#if defined(USE_AVX512)
-#if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32)
-#define _mm512_loadA_si512   _mm512_loadu_si512
-#define _mm512_storeA_si512  _mm512_storeu_si512
-#else
-#define _mm512_loadA_si512   _mm512_load_si512
-#define _mm512_storeA_si512  _mm512_store_si512
-#endif
-#endif
-
 INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     unsigned outDims, int32_t *biases, weight_t *weights)
 {
@@ -246,9 +223,9 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     __m512i *row = (__m512i *)&weights[offset];
     for (unsigned j = 0; j < numChunks; j++) {
 #if defined(USE_VNNI)
-      sum = _mm512_dpbusd_epi32(sum, _mm512_loadA_si512(&inVec[j]), _mm512_load_si512(&row[j]));
+      sum = _mm512_dpbusd_epi32(sum, inVec[j], row[j]);
 #else
-      __m512i product = _mm512_maddubs_epi16(_mm512_loadA_si512(&inVec[j]), _mm512_load_si512(&row[j]));
+      __m512i product = _mm512_maddubs_epi16(inVec[j], row[j]);
       product = _mm512_madd_epi16(product, kOnes);
       sum = _mm512_add_epi32(sum, product);
 #endif
@@ -262,10 +239,10 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
       __m256i *row256 = (__m256i *)(&row[numChunks]);
 #if defined(USE_VNNI)
       __m256i product256 = _mm256_dpbusd_epi32(_mm512_castsi512_si256(sum),
-          _mm256_loadA_si256(&iv256[0]), _mm256_load_si256(&row256[0]));
+          iv256[0], row256[0]);
       sum = _mm512_inserti32x8(sum, product256, 0);
 #else
-      __m256i product256 = _mm256_maddubs_epi16(_mm256_loadA_si256(&iv256[0]), _mm256_load_si256(&row256[0]));
+      __m256i product256 = _mm256_maddubs_epi16(iv256[0], row256[0]);
       sum = _mm512_add_epi32(sum, _mm512_cvtepi16_epi32(product256));
 #endif
     }
@@ -275,7 +252,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     __m256i sum = _mm256_setzero_si256();
     __m256i *row = (__m256i *)&weights[offset];
     for (unsigned j = 0; j < numChunks; j++) {
-      __m256i product = _mm256_maddubs_epi16(_mm256_loadA_si256(&inVec[j]), _mm256_load_si256(&row[j]));
+      __m256i product = _mm256_maddubs_epi16(inVec[j], row[j]);
       product = _mm256_madd_epi16(product, kOnes);
       sum = _mm256_add_epi32(sum, product);
     }
@@ -358,13 +335,11 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
   __m256i *out = (__m256i *)output;
   for (unsigned i = 0; i < numChunks; i++) {
     __m256i words0 = _mm256_srai_epi16(_mm256_packs_epi32(
-          _mm256_loadA_si256(&in[i * 4 + 0]),
-          _mm256_loadA_si256(&in[i * 4 + 1])), SHIFT);
+          in[i * 4 + 0], in[i * 4 + 1]), SHIFT);
     __m256i words1 = _mm256_srai_epi16(_mm256_packs_epi32(
-          _mm256_loadA_si256(&in[i * 4 + 2]),
-          _mm256_loadA_si256(&in[i * 4 + 3])), SHIFT);
-    _mm256_storeA_si256(&out[i], _mm256_permutevar8x32_epi32(_mm256_max_epi8(
-          _mm256_packs_epi16(words0, words1), kZero), kOffsets));
+          in[i * 4 + 2], in[i * 4 + 3]), SHIFT);
+    out[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(
+          _mm256_packs_epi16(words0, words1), kZero), kOffsets);
   }
 
 #elif defined(USE_SSSE3)
@@ -457,14 +432,14 @@ INLINE void refresh_accumulator(const Position *pos)
       __m512i *column = (__m512i *)&ft_weights[offset];
       const unsigned numChunks = kHalfDimensions / 32;
       for (unsigned j = 0; j < numChunks; j++)
-        _mm512_storeA_si512(&accumulation[j], _mm512_add_epi16(_mm512_loadA_si512(&accumulation[j]), column[j]));
+        accumulation[j] = _mm512_add_epi16(accumulation[j], column[j]);
 
 #elif defined(USE_AVX2)
       __m256i *accumulation = (__m256i *)&accumulator->accumulation[c][0];
       __m256i *column = (__m256i *)&ft_weights[offset];
       const unsigned numChunks = kHalfDimensions / 16;
       for (unsigned j = 0; j < numChunks; j++)
-        _mm256_storeA_si256(&accumulation[j], _mm256_add_epi16(_mm256_loadA_si256(&accumulation[j]), column[j]));
+        accumulation[j] = _mm256_add_epi16(accumulation[j], column[j]);
 
 #elif defined(USE_SSE2)
       __m128i *accumulation = (__m128i *)&accumulator->accumulation[c][0];
@@ -652,19 +627,17 @@ INLINE void transform(const Position *pos, clipped_t *output)
 #if defined(USE_AVX2)
     __m256i *out = (__m256i *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
-      __m256i sum0 = _mm256_loadA_si256(
-          &((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 0]);
-      __m256i sum1 = _mm256_loadA_si256(
-          &((__m256i *)(&(*accumulation)[perspectives[p]]))[i * 2 + 1]);
-      _mm256_storeA_si256(&out[i], _mm256_permute4x64_epi64(_mm256_max_epi8(
-          _mm256_packs_epi16(sum0, sum1), kZero), 0xd8));
+      __m256i sum0 = ((__m256i *)(*accumulation)[perspectives[p]])[i * 2 + 0];
+      __m256i sum1 = ((__m256i *)(*accumulation)[perspectives[p]])[i * 2 + 1];
+      out[i] = _mm256_permute4x64_epi64(_mm256_max_epi8(
+          _mm256_packs_epi16(sum0, sum1), kZero), 0xd8);
     }
 
 #elif defined(USE_SSSE3)
     __m128i *out = (__m128i *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
-      __m128i sum0 = ((__m128i *)((*accumulation)[perspectives[p]]))[i * 2 + 0];
-      __m128i sum1 = ((__m128i *)((*accumulation)[perspectives[p]]))[i * 2 + 1];
+      __m128i sum0 = ((__m128i *)(*accumulation)[perspectives[p]])[i * 2 + 0];
+      __m128i sum1 = ((__m128i *)(*accumulation)[perspectives[p]])[i * 2 + 1];
       __m128i packedbytes = _mm_packs_epi16(sum0, sum1);
 #if defined(USE_SSE41)
       out[i] = _mm_max_epi8(packedbytes, kZero);
@@ -676,21 +649,21 @@ INLINE void transform(const Position *pos, clipped_t *output)
 #elif defined(USE_SSE2)
     __m128i *out = (__m128i *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
-      __m128i sum = ((__m128i *)((*accumulation)[perspectives[p]]))[i];
+      __m128i sum = ((__m128i *)(*accumulation)[perspectives[p]])[i];
       out[i] = _mm_subs_epu16(_mm_adds_epi16(sum, k0x7f80), k0x7f80);
     }
 
 #elif defined(USE_MMX)
     __m64 *out = (__m64 *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
-      __m64 sum0 = ((__m64 *)((*accumulation)[perspectives[p]]))[i];
+      __m64 sum0 = ((__m64 *)(*accumulation)[perspectives[p]])[i];
       out[i] = _mm_subs_pu16(_mm_adds_pi16(sum0, k0x7f80), k0x7f80);
     }
 
 #elif defined(USE_NEON)
     int8x8_t *out = (int8x8_t *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
-      int16x8_t sum = ((int16x8_t *)((*accumulation)[perspectives[p]]))[i];
+      int16x8_t sum = ((int16x8_t *)(*accumulation)[perspectives[p]])[i];
       out[i] = vmax_s8(vqmovn_s16(sum), kZero);
     }
 
@@ -705,31 +678,40 @@ INLINE void transform(const Position *pos, clipped_t *output)
   }
 }
 
+struct NetData {
+  clipped_t input[FtOutDims];
+  int32_t hidden1_values[32];
+  int32_t hidden2_values[32];
+  clipped_t hidden1_clipped[32];
+  clipped_t hidden2_clipped[32];
+};
+
 // Evaluation function
 Value nnue_evaluate(const Position *pos)
 {
-  alignas(kCacheLineSize) clipped_t input[FtOutDims];
-  alignas(kCacheLineSize) int32_t hidden1_values[32];
-  alignas(kCacheLineSize) clipped_t hidden1_clipped[32];
-  alignas(kCacheLineSize) int32_t hidden2_values[32];
-  alignas(kCacheLineSize) clipped_t hidden2_clipped[32];
-  alignas(kCacheLineSize) int32_t out_values[1];
+  int32_t out_value;
+#if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32)
+  uint buf[sizeof(struct NetData) + 63];
+#else
+  alignas(64) struct NetData buf[1];
+#endif
+  struct NetData *b = (struct NetData *)(((uintptr_t)buf + 0x3f) & ~0x3f);
 
-  transform(pos, input);
-  affine_propagate(input, hidden1_values, FtOutDims, 32, hidden1_biases,
-      hidden1_weights);
-  clip_propagate(hidden1_values, hidden1_clipped, 32);
-  affine_propagate(hidden1_clipped, hidden2_values, 32, 32, hidden2_biases,
-      hidden2_weights);
-  clip_propagate(hidden2_values, hidden2_clipped, 32);
-  affine_propagate(hidden2_clipped, out_values, 32, 1, output_biases,
+  transform(pos, b->input);
+  affine_propagate(b->input, b->hidden1_values, FtOutDims, 32,
+      hidden1_biases, hidden1_weights);
+  clip_propagate(b->hidden1_values, b->hidden1_clipped, 32);
+  affine_propagate(b->hidden1_clipped, b->hidden2_values, 32, 32,
+      hidden2_biases, hidden2_weights);
+  clip_propagate(b->hidden2_values, b->hidden2_clipped, 32);
+  affine_propagate(b->hidden2_clipped, &out_value, 32, 1, output_biases,
       output_weights);
 
 #if defined(USE_MMX)
   _mm_empty();
 #endif
 
-  return out_values[0] / FV_SCALE;
+  return out_value / FV_SCALE;
 }
 
 bool read_weights(weight_t *output_buf, unsigned count, FILE *F)
