@@ -334,7 +334,7 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
       sum = _mm_add_epi32(sum, product1);
     }
 
-    assert(kNumChunks & 1 == 0);
+    assert((kNumChunks & 1) == 0);
 #if 0
     if (kNumChunks & 0x1) {
       __m128i product = _mm_maddubs_epi16(_mm_load_si128(&inVec[kNumChunks - 1]), _mm_load_si128(&row[kNumChunks - 1]));
@@ -358,7 +358,7 @@ void affine_propagate(clamped_t *input, int32_t *output, unsigned paddedInDims,
         _mm_load_si128(&inVec[j + 1]), _mm_load_si128(&row[j + 1]));
       sum1 = _mm_add_epi32(sum1, product1);
     }
-    assert(kNumChunks & 1 == 0);
+    assert((kNumChunks & 1) == 0);
     sum = _mm_add_epi32(sum, sum1);
     sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xE));
     sum = _mm_add_epi32(sum, _mm_shufflelo_epi16(sum, 0xE));
