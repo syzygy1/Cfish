@@ -428,35 +428,35 @@ INLINE void refresh_accumulator(const Position *pos)
       unsigned offset = kHalfDimensions * index;
 
 #if defined(USE_AVX512)
-      __m512i *accumulation = (__m512i *)&accumulator->accumulation[c][0];
+      __m512i *accumulation = (__m512i *)accumulator->accumulation[c];
       __m512i *column = (__m512i *)&ft_weights[offset];
       const unsigned numChunks = kHalfDimensions / 32;
       for (unsigned j = 0; j < numChunks; j++)
         accumulation[j] = _mm512_add_epi16(accumulation[j], column[j]);
 
 #elif defined(USE_AVX2)
-      __m256i *accumulation = (__m256i *)&accumulator->accumulation[c][0];
+      __m256i *accumulation = (__m256i *)accumulator->accumulation[c];
       __m256i *column = (__m256i *)&ft_weights[offset];
       const unsigned numChunks = kHalfDimensions / 16;
       for (unsigned j = 0; j < numChunks; j++)
         accumulation[j] = _mm256_add_epi16(accumulation[j], column[j]);
 
 #elif defined(USE_SSE2)
-      __m128i *accumulation = (__m128i *)&accumulator->accumulation[c][0];
+      __m128i *accumulation = (__m128i *)accumulator->accumulation[c];
       __m128i *column = (__m128i *)&ft_weights[offset];
       const unsigned numChunks = kHalfDimensions / 8;
       for (unsigned j = 0; j < numChunks; j++)
         accumulation[j] = _mm_add_epi16(accumulation[j], column[j]);
 
 #elif defined(USE_MMX)
-      __m64 *accumulation = (__m64 *)&accumulator->accumulation[c][0];
+      __m64 *accumulation = (__m64 *)accumulator->accumulation[c];
       __m64 *column = (__m64 *)&ft_weights[offset];
       const unsigned numChunks = kHalfDimensions / 4;
       for (unsigned j = 0; j < numChunks; ++j)
         accumulation[j] = _mm_add_pi16(accumulation[j], column[j]);
 
 #elif defined(USE_NEON)
-      int16x8_t *accumulation = (int16x8_t *)&accumulator->accumulation[c][0];
+      int16x8_t *accumulation = (int16x8_t *)accumulator->accumulation[c];
       int16x8_t *column = (int16x8_t *)&ft_weights[offset];
       const unsigned numChunks = kHalfDimensions / 8;
       for (unsigned j = 0; j < numChunks; j++)
@@ -491,22 +491,25 @@ static bool update_accumulator_if_possible(const Position *pos)
   append_changed_indices(pos, removed_indices, added_indices, reset);
 
   for (unsigned c = 0; c < 2; c++) {
+#if defined(USE_AVX512)
+    const unsigned numChunks = kHalfDimensions / 32;
+    __m512i *accumulation = (__m512i *)accumulator->accumulation[c];
 
-#if defined(USE_AVX2)
+#elif defined(USE_AVX2)
     const unsigned numChunks = kHalfDimensions / 16;
-    __m256i *accumulation = (__m256i *)&accumulator->accumulation[c][0];
+    __m256i *accumulation = (__m256i *)accumulator->accumulation[c];
 
 #elif defined(USE_SSE2)
     const unsigned numChunks = kHalfDimensions / 8;
-    __m128i *accumulation = (__m128i *)&accumulator->accumulation[c][0];
+    __m128i *accumulation = (__m128i *)accumulator->accumulation[c];
 
 #elif defined(USE_MMX)
     const unsigned numChunks = kHalfDimensions / 4;
-    __m64 *accumulation = (__m64 *)&accumulator->accumulation[c][0];
+    __m64 *accumulation = (__m64 *)accumulator->accumulation[c];
 
 #elif defined(USE_NEON)
     const unsigned numChunks = kHalfDimensions / 8;
-    int16x8_t *accumulation = (int16x8_t *)&accumulator->accumulation[c][0];
+    int16x8_t *accumulation = (int16x8_t *)accumulator->accumulation[c];
 #endif
 
     if (reset[c]) {
@@ -522,7 +525,12 @@ static bool update_accumulator_if_possible(const Position *pos)
         unsigned index = removed_indices[c].values[k];
         const unsigned offset = kHalfDimensions * index;
 
-#if defined(USE_AVX2)
+#if defined(USE_AVX512)
+        __m512i *column = (__m512i *)&ft_weights[offset];
+        for (unsigned j = 0; j < numChunks; j++)
+          accumulation[j] = _mm512_sub_epi16(accumulation[j], column[j]);
+
+#elif defined(USE_AVX2)
         __m256i *column = (__m256i *)&ft_weights[offset];
         for (unsigned j = 0; j < numChunks; j++)
           accumulation[j] = _mm256_sub_epi16(accumulation[j], column[j]);
@@ -554,7 +562,12 @@ static bool update_accumulator_if_possible(const Position *pos)
       unsigned index = added_indices[c].values[k];
       const unsigned offset = kHalfDimensions * index;
 
-#if defined(USE_AVX2)
+#if defined(USE_AVX512)
+      __m512i *column = (__m512i *)&ft_weights[offset];
+      for (unsigned j = 0; j < numChunks; j++)
+        accumulation[j] = _mm512_add_epi16(accumulation[j], column[j]);
+
+#elif defined(USE_AVX2)
       __m256i *column = (__m256i *)&ft_weights[offset];
       for (unsigned j = 0; j < numChunks; j++)
         accumulation[j] = _mm256_add_epi16(accumulation[j], column[j]);
@@ -592,7 +605,7 @@ INLINE void transform(const Position *pos, clipped_t *output)
   if (!update_accumulator_if_possible(pos))
     refresh_accumulator(pos);
 
-  int16_t (*accumulation)[2][256] = &(pos->st->accumulator.accumulation);
+  int16_t (*accumulation)[2][256] = &pos->st->accumulator.accumulation;
 
 #if defined(USE_AVX2)
   const unsigned numChunks = kHalfDimensions / 32;
