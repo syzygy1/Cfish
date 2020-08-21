@@ -192,7 +192,6 @@ ifeq ($(findstring -vnni,$(ARCH)),-vnni)
 	sse41 = yes
 	avx2 = yes
 	pext = yes
-	avx512 = yes
 	vnni = yes
 endif
 
@@ -203,6 +202,11 @@ endif
 # 64-bit pext is not available on x86-32
 ifeq ($(bits),32)
 	pext = no
+endif
+
+# Make sure the ARCH string contains no invalid components
+ifneq ($(shell echo $(ARCH) | sed 's/x86-\(32\|64\)\(-sse\|-popcnt\|-mmx\|-sse2\|-ssse3\|-sse41\|-modern\|-avx2\|-bmi2\|-avx512\|-vnni\)*/OK/'),OK)
+	arch =
 endif
 
 else
@@ -598,8 +602,9 @@ help:
 	@echo ""
 	@echo "Supported archs:"
 	@echo ""
-	@echo "x86-64-vnni             > x86 64-bit with vnni support"
+	@echo "x86-64-avx512-vnni      > x86 64-bit with 512-bit vnni support"
 	@echo "x86-64-avx512           > x86 64-bit with avx512 support"
+	@echo "x86-64-vnni             > x86 64-bit with 256-bit vnni support"
 	@echo "x86-64-bmi2             > x86 64-bit with bmi2 support"
 	@echo "x86-64-avx2             > x86 64-bit with avx2 support"
 	@echo "x86-64-sse41-popcnt     > x86 64-bit with sse41 and popcnt support"
@@ -607,7 +612,7 @@ help:
 	@echo "x86-64-ssse3            > x86 64-bit with ssse3 support"
 	@echo "x86-64-sse3-popcnt      > x86 64-bit with sse3 and popcnt support"
 	@echo "x86-64                  > x86 64-bit generic"
-	@echo "x86-32-vnni             |"
+	@echo "x86-32-avx512-vnni      |"
 	@echo "x86-32-...              | same as for x86-64"
 	@echo "x86-32-sse3-popcnt      |"
 	@echo "x86-32-sse2             > x86 32-bit with sse2 support"

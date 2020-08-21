@@ -193,8 +193,10 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
 
 #elif defined(USE_AVX2)
   const unsigned numChunks = inDims / 32;
-  const __m256i kOnes = _mm256_set1_epi16(1);
   __m256i *inVec = (__m256i *)input;
+#if !defined(USE_VNNI)
+  const __m256i kOnes = _mm256_set1_epi16(1);
+#endif
 
 #elif defined(USE_SSSE3)
   const unsigned numChunks = inDims / 16;
@@ -252,9 +254,13 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     __m256i sum = _mm256_setzero_si256();
     __m256i *row = (__m256i *)&weights[offset];
     for (unsigned j = 0; j < numChunks; j++) {
+#if defined(USE_VNNI)
+      sum = _mm256_dpbusd_epi32(sum, inVec[j], row[j]);
+#else
       __m256i product = _mm256_maddubs_epi16(inVec[j], row[j]);
       product = _mm256_madd_epi16(product, kOnes);
       sum = _mm256_add_epi32(sum, product);
+#endif
     }
     __m128i sum128 = _mm_add_epi32(_mm256_castsi256_si128(sum), _mm256_extracti128_si256(sum, 1));
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_BADC));
