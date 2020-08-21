@@ -692,7 +692,7 @@ INLINE void transform(const Position *pos, clipped_t *output)
 }
 
 struct NetData {
-  clipped_t input[FtOutDims];
+  alignas(64) clipped_t input[FtOutDims];
   int32_t hidden1_values[32];
   int32_t hidden2_values[32];
   clipped_t hidden1_clipped[32];
@@ -705,19 +705,21 @@ Value nnue_evaluate(const Position *pos)
   int32_t out_value;
 #if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32)
   uint buf[sizeof(struct NetData) + 63];
-#else
-  alignas(64) struct NetData buf[1];
-#endif
   struct NetData *b = (struct NetData *)(((uintptr_t)buf + 0x3f) & ~0x3f);
+#define B(x) (b->x)
+#else
+  struct NetData buf;
+#define B(x) (buf.x)
+#endif
 
-  transform(pos, b->input);
-  affine_propagate(b->input, b->hidden1_values, FtOutDims, 32,
+  transform(pos, B(input));
+  affine_propagate(B(input), B(hidden1_values), FtOutDims, 32,
       hidden1_biases, hidden1_weights);
-  clip_propagate(b->hidden1_values, b->hidden1_clipped, 32);
-  affine_propagate(b->hidden1_clipped, b->hidden2_values, 32, 32,
+  clip_propagate(B(hidden1_values), B(hidden1_clipped), 32);
+  affine_propagate(B(hidden1_clipped), B(hidden2_values), 32, 32,
       hidden2_biases, hidden2_weights);
-  clip_propagate(b->hidden2_values, b->hidden2_clipped, 32);
-  affine_propagate(b->hidden2_clipped, &out_value, 32, 1, output_biases,
+  clip_propagate(B(hidden2_values), B(hidden2_clipped), 32);
+  affine_propagate(B(hidden2_clipped), &out_value, 32, 1, output_biases,
       output_weights);
 
 #if defined(USE_MMX)
