@@ -104,6 +104,81 @@ ARCH = x86-64-modern
 
 ### 2.2 Architecture specific
 
+ifeq ($(ARCH),native)
+cc = gcc
+ifeq ($(COMP),clang))
+cc = clang
+else ifeq ($(COMP),icc)
+cc = icc
+endif
+props = $(shell echo | $(cc) -m64 -march=native -E -dM -)
+x86 = no
+ifeq ($(findstring __i386__,$(props)),__i386__)
+	x86 = yes
+else ifeq ($(findstring __x86_64__,$(props)),__x86_64__)
+	x86 = yes
+endif
+ifeq ($(x86),yes)
+
+	ifeq ($(findstring __i386__,$(props)),__i386__)
+		arch = i386
+		bits = 32
+	else
+		arch = x86_64
+		bits = 64
+	endif
+	ifeq ($(findstring __AVX512__,$(props)),__AVX512__)
+		avx512 = yes
+	endif
+	ifeq ($(findstring __VNNI__,$(props)),__VNNI__)
+		vnni = yes
+	endif
+	ifeq ($(bits),64)
+	ifeq ($(findstring __BMI2__,$(props)),__BMI2__)
+		pext = yes
+	endif
+	endif
+	ifeq ($(findstring __AVX2__,$(props)),__AVX2__)
+		avx2 = yes
+	endif
+	ifeq ($(findstring __SSE4_1__,$(props)),__SSE4_1__)
+		sse41 = yes
+	endif
+	ifeq ($(findstring __POPCNT__,$(props)),__POPCNT__)
+		popcnt = yes
+	endif
+	ifeq ($(findstring __SSSE3__,$(props)),__SSSE3__)
+		ssse3 = yes
+	endif
+	ifeq ($(findstring __SSE2__,$(props)),__SSE2__)
+		sse2 = yes
+	endif
+	ifeq ($(findstring __SSE__,$(props)),__SSE__)
+		sse = yes
+		prefetch = yes
+	endif
+	ifeq ($(findstring __MMX__,$(props)),__MMX__)
+		mmx = yes
+	endif
+
+else ifeq ($(findstring __arm__,$(props)),__arm__)
+# make ARCH=native not yet supported on ARM
+#	ifeq ($(findstring __ARM_NEON__,$(props)),__ARM_NEON__)
+#		neon = yes
+#	endif
+else ifeq ($(findstring __ppc__,$(props)),__ppc__)
+	ifeq ($(findstring __ppc64__,$(props)),__ppc64__)
+		arch = ppc64
+		popcnt = yes
+		prefetch = yes
+	else
+		arch = ppc
+		bits = 32
+	endif
+endif
+
+endif
+
 ifeq ($(findstring x86,$(ARCH)),x86)
 
 # x86-32/64
@@ -205,7 +280,7 @@ ifeq ($(bits),32)
 endif
 
 # Make sure the ARCH string contains no invalid components
-ifneq ($(shell echo $(ARCH) | sed 's/x86-\(32\|64\)\(-sse\|-popcnt\|-mmx\|-sse2\|-ssse3\|-sse41\|-modern\|-avx2\|-bmi2\|-avx512\|-vnni\)*/OK/'),OK)
+ifneq ($(shell echo $(ARCH) | sed -E 's/x86-(32|64)(-sse|-popcnt|-mmx|-sse2|-sse3|-ssse3|-sse41|-modern|-avx2|-bmi2|-avx512|-vnni)*/OK/'),OK)
 	arch =
 endif
 
@@ -225,6 +300,14 @@ endif
 ifeq ($(ARCH),armv7)
 	arch = armv7
 	prefetch = yes
+	bits = 32
+endif
+
+ifeq ($(ARCH),armv7-neon)
+	arch = armv7
+	prefetch = yes
+	popcnt = yes
+	neon = yes
 	bits = 32
 endif
 
@@ -369,9 +452,23 @@ ifeq ($(KERNEL),Darwin)
 	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.14
 endif
 
-### Travis CI script uses COMPILER to overwrite CC
-ifdef COMPILER
-	COMPCC=$(COMPILER)
+# To cross-compile for Android, NDK version r21 or later is recommended.
+# In earlier NDK versions, you'll need to pass -fno-addrsig if using GNU
+# binutils. Currently we don't know how to make PGO builds with the NDK yet.
+ifeq ($(COMP),ndk)
+	CFLAGS += -fPIE
+	ifeq ($(arch),armv7)
+		comp=armv7a-linux-androideabi16-clang
+		CC=armv7a-linux-androideabi16-clang
+		CCFLAGS += -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+		STRIP=arm-linux-androideabi-strip
+	endif
+	ifeq ($(arch),armv8-a)
+		comp=aarch64-linux-android21-clang
+		CC=aarch64-linux-android21-clang
+		STRIP=aarch64-linux-android-strip
+	endif
+	LDFLAGS += -pie -lm -latomic
 endif
 
 ### Allow overwriting CC from command line
@@ -512,6 +609,11 @@ endif
 
 ifeq ($(neon),yes)
 	CFLAGS += -DUSE_NEON
+	ifeq ($(KERNEL),Linux)
+	ifneq ($(COMP),ndk)
+		CXXFLAGS += -mfpu=neon
+	endif
+	endif
 endif
 
 ### native
@@ -611,7 +713,7 @@ help:
 	@echo "x86-64-modern           > common modern CPU, currently x86-64-sse41-popcnt"
 	@echo "x86-64-ssse3            > x86 64-bit with ssse3 support"
 	@echo "x86-64-sse3-popcnt      > x86 64-bit with sse3 and popcnt support"
-	@echo "x86-64                  > x86 64-bit generic"
+	@echo "x86-64                  > x86 64-bit generic (with sse2 support)"
 	@echo "x86-32-avx512-vnni      |"
 	@echo "x86-32-...              | same as for x86-64"
 	@echo "x86-32-sse3-popcnt      |"
@@ -621,8 +723,9 @@ help:
 	@echo "x86-32                  > x86 32-bit generic"
 	@echo "ppc-64                  > PPC 64-bit"
 	@echo "ppc-32                  > PPC 32-bit"
+	@echo "armv8                   > ARMv8 64-bit with popcnt and neon"
+	@echo "armv7-neon              > ARMv7 32-bit with popcnt and neon"
 	@echo "armv7                   > ARMv7 32-bit"
-	@echo "armv8                   > ARMv8 64-bit"
 	@echo "apple-silicon           > Apple silicon ARM64"
 	@echo "general-64              > unspecified 64-bit"
 	@echo "general-32              > unspecified 32-bit"
@@ -642,7 +745,7 @@ help:
 	@echo "Advanced examples, for experienced users looking for performance: "
 	@echo ""
 	@echo "make    help  ARCH=x86-64-bmi2"
-	@echo "make -j profile-build ARCH=x86-64-bmi2 COMP=gcc COMPC=gcc-9.0"
+	@echo "make -j profile-build ARCH=x86-64-bmi2 COMP=gcc COMPCC=gcc-9.0"
 	@echo "make -j build ARCH=x86-64-ssse3 COMP=clang"
 	@echo ""
 ifneq ($(empty_arch),yes)
