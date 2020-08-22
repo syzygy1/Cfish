@@ -104,7 +104,7 @@ ARCH = x86-64-modern
 
 ### 2.2 Architecture specific
 
-ifeq ($(ARCH),native)
+ifeq ($(ARCH),auto)
 cc = gcc
 ifeq ($(COMP),clang)
 cc = clang
@@ -128,14 +128,17 @@ ifeq ($(x86),yes)
 		bits = 64
 	endif
 	ifeq ($(findstring __AVX512__,$(props)),__AVX512__)
-		avx512 = yes
+#		avx512 = yes
 	endif
 	ifeq ($(findstring __VNNI__,$(props)),__VNNI__)
 		vnni = yes
 	endif
 	ifeq ($(bits),64)
 	ifeq ($(findstring __BMI2__,$(props)),__BMI2__)
+	# Let's not use pext on Zen
+	ifneq ($(findstring __znver,$(props)),__znver)
 		pext = yes
+	endif
 	endif
 	endif
 	ifeq ($(findstring __AVX2__,$(props)),__AVX2__)
@@ -704,22 +707,22 @@ help:
 	@echo ""
 	@echo "Supported archs:"
 	@echo ""
-	@echo "x86-64-avx512-vnni      > x86 64-bit with 512-bit vnni support"
-	@echo "x86-64-avx512           > x86 64-bit with avx512 support"
-	@echo "x86-64-vnni             > x86 64-bit with 256-bit vnni support"
-	@echo "x86-64-bmi2             > x86 64-bit with bmi2 support"
-	@echo "x86-64-avx2             > x86 64-bit with avx2 support"
-	@echo "x86-64-sse41-popcnt     > x86 64-bit with sse41 and popcnt support"
+	@echo "x86-64-avx512-vnni      > x86 64-bit with 512-bit AVX512/VNNI support"
+	@echo "x86-64-avx512           > x86 64-bit with 512-bit AVX512 support"
+	@echo "x86-64-vnni             > x86 64-bit with 256-bit AVX2/VNNI support"
+	@echo "x86-64-bmi2             > x86 64-bit with AVX2 and BMI2 support"
+	@echo "x86-64-avx2             > x86 64-bit with 256-bit AVX2 support"
+	@echo "x86-64-sse41-popcnt     > x86 64-bit with SSE4.1 and popcount support"
 	@echo "x86-64-modern           > common modern CPU, currently x86-64-sse41-popcnt"
-	@echo "x86-64-ssse3            > x86 64-bit with ssse3 support"
-	@echo "x86-64-sse3-popcnt      > x86 64-bit with sse3 and popcnt support"
-	@echo "x86-64                  > x86 64-bit generic (with sse2 support)"
+	@echo "x86-64-ssse3            > x86 64-bit with SSSE3 support"
+	@echo "x86-64-sse3-popcnt      > x86 64-bit with SSE3 and popcount support"
+	@echo "x86-64                  > x86 64-bit generic (with SSE2 support)"
 	@echo "x86-32-avx512-vnni      |"
 	@echo "x86-32-...              | same as for x86-64"
 	@echo "x86-32-sse3-popcnt      |"
-	@echo "x86-32-sse2             > x86 32-bit with sse2 support"
-	@echo "x86-32-mmx-sse          > x86 32-bit with mmx and sse support"
-	@echo "x86-32-mmx              > x86 32-bit with mmx support"
+	@echo "x86-32-sse2             > x86 32-bit with SSE2 support"
+	@echo "x86-32-mmx-sse          > x86 32-bit with MMX and SSE support"
+	@echo "x86-32-mmx              > x86 32-bit with MMX support"
 	@echo "x86-32                  > x86 32-bit generic"
 	@echo "ppc-64                  > PPC 64-bit"
 	@echo "ppc-32                  > PPC 32-bit"
@@ -729,6 +732,8 @@ help:
 	@echo "apple-silicon           > Apple silicon ARM64"
 	@echo "general-64              > unspecified 64-bit"
 	@echo "general-32              > unspecified 32-bit"
+	@echo ""
+	@echo "When using many threads, 256-bit AVX2 may perform better than 512-bit AVX512."
 	@echo ""
 	@echo "Supported compilers:"
 	@echo ""
