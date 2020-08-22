@@ -2,7 +2,7 @@
 This is a C port of Stockfish.
 
 ## Compiling Cfish
-Compiling Cfish requires a working gcc or clang environment. The MSYS2 environment is recommended for compiling Cfish on Windows.
+Compiling Cfish requires a working gcc or clang environment. The [MSYS2](https://www.msys2.org/) environment is recommended for compiling Cfish on Windows.
 
 To compile, type:
 
