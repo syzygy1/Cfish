@@ -710,7 +710,7 @@ Value nnue_evaluate(const Position *pos)
 {
   int32_t out_value;
 #if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32)
-  uint buf[sizeof(struct NetData) + 63];
+  uint8_t buf[sizeof(struct NetData) + 63];
   struct NetData *b = (struct NetData *)(((uintptr_t)buf + 0x3f) & ~0x3f);
 #define B(x) (b->x)
 #else
