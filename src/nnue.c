@@ -709,7 +709,7 @@ struct NetData {
 Value nnue_evaluate(const Position *pos)
 {
   int32_t out_value;
-#if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32) && !defined(__clang__) && !defined(__ICC)
+#if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32) && !defined(__clang__) && !defined(__INTEL_COMPILER)
   // work around a bug in old gcc on Windows
   uint8_t buf[sizeof(struct NetData) + 63];
   struct NetData *b = (struct NetData *)(((uintptr_t)buf + 0x3f) & ~0x3f);

@@ -100,7 +100,7 @@ avx2 = no
 avx512 = no
 vnni = no
 neon = no
-ARCH = x86-64-modern
+ARCH = auto
 
 ### 2.2 Architecture specific
 
@@ -693,20 +693,21 @@ help:
 	@echo ""
 	@echo "To compile Cfish, type: "
 	@echo ""
-	@echo "make target ARCH=arch [COMP=compiler] [COMPCC=cc]"
+	@echo "make target [ARCH=arch] [COMP=compiler] [COMPCC=cc]"
 	@echo ""
 	@echo "Supported targets:"
 	@echo ""
 	@echo "help                    > Display architecture details"
 	@echo "build                   > Standard build"
 	@echo "net                     > Download the default nnue net"
-	@echo "profile-build           > PGO build"
+	@echo "profile-build (or pgo)  > PGO build"
 	@echo "strip                   > Strip executable"
 	@echo "install                 > Install executable"
 	@echo "clean                   > Clean up"
 	@echo ""
 	@echo "Supported archs:"
 	@echo ""
+	@echo "auto                    > Auto-detect optimal architecture (default)"
 	@echo "x86-64-avx512-vnni      > x86 64-bit with 512-bit AVX512/VNNI support"
 	@echo "x86-64-avx512           > x86 64-bit with 512-bit AVX512 support"
 	@echo "x86-64-vnni             > x86 64-bit with 256-bit AVX2/VNNI support"
@@ -762,7 +763,7 @@ endif
 
 .PHONY: help build profile-build strip install clean net objclean profileclean \
         config-sanity icc-profile-use icc-profile-make gcc-profile-use \
-        gcc-profile-make clang-profile-use clang-profile-make
+        gcc-profile-make clang-profile-use clang-profile-make pgo
 
 build: config-sanity
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) all
@@ -781,6 +782,8 @@ profile-build: net config-sanity objclean profileclean
 	@echo ""
 	@echo "Step 4/4. NOT deleting profile data ..."
 #	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) profileclean
+
+pgo: profile-build
 
 strip:
 	strip $(EXE)
