@@ -344,6 +344,7 @@ void uci_loop(int argc, char **argv)
                     option_value(OPT_THREADS), atoi(str));
       benchmark(&pos, str_buf);
     }
+    else if (strcmp(token, "compiler") == 0)  print_compiler_info();
     else {
       printf("Unknown command: %s %s\n", token, str);
       fflush(stdout);

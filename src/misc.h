@@ -33,6 +33,7 @@
 #include "types.h"
 
 void print_engine_info(bool to_uci);
+void print_compiler_info(void);
 
 // prefetch() preloads the given address in L1/L2 cache. This is
 // a non-blocking function that doesn't stall the CPU waiting for data

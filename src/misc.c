@@ -78,6 +78,101 @@ void print_engine_info(bool to_uci)
   fflush(stdout);
 }
 
+// print compiler_info() prints a string trying to describe the compiler
+
+void print_compiler_info(void)
+{
+#define stringify2(x) #x
+#define stringify(x) stringify2(x)
+#define make_version_string(major, minor, patch) stringify(major) "." stringify(minor) "." stringify(patch)
+
+  printf("\nCompiled by "
+
+#ifdef __clang__
+         "clang " make_version_string(__clang_major__, __clang_minor__,
+                                      __clang_patchlevel__)
+#elif __INTEL_COMPILER
+         "Intel compiler (version " stringify(__INTEL_COMPILER)
+         " update " stringify(__INTEL_COMPILER_UPDATE) ")"
+#elif _MSC_VER
+         "MSVC (version " stringify(_MSC_FULL_VER) "." stringify(_MSC_BUILD) ")"
+#elif __GNUC__
+         "gcc (GNUC) "
+         make_version_string(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
+#else
+         "Unknown compiler (unknown version)"
+#endif
+
+#ifdef __APPLE__
+         " on Apple"
+#elif __CYGWIN__
+         " on Cygwin"
+#elif __MINGW64__
+         " on MinGW64"
+#elif __MINGW32__
+         " on MinGW32"
+#elif __ANDROID__
+         " on Android"
+#elif __linux__
+         " on Linux"
+#elif _WIN64
+         " on Microsoft Windows 64-bit"
+#elif _WIN32
+         " on Microsoft Windows 32-bit"
+#else
+         " on unknown system"
+#endif
+
+         "\nCompilation settings include: "
+#ifdef IS_64BIT
+         "64bit"
+#else
+         "32bit"
+#endif
+#ifdef USE_VNNI
+         " VNNI"
+#endif
+#ifdef USE_AVX512
+         " AVX512"
+#endif
+#ifdef USE_PEXT
+         " BMI2"
+#endif
+#ifdef USE_AVX2
+         " AVX2"
+#endif
+#ifdef USE_SSE41
+         " SSE41"
+#endif
+#ifdef USE_SSSE3
+         " SSSE3"
+#endif
+#ifdef USE_SSE2
+         " SSE2"
+#endif
+#ifdef USE_POPCNT
+         " POPCNT"
+#endif
+#ifdef USE_MMX
+         " MMX"
+#endif
+#ifdef USE_NEON
+         " NEON"
+#endif
+
+#ifndef NDEBUG
+         " DEBUG"
+#endif
+
+         "\n__VERSION__ macro expands to: "
+#ifdef __VERSION__
+         __VERSION__
+#else
+         "(undefined macro)"
+#endif
+         "\n\n");
+}
+
 // xorshift64star Pseudo-Random Number Generator
 // This class is based on original code written and dedicated
 // to the public domain by Sebastiano Vigna (2014).
