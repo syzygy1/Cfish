@@ -2,57 +2,30 @@
 This is a C port of Stockfish.
 
 ## Compiling Cfish
-Compiling Cfish requires a working gcc or clang environment. To compile, type:
+Compiling Cfish requires a working gcc or clang environment. The MSYS2 environment is recommended for compiling Cfish on Windows.
+
+To compile, type:
 
     make target [ARCH=arch] [COMP=compiler] [COMPCC=gcc-4.8] [further options]
 
-Supported targets:
+from the `src` directory. Lists of supported targets, archs and compilers can be viewed by typing `make` or `make help`.
 
-<table>
-<tr><td><code>build (or cfish)</code></td><td>Standard build</td></tr>
-<tr><td><code>profile-build</code></td><td>PGO build</td></tr>
-<tr><td><code>strip</code></td><td>Strip executable</td></tr>
-<tr><td><code>install</code></td><td>Install executable</td></tr>
-<tr><td><code>clean</code></td><td>Install executable</td></tr>
-</table>
+If the `ARCH` variable is not set or is set to `auto`, the Makefile will attempt to determine and use the optimal settings for your system. If this fails with an error or gives unsatisfactory results, you should set the desired architecture manually.
 
-Supported archs (default is `x86-64-modern`):
-
-<table>
-<tr><td><code>x86-64</code></td><td>x86 64-bit</td></tr>
-<tr><td><code>x86-64-modern</code></td><td>x86 64-bit with popcnt support</td></tr>
-<tr><td><code>x86-64-bmi2</code></td><td>x86 64-bit with pext support</td></tr>
-<tr><td><code>x86-32</code></td><td>x86 32-bit with SSE support</td></tr>
-<tr><td><code>x86-32-old</code></td><td>x86 32-bit fall back for old hardware</td></tr>
-<tr><td><code>ppc-64</code></td><td>PPC 64-bit</td></tr>
-<tr><td><code>ppc-32</code></td><td>PPC 32-bit</td></tr>
-<tr><td><code>armv7</code></td><td>ARMv7 32-bit</td></tr>
-<tr><td><code>general-64</code></td><td>unspecified 64-bit</td></tr>
-<tr><td><code>general-32</code></td><td>unspecified 32-bit</td></tr>
-</table>
-
-Supported compilers:
-
-<table>
-<tr><td><code>gcc</code></td><td>Gnu compiler (default)</td></tr>
-<tr><td><code>mingw</code></td><td>MinGW Gnu compiler</td></tr>
-<tr><td><code>clang</code></td><td>LLVM Clang compiler</td></tr>
-<tr><td><code>icc</code></td><td>Intel compiler (untested)</td></tr>
-</table>
+Be aware that a Cfish binary compiled specifically for your machine may not work on other (older) machines. If the binary has to work on multiple machines, set `ARCH` to the architecture that corresponds to the oldest/least capable machine.
 
 Further options:
 
 <table>
-<tr><td><code>nnue=no</code></td><td>Use classical evaluation</td></tr>
+<tr><td><code>nnue=no</code></td><td>Do not include NNUE code</td></tr>
 <tr><td><code>numa=no</code></td><td>Disable NUMA support</td></tr>
-<tr><td><code>native=no</code></td><td>Disable -march=native compiler setting</td></tr>
 <tr><td><code>lto=yes</code></td><td>Compile with link-time optimization</td></tr>
-<tr><td><code>extra=yes</code></td><td>Compile with extra optimization options (gcc-7.x)</td></tr>
+<tr><td><code>extra=yes</code></td><td>Compile with extra optimization options (gcc-7.x and higher)</td></tr>
 </table>
 
 Add `numa=no` to fix the error `cannot find -lnuma`.
 
-Add `native=no` to prevent the executable from being tied to the specific type of your CPU.
+The optimization options currently enabled with `extra=yes` appear to be less effective now that the NNUE code has been added.
 
 ## UCI settings
 
@@ -80,6 +53,9 @@ Output the N best lines when searching. Leave at 1 for best performance.
 #### Move Overhead
 Compensation for network and GUI delay (in ms).
 
+#### Slow Mover
+Increase to make Cfish use more time, decrease to make Cfish use less time.
+
 #### SyzygyPath
 Path to the folders/directories storing the Syzygy tablebase files. Multiple directories are to be separated by ";" on Windows and by ":" on Unix-based operating systems. Do not use spaces around the ";" or ":".
 
@@ -99,6 +75,12 @@ Use Syzygy DTM tablebases (not yet released).
 
 #### BookFile/BestBookMove/BookDepth
 Control PolyGlot book usage.
+
+#### EvalFile
+Name of NNUE network file.
+
+#### Use NNUE
+By default, Cfish uses NNUE in Stockfish's Hybrid mode, where certain positions are evaluated with the old handcrafted evaluation. Other modes are Pure (NNUE only) and Classical (handcrafted evaluation only).
 
 #### LargePages
 Control allocation of the hash table as Large Pages (LP). On Windows this option does not appear if the operating system lacks LP support or if LP has not properly been set up.
