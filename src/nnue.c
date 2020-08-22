@@ -374,23 +374,27 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 #elif defined(USE_SSE2)
   const unsigned numChunks = numDims / 8;
   const __m128i k0x7f80 = _mm_set1_epi16(0x7f80);
+  const __m128i k0x0080 = _mm_set1_epi16(0x0080);
+  const __m128i k0x8000 = _mm_set1_epi16(-0x8000);
   __m128i *in = (__m128i *)input;
   __m128i *out = (__m128i *)output;
   for (unsigned i = 0; i < numChunks; i++) {
     __m128i words = _mm_srai_epi16(_mm_packs_epi32(in[i * 2], in[i * 2 + 1]),
         SHIFT);
-    out[i] = _mm_subs_epu16(_mm_adds_epi16(words, k0x7f80), k0x7f80);
+    out[i] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(words, k0x7f80), k0x0080), k0x8000);
   }
 
 #elif defined(USE_MMX)
   const unsigned numChunks = numDims / 4;
   const __m64 k0x7f80 = _mm_set1_pi16(0x7f80);
+  const __m64 k0x0080 = _mm_set1_pi16(0x0080);
+  const __m64 k0x8000 = _mm_set1_pi16(-0x8000);
   __m64 *in = (__m64 *)input;
   __m64 *out = (__m64 *)output;
   for (unsigned i = 0; i < numChunks; i++) {
     __m64 words = _mm_srai_pi16(_mm_packs_pi32(in[i * 2], in[i * 2 + 1]),
         SHIFT);
-    out[i] = _mm_subs_pu16(_mm_adds_pi16(words, k0x7f80), k0x7f80);
+    out[i] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(words, k0x7f80), k0x0080), k0x8000);
   }
 
 #elif defined(USE_NEON)
@@ -628,10 +632,14 @@ INLINE void transform(const Position *pos, clipped_t *output)
 #elif defined(USE_SSE2)
   const unsigned numChunks = kHalfDimensions / 8;
   const __m128i k0x7f80 = _mm_set1_epi16(0x7f80);
+  const __m128i k0x0080 = _mm_set1_epi16(0x0080);
+  const __m128i k0x8000 = _mm_set1_epi16(-0x8000);
 
 #elif defined(USE_MMX)
   const unsigned numChunks = kHalfDimensions / 4;
   const __m64 k0x7f80 = _mm_set1_pi16(0x7f80);
+  const __m64 k0x0080 = _mm_set1_pi16(0x0080);
+  const __m64 k0x8000 = _mm_set1_pi16(-0x8000);
 
 #elif defined(USE_NEON)
   const unsigned numChunks = kHalfDimensions / 8;
@@ -669,14 +677,14 @@ INLINE void transform(const Position *pos, clipped_t *output)
     __m128i *out = (__m128i *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
       __m128i sum = ((__m128i *)(*accumulation)[perspectives[p]])[i];
-      out[i] = _mm_subs_epu16(_mm_adds_epi16(sum, k0x7f80), k0x7f80);
+      out[i] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(sum, k0x7f80), k0x0080), k0x8000);
     }
 
 #elif defined(USE_MMX)
     __m64 *out = (__m64 *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
-      __m64 sum0 = ((__m64 *)(*accumulation)[perspectives[p]])[i];
-      out[i] = _mm_subs_pu16(_mm_adds_pi16(sum0, k0x7f80), k0x7f80);
+      __m64 sum = ((__m64 *)(*accumulation)[perspectives[p]])[i];
+      out[i] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(sum, k0x7f80), k0x0080), k0x8000);
     }
 
 #elif defined(USE_NEON)
