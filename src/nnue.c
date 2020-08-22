@@ -797,10 +797,10 @@ void nnue_init(void)
     return;
   }
 
-  fprintf(stderr, "The network file %s was not loaded successfully.\n"
-                  "The default net can be downloaded from: https://tests.stock"
-                  "fishchess.org/api/nn/%s\n", evalFile,
-                  option_default_string_value(OPT_EVAL_FILE));
+  printf("info string ERROR: The network file %s was not loaded successfully.\n"
+         "info string ERROR: The default net can be downloaded from:\n"
+         "info string ERROR: https://tests.stockfishchess.org/api/nn/%s\n",
+         evalFile, option_default_string_value(OPT_EVAL_FILE));
   exit(EXIT_FAILURE);
 }
 

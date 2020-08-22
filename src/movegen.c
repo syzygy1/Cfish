@@ -180,7 +180,7 @@ INLINE ExtMove *generate_moves(const Position *pos, ExtMove *list,
     if (Checks) {
       if (    (Pt == BISHOP || Pt == ROOK || Pt == QUEEN)
           && !(PseudoAttacks[Pt][from] & target & pos->st->checkSquares[Pt]))
-          continue;
+        continue;
 
       if (blockers_for_king(pos, !Us) & sq_bb(from))
         continue;

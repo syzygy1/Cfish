@@ -1020,17 +1020,9 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
       }
   }
 
-  // Step 11. Internal iterative deepening
-  if (depth >= 7 && !ttMove) {
-    if (PvNode)
-      search_PV(pos, ss, alpha, beta, depth - 7);
-    else
-      search_NonPV(pos, ss, alpha, depth - 7, cutNode);
-
-    tte = tt_probe(posKey, &ttHit);
-    // ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply) : VALUE_NONE;
-    ttMove = ttHit ? tte_move(tte) : 0;
-  }
+  // Step 11. If the position is not in TT, decrease depth by 2
+  if (PvNode && depth >= 6 && !ttMove)
+    depth -= 2;
 
 moves_loop: // When in check search starts from here.
   ;  // Avoid a compiler warning. A label must be followed by a statement.
@@ -1243,6 +1235,11 @@ moves_loop: // When in check search starts from here.
     // Check extension
     else if (    givesCheck
              && (is_discovery_check_on_king(pos, !stm(), move) || see_test(pos, move, 0)))
+      extension = 1;
+
+    // Last capture extension
+    else if (   PieceValue[EG][captured_piece()] > PawnValueEg
+             && non_pawn_material() <= 2 * RookValueMg)
       extension = 1;
 
     // Castling extension

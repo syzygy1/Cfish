@@ -106,7 +106,7 @@ ARCH = x86-64-modern
 
 ifeq ($(ARCH),native)
 cc = gcc
-ifeq ($(COMP),clang))
+ifeq ($(COMP),clang)
 cc = clang
 else ifeq ($(COMP),icc)
 cc = icc

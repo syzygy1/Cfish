@@ -1302,17 +1302,24 @@ static NOINLINE int probe_dtz_table(Position *pos, int wdl, int *success)
   return probe_table(pos, wdl, success, DTZ);
 }
 
-// Add underpromotion captures to list of captures.
+// Add missing underpromotion captures to list of captures.
+// generate_captures() generates all queen promotions and knight promotions
+// that give check.
 static ExtMove *add_underprom_caps(Position *pos, ExtMove *m, ExtMove *end)
 {
   ExtMove *extra = end;
 
   for (; m < end; m++) {
     Move move = m->move;
-    if (type_of_m(move) == PROMOTION && piece_on(to_sq(move))) {
-      (*extra++).move = (Move)(move - (1 << 12));
-      (*extra++).move = (Move)(move - (2 << 12));
-      (*extra++).move = (Move)(move - (3 << 12));
+    if (   type_of_m(move) == PROMOTION
+        && promotion_type(move) == QUEEN
+        && piece_on(to_sq(move)))
+    {
+      (*extra++).move = (Move)(move - (1 << 12)); // ROOK
+      (*extra++).move = (Move)(move - (2 << 12)); // BISHOP
+      // Skip knight promotion if it was already generated
+      if (m+1 == end || from_to((m+1)->move) != from_to(move))
+        (*extra++).move = (Move)(move - (3 << 12)); // KNIGHT
     }
   }
 
