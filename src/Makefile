@@ -105,13 +105,25 @@ ARCH = auto
 ### 2.2 Architecture specific
 
 ifeq ($(ARCH),auto)
-cc = gcc
-ifeq ($(COMP),clang)
-cc = clang
+
+ifeq ($(COMP),)
+	CC=gcc
+else ifeq ($(COMP),gcc)
+	CC=gcc
+else ifeq ($(COMP),mingw)
+	CC=gcc
 else ifeq ($(COMP),icc)
-cc = icc
+	CC=icc
+else ifeq ($(COMP),clang)
+	CC=clang
 endif
-props = $(shell echo | $(cc) -m64 -march=native -E -dM -)
+
+ifdef COMPCC
+	CC=$(COMPCC)
+endif
+
+props = $(shell echo | $(CC) -m64 -march=native -E -dM -)
+
 x86 = no
 ifeq ($(findstring __i386__,$(props)),__i386__)
 	x86 = yes
@@ -127,9 +139,9 @@ ifeq ($(x86),yes)
 		arch = x86_64
 		bits = 64
 	endif
-	ifeq ($(findstring __AVX512__,$(props)),__AVX512__)
+#	ifeq ($(findstring __AVX512__,$(props)),__AVX512__)
 #		avx512 = yes
-	endif
+#	endif
 	ifeq ($(findstring __VNNI__,$(props)),__VNNI__)
 		vnni = yes
 	endif
@@ -160,8 +172,10 @@ ifeq ($(x86),yes)
 		sse = yes
 		prefetch = yes
 	endif
+	ifeq ($(sse2),no)
 	ifeq ($(findstring __MMX__,$(props)),__MMX__)
 		mmx = yes
+	endif
 	endif
 
 else ifeq ($(findstring __arm__,$(props)),__arm__)
@@ -440,14 +454,12 @@ endif
 ifeq ($(comp),icc)
 	profile_make = icc-profile-make
 	profile_use = icc-profile-use
-else
-ifeq ($(comp),clang)
+else ifeq ($(comp),clang)
 	profile_make = clang-profile-make
 	profile_use = clang-profile-use
 else
 	profile_make = gcc-profile-make
 	profile_use = gcc-profile-use
-endif
 endif
 
 ifeq ($(KERNEL),Darwin)
@@ -619,8 +631,7 @@ ifeq ($(neon),yes)
 	endif
 endif
 
-### native
-ifeq ($(native),yes)
+ifeq ($(ARCH),auto)
 	CFLAGS += -march=native
 endif
 
@@ -743,16 +754,13 @@ help:
 	@echo "clang                   > LLVM Clang compiler"
 	@echo "icc                     > Intel compiler"
 	@echo ""
-	@echo "Simple examples. If you don't know what to do, you likely want to run: "
+	@echo "Advanced examples:"
+	@echo "make profile-build ARCH=x86-64-bmi2 COMP=gcc COMPCC=gcc-9.0"
+	@echo "make build ARCH=x86-64-ssse3 COMP=clang"
 	@echo ""
-	@echo "make -j build ARCH=x86-64  (A portable, slow compile for 64-bit systems)"
-	@echo "make -j build ARCH=x86-32  (A portable, slow compile for 32-bit systems)"
-	@echo ""
-	@echo "Advanced examples, for experienced users looking for performance: "
-	@echo ""
-	@echo "make    help  ARCH=x86-64-bmi2"
-	@echo "make -j profile-build ARCH=x86-64-bmi2 COMP=gcc COMPCC=gcc-9.0"
-	@echo "make -j build ARCH=x86-64-ssse3 COMP=clang"
+	@echo "For best performance, try one or both of:"
+	@echo "make pgo"
+	@echo "make pgo COMP=clang"
 	@echo ""
 ifneq ($(empty_arch),yes)
 	@echo "-------------------------------"
