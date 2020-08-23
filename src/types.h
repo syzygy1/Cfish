@@ -414,11 +414,9 @@ CLAMP(double)
 
 typedef uint32_t PieceId;
 enum {
-  PIECE_ID_ZERO  = 0,
   PIECE_ID_KING  = 30,
   PIECE_ID_WKING = 30,
   PIECE_ID_BKING = 31,
-  PIECE_ID_NONE  = 32
 };
 
 typedef uint32_t PieceSquare;
@@ -436,8 +434,7 @@ enum {
   PS_B_QUEEN  =  9 * 64 + 1,
   PS_W_KING   = 10 * 64 + 1,
   PS_END      = PS_W_KING, // pieces without kings (pawns included)
-  PS_B_KING   = 11 * 64 + 1,
-  PS_END2     = 12 * 64 + 1
+  PS_B_KING   = 11 * 64 + 1
 };
 
 typedef PieceSquare ExtPieceSquare[2];
@@ -455,14 +452,6 @@ struct DirtyPiece {
 };
 
 typedef struct DirtyPiece DirtyPiece;
-
-struct EvalList {
-  PieceId pieceIdList[64];
-  PieceSquare pieceListFw[32];
-  PieceSquare pieceListFb[32];
-};
-
-typedef struct EvalList EvalList;
 
 #endif
 

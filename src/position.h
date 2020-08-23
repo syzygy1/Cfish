@@ -158,7 +158,7 @@ struct Position {
 
 #ifdef NNUE
   PieceId pieceIdList[64];
-  PieceSquare pieceListFw[32], pieceListFb[32];
+  PieceSquare pieceListF[2][32];
 #endif
 
   ExtMove *moveList;
@@ -404,12 +404,12 @@ INLINE void nnue_put_piece(Position *pos, PieceId pieceId, Square s,
     Piece pc)
 {
   if (pc != 0) {
-    pos->pieceListFw[pieceId] = KppBoardIndex[pc][WHITE] + s;
-    pos->pieceListFb[pieceId] = KppBoardIndex[pc][BLACK] + (s ^ 0x3f);
+    pos->pieceListF[WHITE][pieceId] = KppBoardIndex[pc][WHITE] + s;
+    pos->pieceListF[BLACK][pieceId] = KppBoardIndex[pc][BLACK] + (s ^ 0x3f);
     pos->pieceIdList[s] = pieceId;
   } else {
-    pos->pieceListFw[pieceId] = PS_NONE;
-    pos->pieceListFb[pieceId] = PS_NONE;
+    pos->pieceListF[WHITE][pieceId] = PS_NONE;
+    pos->pieceListF[BLACK][pieceId] = PS_NONE;
     pos->pieceIdList[s] = pieceId;
   }
 }
@@ -417,8 +417,8 @@ INLINE void nnue_put_piece(Position *pos, PieceId pieceId, Square s,
 INLINE void nnue_copy_piece(const Position *pos, ExtPieceSquare pc,
     PieceId dp)
 {
-  pc[WHITE] = pos->pieceListFw[dp];
-  pc[BLACK] = pos->pieceListFb[dp];
+  pc[WHITE] = pos->pieceListF[WHITE][dp];
+  pc[BLACK] = pos->pieceListF[BLACK][dp];
 }
 
 #endif

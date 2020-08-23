@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#define ARRAY
-
 #if defined(USE_AVX2)
 #include <immintrin.h>
 
@@ -74,12 +72,10 @@ enum {
 };
 
 enum {
-  kTransformedFeatureDimensions = 256,
-  kDimensions = 64 * PS_END, // HalfKP
-  kMaxActiveDimensions = PIECE_ID_KING,
-  kHalfDimensions = kTransformedFeatureDimensions,
-  FtInDims = kDimensions,
-  FtOutDims = kHalfDimensions * 2,
+  kMaxActiveDimensions = PIECE_ID_KING, // 30
+  kHalfDimensions = 256,
+  FtInDims = 64 * PS_END, // 64 * 641
+  FtOutDims = kHalfDimensions * 2
 };
 
 static uint32_t read_uint32_t(FILE *F)
@@ -94,52 +90,37 @@ typedef struct {
   unsigned values[kMaxActiveDimensions];
 } IndexList;
 
-INLINE unsigned make_index(Square sq, PieceSquare p)
-{
-  return PS_END * sq + p;
-}
-
-INLINE void get_pieces(const Position *pos, Color c, const PieceSquare **pcs,
-    Square *sq)
-{
-  *pcs = c == WHITE ? pos->pieceListFw : pos->pieceListFb;
-  PieceId target = PIECE_ID_KING + c;
-  *sq = ((*pcs)[target] - PS_W_KING) & 0x3f;
-}
-
 static void half_kp_append_active_indices(const Position *pos, Color c,
     IndexList *active)
 {
-  const PieceSquare *pcs;
-  Square sq;
-  get_pieces(pos, c, &pcs, &sq);
-  for (PieceId i = PIECE_ID_ZERO; i < PIECE_ID_KING; i++)
+  const PieceSquare *pcs = pos->pieceListF[c];
+  Square ksq = (pcs[PIECE_ID_KING + c] - 1) & 0x3f;
+  for (PieceId i = 0; i < PIECE_ID_KING; i++)
     if (pcs[i] != PS_NONE)
-      active->values[active->size++] = make_index(sq, pcs[i]);
+      active->values[active->size++] = pcs[i] + PS_END * ksq;
 }
 
 static void half_kp_append_changed_indices(const Position *pos, Color c,
     IndexList *removed, IndexList *added)
 {
-  const PieceSquare *pcs;
-  Square sq;
-  get_pieces(pos, c, &pcs, &sq);
+  const PieceSquare *pcs = pos->pieceListF[c];
+  Square ksq = (pcs[PIECE_ID_KING + c] - 1) & 0x3f;
   const DirtyPiece *dp = &(pos->st->dirtyPiece);
   for (int i = 0; i < dp->dirtyNum; i++) {
     if (dp->pieceId[i] >= PIECE_ID_KING) continue;
     PieceSquare old_p = dp->oldPiece[i][c];
     if (old_p != PS_NONE)
-      removed->values[removed->size++] = make_index(sq, old_p);
+      removed->values[removed->size++] = old_p + PS_END * ksq;
     PieceSquare new_p = dp->newPiece[i][c];
     if (new_p != PS_NONE)
-      added->values[added->size++] = make_index(sq, new_p);
+      added->values[added->size++] = new_p + PS_END * ksq;
   }
 }
 
 static void append_active_indices(const Position *pos, IndexList active[2])
 {
   for (unsigned c = 0; c < 2; c++)
-    half_kp_append_active_indices(pos, c, &(active[c]));
+    half_kp_append_active_indices(pos, c, &active[c]);
 }
 
 static void append_changed_indices(const Position *pos, IndexList removed[2],
@@ -151,9 +132,9 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
   for (unsigned c = 0; c < 2; c++) {
     reset[c] = dp->pieceId[0] == PIECE_ID_KING + c;
     if (reset[c])
-      half_kp_append_active_indices(pos, c, &(added[c]));
+      half_kp_append_active_indices(pos, c, &added[c]);
     else
-      half_kp_append_changed_indices(pos, c, &(removed[c]), &(added[c]));
+      half_kp_append_changed_indices(pos, c, &removed[c], &added[c]);
   }
 }
 
@@ -480,13 +461,15 @@ INLINE void refresh_accumulator(const Position *pos)
     for (unsigned i = 0; i < kHalfDimensions / TILE_HEIGHT; i++) {
 #if defined(USE_SSE2) || defined(USE_MMX)
       vec_t *ft_biases_tile = (vec_t *)&ft_biases[i * TILE_HEIGHT];
-      vec_t *accum_tile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
+      vec_t *accTile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
       vec_t acc[NUM_REGS];
       for (unsigned j = 0; j < NUM_REGS; j++)
         acc[j] = ft_biases_tile[j];
+
 #else
       memcpy(&(accumulator->accumulation[c][i * TILE_HEIGHT]), 
           &ft_biases[i * TILE_HEIGHT], TILE_HEIGHT * sizeof(int16_t));
+
 #endif
       for (size_t k = 0; k < activeIndices[c].size; k++) {
         unsigned index = activeIndices[c].values[k];
@@ -513,7 +496,7 @@ INLINE void refresh_accumulator(const Position *pos)
 
 #if defined(USE_SSE2) || defined(USE_MMX)
       for (unsigned j = 0; j < NUM_REGS; j++)
-        accum_tile[j] = acc[j];
+        accTile[j] = acc[j];
 
 #endif
     }
@@ -541,12 +524,12 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
   for (unsigned i = 0; i< kHalfDimensions / TILE_HEIGHT; i++) {
     for (unsigned c = 0; c < 2; c++) {
 #if defined(USE_SSE2) || defined(USE_MMX)
-      vec_t *accum_tile = (vec_t *)&(accumulator->accumulation[c][i * TILE_HEIGHT]);
+      vec_t *accTile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
       vec_t acc[NUM_REGS];
 
 #elif defined(USE_NEON)
       const unsigned numChunks = kHalfDimensions / 8;
-      int16x8_t *accum_tile = (int16x8_t *)&(accumulator->accumulation[c][i * TILE_HEIGHT]);
+      int16x8_t *accTile = (int16x8_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
 
 #endif
 
@@ -556,17 +539,17 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = ft_b_tile[j];
 #else
-        memcpy(&(accumulator->accumulation[c][i*TILE_HEIGHT]),
+        memcpy(&accumulator->accumulation[c][i * TILE_HEIGHT],
             &ft_biases[i * TILE_HEIGHT], TILE_HEIGHT * sizeof(int16_t));
 #endif
       } else {
 #if defined(USE_SSE2) || defined(USE_MMX)
-        vec_t *prev_acc_tile = (vec_t *)&prevAccumulator->accumulation[c][i * TILE_HEIGHT];
+        vec_t *prevAccTile = (vec_t *)&prevAccumulator->accumulation[c][i * TILE_HEIGHT];
         for (unsigned j = 0; j < NUM_REGS; j++)
-          acc[j] = prev_acc_tile[j];
+          acc[j] = prevAccTile[j];
 #else
-        memcpy(&(accumulator->accumulation[c][i * TILE_HEIGHT]),
-            &(prevAccumulator->accumulation[c][i * TILE_HEIGHT]),
+        memcpy(&accumulator->accumulation[c][i * TILE_HEIGHT],
+            &prevAccumulator->accumulation[c][i * TILE_HEIGHT],
             TILE_HEIGHT * sizeof(int16_t));
 #endif
         // Difference calculation for the deactivated features
@@ -582,7 +565,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 #elif defined(USE_NEON)
           int16x8_t *column = (int16x8_t *)&ft_weights[offset];
           for (unsigned j = 0; j < numChunks; j++)
-            accum_tile[j] = vsubq_s16(accum_tile[j], column[j]);
+            accTile[j] = vsubq_s16(accTile[j], column[j]);
 
 #else
           for (unsigned j = 0; j < kHalfDimensions; j++)
@@ -605,7 +588,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 #elif defined(USE_NEON)
         int16x8_t *column = (int16x8_t *)&ft_weights[offset];
         for (unsigned j = 0; j < numChunks; j++)
-          accum_tile[j] = vaddq_s16(accum_tile[j], column[j]);
+          accTile[j] = vaddq_s16(accTile[j], column[j]);
 
 #else
         for (unsigned j = 0; j < TILE_HEIGHT; j++)
@@ -616,7 +599,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 
 #if defined(USE_SSE2) || defined(USE_MMX)
       for (unsigned j = 0; j < NUM_REGS; j++)
-        accum_tile[j] = acc[j];
+        accTile[j] = acc[j];
 
 #endif
     }
@@ -737,7 +720,7 @@ Value nnue_evaluate(const Position *pos)
 #if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32) && !defined(__clang__) && !defined(__INTEL_COMPILER)
   // work around a bug in old gcc on Windows
   uint8_t buf[sizeof(struct NetData) + 63];
-  struct NetData *b = (struct NetData *)(((uintptr_t)buf + 0x3f) & ~0x3f);
+  struct NetData *b = (struct NetData *)(buf + ((((uintptr_t)buf-1) ^ 0x3f) & 0x3f));
 #define B(x) (b->x)
 #else
   struct NetData buf;

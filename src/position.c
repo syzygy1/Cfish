@@ -221,7 +221,7 @@ void pos_set(Position *pos, char *fen, int isChess960)
   unsigned char col, row, token;
   Square sq = SQ_A8;
 #ifdef NNUE
-  PieceId pieceId, nextPieceId = PIECE_ID_ZERO;
+  PieceId pieceId, nextPieceId = 0;
 #endif
 
   Stack *st = pos->st;
@@ -364,10 +364,10 @@ static void set_state(Position *pos, Stack *st)
   }
 
   if (st->epSquare != 0)
-      st->key ^= zob.enpassant[file_of(st->epSquare)];
+    st->key ^= zob.enpassant[file_of(st->epSquare)];
 
   if (stm() == BLACK)
-      st->key ^= zob.side;
+    st->key ^= zob.side;
 
   st->key ^= zob.castling[st->castlingRights];
 
@@ -381,10 +381,9 @@ static void set_state(Position *pos, Stack *st)
     st->materialKey += piece_count(BLACK, pt) * matKey[8 * BLACK + pt];
   }
 
-  for (PieceType pt = KNIGHT; pt <= QUEEN; pt++) {
-    st->nonPawn += piece_count(WHITE, pt) * NonPawnPieceValue[make_piece(WHITE, pt)];
-    st->nonPawn += piece_count(BLACK, pt) * NonPawnPieceValue[make_piece(BLACK, pt)];
-  }
+  for (PieceType pt = KNIGHT; pt <= QUEEN; pt++)
+    for (int c = 0; c < 2; c++)
+      st->nonPawn += piece_count(c, pt) * NonPawnPieceValue[make_piece(c, pt)];
 }
 
 
@@ -434,8 +433,7 @@ void pos_fen(const Position *pos, char *str)
     *str++ = '-';
   }
 
-  sprintf(str, " %d %d", rule50_count(),
-          1 + (game_ply() - (stm() == BLACK)) / 2);
+  sprintf(str, " %d %d", rule50_count(), 1 + (game_ply()-(stm() == BLACK)) / 2);
 }
 
 
@@ -796,8 +794,8 @@ void do_move(Position *pos, Move m, int givesCheck)
 
 #ifdef NNUE
   st->accumulator.computedAccumulation = false;
-  PieceId dp0 = PIECE_ID_NONE;
-  PieceId dp1 = PIECE_ID_NONE;
+  PieceId dp0;
+  PieceId dp1;
   DirtyPiece *dp = &(st->dirtyPiece);
   dp->dirtyNum = 1;
 #endif
@@ -807,8 +805,8 @@ void do_move(Position *pos, Move m, int givesCheck)
   Square from = from_sq(m);
   Square to = to_sq(m);
   Piece piece = piece_on(from);
-  Piece captured = type_of_m(m) == ENPASSANT
-                   ? make_piece(them, PAWN) : piece_on(to);
+  Piece captured =  type_of_m(m) == ENPASSANT
+                  ? make_piece(them, PAWN) : piece_on(to);
 
   assert(color_of(piece) == us);
   assert(   is_empty(to)
