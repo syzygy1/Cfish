@@ -421,22 +421,50 @@ static alignas(64) int16_t ft_weights[kHalfDimensions * FtInDims];
 
 static_assert(kHalfDimensions % 256 == 0);
 
+#ifdef USE_AVX512
+#define SIMD_WIDTH 512
+typedef __m512i vec_t;
+#define vec_add_16(a,b) _mm512_add_epi16(a,b)
+#define vec_sub_16(a,b) _mm512_sub_epi16(a,b)
+
+#elif USE_AVX2
+#define SIMD_WIDTH 256
+typedef __m256i vec_t;
+#define vec_add_16(a,b) _mm256_add_epi16(a,b)
+#define vec_sub_16(a,b) _mm256_sub_epi16(a,b)
+
+#elif USE_SSE2
+#define SIMD_WIDTH 128
+typedef __m128i vec_t;
+#define vec_add_16(a,b) _mm_add_epi16(a,b)
+#define vec_sub_16(a,b) _mm_sub_epi16(a,b)
+
+#elif USE_MMX
+#define SIMD_WIDTH 64
+typedef __m64 vec_t;
+#define vec_add_16(a,b) _mm_add_pi16(a,b)
+#define vec_sub_16(a,b) _mm_sub_pi16(a,b)
+
+#endif
+
 #if defined(USE_AVX512)
-static const unsigned kTileHeight = 256;
-#elif defined(USE_AVX2)
-static const unsigned kTileHeight = Is64Bit ? 256 : 128;
-#elif defined(USE_SSE41)
-static const unsigned kTileHeight = Is64Bit ? 128 : 64;
-#elif defined(USE_SSSE3)
-static const unsigned kTileHeight = Is64Bit ? 128 : 64;
+#define NUM_REGS 8 // only 8 are needed
+
+#elif defined(USE_SSE2) && defined(IS_64BIT)
+#define NUM_REGS 16
+
 #elif defined(USE_SSE2)
-static const unsigned kTileHeight = Is64Bit ? 128 : 64;
-#elif defined(USE_MMX)
-static const unsigned kTileHeight = 32;
-//#elif defined(USE_NEON)
-//const unsigned kTileHeight = 128;
+#define NUM_REGS 8
+
+#elif USE_MMX
+#define NUM_REGS 8
+
+#endif
+
+#if defined(USE_SSE2) || defined(USE_MMX)
+#define TILE_HEIGHT (NUM_REGS * SIMD_WIDTH / 16)
 #else
-static const unsigned kTileHeight = kHalfDimensions;
+#define TILE_HEIGHT kHalfDimensions
 #endif
 
 // Calculate cumulative value without using difference calculation
@@ -449,63 +477,28 @@ INLINE void refresh_accumulator(const Position *pos)
   append_active_indices(pos, activeIndices);
 
   for (unsigned c = 0; c < 2; c++) {
-    for (unsigned i = 0; i < kHalfDimensions / kTileHeight; i++) {
-#if defined(USE_AVX512)
-      __m512i *ft_biases_tile = (__m512i *)&ft_biases[i * kTileHeight];
-      __m512i *accum_tile = (__m512i *)&accumulator->accumulation[c][i * kTileHeight];
-      __m512i acc[8];
-      for (unsigned j = 0; j < 8; j++)
-        acc[j] = ft_biases_tile[j];
-#elif defined(USE_SSE2)
-#if defined(USE_AVX2)
-      __m256i *ft_biases_tile = (__m256i *)&ft_biases[i * kTileHeight];
-      __m256i *accum_tile = (__m256i *)&accumulator->accumulation[c][i * kTileHeight];
-      __m256i acc[16];
-      for (unsigned j = 0; j < 16; j++)
-        acc[j] = ft_biases_tile[j];
-#else // SSE2
-      __m128i *ft_biases_tile = (__m128i *)&ft_biases[i * kTileHeight];
-      __m128i *accum_tile = (__m128i *)&accumulator->accumulation[c][i * kTileHeight];
-      __m128i acc[16];
-      for (unsigned j = 0; j < 16; j++)
-        acc[j] = ft_biases_tile[j];
-#endif
-#elif defined(USE_MMX)
-      __m64 *ft_biases_tile = (__m64 *)&ft_biases[i * kTileHeight];
-      __m64 *accum_tile = (__m64 *)&accumulator->accumulation[c][i * kTileHeight];
-      __m64 acc[8];
-      for (unsigned j = 0; j < 8; j++)
+    for (unsigned i = 0; i < kHalfDimensions / TILE_HEIGHT; i++) {
+#if defined(USE_SSE2) || defined(USE_MMX)
+      vec_t *ft_biases_tile = (vec_t *)&ft_biases[i * TILE_HEIGHT];
+      vec_t *accum_tile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
+      vec_t acc[NUM_REGS];
+      for (unsigned j = 0; j < NUM_REGS; j++)
         acc[j] = ft_biases_tile[j];
 #else
-      memcpy(&(accumulator->accumulation[c][i * kTileHeight]), 
-          &ft_biases[i * kTileHeight], kTileHeight * sizeof(int16_t));
+      memcpy(&(accumulator->accumulation[c][i * TILE_HEIGHT]), 
+          &ft_biases[i * TILE_HEIGHT], TILE_HEIGHT * sizeof(int16_t));
 #endif
       for (size_t k = 0; k < activeIndices[c].size; k++) {
         unsigned index = activeIndices[c].values[k];
-        unsigned offset = kHalfDimensions * index + i * kTileHeight;
+        unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_AVX512)
-        __m512i *column = (__m512i *)&ft_weights[offset];
-        for (unsigned j = 0; j < 8; j++)
-          acc[j] = _mm512_add_epi16(acc[j], column[j]);
-
-#elif defined(USE_AVX2)
-        __m256i *column = (__m256i *)(&ft_weights[offset]);
-        for (unsigned j = 0; j < 16; j++)
-          acc[j] = _mm256_add_epi16(acc[j], column[j]);
-
-#elif defined(USE_SSE2)
-        __m128i *column = (__m128i *)&ft_weights[offset];
-        for (unsigned j = 0; j < 16; j++)
-          acc[j] = _mm_add_epi16(acc[j], column[j]);
-
-#elif defined(USE_MMX)
-        __m64 *column = (__m64 *)&ft_weights[offset];
-        for (unsigned j = 0; j < 8; j++)
-          acc[j] = _mm_add_pi16(acc[j], column[j]);
+#if defined(USE_SSE2) || defined(USE_MMX)
+        vec_t *column = (vec_t *)&ft_weights[offset];
+        for (unsigned j = 0; j < NUM_REGS; j++)
+          acc[j] = vec_add_16(acc[j], column[j]);
 
 #elif defined(USE_NEON)
-        int16x8_t *accumulation = (int16x8_t *)&accumulator->accumulation[c][i * kTileHeight];
+        int16x8_t *accumulation = (int16x8_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
         int16x8_t *column = (int16x8_t *)&ft_weights[offset];
         const unsigned numChunks = kHalfDimensions / 8;
         for (unsigned j = 0; j < numChunks; j++)
@@ -513,17 +506,13 @@ INLINE void refresh_accumulator(const Position *pos)
 
 #else
         for (unsigned j = 0; j < kHalfDimensions; j++)
-          accumulator->accumulation[c][i * kTileHeight + j] += ft_weights[offset + j];
+          accumulator->accumulation[c][i * TILE_HEIGHT + j] += ft_weights[offset + j];
 
 #endif
       }
 
-#if defined(USE_SSE2) && !defined(USE_AVX512)
-      for (unsigned j = 0; j < 16; j++)
-        accum_tile[j] = acc[j];
-
-#elif defined(USE_MMX) || defined(USE_AVX512)
-      for (unsigned j = 0; j < 8; j++)
+#if defined(USE_SSE2) || defined(USE_MMX)
+      for (unsigned j = 0; j < NUM_REGS; j++)
         accum_tile[j] = acc[j];
 
 #endif
@@ -549,97 +538,46 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
   added_indices[0].size = added_indices[1].size = 0;
   bool reset[2];
   append_changed_indices(pos, removed_indices, added_indices, reset);
-  for (unsigned i = 0; i< kHalfDimensions / kTileHeight; i++) {
+  for (unsigned i = 0; i< kHalfDimensions / TILE_HEIGHT; i++) {
     for (unsigned c = 0; c < 2; c++) {
-#if defined(USE_AVX512)
-      __m512i *accum_tile = (__m512i *)&(accumulator->accumulation[c][i * kTileHeight]);
-      __m512i acc[8];
-#elif defined(USE_AVX2)
-      __m256i *accum_tile = (__m256i *)&accumulator->accumulation[c][i * kTileHeight];
-      __m256i acc[16];
-#elif defined(USE_SSE2)
-      __m128i *accum_tile = (__m128i *)&accumulator->accumulation[c][i * kTileHeight];
-      __m128i acc[16];
-
-#elif defined(USE_MMX)
-      __m64 *accum_tile = (__m64 *)&accumulator->accumulation[c][i * kTileHeight];
-      __m64 acc[8];
+#if defined(USE_SSE2) || defined(USE_MMX)
+      vec_t *accum_tile = (vec_t *)&(accumulator->accumulation[c][i * TILE_HEIGHT]);
+      vec_t acc[NUM_REGS];
 
 #elif defined(USE_NEON)
       const unsigned numChunks = kHalfDimensions / 8;
-      int16x8_t *accum_tile = (int16x8_t *)&(accumulator->accumulation[c][i * kTileHeight]);
+      int16x8_t *accum_tile = (int16x8_t *)&(accumulator->accumulation[c][i * TILE_HEIGHT]);
+
 #endif
 
       if (reset[c]) {
 #if defined(USE_SSE2) || defined(USE_MMX)
-#if defined(USE_AVX512)
-        __m512i *ft_b_tile = (__m512i *)&ft_biases[i * kTileHeight];
-#elif defined(USE_AVX2) 
-        __m256i *ft_b_tile = (__m256i *)&ft_biases[i * kTileHeight];
-#elif defined(USE_SSE2)
-        __m128i *ft_b_tile = (__m128i *)&ft_biases[i * kTileHeight];
-#elif defined(USE_MMX)
-        __m64 *ft_b_tile = (__m64 *)&ft_biases[i * kTileHeight];
-#endif
-#if defined(USE_AVX512) || defined(USE_MMX)
-        for (unsigned j = 0; j < 8; j++)
+        vec_t *ft_b_tile = (vec_t *)&ft_biases[i * TILE_HEIGHT];
+        for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = ft_b_tile[j];
 #else
-        for (unsigned j = 0; j < 16; j++)
-          acc[j] = ft_b_tile[j];
-#endif
-#else
-        memcpy(&(accumulator->accumulation[c][i*kTileHeight]), &ft_biases[i * kTileHeight],
-            kTileHeight * sizeof(int16_t));
+        memcpy(&(accumulator->accumulation[c][i*TILE_HEIGHT]),
+            &ft_biases[i * TILE_HEIGHT], TILE_HEIGHT * sizeof(int16_t));
 #endif
       } else {
 #if defined(USE_SSE2) || defined(USE_MMX)
-#if defined(USE_AVX512)
-        __m512i *prev_acc_tile = (__m512i *)&prevAccumulator->accumulation[c][i * kTileHeight];
-        for (unsigned j = 0; j < 8; j++)
+        vec_t *prev_acc_tile = (vec_t *)&prevAccumulator->accumulation[c][i * TILE_HEIGHT];
+        for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = prev_acc_tile[j];
-#elif defined(USE_AVX2)
-        __m256i *prev_acc_tile = (__m256i *)&prevAccumulator->accumulation[c][i * kTileHeight];
-        for (unsigned j = 0; j < 16; j++)
-          acc[j] = prev_acc_tile[j];
-#elif defined(USE_SSE2)
-        __m128i *prev_acc_tile = (__m128i *)&prevAccumulator->accumulation[c][i * kTileHeight];
-        for (unsigned j = 0; j < 16; j++)
-          acc[j] = prev_acc_tile[j];
-#elif defined(USE_MMX)
-        __m64 *prev_acc_tile = (__m64 *)&prevAccumulator->accumulation[c][i * kTileHeight];
-        for (unsigned j = 0; j < 8; j++)
-          acc[j] = prev_acc_tile[j];
-#endif
 #else
-        memcpy(&(accumulator->accumulation[c][i * kTileHeight]),
-            &(prevAccumulator->accumulation[c][i * kTileHeight]),
-            kTileHeight * sizeof(int16_t));
+        memcpy(&(accumulator->accumulation[c][i * TILE_HEIGHT]),
+            &(prevAccumulator->accumulation[c][i * TILE_HEIGHT]),
+            TILE_HEIGHT * sizeof(int16_t));
 #endif
         // Difference calculation for the deactivated features
         for (unsigned k = 0; k < removed_indices[c].size; k++) {
           unsigned index = removed_indices[c].values[k];
-          const unsigned offset = kHalfDimensions * index + i * kTileHeight;
+          const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_AVX512)
-          __m512i *column = (__m512i *)&ft_weights[offset];
-          for (unsigned j = 0; j < 8; j++)
-            acc[j] = _mm512_sub_epi16(acc[j], column[j]);
-
-#elif defined(USE_AVX2)
-          __m256i *column = (__m256i *)&ft_weights[offset];
-          for (unsigned j = 0; j < 16; j++)
-            acc[j] = _mm256_sub_epi16(acc[j], column[j]);
-
-#elif defined(USE_SSE2)
-          __m128i *column = (__m128i *)&ft_weights[offset];
-          for (unsigned j = 0; j < 16; j++)
-            acc[j] = _mm_sub_epi16(acc[j], column[j]);
-
-#elif defined(USE_MMX)
-          __m64 *column = (__m64 *)&ft_weights[offset];
-          for (unsigned j = 0; j < 8; j++)
-            acc[j] = _mm_sub_pi16(acc[j], column[j]);
+#if defined(USE_SSE2) || defined(USE_MMX)
+          vec_t *column = (vec_t *)&ft_weights[offset];
+          for (unsigned j = 0; j < NUM_REGS; j++)
+            acc[j] = vec_sub_16(acc[j], column[j]);
 
 #elif defined(USE_NEON)
           int16x8_t *column = (int16x8_t *)&ft_weights[offset];
@@ -648,7 +586,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 
 #else
           for (unsigned j = 0; j < kHalfDimensions; j++)
-            accumulator->accumulation[c][i * kTileHeight + j] -= ft_weights[offset + j];
+            accumulator->accumulation[c][i * TILE_HEIGHT + j] -= ft_weights[offset + j];
 
 #endif
         }
@@ -657,27 +595,12 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
       // Difference calculation for the activated features
       for (unsigned k = 0; k < added_indices[c].size; k++) {
         unsigned index = added_indices[c].values[k];
-        const unsigned offset = kHalfDimensions * index + i * kTileHeight;
+        const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_AVX512)
-        __m512i *column = (__m512i *)&ft_weights[offset];
-        for (unsigned j = 0; j < 8; j++)
-          acc[j] = _mm512_add_epi16(acc[j], column[j]);
-
-#elif defined(USE_AVX2)
-        __m256i *column = (__m256i *)&ft_weights[offset];
-        for (unsigned j = 0; j < 16; j++)
-          acc[j] = _mm256_add_epi16(acc[j], column[j]);
-
-#elif defined(USE_SSE2)
-        __m128i *column = (__m128i *)&ft_weights[offset];
-        for (unsigned j = 0; j < 16; j++)
-          acc[j] = _mm128_add_epi16(acc[j], column[j]);
-
-#elif defined(USE_MMX)
-        __m64 *column = (__m64 *)&ft_weights[offset];
-        for (unsigned j = 0; j < 8; j++)
-          acc[j] = _mm_add_pi16(acc[j], column[j]);
+#if defined(USE_SSE2) || defined(USE_MMX)
+        vec_t *column = (vec_t *)&ft_weights[offset];
+        for (unsigned j = 0; j < NUM_REGS; j++)
+          acc[j] = vec_add_16(acc[j], column[j]);
 
 #elif defined(USE_NEON)
         int16x8_t *column = (int16x8_t *)&ft_weights[offset];
@@ -685,18 +608,16 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
           accum_tile[j] = vaddq_s16(accum_tile[j], column[j]);
 
 #else
-        for (unsigned j = 0; j < kTileHeight; j++)
-          accumulator->accumulation[c][i * kTileHeight + j] += ft_weights[offset + j];
+        for (unsigned j = 0; j < TILE_HEIGHT; j++)
+          accumulator->accumulation[c][i * TILE_HEIGHT + j] += ft_weights[offset + j];
 
 #endif
       }
 
-#if defined(USE_SSE2) && !defined(USE_AVX512) // AVX2 included
-      for (unsigned j = 0; j < 16; j++)
+#if defined(USE_SSE2) || defined(USE_MMX)
+      for (unsigned j = 0; j < NUM_REGS; j++)
         accum_tile[j] = acc[j];
-#elif defined(USE_MMX) || defined(USE_AVX512)
-      for (unsigned j = 0; j < 8; j++)
-        accum_tile[j] = acc[j];
+
 #endif
     }
   }
