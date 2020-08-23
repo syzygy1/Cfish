@@ -156,11 +156,6 @@ struct Position {
   uint16_t gamePly;
   bool hasRepeated;
 
-#ifdef NNUE
-  PieceId pieceIdList[64];
-  PieceSquare pieceListF[2][32];
-#endif
-
   ExtMove *moveList;
 
   // Relevant mainly to the search of the root position.
@@ -393,34 +388,5 @@ INLINE Bitboard attackers_to_occ(const Position *pos, Square s,
         | (attacks_bb_bishop(s, occupied) & pieces_pp(BISHOP, QUEEN))
         | (attacks_from_king(s)           & pieces_p(KING));
 }
-
-#ifdef NNUE
-
-#define piece_id_on(s) (pos->pieceIdList[s])
-
-extern ExtPieceSquare KppBoardIndex[];
-
-INLINE void nnue_put_piece(Position *pos, PieceId pieceId, Square s,
-    Piece pc)
-{
-  if (pc != 0) {
-    pos->pieceListF[WHITE][pieceId] = KppBoardIndex[pc][WHITE] + s;
-    pos->pieceListF[BLACK][pieceId] = KppBoardIndex[pc][BLACK] + (s ^ 0x3f);
-    pos->pieceIdList[s] = pieceId;
-  } else {
-    pos->pieceListF[WHITE][pieceId] = PS_NONE;
-    pos->pieceListF[BLACK][pieceId] = PS_NONE;
-    pos->pieceIdList[s] = pieceId;
-  }
-}
-
-INLINE void nnue_copy_piece(const Position *pos, ExtPieceSquare pc,
-    PieceId dp)
-{
-  pc[WHITE] = pos->pieceListF[WHITE][dp];
-  pc[BLACK] = pos->pieceListF[BLACK][dp];
-}
-
-#endif
 
 #endif

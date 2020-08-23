@@ -29,25 +29,25 @@
 #include "position.h"
 #include "uci.h"
 
-ExtPieceSquare KppBoardIndex[] = {
-  // convention: W - us, B - them
-  // viewed from other side, W and B are reversed
-  { PS_NONE,     PS_NONE     },
-  { PS_W_PAWN,   PS_B_PAWN   },
-  { PS_W_KNIGHT, PS_B_KNIGHT },
-  { PS_W_BISHOP, PS_B_BISHOP },
-  { PS_W_ROOK,   PS_B_ROOK   },
-  { PS_W_QUEEN,  PS_B_QUEEN  },
-  { PS_W_KING,   PS_B_KING   },
-  { PS_NONE,     PS_NONE     },
-  { PS_NONE,     PS_NONE     },
-  { PS_B_PAWN,   PS_W_PAWN   },
-  { PS_B_KNIGHT, PS_W_KNIGHT },
-  { PS_B_BISHOP, PS_W_BISHOP },
-  { PS_B_ROOK,   PS_W_ROOK   },
-  { PS_B_QUEEN,  PS_W_QUEEN  },
-  { PS_B_KING,   PS_W_KING   },
-  { PS_NONE,     PS_NONE     }
+enum {
+  PS_W_PAWN   =  1,
+  PS_B_PAWN   =  1 * 64 + 1,
+  PS_W_KNIGHT =  2 * 64 + 1,
+  PS_B_KNIGHT =  3 * 64 + 1,
+  PS_W_BISHOP =  4 * 64 + 1,
+  PS_B_BISHOP =  5 * 64 + 1,
+  PS_W_ROOK   =  6 * 64 + 1,
+  PS_B_ROOK   =  7 * 64 + 1,
+  PS_W_QUEEN  =  8 * 64 + 1,
+  PS_B_QUEEN  =  9 * 64 + 1,
+  PS_END      = 10 * 64 + 1
+};
+
+uint32_t PieceToIndex[2][16] = {
+  { 0, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, 0, 0,
+    0, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, 0, 0 },
+  { 0, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, 0, 0,
+    0, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, 0, 0 }
 };
 
 #if defined(USE_SSE2)
@@ -72,7 +72,7 @@ enum {
 };
 
 enum {
-  kMaxActiveDimensions = PIECE_ID_KING, // 30
+  kMaxActiveDimensions = 30,
   kHalfDimensions = 256,
   FtInDims = 64 * PS_END, // 64 * 641
   FtOutDims = kHalfDimensions * 2
@@ -93,27 +93,28 @@ typedef struct {
 static void half_kp_append_active_indices(const Position *pos, Color c,
     IndexList *active)
 {
-  const PieceSquare *pcs = pos->pieceListF[c];
-  Square ksq = (pcs[PIECE_ID_KING + c] - 1) & 0x3f;
-  for (PieceId i = 0; i < PIECE_ID_KING; i++)
-    if (pcs[i] != PS_NONE)
-      active->values[active->size++] = pcs[i] + PS_END * ksq;
+  uint8_t flip = c == WHITE ? 0x00: 0x3f;
+  Square ksq = piece_list(c, KING)[0] ^ flip;
+  Bitboard bb = pieces() & ~pieces_p(KING);
+  while (bb) {
+    Square s = pop_lsb(&bb);
+    active->values[active->size++] = (s ^ flip) + PieceToIndex[c][piece_on(s)] + PS_END * ksq;
+  }
 }
 
 static void half_kp_append_changed_indices(const Position *pos, Color c,
     IndexList *removed, IndexList *added)
 {
-  const PieceSquare *pcs = pos->pieceListF[c];
-  Square ksq = (pcs[PIECE_ID_KING + c] - 1) & 0x3f;
-  const DirtyPiece *dp = &(pos->st->dirtyPiece);
+  uint8_t flip = c == WHITE ? 0x00 : 0x3f;
+  Square sq, ksq = piece_list(c, KING)[0] ^ flip;
+  DirtyPiece *dp = &(pos->st->dirtyPiece);
   for (int i = 0; i < dp->dirtyNum; i++) {
-    if (dp->pieceId[i] >= PIECE_ID_KING) continue;
-    PieceSquare old_p = dp->oldPiece[i][c];
-    if (old_p != PS_NONE)
-      removed->values[removed->size++] = old_p + PS_END * ksq;
-    PieceSquare new_p = dp->newPiece[i][c];
-    if (new_p != PS_NONE)
-      added->values[added->size++] = new_p + PS_END * ksq;
+    Piece pc = dp->pc[i];
+    if (type_of_p(pc) == KING) continue;
+    if ((sq = dp->from[i]) != SQ_NONE)
+      removed->values[removed->size++] = (sq ^ flip) + PieceToIndex[c][pc] + PS_END * ksq;
+    if ((sq = dp->to[i]) != SQ_NONE)
+      added->values[added->size++] = (sq ^ flip) + PieceToIndex[c][pc] + PS_END * ksq;
   }
 }
 
@@ -130,7 +131,7 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
   if (dp->dirtyNum == 0) return;
 
   for (unsigned c = 0; c < 2; c++) {
-    reset[c] = dp->pieceId[0] == PIECE_ID_KING + c;
+    reset[c] = dp->pc[0] == make_piece(c, KING);
     if (reset[c])
       half_kp_append_active_indices(pos, c, &added[c]);
     else

@@ -412,43 +412,11 @@ CLAMP(double)
 
 #ifdef NNUE
 
-typedef uint32_t PieceId;
-enum {
-  PIECE_ID_KING  = 30,
-  PIECE_ID_WKING = 30,
-  PIECE_ID_BKING = 31,
-};
-
-typedef uint32_t PieceSquare;
-enum {
-  PS_NONE     =  0,
-  PS_W_PAWN   =  1,
-  PS_B_PAWN   =  1 * 64 + 1,
-  PS_W_KNIGHT =  2 * 64 + 1,
-  PS_B_KNIGHT =  3 * 64 + 1,
-  PS_W_BISHOP =  4 * 64 + 1,
-  PS_B_BISHOP =  5 * 64 + 1,
-  PS_W_ROOK   =  6 * 64 + 1,
-  PS_B_ROOK   =  7 * 64 + 1,
-  PS_W_QUEEN  =  8 * 64 + 1,
-  PS_B_QUEEN  =  9 * 64 + 1,
-  PS_W_KING   = 10 * 64 + 1,
-  PS_END      = PS_W_KING, // pieces without kings (pawns included)
-  PS_B_KING   = 11 * 64 + 1
-};
-
-typedef PieceSquare ExtPieceSquare[2];
-
 struct DirtyPiece {
-  // Number of changed pieces
   int dirtyNum;
-
-  // The ids of changes pieces, max 2 pieces can change in one move
-  PieceId pieceId[2];
-
-  // What changed from the piece with that piece number
-  ExtPieceSquare oldPiece[2];
-  ExtPieceSquare newPiece[2];
+  Piece pc[3];
+  Square from[3];
+  Square to[3];
 };
 
 typedef struct DirtyPiece DirtyPiece;

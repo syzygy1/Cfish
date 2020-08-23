@@ -220,9 +220,6 @@ void pos_set(Position *pos, char *fen, int isChess960)
 {
   unsigned char col, row, token;
   Square sq = SQ_A8;
-#ifdef NNUE
-  PieceId pieceId, nextPieceId = 0;
-#endif
 
   Stack *st = pos->st;
   memset(pos, 0, offsetof(Position, moveList));
@@ -242,14 +239,7 @@ void pos_set(Position *pos, char *fen, int isChess960)
     else {
       for (int piece = 0; piece < 16; piece++)
         if (PieceToChar[piece] == token) {
-          put_piece(pos, color_of(piece), piece, sq);
-#ifdef NNUE
-          pieceId =  piece == W_KING ? PIECE_ID_WKING
-                   : piece == B_KING ? PIECE_ID_BKING
-                   : nextPieceId++;
-          nnue_put_piece(pos, pieceId, sq, piece);
-#endif
-          sq++;
+          put_piece(pos, color_of(piece), piece, sq++);
           break;
         }
     }
@@ -794,8 +784,6 @@ void do_move(Position *pos, Move m, int givesCheck)
 
 #ifdef NNUE
   st->accumulator.computedAccumulation = false;
-  PieceId dp0;
-  PieceId dp1;
   DirtyPiece *dp = &(st->dirtyPiece);
   dp->dirtyNum = 1;
 #endif
@@ -826,16 +814,10 @@ void do_move(Position *pos, Move m, int givesCheck)
 
 #ifdef NNUE
     dp->dirtyNum = 2;
-    dp0 = piece_id_on(from);
-    dp1 = piece_id_on(rfrom);
-    dp->pieceId[0] = dp0;
-    nnue_copy_piece(pos, dp->oldPiece[0], dp0);
-    nnue_put_piece(pos, dp0, to, piece);
-    nnue_copy_piece(pos, dp->newPiece[0], dp0);
-    dp->pieceId[1] = dp1;
-    nnue_copy_piece(pos, dp->oldPiece[1], dp1);
-    nnue_put_piece(pos, dp1, rto, captured);
-    nnue_copy_piece(pos, dp->newPiece[1], dp1);
+    dp->pc[0] = piece;      // from/to of king will be ignored by NNUE
+    dp->pc[1] = captured;
+    dp->from[1] = rfrom;
+    dp->to[1] = rto;
 #endif
 
     // Remove both pieces first since squares could overlap in Chess960
@@ -873,12 +855,10 @@ void do_move(Position *pos, Move m, int givesCheck)
       st->nonPawn -= NonPawnPieceValue[captured];
 
 #ifdef NNUE
-    dp->dirtyNum = 2; // 2 pieces moved
-    dp1 = piece_id_on(capsq);
-    dp->pieceId[1] = dp1;
-    nnue_copy_piece(pos, dp->oldPiece[1], dp1);
-    nnue_put_piece(pos, dp1, capsq, 0);
-    nnue_copy_piece(pos, dp->newPiece[1], dp1);
+    dp->dirtyNum = 2; // captured piece goes off the board
+    dp->pc[1] = captured;
+    dp->from[1] = capsq;
+    dp->to[1] = SQ_NONE;
 #endif
 
     // Update board and piece lists
@@ -922,11 +902,9 @@ void do_move(Position *pos, Move m, int givesCheck)
   // Move the piece. The tricky Chess960 castling is handled earlier.
   if (likely(type_of_m(m) != CASTLING)) {
 #ifdef NNUE
-    dp0 = piece_id_on(from);
-    dp->pieceId[0] = dp0;
-    nnue_copy_piece(pos, dp->oldPiece[0], dp0);
-    nnue_put_piece(pos, dp0, to, piece);
-    nnue_copy_piece(pos, dp->newPiece[0], dp0);
+    dp->pc[0] = piece;
+    dp->from[0] = from;
+    dp->to[0] = to;
 #endif
     move_piece(pos, us, piece, from, to);
   }
@@ -950,9 +928,11 @@ void do_move(Position *pos, Move m, int givesCheck)
       put_piece(pos, us, promotion, to);
 
 #ifdef NNUE
-      dp0 = piece_id_on(to);
-      nnue_put_piece(pos, dp0, to, promotion);
-      nnue_copy_piece(pos, dp->newPiece[0], dp0);
+      dp->to[0] = SQ_NONE;   // pawn to SQ_NONE, promoted piece from SQ_NONE
+      dp->pc[dp->dirtyNum] = promotion;
+      dp->from[dp->dirtyNum] = SQ_NONE;
+      dp->to[dp->dirtyNum] = to;
+      dp->dirtyNum++;
 #endif
 
       // Update hash keys
@@ -1040,14 +1020,6 @@ void undo_move(Position *pos, Move m)
     Piece king = make_piece(us, KING);
     Piece rook = make_piece(us, ROOK);
 
-#ifdef NNUE
-    pos->st->dirtyPiece.dirtyNum = 2;
-    PieceId dp0 = piece_id_on(to);
-    PieceId dp1 = piece_id_on(rto);
-    nnue_put_piece(pos, dp0, from, king);
-    nnue_put_piece(pos, dp1, rfrom, rook);
-#endif
-
     // Remove both pieces first since squares could overlap in Chess960
     remove_piece(pos, us, king, to);
     remove_piece(pos, us, rook, rto);
@@ -1056,11 +1028,6 @@ void undo_move(Position *pos, Move m)
     put_piece(pos, us, rook, rfrom);
   } else {
     move_piece(pos, us, pc, to, from); // Put the piece back at the source square
-
-#ifdef NNUE
-    PieceId dp0 = pos->st->dirtyPiece.pieceId[0];
-    nnue_put_piece(pos, dp0, from, pc);
-#endif
 
     if (pos->st->capturedPiece) {
       Square capsq = to;
@@ -1076,11 +1043,6 @@ void undo_move(Position *pos, Move m)
       }
 
       put_piece(pos, !us, pos->st->capturedPiece, capsq); // Restore the captured piece
-
-#ifdef NNUE
-      PieceId dp1 = pos->st->dirtyPiece.pieceId[1];
-      nnue_put_piece(pos, dp1, capsq, pos->st->capturedPiece);
-#endif
     }
   }
 
