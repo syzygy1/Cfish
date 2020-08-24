@@ -329,7 +329,7 @@ ifeq ($(ARCH),armv7-neon)
 endif
 
 ifeq ($(ARCH),armv8)
-	arch = armv8-a
+	arch = armv8
 	prefetch = yes
 	popcnt = yes
 	neon = yes
@@ -478,7 +478,7 @@ ifeq ($(COMP),ndk)
 		CCFLAGS += -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon
 		STRIP=arm-linux-androideabi-strip
 	endif
-	ifeq ($(arch),armv8-a)
+	ifeq ($(arch),armv8)
 		comp=aarch64-linux-android21-clang
 		CC=aarch64-linux-android21-clang
 		STRIP=aarch64-linux-android-strip
@@ -553,7 +553,7 @@ endif
 
 ### 3.6 popcnt
 ifeq ($(popcnt),yes)
-	ifeq ($(arch),$(filter $(arch),ppc64 armv8-a))
+	ifeq ($(arch),$(filter $(arch),ppc64 armv8))
 		CFLAGS += -DUSE_POPCNT
 	else
 	ifeq ($(comp),icc)
@@ -590,7 +590,7 @@ endif
 ifeq ($(vnni),yes)
 	CFLAGS += -DUSE_VNNI
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
-		CFLAGS += -mavx512vnni -mavx512dq -mavx512vl
+		CFLAGS += -mavx512f -mavx512bw -mavx512vnni -mavx512dq -mavx512vl
 	endif
 endif
 
@@ -626,7 +626,9 @@ ifeq ($(neon),yes)
 	CFLAGS += -DUSE_NEON
 	ifeq ($(KERNEL),Linux)
 	ifneq ($(COMP),ndk)
+	ifneq ($(arch),armv8)
 		CXXFLAGS += -mfpu=neon
+	endif
 	endif
 	endif
 endif
@@ -867,7 +869,7 @@ config-sanity:
 	@test "$(optimize)" = "yes" || test "$(optimize)" = "no"
 	@test "$(arch)" = "any" || test "$(arch)" = "x86_64" || test "$(arch)" = "i386" || \
 	 test "$(arch)" = "ppc64" || test "$(arch)" = "ppc" || \
-	 test "$(arch)" = "armv7" || test "$(arch)" = "armv8-a" || test "$(arch)" = "arm64"
+	 test "$(arch)" = "armv7" || test "$(arch)" = "armv8" || test "$(arch)" = "arm64"
 	@test "$(bits)" = "32" || test "$(bits)" = "64"
 	@test "$(prefetch)" = "yes" || test "$(prefetch)" = "no"
 	@test "$(popcnt)" = "yes" || test "$(popcnt)" = "no"

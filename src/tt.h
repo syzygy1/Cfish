@@ -27,21 +27,21 @@
 // TTEntry struct is the 10 bytes transposition table entry, defined as below:
 //
 // key        16 bit
-// move       16 bit
-// value      16 bit
-// eval value 16 bit
+// depth       8 bit
 // generation  5 bit
 // pv node     1 bit
 // bound type  2 bit
-// depth       8 bit
+// move       16 bit
+// value      16 bit
+// eval value 16 bit
 
 struct TTEntry {
   uint16_t key16;
+  uint8_t  depth8;
+  uint8_t  genBound8;
   uint16_t move16;
   int16_t  value16;
   int16_t  eval16;
-  uint8_t  genBound8;
-  uint8_t   depth8;
 };
 
 typedef struct TTEntry TTEntry;
@@ -83,36 +83,38 @@ INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
 
   // Don't overwrite more valuable entries
   if (  (uint16_t)k != tte->key16
-      || d + 10 > tte->depth8
-   /* || g != (tte->genBound8 & 0xFC) // Matching non-zero keys are already refreshed by probe() */
-      || b == BOUND_EXACT) {
+      || d - DEPTH_OFFSET > tte->depth8 - 4
+      || b == BOUND_EXACT)
+  {
+    assert(d > DEPTH_OFFSET && d < 256 + DEPTH_OFFSET);
+
     tte->key16     = (uint16_t)k;
+    tte->depth8    = (uint8_t)(d - DEPTH_OFFSET);
+    tte->genBound8 = (uint8_t)(TT.generation8 | pn | b);
     tte->value16   = (int16_t)v;
     tte->eval16    = (int16_t)ev;
-    tte->genBound8 = (uint8_t)(TT.generation8 | pn | b);
-    assert((d - DEPTH_NONE) >= 0);
-    tte->depth8    = (int8_t)(d - DEPTH_NONE);
+//printf("tte.key16 = %d, tte.eval16 = %d\n", tte->key16, tte->eval16);
   }
 }
 
 INLINE Move tte_move(TTEntry *tte)
 {
-  return (Move)tte->move16;
+  return tte->move16;
 }
 
 INLINE Value tte_value(TTEntry *tte)
 {
-  return (Value)tte->value16;
+  return tte->value16;
 }
 
 INLINE Value tte_eval(TTEntry *tte)
 {
-  return (Value)tte->eval16;
+  return tte->eval16;
 }
 
 INLINE Depth tte_depth(TTEntry *tte)
 {
-  return (Depth)(tte->depth8) + DEPTH_NONE;
+  return tte->depth8 + DEPTH_OFFSET;
 }
 
 INLINE int tte_is_pv(TTEntry *tte)

@@ -209,6 +209,7 @@ enum {
   DEPTH_QS_NO_CHECKS  = -1,
   DEPTH_QS_RECAPTURES = -5,
   DEPTH_NONE = -6,
+  DEPTH_OFFSET = -7
 };
 
 enum {

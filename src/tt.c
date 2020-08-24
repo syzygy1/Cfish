@@ -182,10 +182,10 @@ TTEntry *tt_probe(Key key, int *found)
   uint16_t key16 = key; // Use the low 16 bits as key inside the cluster
 
   for (int i = 0; i < ClusterSize; i++)
-    if (!tte[i].key16 || tte[i].key16 == key16) {
+    if (tte[i].key16 == key16 || !tte[i].depth8) {
 //      if ((tte[i].genBound8 & 0xF8) != TT.generation8 && tte[i].key16)
       tte[i].genBound8 = TT.generation8 | (tte[i].genBound8 & 0x7); // Refresh
-      *found = tte[i].key16;
+      *found = tte[i].depth8;
       return &tte[i];
     }
 
@@ -214,8 +214,7 @@ int tt_hashfull(void)
   for (int i = 0; i < 1000 / ClusterSize; i++) {
     const TTEntry *tte = &TT.table[i].entry[0];
     for (int j = 0; j < ClusterSize; j++)
-      if ((tte[j].genBound8 & 0xF8) == TT.generation8)
-        cnt++;
+      cnt += tte[j].depth8 && (tte[j].genBound8 & 0xf8) == TT.generation8;
   }
   return cnt * 1000 / (ClusterSize * (1000 / ClusterSize));
 }

@@ -1689,10 +1689,17 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     }
 
     ss->currentMove = move;
+    bool captureOrPromotion = is_capture_or_promotion(pos, move);
     ss->history = &(*pos->counterMoveHistory)[InCheck]
-                                           [is_capture_or_promotion(pos, move)]
+                                           [captureOrPromotion]
                                            [moved_piece(move)]
                                            [to_sq(move)];
+
+    if (  !captureOrPromotion
+        && moveCount >= abs(depth) + 1
+        && (*(ss-1)->history)[moved_piece(move)][to_sq(move)] < CounterMovePruneThreshold
+        && (*(ss-2)->history)[moved_piece(move)][to_sq(move)] < CounterMovePruneThreshold)
+      continue;
 
     // Make and search the move
     do_move(pos, move, givesCheck);
