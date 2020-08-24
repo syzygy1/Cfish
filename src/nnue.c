@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -401,7 +402,7 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 static alignas(64) int16_t ft_biases[kHalfDimensions];
 static alignas(64) int16_t ft_weights[kHalfDimensions * FtInDims];
 
-static_assert(kHalfDimensions % 256 == 0);
+static_assert(kHalfDimensions % 256 == 0, "kHalfDimensions should be a multiple of 256");
 
 #ifdef USE_AVX512
 #define SIMD_WIDTH 512

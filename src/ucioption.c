@@ -126,7 +126,7 @@ static Option optionsMap[] = {
 #endif
   { "LargePages", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_large_pages, 0, NULL },
   { "NUMA", OPT_TYPE_STRING, 0, 0, 0, "all", on_numa, 0, NULL },
-  { NULL }
+  { 0 }
 };
 
 // options_init() initializes the UCI options to their hard-coded default

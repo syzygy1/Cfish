@@ -1659,6 +1659,9 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     {
       assert(type_of_m(move) != ENPASSANT); // Due to !advanced_pawn_push
 
+      if (moveCount > abs(depth) + 2)
+        continue;
+
       futilityValue = futilityBase + PieceValue[EG][piece_on(to_sq(move))];
 
       if (futilityValue <= alpha) {
