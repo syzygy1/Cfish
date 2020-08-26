@@ -1020,10 +1020,6 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
       }
   }
 
-  // Step 11. If the position is not in TT, decrease depth by 2
-  if (PvNode && depth >= 6 && !ttMove)
-    depth -= 2;
-
 moves_loop: // When in check search starts from here.
   ;  // Avoid a compiler warning. A label must be followed by a statement.
   PieceToHistory *cmh  = (ss-1)->history;
@@ -1058,7 +1054,7 @@ moves_loop: // When in check search starts from here.
     }
   }
 
-  // Step 12. Loop through moves
+  // Step 11. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
   // cutoff occurs
   while ((move = next_move(pos, moveCountPruning))) {
@@ -1107,7 +1103,7 @@ moves_loop: // When in check search starts from here.
     // Calculate new depth for this move
     newDepth = depth - 1;
 
-    // Step 13. Pruning at shallow depth
+    // Step 12. Pruning at shallow depth
     if (  !rootNode
         && non_pawn_material_c(stm())
         && bestValue > VALUE_TB_LOSS_IN_MAX_PLY)
@@ -1165,7 +1161,7 @@ moves_loop: // When in check search starts from here.
       }
     }
 
-    // Step 14. Extensions
+    // Step 13. Extensions
 
     // Singular extension search. If all moves but one fail low on a search
     // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
@@ -1264,12 +1260,12 @@ moves_loop: // When in check search starts from here.
     ss->currentMove = move;
     ss->history = &(*pos->counterMoveHistory)[inCheck][captureOrPromotion][movedPiece][to_sq(move)];
 
-    // Step 15. Make the move.
+    // Step 14. Make the move.
     do_move(pos, move, givesCheck);
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
-    // Step 16. Reduced depth search (LMR). If the move fails high it will be
+    // Step 15. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3
         &&  moveCount > 1 + 2 * rootNode + 2 * (PvNode && abs(bestValue) < 2)
@@ -1369,7 +1365,7 @@ moves_loop: // When in check search starts from here.
       didLMR = false;
     }
 
-    // Step 17. Full depth search when LMR is skipped or fails high.
+    // Step 16. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch) {
       value = -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
 
@@ -1396,14 +1392,14 @@ moves_loop: // When in check search starts from here.
       value = -search_PV(pos, ss+1, -beta, -alpha, newDepth);
     }
 
-    // Step 18. Undo move
+    // Step 17. Undo move
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
     undo_move(pos, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
 
-    // Step 19. Check for a new best move
+    // Step 18. Check for a new best move
     // Finished searching the move. If a stop occurred, the return value of
     // the search cannot be trusted, and we return immediately without
     // updating best move, PV and TT.
@@ -1478,7 +1474,7 @@ moves_loop: // When in check search starts from here.
     return VALUE_DRAW;
   */
 
-  // Step 20. Check for mate and stalemate
+  // Step 19. Check for mate and stalemate
   // All legal moves have been searched and if there are no legal moves,
   // it must be a mate or a stalemate. If we are in a singular extension
   // search then return a fail low score.
@@ -1659,7 +1655,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     {
       assert(type_of_m(move) != ENPASSANT); // Due to !advanced_pawn_push
 
-      if (moveCount > abs(depth) + 2)
+      if (moveCount > 2)
         continue;
 
       futilityValue = futilityBase + PieceValue[EG][piece_on(to_sq(move))];

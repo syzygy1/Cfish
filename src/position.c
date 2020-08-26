@@ -814,7 +814,6 @@ void do_move(Position *pos, Move m, int givesCheck)
 
 #ifdef NNUE
     dp->dirtyNum = 2;
-    dp->pc[0] = piece;      // from/to of king will be ignored by NNUE
     dp->pc[1] = captured;
     dp->from[1] = rfrom;
     dp->to[1] = rto;
@@ -899,15 +898,15 @@ void do_move(Position *pos, Move m, int givesCheck)
     key ^= zob.castling[st->castlingRights];
   }
 
-  // Move the piece. The tricky Chess960 castling is handled earlier.
-  if (likely(type_of_m(m) != CASTLING)) {
 #ifdef NNUE
     dp->pc[0] = piece;
     dp->from[0] = from;
     dp->to[0] = to;
 #endif
+
+  // Move the piece. The tricky Chess960 castling is handled earlier.
+  if (likely(type_of_m(m) != CASTLING))
     move_piece(pos, us, piece, from, to);
-  }
 
   // If the moving piece is a pawn do some special extra work
   if (type_of_p(piece) == PAWN) {

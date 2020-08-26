@@ -91,31 +91,39 @@ typedef struct {
   unsigned values[kMaxActiveDimensions];
 } IndexList;
 
+INLINE Square orient(Color c, Square s)
+{
+  return s ^ (c == WHITE ? 0x00 : 0x3f);
+}
+
+INLINE unsigned make_index(Color c, Square s, Piece pc, Square ksq)
+{
+  return orient(c, s) + PieceToIndex[c][pc] + PS_END * ksq;
+}
+
 static void half_kp_append_active_indices(const Position *pos, Color c,
     IndexList *active)
 {
-  uint8_t flip = c == WHITE ? 0x00: 0x3f;
-  Square ksq = piece_list(c, KING)[0] ^ flip;
+  Square ksq = orient(c, square_of(c, KING));
   Bitboard bb = pieces() & ~pieces_p(KING);
   while (bb) {
     Square s = pop_lsb(&bb);
-    active->values[active->size++] = (s ^ flip) + PieceToIndex[c][piece_on(s)] + PS_END * ksq;
+    active->values[active->size++] = make_index(c, s, piece_on(s), ksq);
   }
 }
 
 static void half_kp_append_changed_indices(const Position *pos, Color c,
     IndexList *removed, IndexList *added)
 {
-  uint8_t flip = c == WHITE ? 0x00 : 0x3f;
-  Square sq, ksq = piece_list(c, KING)[0] ^ flip;
+  Square ksq = orient(c, square_of(c, KING));
   DirtyPiece *dp = &(pos->st->dirtyPiece);
   for (int i = 0; i < dp->dirtyNum; i++) {
     Piece pc = dp->pc[i];
     if (type_of_p(pc) == KING) continue;
-    if ((sq = dp->from[i]) != SQ_NONE)
-      removed->values[removed->size++] = (sq ^ flip) + PieceToIndex[c][pc] + PS_END * ksq;
-    if ((sq = dp->to[i]) != SQ_NONE)
-      added->values[added->size++] = (sq ^ flip) + PieceToIndex[c][pc] + PS_END * ksq;
+    if (dp->from[i] != SQ_NONE)
+      removed->values[removed->size++] = make_index(c, dp->from[i], pc, ksq);
+    if (dp->to[i] != SQ_NONE)
+      added->values[added->size++] = make_index(c, dp->to[i], pc, ksq);
   }
 }
 
