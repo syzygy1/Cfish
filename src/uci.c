@@ -338,12 +338,6 @@ void uci_loop(int argc, char **argv)
 
     // Additional custom non-UCI commands, useful for debugging
     else if (strcmp(token, "bench") == 0)     benchmark(&pos, str);
-#ifdef NNUE
-    else if (strcmp(token, "evalnn") == 0)    {
-      nnue_init(); 
-      printf("NNUE eval = %d\n", nnue_evaluate(&pos));
-    }
-#endif
     else if (strcmp(token, "d") == 0)         print_pos(&pos);
     else if (strcmp(token, "perft") == 0) {
       sprintf(str_buf, "%d %d %d current perft", option_value(OPT_HASH),
