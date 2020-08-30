@@ -32,8 +32,10 @@
 
 // Old gcc on Windows is unable to provide a 32-byte aligned stack.
 // We need to hack around this when using AVX2 and AVX512.
-#if defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32) && !defined(__clang__) && !defined(__INTEL_COMPILER) && defined(USE_AVX2)
-#define HACK
+#if     defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32) \
+    && !defined(__clang__) && !defined(__INTEL_COMPILER) \
+    &&  defined(USE_AVX2)
+#define ALIGNMENT_HACK
 #endif
 
 enum {
@@ -80,7 +82,8 @@ enum {
 
 // For certain architectures we transpose the weights matrix and make use
 // of the sparseness of the vectors. Only SSE2 for now.
-#if defined(USE_SSE2) && !defined(USE_SSSE3)
+#if defined(USE_SSE2) && !defined(AVX2)
+#warning TRANSPOSE
 #define TRANSPOSE
 #define USE_MASK
 #endif
@@ -249,8 +252,6 @@ static alignas(64) int32_t hidden1_biases[32];
 static alignas(64) int32_t hidden2_biases[32];
 static int32_t output_biases [1];
 
-#ifndef TRANSPOSE
-
 INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     unsigned outDims, int32_t *biases, weight_t *weights)
 {
@@ -271,7 +272,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
 #endif
 
 #elif defined(USE_SSSE3)
-  const unsigned numChunks = inDims / 16;
+  const unsigned numChunks = inDims / 32;
   const __m128i kOnes = _mm_set1_epi16(1);
   __m128i *inVec = (__m128i *)input;
 
@@ -339,11 +340,11 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
 #elif defined(USE_SSSE3)
     __m128i sum = _mm_setzero_si128();
     __m128i *row = (__m128i *)&weights[offset];
-    for (unsigned j = 0; j < numChunks - 1; j += 2) {
-      __m128i product0 = _mm_maddubs_epi16(inVec[j], row[j]);
+    for (unsigned j = 0; j < numChunks; j++) {
+      __m128i product0 = _mm_maddubs_epi16(inVec[2 * j], row[2 * j]);
       product0 = _mm_madd_epi16(product0, kOnes);
       sum = _mm_add_epi32(sum, product0);
-      __m128i product1 = _mm_maddubs_epi16(inVec[j + 1], row[j + 1]);
+      __m128i product1 = _mm_maddubs_epi16(inVec[2 * j + 1], row[2 * j + 1]);
       product1 = _mm_madd_epi16(product1, kOnes);
       sum = _mm_add_epi32(sum, product1);
     }
@@ -396,6 +397,8 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
 #endif
   }
 }
+
+#ifndef TRANSPOSE
 
 INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 {
@@ -502,7 +505,7 @@ INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
   return true;
 }
 
-#ifdef USE_SSE2
+#ifdef USE_SSSE3
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     unsigned outDims, const int32_t *biases, weight_t *weights,
     uint64_t *inMask, uint16_t *outMask,
@@ -510,12 +513,93 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 {
   assert(outDims == 32);
 
-  __m128i kZeros[4] = { 0 };
+  const __m128i kZeros[4] = { 0 };
+  __m128i *inVec = (__m128i *)input;
+#define TMP(j) __m128i out_##j = ((__m128i *)biases)[j];
+  LOOP_8(TMP);
+#undef TMP
+  const __m128i *first, *second;
+  uint64_t v = inMask[0];
+  unsigned idx;
+
+  for (unsigned offset = 0; offset < inDims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+      break;
+    first = (__m128i *)&weights[outDims * idx];
+    uint32_t factor = ((uint8_t *)inVec)[idx];
+    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
+      second = (__m128i *)&weights[outDims * idx];
+      factor |= ((uint8_t *)inVec)[idx] << 8;
+    } else {
+      second = kZeros;
+    }
+    __m128i mul = _mm_set1_epi16(factor), prod;
+    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[0], second[0]));
+#if defined(USE_SSE41)
+    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[0], second[0]));
+    out_0 = _mm_add_epi32(out_0, _mm_cvtepi16_epi32(prod));
+    out_1 = _mm_add_epi32(out_1, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
+    prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[0], second[0]));
+    out_2 = _mm_add_epi32(out_2, _mm_cvtepi16_epi32(prod));
+    out_3 = _mm_add_epi32(out_3, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
+    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[1], second[1]));
+    out_4 = _mm_add_epi32(out_4, _mm_cvtepi16_epi32(prod));
+    out_5 = _mm_add_epi32(out_5, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
+    prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[1], second[1]));
+    out_6 = _mm_add_epi32(out_6, _mm_cvtepi16_epi32(prod));
+    out_7 = _mm_add_epi32(out_7, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
+#else
+    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[0], second[0]));
+    out_0 = _mm_add_epi32(out_0, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
+    out_1 = _mm_add_epi32(out_1, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
+    prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[0], second[0]));
+    out_2 = _mm_add_epi32(out_2, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
+    out_3 = _mm_add_epi32(out_3, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
+    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[1], second[1]));
+    out_4 = _mm_add_epi32(out_4, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
+    out_5 = _mm_add_epi32(out_5, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
+    prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[1], second[1]));
+    out_6 = _mm_add_epi32(out_6, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
+    out_7 = _mm_add_epi32(out_7, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
+#endif
+  }
+
+  __m128i out_in16_0 = _mm_srai_epi16(_mm_packs_epi32(out_0, out_1), SHIFT);
+  __m128i out_in16_1 = _mm_srai_epi16(_mm_packs_epi32(out_2, out_3), SHIFT);
+  __m128i out_in16_2 = _mm_srai_epi16(_mm_packs_epi32(out_4, out_5), SHIFT);
+  __m128i out_in16_3 = _mm_srai_epi16(_mm_packs_epi32(out_6, out_7), SHIFT);
+
+  __m128i *outVec = (__m128i *)output;
+  if (pack8_and_calc_mask) {
+    outVec[0] = _mm_packs_epi16(out_in16_0, out_in16_1);
+    outMask[0] = _mm_movemask_epi8(_mm_cmpgt_epi8(outVec[0], kZeros[0]));
+    outVec[1] = _mm_packs_epi16(out_in16_2, out_in16_3);
+    outMask[1] = _mm_movemask_epi8(_mm_cmpgt_epi8(outVec[1], kZeros[0]));
+  } else {
+#if defined(USE_SSE41)
+    outVec[0] = _mm_max_epi8(_mm_packs_epi16(out_in16_0, out_in16_1), kZeros[0]);
+    outVec[1] = _mm_max_epi8(_mm_packs_epi16(out_in16_2, out_in16_3), kZeros[0]);
+#else
+    const __m128i k0x80s = _mm_set1_epi8(-128);
+    outVec[0] = _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(out_in16_0, out_in16_1), k0x80s), k0x80s);
+    outVec[1] = _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(out_in16_2, out_in16_3), k0x80s), k0x80s);
+#endif
+  }
+}
+#elif defined(USE_SSE2)
+INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
+    unsigned outDims, const int32_t *biases, weight_t *weights,
+    uint64_t *inMask, uint16_t *outMask,
+    const bool pack8_and_calc_mask)
+{
+  assert(outDims == 32);
+
+  const __m128i kZeros[4] = { 0 };
   __m128i *inVec = (__m128i *)input;
 #define TMP(j) __m128i out_##j = ((__m128i *)biases)[j]
   LOOP_8(TMP);
 #undef TMP
-  __m128i *first, *second;
+  const __m128i *first, *second;
   uint64_t v = inMask[0];
   unsigned idx;
 
@@ -584,59 +668,6 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[i] = clamp(tmp[i] >> SHIFT, 0, 127);
 }
 #endif
-
-INLINE void scalar_prod(uint8_t *input, int32_t *output, unsigned inDims,
-    unsigned outDims, int32_t *biases, weight_t *weights)
-{
-  assert(inDims % 32 == 0);
-  assert(outDims == 1);
-#if defined(USE_SSE2)
-  const unsigned numChunks = inDims / 16;
-  __m128i *inVec = (__m128i *)input;
-#elif defined(USE_MMX)
-  const unsigned numChunks = inDims / 8;
-  __m64 *inVec = (__m64 *)input;
-
-#endif
-
-  for (unsigned i = 0; i < outDims; ++i) {
-    unsigned offset = i * inDims;
-
-#if defined(USE_SSE2)
-    __m128i sum = _mm_setzero_si128(), sum1 = sum;
-    __m128i *row = (__m128i *)&weights[offset];
-    for (unsigned j = 0; j < numChunks; j++) {
-      __m128i product0 = _mm_madd_epi16(inVec[2 * j], row[2 * j]);
-      sum = _mm_add_epi32(sum, product0);
-      __m128i product1 = _mm_madd_epi16(inVec[2 * j + 1], row[2 * j + 1]);
-      sum1 = _mm_add_epi32(sum1, product1);
-    }
-    sum = _mm_add_epi32(sum, sum1);
-    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xE));
-    sum = _mm_add_epi32(sum, _mm_shufflelo_epi16(sum, 0xE));
-    output[i] = _mm_cvtsi128_si32(sum) + biases[i];
-
-#elif defined(USE_MMX)
-    // adding 1 or 4 numbers per loop is slower, 2 seems optimal
-    __m64 s0 = _mm_setzero_si64(), s1 = s0;
-    __m64 *row = (__m64 *)&weights[offset];
-    for (unsigned j = 0; j < numChunks; j++) {
-      s0 = _mm_add_pi32(s0, _mm_madd_pi16(row[2 * j + 0], inVec[2 * j + 0]));
-      s1 = _mm_add_pi32(s1, _mm_madd_pi16(row[2 * j + 1], inVec[2 * j + 1]));
-    }
-    __m64 sum = _mm_add_pi32(s0, s1);
-    sum = _mm_add_pi32(sum, _mm_unpackhi_pi32(sum, sum));
-    output[i] = _mm_cvtsi64_si32(sum) + biases[i];
-
-#else
-    int32_t sum = biases[i];
-    for (unsigned j = 0; j < inDims; j++)
-      sum += weights[offset + j] * input[j];
-    output[i] = sum;
-
-#endif
-  }
-}
 
 #endif
 
@@ -827,7 +858,7 @@ INLINE void transform(const Position *pos, clipped_t *output,
 
 #elif defined(USE_SSE2)
   const unsigned numChunks = kHalfDimensions / 16;
-#if defined(USE_SSE41) || !defined(USE_SSSE3)
+#if defined(USE_SSE41) || defined(TRANSPOSE)
   const __m128i kZero = _mm_setzero_si128();
 #else
   const __m128i k0x80s = _mm_set1_epi8(-128);
@@ -893,7 +924,7 @@ INLINE void transform(const Position *pos, clipped_t *output,
 #else
     for (unsigned i = 0; i < kHalfDimensions; i++) {
       int16_t sum = (*accumulation)[perspectives[p]][i];
-      output[offset + i] = max(0, min(127, sum));
+      output[offset + i] = clamp(sum, 0, 127);
     }
 
 #endif
@@ -910,7 +941,11 @@ struct NetData {
   clipped_t hidden2_clipped[32];
 #else
   clipped_t hidden1_out[32];
+#if defined(USE_SSE2) && !defined(USE_SSSE3)
   int16_t hidden2_out[32];
+#else
+  int8_t hidden2_out[32];
+#endif
 #endif
 };
 
@@ -922,7 +957,7 @@ Value nnue_evaluate(const Position *pos)
 #ifdef TRANSPOSE
   alignas(8) uint16_t hidden1_mask[4] = { 0 };
 #endif
-#ifdef HACK // work around a bug in old gcc on Windows
+#ifdef ALIGNMENT_HACK // work around a bug in old gcc on Windows
   uint8_t buf[sizeof(struct NetData) + 63];
   struct NetData *b = (struct NetData *)(buf + ((((uintptr_t)buf-1) ^ 0x3f) & 0x3f));
 #define B(x) (b->x)
@@ -931,8 +966,7 @@ Value nnue_evaluate(const Position *pos)
 #define B(x) (buf.x)
 #endif
 
-  // accumulator -> __m128i input[32] + uint16_t input_mask[32]
-  transform(pos, ((uint8_t *)B(input)), input_mask);
+  transform(pos, B(input), input_mask);
 
 #ifndef TRANSPOSE
 
@@ -959,7 +993,7 @@ Value nnue_evaluate(const Position *pos)
   affine_txfm(B(hidden1_out), B(hidden2_out), 32, 32,
       hidden2_biases, hidden2_weights, hidden1_mask2, NULL, false);
 
-  scalar_prod((uint8_t *)B(hidden2_out), &out_value, 32, 1, output_biases,
+  affine_propagate((uint8_t *)B(hidden2_out), &out_value, 32, 1, output_biases,
       output_weights);
 
 #endif

@@ -353,6 +353,7 @@ MAX(int)
 MAX(uint64_t)
 MAX(unsigned)
 MAX(int64_t)
+MAX(int16_t)
 MAX(uint8_t)
 MAX(double)
 #undef MAX
@@ -362,6 +363,7 @@ MIN(int)
 MIN(uint64_t)
 MIN(unsigned)
 MIN(int64_t)
+MIN(int16_t)
 MIN(uint8_t)
 MIN(double)
 #undef MIN
@@ -371,6 +373,7 @@ CLAMP(int)
 CLAMP(uint64_t)
 CLAMP(unsigned)
 CLAMP(int64_t)
+CLAMP(int16_t)
 CLAMP(uint8_t)
 CLAMP(double)
 #undef CLAMP
@@ -380,6 +383,7 @@ CLAMP(double)
     uint64_t: max_uint64_t,    \
     unsigned: max_unsigned,    \
     int64_t: max_int64_t,      \
+    int16_t: max_int16_t,      \
     uint8_t: max_uint8_t,      \
     double: max_double         \
 ) (a,b)
@@ -389,6 +393,7 @@ CLAMP(double)
     uint64_t: min_uint64_t,    \
     unsigned: min_unsigned,    \
     int64_t: min_int64_t,      \
+    int16_t: min_int16_t,      \
     uint8_t: min_uint8_t,      \
     double: min_double         \
 ) (a,b)
@@ -398,6 +403,7 @@ CLAMP(double)
     uint64_t: clamp_uint64_t,    \
     unsigned: clamp_unsigned,    \
     int64_t: clamp_int64_t,      \
+    int16_t: clamp_int16_t,      \
     uint8_t: clamp_uint8_t,      \
     double: clamp_double         \
 ) (a,b,c)
