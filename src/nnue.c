@@ -82,7 +82,7 @@ enum {
 
 // For certain architectures we transpose the weights matrix and make use
 // of the sparseness of the vectors. Only SSE2 for now.
-#if defined(USE_SSE2) && !defined(USE_AVX2)
+#if defined(USE_SSE2) // && !defined(USE_AVX2)
 #define TRANSPOSE
 #define USE_MASK
 #endif
@@ -154,6 +154,12 @@ typedef uint8_t clipped_t;
 typedef int16_t weight_t;
 #else
 typedef int8_t weight_t;
+#endif
+
+#if defined(USE_AVX2)
+typedef uint32_t mask_t;
+#else
+typedef uint16_t mask_t;
 #endif
 
 #endif
@@ -504,16 +510,63 @@ INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
   return true;
 }
 
-#ifdef USE_SSSE3
-INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
+#ifdef USE_AVX2
+INLINE void affine_txfm(uint8_t *input, void *output, unsigned inDims,
     unsigned outDims, const int32_t *biases, weight_t *weights,
-    uint64_t *inMask, uint16_t *outMask,
+    uint64_t *inMask, mask_t *outMask,
     const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
 
-  const __m128i kZeros[4] = { 0 };
-  __m128i *inVec = (__m128i *)input;
+  (void)outDims;
+  const __m256i kZero = _mm256_setzero_si256();
+#define TMP(j) __m256i out_##j = ((__m256i *)biases)[j];
+  LOOP_4(TMP);
+#undef TMP
+  __m256i first, second;
+  uint64_t v = inMask[0];
+  unsigned idx;
+
+  for (unsigned offset = 0; offset < inDims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+      break;
+    first = ((__m256i *)weights)[idx];
+    uint16_t factor = input[idx];
+    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
+      second = ((__m256i *)weights)[idx];
+      factor |= input[idx] << 8;
+    } else {
+      second = kZero;
+    }
+    __m256i mul = _mm256_set1_epi16(factor), prod;
+    prod = _mm256_maddubs_epi16(mul, _mm256_unpacklo_epi8(first, second));
+    out_0 = _mm256_add_epi32(out_0, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(prod)));
+    out_1 = _mm256_add_epi32(out_1, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(_mm256_permute4x64_epi64(prod, 0xE))));
+    prod = _mm256_maddubs_epi16(mul, _mm256_unpackhi_epi8(first, second));
+    out_2 = _mm256_add_epi32(out_2, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(prod)));
+    out_3 = _mm256_add_epi32(out_3, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(_mm256_permute4x64_epi64(prod, 0xE))));
+  }
+
+  __m256i out_in16_0 = _mm256_srai_epi16(_mm256_packs_epi32(out_0, out_1), SHIFT);
+  __m256i out_in16_1 = _mm256_srai_epi16(_mm256_packs_epi32(out_2, out_3), SHIFT);
+
+  __m256i *outVec = (__m256i *)output;
+  if (pack8_and_calc_mask) {
+    outVec[0] = _mm256_packs_epi16(out_in16_0, out_in16_1);
+    outMask[0] = _mm256_movemask_epi8(_mm256_cmpgt_epi8(outVec[0], kZero));
+  } else {
+    outVec[0] = _mm256_max_epi8(_mm256_packs_epi16(out_in16_0, out_in16_1), kZero);
+  }
+}
+#elif USE_SSSE3
+INLINE void affine_txfm(uint8_t *input, void *output, unsigned inDims,
+    unsigned outDims, const int32_t *biases, weight_t *weights,
+    uint64_t *inMask, mask_t *outMask,
+    const bool pack8_and_calc_mask)
+{
+  assert(outDims == 32);
+
+  const __m128i kZeros[2] = { 0 };
 #define TMP(j) __m128i out_##j = ((__m128i *)biases)[j];
   LOOP_8(TMP);
 #undef TMP
@@ -525,10 +578,10 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
     first = (__m128i *)&weights[outDims * idx];
-    uint32_t factor = ((uint8_t *)inVec)[idx];
+    uint16_t factor = input[idx];
     if (next_idx(&idx, &offset, &v, inMask, inDims)) {
       second = (__m128i *)&weights[outDims * idx];
-      factor |= ((uint8_t *)inVec)[idx] << 8;
+      factor |= input[idx] << 8;
     } else {
       second = kZeros;
     }
@@ -588,7 +641,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 #elif defined(USE_SSE2)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     unsigned outDims, const int32_t *biases, weight_t *weights,
-    uint64_t *inMask, uint16_t *outMask,
+    uint64_t *inMask, mask_t *outMask,
     const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
@@ -647,7 +700,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 #else /* generic fallback */
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     unsigned outDims, int32_t *biases, weight_t *weights,
-    uint64_t *inMask, uint16_t *outMask,
+    uint64_t *inMask, mask_t *outMask,
     const bool pack8_and_calc_mask)
 {
   (void)inMask; (void)outMask; (void)pack8_and_calc_mask;
@@ -843,7 +896,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 
 // Convert input features
 INLINE void transform(const Position *pos, clipped_t *output,
-    uint16_t *outMask)
+    mask_t *outMask)
 {
   if (!update_accumulator_if_possible(pos))
     refresh_accumulator(pos);
@@ -884,8 +937,13 @@ INLINE void transform(const Position *pos, clipped_t *output,
     for (unsigned i = 0; i < numChunks; i++) {
       __m256i sum0 = ((__m256i *)(*accumulation)[perspectives[p]])[i * 2 + 0];
       __m256i sum1 = ((__m256i *)(*accumulation)[perspectives[p]])[i * 2 + 1];
+#ifndef TRANSPOSE
       out[i] = _mm256_permute4x64_epi64(_mm256_max_epi8(
           _mm256_packs_epi16(sum0, sum1), kZero), 0xd8);
+#else
+      out[i] = _mm256_permute4x64_epi64(_mm256_packs_epi16(sum0, sum1), 0xd8);
+      *outMask++ = _mm256_movemask_epi8(_mm256_cmpgt_epi8(out[i], kZero));
+#endif
     }
 
 #elif defined(USE_SSE2)
@@ -952,9 +1010,9 @@ struct NetData {
 Value nnue_evaluate(const Position *pos)
 {
   int32_t out_value;
-  alignas(8) uint16_t input_mask[FtOutDims / 16];
+  alignas(8) mask_t input_mask[FtOutDims / (8 * sizeof(mask_t))];
 #ifdef TRANSPOSE
-  alignas(8) uint16_t hidden1_mask[4] = { 0 };
+  alignas(8) mask_t hidden1_mask[8 / sizeof(mask_t)] = { 0 };
 #endif
 #ifdef ALIGNMENT_HACK // work around a bug in old gcc on Windows
   uint8_t buf[sizeof(struct NetData) + 63];
@@ -980,7 +1038,7 @@ Value nnue_evaluate(const Position *pos)
 
 #else
 
-  // Use memcpy() from uint16_t to uint64_t to prevent aliasing problems.
+  // Use memcpy() from mask_t to uint64_t to prevent aliasing problems.
   // The compiler will optimize away the actual memcpy() operation.
   uint64_t input_mask2[FtOutDims / 64];
   memcpy(input_mask2, input_mask, FtOutDims / 8);
@@ -1023,6 +1081,29 @@ bool read_weights(weight_t *output_buf, unsigned width, unsigned height,
   return true;
 }
 
+#if defined(TRANSPOSE) && defined(USE_AVX2)
+void permute_weights_and_biases(int8_t *weights, int32_t *biases,
+    unsigned numDims)
+{
+  __m256i *w = (__m256i *)weights;
+  __m256i permutation = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
+  for (unsigned i = 0; i < numDims; i++)
+    w[i] = _mm256_permutevar8x32_epi32(w[i], permutation);
+
+  __m128i *b = (__m128i *)biases;
+  __m128i tmp[8];
+  tmp[0] = b[0];
+  tmp[1] = b[4];
+  tmp[2] = b[1];
+  tmp[3] = b[5];
+  tmp[4] = b[2];
+  tmp[5] = b[6];
+  tmp[6] = b[3];
+  tmp[7] = b[7];
+  memcpy(b, tmp, 8 * sizeof(__m128i));
+}
+#endif
+
 bool load_eval_file(const char *evalFile)
 {
   FILE *F = fopen(evalFile, "rb");
@@ -1053,6 +1134,11 @@ bool load_eval_file(const char *evalFile)
   read_weights(hidden2_weights, 32 , 32 , F);
   fread(output_biases, sizeof(int32_t), 1 , F);
   read_weights(output_weights, 32, 1 , F);
+
+#if defined(TRANSPOSE) && defined(USE_AVX2)
+  permute_weights_and_biases(hidden1_weights, hidden1_biases, 512);
+  permute_weights_and_biases(hidden2_weights, hidden2_biases, 32);
+#endif
 
   return true;
 //  return feof(F);
