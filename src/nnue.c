@@ -83,7 +83,6 @@ enum {
 // For certain architectures we transpose the weights matrix and make use
 // of the sparseness of the vectors. Only SSE2 for now.
 #if defined(USE_SSE2) && !defined(AVX2)
-#warning TRANSPOSE
 #define TRANSPOSE
 #define USE_MASK
 #endif
