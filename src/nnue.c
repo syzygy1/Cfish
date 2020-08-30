@@ -249,7 +249,7 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
 // OutputLayer = AffineTransform<HiddenLayer2, 1>
 // 32 x clipped_t -> 1 x int32_t
 
-static alignas(64) weight_t hidden1_weights[32 * 512];
+static alignas(64) weight_t hidden1_weights[32 * (2 * kHalfDimensions)];
 static alignas(64) weight_t hidden2_weights[32 * 32];
 static alignas(64) weight_t output_weights [1 * 32];
 
@@ -901,7 +901,8 @@ INLINE void transform(const Position *pos, clipped_t *output,
   if (!update_accumulator_if_possible(pos))
     refresh_accumulator(pos);
 
-  int16_t (*accumulation)[2][256] = &pos->st->accumulator.accumulation;
+  int16_t (*accumulation)[2][kHalfDimensions] = 
+      &pos->st->accumulator.accumulation;
   (void)outMask; // avoid compiler warning
 
 #if defined(USE_AVX2)
@@ -1129,14 +1130,15 @@ bool load_eval_file(const char *evalFile)
   hash = read_uint32_t(F);
   if (hash != 0x63337156) return false;
   fread(hidden1_biases, sizeof(int32_t), 32, F);
-  read_weights(hidden1_weights, 512, 32, F);
+  read_weights(hidden1_weights, 2 * kHalfDimensions, 32, F);
   fread(hidden2_biases, sizeof(int32_t), 32, F);
   read_weights(hidden2_weights, 32 , 32 , F);
   fread(output_biases, sizeof(int32_t), 1 , F);
   read_weights(output_weights, 32, 1 , F);
 
 #if defined(TRANSPOSE) && defined(USE_AVX2)
-  permute_weights_and_biases(hidden1_weights, hidden1_biases, 512);
+  permute_weights_and_biases(hidden1_weights, hidden1_biases, 
+      2 * kHalfDimensions);
   permute_weights_and_biases(hidden2_weights, hidden2_biases, 32);
 #endif
 
