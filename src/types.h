@@ -357,6 +357,7 @@ MAX(int16_t)
 MAX(uint8_t)
 MAX(double)
 MAX(size_t)
+MAX(ssize_t)
 #undef MAX
 
 #define MIN(T) INLINE T min_##T(T a, T b) { return a < b ? a : b; }
@@ -368,6 +369,7 @@ MIN(int16_t)
 MIN(uint8_t)
 MIN(double)
 MIN(size_t)
+MIN(ssize_t)
 #undef MIN
 
 #define CLAMP(T) INLINE T clamp_##T(T a, T b, T c) { return a < b ? b : a > c ? c : a; }
@@ -379,6 +381,7 @@ CLAMP(int16_t)
 CLAMP(uint8_t)
 CLAMP(double)
 CLAMP(size_t)
+CLAMP(ssize_t)
 #undef CLAMP
 
 #ifndef __APPLE__
@@ -390,7 +393,7 @@ CLAMP(size_t)
     int16_t: F##_int16_t,      \
     uint8_t: F##_uint8_t,      \
     double: F##_double         \
-) (a,##__VA_ARGS__)
+) (a,__VA_ARGS__)
 #else
 #define TEMPLATE(F,a,...) _Generic((a), \
     int: F##_int,              \
@@ -400,8 +403,9 @@ CLAMP(size_t)
     int16_t: F##_int16_t,      \
     uint8_t: F##_uint8_t,      \
     size_t: F##_size_t,        \
+    ssize_t: F##_ssize_t,      \
     double: F##_double         \
-) (a,##__VA_ARGS__)
+) (a,__VA_ARGS__)
 #endif
 
 #define max(a,b) TEMPLATE(max,a,b)
