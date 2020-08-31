@@ -297,9 +297,9 @@ ifeq ($(bits),32)
 endif
 
 # Make sure the ARCH string contains no invalid components
-ifneq ($(shell echo $(ARCH) | sed -E 's/x86-(32|64)(-sse|-popcnt|-mmx|-sse2|-sse3|-ssse3|-sse41|-modern|-avx2|-bmi2|-avx512|-vnni)*/OK/'),OK)
-	arch =
-endif
+#ifneq ($(shell echo $(ARCH) | sed -E 's/x86-(32|64)(-sse|-popcnt|-mmx|-sse2|-sse3|-ssse3|-sse41|-modern|-avx2|-bmi2|-avx512|-vnni)*/OK/'),OK)
+#	arch =
+#endif
 
 else
 

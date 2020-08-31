@@ -356,6 +356,7 @@ MAX(int64_t)
 MAX(int16_t)
 MAX(uint8_t)
 MAX(double)
+MAX(size_t)
 #undef MAX
 
 #define MIN(T) INLINE T min_##T(T a, T b) { return a < b ? a : b; }
@@ -366,6 +367,7 @@ MIN(int64_t)
 MIN(int16_t)
 MIN(uint8_t)
 MIN(double)
+MIN(size_t)
 #undef MIN
 
 #define CLAMP(T) INLINE T clamp_##T(T a, T b, T c) { return a < b ? b : a > c ? c : a; }
@@ -376,37 +378,35 @@ CLAMP(int64_t)
 CLAMP(int16_t)
 CLAMP(uint8_t)
 CLAMP(double)
+CLAMP(size_t)
 #undef CLAMP
 
-#define max(a,b) _Generic((a), \
-    int: max_int,              \
-    uint64_t: max_uint64_t,    \
-    unsigned: max_unsigned,    \
-    int64_t: max_int64_t,      \
-    int16_t: max_int16_t,      \
-    uint8_t: max_uint8_t,      \
-    double: max_double         \
-) (a,b)
+#ifndef __APPLE__
+#define TEMPLATE(F,a,...) _Generic((a), \
+    int: F##_int,              \
+    uint64_t: F##_uint64_t,    \
+    unsigned: F##_unsigned,    \
+    int64_t: F##_int64_t,      \
+    int16_t: F##_int16_t,      \
+    uint8_t: F##_uint8_t,      \
+    double: F##_double         \
+) (a,##__VA_ARGS__)
+#else
+#define TEMPLATE(F,a,...) _Generic((a), \
+    int: F##_int,              \
+    uint64_t: F##_uint64_t,    \
+    unsigned: F##_unsigned,    \
+    int64_t: F##_int64_t,      \
+    int16_t: F##_int16_t,      \
+    uint8_t: F##_uint8_t,      \
+    size_t: F##_size_t,        \
+    double: F##_double         \
+) (a,##__VA_ARGS__)
+#endif
 
-#define min(a,b) _Generic((a), \
-    int: min_int,              \
-    uint64_t: min_uint64_t,    \
-    unsigned: min_unsigned,    \
-    int64_t: min_int64_t,      \
-    int16_t: min_int16_t,      \
-    uint8_t: min_uint8_t,      \
-    double: min_double         \
-) (a,b)
-
-#define clamp(a,b,c) _Generic((a), \
-    int: clamp_int,              \
-    uint64_t: clamp_uint64_t,    \
-    unsigned: clamp_unsigned,    \
-    int64_t: clamp_int64_t,      \
-    int16_t: clamp_int16_t,      \
-    uint8_t: clamp_uint8_t,      \
-    double: clamp_double         \
-) (a,b,c)
+#define max(a,b) TEMPLATE(max,a,b)
+#define min(a,b) TEMPLATE(min,a,b)
+#define clamp(a,b,c) TEMPLATE(clamp,a,b,c)
 
 #ifdef NDEBUG
 #define assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
