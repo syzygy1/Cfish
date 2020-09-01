@@ -357,7 +357,7 @@ MAX(int16_t)
 MAX(uint8_t)
 MAX(double)
 MAX(size_t)
-MAX(ssize_t)
+MAX(long)
 #undef MAX
 
 #define MIN(T) INLINE T min_##T(T a, T b) { return a < b ? a : b; }
@@ -369,7 +369,7 @@ MIN(int16_t)
 MIN(uint8_t)
 MIN(double)
 MIN(size_t)
-MIN(ssize_t)
+MIN(long)
 #undef MIN
 
 #define CLAMP(T) INLINE T clamp_##T(T a, T b, T c) { return a < b ? b : a > c ? c : a; }
@@ -381,7 +381,7 @@ CLAMP(int16_t)
 CLAMP(uint8_t)
 CLAMP(double)
 CLAMP(size_t)
-CLAMP(ssize_t)
+CLAMP(long)
 #undef CLAMP
 
 #ifndef __APPLE__
@@ -403,7 +403,7 @@ CLAMP(ssize_t)
     int16_t: F##_int16_t,      \
     uint8_t: F##_uint8_t,      \
     size_t: F##_size_t,        \
-    ssize_t: F##_ssize_t,      \
+    long: F##_long,            \
     double: F##_double         \
 ) (a,__VA_ARGS__)
 #endif
