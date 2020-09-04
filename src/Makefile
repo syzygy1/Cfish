@@ -450,7 +450,7 @@ endif
 
 ifneq ($(COMP),mingw)
 ifeq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
-	CFLAGS += -D_DEFAULT_SOURCE
+	CFLAGS += -D_DEFAULT_SOURCE -D_BSD_SOURCE
 endif
 endif
 
