@@ -92,6 +92,7 @@ struct Stack {
   Value staticEval;
   Value statScore;
   int moveCount;
+  bool ttPv;
   uint8_t ply;
 
   // MovePicker data

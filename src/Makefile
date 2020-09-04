@@ -101,10 +101,13 @@ avx512 = no
 vnni = no
 neon = no
 ARCH = auto
+native = no
 
 ### 2.2 Architecture specific
 
 ifeq ($(ARCH),auto)
+
+native = yes
 
 ifeq ($(COMP),)
 	CC=gcc
@@ -627,13 +630,13 @@ ifeq ($(neon),yes)
 	ifeq ($(KERNEL),Linux)
 	ifneq ($(COMP),ndk)
 	ifneq ($(arch),armv8)
-		CXXFLAGS += -mfpu=neon
+		CFLAGS += -mfpu=neon
 	endif
 	endif
 	endif
 endif
 
-ifeq ($(ARCH),auto)
+ifeq ($(native),yes)
 	CFLAGS += -march=native
 endif
 
@@ -659,8 +662,16 @@ endif
 ifeq ($(lto),yes)
 ifeq ($(optimize),yes)
 ifeq ($(debug),no)
-	ifeq ($(comp),clang)
+	ifeq ($(COMP),ndk)
+		CFLAGS += -fltho=thin
+		LDFLAGS += $(CFLAGS)
+	else ifeq ($(comp),clang)
 		CFLAGS += -flto=thin
+		ifneq ($(findstring MINGW,$(KERNEL)),)
+			CFLAGS += -fuse-ld=lld
+		else ifneq ($(findstring MSYS,$(KERNEL)),)
+			CFLAGS += -fuse-ld=lld
+		endif
 		LDFLAGS += $(CFLAGS)
 
 # GCC and CLANG  user different methods for parallelizing LTO, and CLANG
@@ -856,6 +867,7 @@ config-sanity:
 	@echo "avx512: '$(avx512)'"
 	@echo "vnni: '$(vnni)'"
 	@echo "neon: '$(neon)'"
+	@echo "native: '$(native)'"
 	@echo ""
 	@echo "Flags:"
 	@echo "CC: $(CC)"
@@ -883,6 +895,7 @@ config-sanity:
 	@test "$(avx512)" = "yes" || test "$(avx512)" = "no"
 	@test "$(vnni)" = "yes" || test "$(vnni)" = "no"
 	@test "$(neon)" = "yes" || test "$(neon)" = "no"
+	@test "$(native)" = "yes" || test "$(native)" = "no"
 	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang"
 
 $(EXE): $(OBJS)

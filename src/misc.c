@@ -331,7 +331,9 @@ void *map_file(FD fd, map_t *map)
 
   *map = file_size(fd);
   void *data = mmap(NULL, *map, PROT_READ, MAP_SHARED, fd, 0);
+#ifdef MADV_RANDOM
   madvise(data, *map, MADV_RANDOM);
+#endif
   return data == MAP_FAILED ? NULL : data;
 
 #else

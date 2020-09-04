@@ -123,25 +123,25 @@ static const Score MobilityBonus[4][32] = {
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(19, 7), S(48, 29) };
+static const Score RookOnFile[2] = { S(19, 7), S(48, 27) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
 // pawn defended are not considered.
 static const Score ThreatByMinor[8] = {
-  S(0, 0), S(5, 32), S(57, 41), S(77, 56), S(88,119), S(79,161)
+  S(0, 0), S(5, 32), S(55, 41), S(77, 56), S(89,119), S(79,162)
 };
 
 static const Score ThreatByRook[8] = {
-  S(0, 0), S(3, 46), S(37, 68), S(42, 60), S( 0, 38), S(58, 41)
+  S(0, 0), S(3, 44), S(37, 68), S(42, 60), S( 0, 39), S(58, 43)
 };
 
 // PassedRank[mg/eg][Rank] contains midgame and endgame bonuses for passed
 // pawns. We don't use a Score because we process the two components
 // independently.
 static const Value PassedRank[][8] = {
-  { V(0), V(10), V(17), V(15), V(62), V(168), V(276) },
-  { V(0), V(28), V(33), V(41), V(72), V(177), V(260) }
+  { V(0), V( 9), V(15), V(17), V(64), V(171), V(277) },
+  { V(0), V(28), V(31), V(39), V(70), V(177), V(260) }
 };
 
 // PassedFile[File] contains a bonus according to the file of a passed pawn
@@ -154,7 +154,7 @@ static const Score PassedFile[8] = {
 static const Score BadOutpost          = S( -7, 36);
 static const Score BishopKingProtector = S(  6,  9);
 static const Score BishopOnKingRing    = S( 24,  0);
-static const Score BishopOutpost       = S( 30, 23);
+static const Score BishopOutpost       = S( 31, 23);
 static const Score BishopPawns         = S(  3,  7);
 static const Score BishopXRayPawns     = S(  4,  5);
 static const Score CorneredBishop      = S( 50, 50);
@@ -162,7 +162,7 @@ static const Score FlankAttacks        = S(  8,  0);
 static const Score Hanging             = S( 69, 36);
 static const Score KnightKingProtector = S(  8,  9);
 static const Score KnightOnQueen       = S( 16, 11);
-static const Score KnightOutpost       = S( 56, 36);
+static const Score KnightOutpost       = S( 56, 34);
 static const Score LongDiagonalBishop  = S( 45,  0);
 static const Score MinorBehindPawn     = S( 18,  3);
 static const Score PawnlessFlank       = S( 17, 95);

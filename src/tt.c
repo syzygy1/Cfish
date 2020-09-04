@@ -176,7 +176,7 @@ void tt_clear_worker(int idx)
 // considered more valuable than TTEntry t2 if its replace value is greater
 // than that of t2.
 
-TTEntry *tt_probe(Key key, int *found)
+TTEntry *tt_probe(Key key, bool *found)
 {
   TTEntry *tte = tt_first_entry(key);
   uint16_t key16 = key; // Use the low 16 bits as key inside the cluster
@@ -200,7 +200,7 @@ TTEntry *tt_probe(Key key, int *found)
         >  tte[i].depth8 - ((263 + TT.generation8 -   tte[i].genBound8) & 0xF8))
       replace = &tte[i];
 
-  *found = 0;
+  *found = false;
   return replace;
 }
 

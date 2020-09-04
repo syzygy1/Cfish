@@ -174,6 +174,7 @@ void benchmark(Position *current, char *str)
 
   uint64_t nodes = 0;
   Position pos;
+  memset(&pos, 0, sizeof(pos));
   pos.stackAllocation = malloc(63 + 217 * sizeof(*pos.stack));
   pos.stack = (Stack *)(((uintptr_t)pos.stackAllocation + 0x3f) & ~0x3f);
   pos.st = pos.stack + 7;

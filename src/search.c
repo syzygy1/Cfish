@@ -642,15 +642,6 @@ skip_search:
 #endif
 }
 
-static int best_move_count(Position *pos, Move move)
-{
-  int idx;
-  for (idx = pos->pvIdx; idx < pos->pvLast; idx++)
-    if (pos->rootMoves->move[idx].pv[0] == move)
-      break;
-  return idx < pos->pvLast ? pos->rootMoves->move[idx].bestMoveCount : 0;
-}
-
 // search_node() is the main search function template for both PV
 // and non-PV nodes
 INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
@@ -692,8 +683,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue, probCutBeta;
-  int ttHit, ttPv; // not bool on purpose
-  bool formerPv, givesCheck, improving, didLMR;
+  bool ttHit, formerPv, givesCheck, improving, didLMR;
   bool captureOrPromotion, inCheck, doFullDepthSearch, moveCountPruning;
   bool ttCapture, singularQuietLMR;
   Piece movedPiece;
@@ -749,6 +739,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
   assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
+  (ss+1)->ttPv = false;
   (ss+1)->excludedMove = bestMove = 0;
   (ss+2)->killers[0] = (ss+2)->killers[1] = 0;
   Square prevSq = to_sq((ss-1)->currentMove);
@@ -773,9 +764,10 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
           : ttHit    ? tte_move(tte) : 0;
-  ttPv = PvNode ? 4 : (ttHit ? tte_is_pv(tte) : 0);
+  if (!excludedMove)
+    ss->ttPv = PvNode || (ttHit && tte_is_pv(tte));
 
-  if (   ttPv
+  if (   ss->ttPv
       && depth > 12
       && ss->ply - 1 < MAX_LPH
       && !captured_piece()
@@ -783,7 +775,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     lph_update(*pos->lowPlyHistory, ss->ply - 1, (ss-1)->currentMove, stat_bonus(depth - 5));
 
   // pos->ttHitAverage can be used to approximate the running average of ttHit
-  pos->ttHitAverage = (ttHitAverageWindow - 1) * pos->ttHitAverage / ttHitAverageWindow + ttHitAverageResolution * !!ttHit;
+  pos->ttHitAverage = (ttHitAverageWindow - 1) * pos->ttHitAverage / ttHitAverageWindow + ttHitAverageResolution * ttHit;
 
   // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
@@ -840,7 +832,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
         if (    b == BOUND_EXACT
             || (b == BOUND_LOWER ? value >= beta : value <= alpha))
         {
-          tte_save(tte, posKey, value_to_tt(value, ss->ply), ttPv, b,
+          tte_save(tte, posKey, value_to_tt(value, ss->ply), ss->ttPv, b,
               min(MAX_PLY - 1, depth + 6), 0, VALUE_NONE);
           return value;
         }
@@ -849,8 +841,8 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
           Value mate = TB_probe_dtm(pos, wdl, &found);
           if (found) {
             mate += wdl > 0 ? -ss->ply : ss->ply;
-            tte_save(tte, posKey, value_to_tt(mate, ss->ply), ttPv, BOUND_EXACT,
-                min(MAX_PLY - 1, depth + 6), 0, VALUE_NONE);
+            tte_save(tte, posKey, value_to_tt(mate, ss->ply), ss->ttPv,
+                BOUND_EXACT, min(MAX_PLY - 1, depth + 6), 0, VALUE_NONE);
             return mate;
           }
         }
@@ -892,7 +884,8 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     else
       ss->staticEval = eval = -(ss-1)->staticEval + 2 * Tempo;
 
-    tte_save(tte, posKey, VALUE_NONE, ttPv, BOUND_NONE, DEPTH_NONE, 0, eval);
+    tte_save(tte, posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_NONE, 0,
+        eval);
   }
 
   // Step 7. Razoring
@@ -919,7 +912,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
       && (ss-1)->statScore < 22977
       && eval >= beta
       && eval >= ss->staticEval
-      && ss->staticEval >= beta - 30 * depth - 28 * improving + 84 * !!ttPv + 182
+      && ss->staticEval >= beta - 30 * depth - 28 * improving + 84 * ss->ttPv + 182
       && !excludedMove
       && non_pawn_material_c(stm())
       && (ss->ply >= pos->nmpMinPly || stm() != pos->nmpColor))
@@ -984,6 +977,8 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
     mp_init_pc(pos, ttMove, probCutBeta - ss->staticEval);
     int probCutCount = 2 + 2 * cutNode;
+    bool ttPv = ss->ttPv;
+    ss->ttPv = false;
 
     while (  (move = next_move(pos, 0))
            && probCutCount)
@@ -1018,7 +1013,12 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
           return value;
         }
       }
+    ss->ttPv = ttPv;
   }
+
+  // Step 11. If the position is not in TT, decrease depth by 2
+  if (PvNode && depth >= 6 && !ttMove)
+    depth -= 2;
 
 moves_loop: // When in check search starts from here.
   ;  // Avoid a compiler warning. A label must be followed by a statement.
@@ -1032,7 +1032,7 @@ moves_loop: // When in check search starts from here.
   value = bestValue;
   singularQuietLMR = moveCountPruning = false;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
-  formerPv = ttPv && !PvNode;
+  formerPv = ss->ttPv && !PvNode;
 
   // Check for a breadcrumb and leave one if none found
   _Atomic uint64_t *crumb = NULL;
@@ -1054,7 +1054,7 @@ moves_loop: // When in check search starts from here.
     }
   }
 
-  // Step 11. Loop through moves
+  // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
   // cutoff occurs
   while ((move = next_move(pos, moveCountPruning))) {
@@ -1103,7 +1103,7 @@ moves_loop: // When in check search starts from here.
     // Calculate new depth for this move
     newDepth = depth - 1;
 
-    // Step 12. Pruning at shallow depth
+    // Step 13. Pruning at shallow depth
     if (  !rootNode
         && non_pawn_material_c(stm())
         && bestValue > VALUE_TB_LOSS_IN_MAX_PLY)
@@ -1161,7 +1161,7 @@ moves_loop: // When in check search starts from here.
       }
     }
 
-    // Step 13. Extensions
+    // Step 14. Extensions
 
     // Singular extension search. If all moves but one fail low on a search
     // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
@@ -1260,16 +1260,15 @@ moves_loop: // When in check search starts from here.
     ss->currentMove = move;
     ss->history = &(*pos->counterMoveHistory)[inCheck][captureOrPromotion][movedPiece][to_sq(move)];
 
-    // Step 14. Make the move.
+    // Step 15. Make the move.
     do_move(pos, move, givesCheck);
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
-    // Step 15. Reduced depth search (LMR). If the move fails high it will be
+    // Step 16. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3
         &&  moveCount > 1 + 2 * rootNode + 2 * (PvNode && abs(bestValue) < 2)
-        && (!rootNode || best_move_count(pos, move) == 0)
         && (   !captureOrPromotion
             || moveCountPruning
             || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha
@@ -1280,10 +1279,7 @@ moves_loop: // When in check search starts from here.
 
       // Decrease reduction at non-check cut nodes for second move at low
       // depths
-      if (   cutNode
-          && depth <= 10
-          && moveCount <= 2
-          && !inCheck)
+      if (cutNode && depth <= 10 && moveCount <= 2 && !inCheck)
         r--;
 
       // Decrease reduction if the ttHit runing average is large
@@ -1295,7 +1291,7 @@ moves_loop: // When in check search starts from here.
         r++;
 
       // Decrease reduction if position is or has been on the PV
-      if (ttPv)
+      if (ss->ttPv)
         r -= 2;
 
       if (moveCountPruning && !formerPv)
@@ -1323,7 +1319,7 @@ moves_loop: // When in check search starts from here.
         // hence break make_move().
         else if (   type_of_m(move) == NORMAL
                  && !see_test(pos, reverse_move(move), 0))
-          r -= 2 + !!ttPv - (type_of_p(movedPiece) == PAWN);
+          r -= 2 + ss->ttPv - (type_of_p(movedPiece) == PAWN);
 
         ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
                        + (*fmh )[movedPiece][to_sq(move)]
@@ -1365,7 +1361,7 @@ moves_loop: // When in check search starts from here.
       didLMR = false;
     }
 
-    // Step 16. Full depth search when LMR is skipped or fails high.
+    // Step 17. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch) {
       value = -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
 
@@ -1383,7 +1379,7 @@ moves_loop: // When in check search starts from here.
     // For PV nodes only, do a full PV search on the first move or after a fail
     // high (in the latter case search only if value < beta), otherwise let the
     // parent node fail low with value <= alpha and try another move.
-    if (PvNode
+    if (   PvNode
         && (moveCount == 1 || (value > alpha && (rootNode || value < beta))))
     {
       (ss+1)->pv = pv;
@@ -1392,14 +1388,14 @@ moves_loop: // When in check search starts from here.
       value = -search_PV(pos, ss+1, -beta, -alpha, newDepth);
     }
 
-    // Step 17. Undo move
+    // Step 18. Undo move
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
     undo_move(pos, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
 
-    // Step 18. Check for a new best move
+    // Step 19. Check for a new best move
     // Finished searching the move. If a stop occurred, the return value of
     // the search cannot be trusted, and we return immediately without
     // updating best move, PV and TT.
@@ -1458,10 +1454,13 @@ moves_loop: // When in check search starts from here.
       }
     }
 
-    if (!captureOrPromotion && move != bestMove && quietCount < 64)
-      quietsSearched[quietCount++] = move;
-    else if (captureOrPromotion && move != bestMove && captureCount < 32)
-      capturesSearched[captureCount++] = move;
+    if (move != bestMove) {
+      if (captureOrPromotion && captureCount < 32)
+        capturesSearched[captureCount++] = move;
+
+      else if (!captureOrPromotion && quietCount < 64)
+        quietsSearched[quietCount++] = move;
+    }
   }
 
   if (crumb) store_rlx(*crumb, 0);
@@ -1474,7 +1473,7 @@ moves_loop: // When in check search starts from here.
     return VALUE_DRAW;
   */
 
-  // Step 19. Check for mate and stalemate
+  // Step 20. Check for mate and stalemate
   // All legal moves have been searched and if there are no legal moves,
   // it must be a mate or a stalemate. If we are in a singular extension
   // search then return a fail low score.
@@ -1510,11 +1509,21 @@ moves_loop: // When in check search starts from here.
            && !captured_piece())
     update_cm_stats(ss-1, piece_on(prevSq), prevSq, stat_bonus(depth));
 
-  if (PvNode && bestValue > maxValue)
-     bestValue = maxValue;
+  if (PvNode)
+    bestValue = min(bestValue, maxValue);
+
+  // If no good move is found and the previous position was ttPv, then the
+  // previous opponent move is probably good and the new position is added
+  // to the search tree
+  if (bestValue <= alpha)
+    ss->ttPv = ss->ttPv || ((ss-1)->ttPv && depth > 3);
+  // Otherwise, a countermove has been found and if the position is in the
+  // last leaf in the search tree, remove the position from the search tree.
+  else if (depth > 3)
+    ss->ttPv = ss->ttPv && (ss+1)->ttPv;
 
   if (!excludedMove && !(rootNode && pos->pvIdx))
-    tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), ttPv,
+    tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), ss->ttPv,
         bestValue >= beta ? BOUND_LOWER :
         PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
         depth, bestMove, ss->staticEval);
@@ -1556,8 +1565,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
   Key posKey;
   Move ttMove, move, bestMove;
   Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
-  int ttHit, pvHit; // not bool on purpose
-  bool givesCheck;
+  bool ttHit, pvHit, givesCheck;
   Depth ttDepth;
   int moveCount;
 
@@ -1587,7 +1595,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
   tte = tt_probe(posKey, &ttHit);
   ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
   ttMove = ttHit ? tte_move(tte) : 0;
-  pvHit = ttHit ? tte_is_pv(tte) : 0;
+  pvHit = ttHit && tte_is_pv(tte);
 
   if (  !PvNode
       && ttHit
@@ -1692,7 +1700,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
                                            [to_sq(move)];
 
     if (  !captureOrPromotion
-        && moveCount >= abs(depth) + 1
+        && moveCount
         && (*(ss-1)->history)[moved_piece(move)][to_sq(move)] < CounterMovePruneThreshold
         && (*(ss-2)->history)[moved_piece(move)][to_sq(move)] < CounterMovePruneThreshold)
       continue;
@@ -1970,11 +1978,14 @@ static void uci_print_pv(Position *pos, Depth depth, Value alpha, Value beta)
   for (int i = 0; i < multiPV; i++) {
     bool updated = rm->move[i].score != -VALUE_INFINITE;
 
-    if (depth == 1 && !updated)
-        continue;
+    if (depth == 1 && !updated && i > 0)
+      continue;
 
-    Depth d = updated ? depth : depth - 1;
+    Depth d = updated ? depth : max(1, depth - 1);
     Value v = updated ? rm->move[i].score : rm->move[i].previousScore;
+
+    if (v == -VALUE_INFINITE)
+      v = VALUE_ZERO;
 
     bool tb = TB_RootInTB && abs(v) < VALUE_MATE_IN_MAX_PLY;
     if (tb)
@@ -2020,7 +2031,7 @@ static void uci_print_pv(Position *pos, Depth depth, Value alpha, Value beta)
 
 static int extract_ponder_from_tt(RootMove *rm, Position *pos)
 {
-  int ttHit;
+  bool ttHit;
 
   assert(rm->pvSize == 1);
 

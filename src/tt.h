@@ -74,7 +74,7 @@ typedef struct TranspositionTable TranspositionTable;
 
 extern TranspositionTable TT;
 
-INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
+INLINE void tte_save(TTEntry *tte, Key k, Value v, bool pv, int b, Depth d,
     Move m, Value ev)
 {
   // Preserve any existing move for the same position
@@ -90,10 +90,9 @@ INLINE void tte_save(TTEntry *tte, Key k, Value v, int pn, int b, Depth d,
 
     tte->key16     = (uint16_t)k;
     tte->depth8    = (uint8_t)(d - DEPTH_OFFSET);
-    tte->genBound8 = (uint8_t)(TT.generation8 | pn | b);
+    tte->genBound8 = (uint8_t)(TT.generation8 | ((uint8_t)pv << 2) | b);
     tte->value16   = (int16_t)v;
     tte->eval16    = (int16_t)ev;
-//printf("tte.key16 = %d, tte.eval16 = %d\n", tte->key16, tte->eval16);
   }
 }
 
@@ -117,7 +116,7 @@ INLINE Depth tte_depth(TTEntry *tte)
   return tte->depth8 + DEPTH_OFFSET;
 }
 
-INLINE int tte_is_pv(TTEntry *tte)
+INLINE bool tte_is_pv(TTEntry *tte)
 {
   return tte->genBound8 & 0x4;
 }
@@ -139,7 +138,7 @@ INLINE TTEntry *tt_first_entry(Key key)
   return &TT.table[mul_hi64(key, TT.clusterCount)].entry[0];
 }
 
-TTEntry *tt_probe(Key key, int *found);
+TTEntry *tt_probe(Key key, bool *found);
 int tt_hashfull(void);
 void tt_allocate(size_t mbSize);
 void tt_clear(void);
