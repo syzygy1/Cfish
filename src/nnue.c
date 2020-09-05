@@ -538,13 +538,15 @@ INLINE void affine_txfm(uint8_t *input, void *output, unsigned inDims,
     } else {
       second = kZero;
     }
-    __m256i mul = _mm256_set1_epi16(factor), prod;
+    __m256i mul = _mm256_set1_epi16(factor), prod, signs;
     prod = _mm256_maddubs_epi16(mul, _mm256_unpacklo_epi8(first, second));
-    out_0 = _mm256_add_epi32(out_0, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(prod)));
-    out_1 = _mm256_add_epi32(out_1, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(_mm256_permute4x64_epi64(prod, 0xE))));
+    signs = _mm256_cmpgt_epi16(kZero, prod);
+    out_0 = _mm256_add_epi32(out_0, _mm256_unpacklo_epi16(prod, signs));
+    out_1 = _mm256_add_epi32(out_1, _mm256_unpackhi_epi16(prod, signs));
     prod = _mm256_maddubs_epi16(mul, _mm256_unpackhi_epi8(first, second));
-    out_2 = _mm256_add_epi32(out_2, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(prod)));
-    out_3 = _mm256_add_epi32(out_3, _mm256_cvtepi16_epi32(_mm256_castsi256_si128(_mm256_permute4x64_epi64(prod, 0xE))));
+    signs = _mm256_cmpgt_epi16(kZero, prod);
+    out_2 = _mm256_add_epi32(out_2, _mm256_unpacklo_epi16(prod, signs));
+    out_3 = _mm256_add_epi32(out_3, _mm256_unpackhi_epi16(prod, signs));
   }
 
   __m256i out_in16_0 = _mm256_srai_epi16(_mm256_packs_epi32(out_0, out_1), SHIFT);
@@ -1082,14 +1084,8 @@ bool read_weights(weight_t *output_buf, unsigned width, unsigned height,
 }
 
 #if defined(TRANSPOSE) && defined(USE_AVX2)
-void permute_weights_and_biases(int8_t *weights, int32_t *biases,
-    unsigned numDims)
+void permute_biases(int32_t *biases)
 {
-  __m256i *w = (__m256i *)weights;
-  __m256i permutation = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
-  for (unsigned i = 0; i < numDims; i++)
-    w[i] = _mm256_permutevar8x32_epi32(w[i], permutation);
-
   __m128i *b = (__m128i *)biases;
   __m128i tmp[8];
   tmp[0] = b[0];
@@ -1136,8 +1132,8 @@ bool load_eval_file(const char *evalFile)
   read_weights(output_weights, 32, 1 , F);
 
 #if defined(TRANSPOSE) && defined(USE_AVX2)
-  permute_weights_and_biases(hidden1_weights, hidden1_biases, 512);
-  permute_weights_and_biases(hidden2_weights, hidden2_biases, 32);
+  permute_biases(hidden1_biases);
+  permute_biases(hidden2_biases);
 #endif
 
   return true;
