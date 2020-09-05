@@ -82,7 +82,7 @@ enum {
 
 // For certain architectures we transpose the weights matrix and make use
 // of the sparseness of the vectors. Only SSE2 for now.
-#if defined(USE_SSE2) // && !defined(USE_AVX2)
+#if defined(USE_SSE2)
 #define TRANSPOSE
 #define USE_MASK
 #endif
@@ -146,6 +146,8 @@ typedef int16_t weight_t;
 typedef uint8_t clipped_t;
 typedef int8_t weight_t;
 #endif
+
+typedef uint8_t mask_t; // irrelevant
 
 #else /* TRANSPOSE */
 

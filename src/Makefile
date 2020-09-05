@@ -640,7 +640,7 @@ ifeq ($(native),yes)
 	ifneq ($(findstring ppc,$(arch)),)
 		CFLAGS += -mcpu=native -mtune=native
 	else ifneq ($(findstring arm,$(arch)),)
-		CFLAGS += -march=native -mtune=native
+	#	CFLAGS += -march=native -mtune=native
 	else
 		CFLAGS += -march=native
 	endif
