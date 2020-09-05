@@ -324,6 +324,14 @@ void TB_free(void)
   free(pawnEntry);
 }
 
+void TB_release(void)
+{
+  for (int i = 0; i < tbNumPiece; i++)
+    free_tb_entry((struct BaseEntry *)&pieceEntry[i]);
+  for (int i = 0; i < tbNumPawn; i++)
+    free_tb_entry((struct BaseEntry *)&pawnEntry[i]);
+}
+
 void TB_init(char *path)
 {
   if (!initialized) {
@@ -336,16 +344,16 @@ void TB_init(char *path)
     free(pathString);
     free(paths);
 
-    for (int i = 0; i < tbNumPiece; i++)
-      free_tb_entry((struct BaseEntry *)&pieceEntry[i]);
-    for (int i = 0; i < tbNumPawn; i++)
-      free_tb_entry((struct BaseEntry *)&pawnEntry[i]);
+    TB_release();
 
     LOCK_DESTROY(tbMutex);
 
     pathString = NULL;
-    numWdl = numDtm = numDtz = 0;
   }
+
+  numWdl = numDtm = numDtz = 0;
+  tbNumPiece = tbNumPawn = 0;
+  TB_MaxCardinality = TB_MaxCardinalityDTM = 0;
 
   // if path is an empty string or equals "<empty>", we are done.
   const char *p = path;
@@ -369,9 +377,6 @@ void TB_init(char *path)
   }
 
   LOCK_INIT(tbMutex);
-
-  tbNumPiece = tbNumPawn = 0;
-  TB_MaxCardinality = TB_MaxCardinalityDTM = 0;
 
   if (!pieceEntry) {
     pieceEntry = malloc(TB_MAX_PIECE * sizeof(*pieceEntry));

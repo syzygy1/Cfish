@@ -128,66 +128,66 @@ endif
 props = $(shell echo | $(CC) -m64 -march=native -E -dM -)
 
 x86 = no
-ifeq ($(findstring __i386__,$(props)),__i386__)
+ifneq ($(findstring __i386__,$(props)),)
 	x86 = yes
-else ifeq ($(findstring __x86_64__,$(props)),__x86_64__)
+else ifneq ($(findstring __x86_64__,$(props)),)
 	x86 = yes
 endif
 ifeq ($(x86),yes)
 
-	ifeq ($(findstring __i386__,$(props)),__i386__)
+	ifneq ($(findstring __i386__,$(props)),)
 		arch = i386
 		bits = 32
 	else
 		arch = x86_64
 		bits = 64
 	endif
-#	ifeq ($(findstring __AVX512__,$(props)),__AVX512__)
+#	ifneq ($(findstring __AVX512__,$(props)),)
 #		avx512 = yes
 #	endif
-	ifeq ($(findstring __VNNI__,$(props)),__VNNI__)
+	ifneq ($(findstring __VNNI__,$(props)),)
 		vnni = yes
 	endif
 	ifeq ($(bits),64)
-	ifeq ($(findstring __BMI2__,$(props)),__BMI2__)
+	ifneq ($(findstring __BMI2__,$(props)),)
 	# Let's not use pext on Zen
-	ifneq ($(findstring __znver,$(props)),__znver)
+	ifeq ($(findstring __znver,$(props)),)
 		pext = yes
 	endif
 	endif
 	endif
-	ifeq ($(findstring __AVX2__,$(props)),__AVX2__)
+	ifneq ($(findstring __AVX2__,$(props)),)
 		avx2 = yes
 	endif
-	ifeq ($(findstring __SSE4_1__,$(props)),__SSE4_1__)
+	ifneq ($(findstring __SSE4_1__,$(props)),)
 		sse41 = yes
 	endif
-	ifeq ($(findstring __POPCNT__,$(props)),__POPCNT__)
+	ifneq ($(findstring __POPCNT__,$(props)),)
 		popcnt = yes
 	endif
-	ifeq ($(findstring __SSSE3__,$(props)),__SSSE3__)
+	ifneq ($(findstring __SSSE3__,$(props)),)
 		ssse3 = yes
 	endif
-	ifeq ($(findstring __SSE2__,$(props)),__SSE2__)
+	ifneq ($(findstring __SSE2__,$(props)),)
 		sse2 = yes
 	endif
-	ifeq ($(findstring __SSE__,$(props)),__SSE__)
+	ifneq ($(findstring __SSE__,$(props)),)
 		sse = yes
 		prefetch = yes
 	endif
 	ifeq ($(sse2),no)
-	ifeq ($(findstring __MMX__,$(props)),__MMX__)
+	ifneq ($(findstring __MMX__,$(props)),)
 		mmx = yes
 	endif
 	endif
 
-else ifeq ($(findstring __arm__,$(props)),__arm__)
+else ifneq ($(findstring __arm__,$(props)),)
 # make ARCH=native not yet supported on ARM
-#	ifeq ($(findstring __ARM_NEON__,$(props)),__ARM_NEON__)
+#	ifneq ($(findstring __ARM_NEON__,$(props)),)
 #		neon = yes
 #	endif
-else ifeq ($(findstring __ppc__,$(props)),__ppc__)
-	ifeq ($(findstring __ppc64__,$(props)),__ppc64__)
+else ifneq ($(findstring __ppc__,$(props)),)
+	ifneq ($(findstring __ppc64__,$(props)),)
 		arch = ppc64
 		popcnt = yes
 		prefetch = yes
@@ -199,11 +199,11 @@ endif
 
 endif
 
-ifeq ($(findstring x86,$(ARCH)),x86)
+ifneq ($(findstring x86,$(ARCH)),)
 
 # x86-32/64
 
-ifeq ($(findstring x86-32,$(ARCH)),x86-32)
+ifneq ($(findstring x86-32,$(ARCH)),)
 	arch = i386
 	bits = 32
 else
@@ -212,36 +212,36 @@ else
 	sse2 = yes
 endif
 
-ifeq ($(findstring -sse,$(ARCH)),-sse)
+ifneq ($(findstring -sse,$(ARCH)),)
 	sse = yes
 endif
 
-ifeq ($(findstring -popcnt,$(ARCH)),-popcnt)
+ifneq ($(findstring -popcnt,$(ARCH)),)
 	popcnt = yes
 endif
 
-ifeq ($(findstring -mmx,$(ARCH)),-mmx)
+ifneq ($(findstring -mmx,$(ARCH)),)
 	mmx = yes
 endif
 
-ifeq ($(findstring -sse2,$(ARCH)),-sse2)
+ifneq ($(findstring -sse2,$(ARCH)),)
 	sse = yes
 	sse2 = yes
 endif
 
-ifeq ($(findstring -ssse3,$(ARCH)),-ssse3)
+ifneq ($(findstring -ssse3,$(ARCH)),)
 	sse = yes
 	ssse3 = yes
 endif
 
-ifeq ($(findstring -sse41,$(ARCH)),-sse41)
+ifneq ($(findstring -sse41,$(ARCH)),)
 	sse = yes
 	sse2 = yes
 	ssse3 = yes
 	sse41 = yes
 endif
 
-ifeq ($(findstring -modern,$(ARCH)),-modern)
+ifneq ($(findstring -modern,$(ARCH)),)
 	popcnt = yes
 	sse = yes
 	sse2 = yes
@@ -249,7 +249,7 @@ ifeq ($(findstring -modern,$(ARCH)),-modern)
 	sse41 = yes
 endif
 
-ifeq ($(findstring -avx2,$(ARCH)),-avx2)
+ifneq ($(findstring -avx2,$(ARCH)),)
 	popcnt = yes
 	sse = yes
 	sse2 = yes
@@ -258,7 +258,7 @@ ifeq ($(findstring -avx2,$(ARCH)),-avx2)
 	avx2 = yes
 endif
 
-ifeq ($(findstring -bmi2,$(ARCH)),-bmi2)
+ifneq ($(findstring -bmi2,$(ARCH)),)
 	popcnt = yes
 	sse = yes
 	sse2 = yes
@@ -268,7 +268,7 @@ ifeq ($(findstring -bmi2,$(ARCH)),-bmi2)
 	pext = yes
 endif
 
-ifeq ($(findstring -avx512,$(ARCH)),-avx512)
+ifneq ($(findstring -avx512,$(ARCH)),)
 	popcnt = yes
 	sse = yes
 	sse2 = yes
@@ -279,7 +279,7 @@ ifeq ($(findstring -avx512,$(ARCH)),-avx512)
 	avx512 = yes
 endif
 
-ifeq ($(findstring -vnni,$(ARCH)),-vnni)
+ifneq ($(findstring -vnni,$(ARCH)),)
 	popcnt = yes
 	sse = yes
 	sse2 = yes
@@ -637,7 +637,13 @@ ifeq ($(neon),yes)
 endif
 
 ifeq ($(native),yes)
-	CFLAGS += -march=native
+	ifneq ($(findstring ppc,$(arch)),)
+		CFLAGS += -mcpu=native -mtune=native
+	else ifneq ($(findstring arm,$(arch)),)
+		CFLAGS += -march=native -mtune=native
+	else
+		CFLAGS += -march=native
+	endif
 endif
 
 ### numa

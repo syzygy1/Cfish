@@ -171,6 +171,8 @@ void search_clear(void)
     stats_clear(pos->lowPlyHistory);
   }
 
+  TB_release();
+
   mainThread.previousScore = VALUE_INFINITE;
   mainThread.previousTimeReduction = 1;
 }
