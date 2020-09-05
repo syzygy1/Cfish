@@ -152,7 +152,7 @@ typedef uint8_t mask_t; // irrelevant
 #else /* TRANSPOSE */
 
 typedef uint8_t clipped_t;
-#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_SSSE3))
+#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(AVX2))
 typedef int16_t weight_t;
 #else
 typedef int8_t weight_t;
@@ -278,7 +278,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
   const __m256i kOnes = _mm256_set1_epi16(1);
 #endif
 
-#elif defined(USE_SSSE3)
+#elif defined(USE_SSSE3) && !defined(TRANSPOSE)
   const unsigned numChunks = inDims / 32;
   const __m128i kOnes = _mm_set1_epi16(1);
   __m128i *inVec = (__m128i *)input;
@@ -344,7 +344,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_CDAB));
     output[i] = _mm_cvtsi128_si32(sum128) + biases[i];
 
-#elif defined(USE_SSSE3)
+#elif defined(USE_SSSE3) && !defined(TRANSPOSE)
     __m128i sum = _mm_setzero_si128();
     __m128i *row = (__m128i *)&weights[offset];
     for (unsigned j = 0; j < numChunks; j++) {
@@ -562,7 +562,7 @@ INLINE void affine_txfm(uint8_t *input, void *output, unsigned inDims,
     outVec[0] = _mm256_max_epi8(_mm256_packs_epi16(out_in16_0, out_in16_1), kZero);
   }
 }
-#elif USE_SSSE3
+#elif AVOID_USE_SSSE3
 INLINE void affine_txfm(uint8_t *input, void *output, unsigned inDims,
     unsigned outDims, const int32_t *biases, weight_t *weights,
     uint64_t *inMask, mask_t *outMask,
@@ -681,24 +681,33 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     out_7 = _mm_add_epi32(out_7, _mm_madd_epi16(mul, _mm_unpackhi_epi16(first[3],second[3])));
   }
 
-  __m128i out_in16_0 = _mm_srai_epi16(_mm_packs_epi32(out_0, out_1), SHIFT);
-  __m128i out_in16_1 = _mm_srai_epi16(_mm_packs_epi32(out_2, out_3), SHIFT);
-  __m128i out_in16_2 = _mm_srai_epi16(_mm_packs_epi32(out_4, out_5), SHIFT);
-  __m128i out_in16_3 = _mm_srai_epi16(_mm_packs_epi32(out_6, out_7), SHIFT);
+  __m128i out16_0 = _mm_srai_epi16(_mm_packs_epi32(out_0, out_1), SHIFT);
+  __m128i out16_1 = _mm_srai_epi16(_mm_packs_epi32(out_2, out_3), SHIFT);
+  __m128i out16_2 = _mm_srai_epi16(_mm_packs_epi32(out_4, out_5), SHIFT);
+  __m128i out16_3 = _mm_srai_epi16(_mm_packs_epi32(out_6, out_7), SHIFT);
 
   __m128i *outVec = (__m128i *)output;
   if (pack8_and_calc_mask) {
-    outVec[0] = _mm_packs_epi16(out_in16_0, out_in16_1);
+    outVec[0] = _mm_packs_epi16(out16_0, out16_1);
     outMask[0] = _mm_movemask_epi8(_mm_cmpgt_epi8(outVec[0], kZeros[0]));
-    outVec[1] = _mm_packs_epi16(out_in16_2, out_in16_3);
+    outVec[1] = _mm_packs_epi16(out16_2, out16_3);
     outMask[1] = _mm_movemask_epi8(_mm_cmpgt_epi8(outVec[1], kZeros[0]));
   } else {
+#if defined(USE_SSE41)
+    const __m128i kx07f = _mm_set1_epi16(127);
+    outVec[0] = _mm_min_epi16(_mm_max_epi16(out16_0, kZeros[0]), kx07f);
+    outVec[1] = _mm_min_epi16(_mm_max_epi16(out16_1, kZeros[0]), kx07f);
+    outVec[2] = _mm_min_epi16(_mm_max_epi16(out16_2, kZeros[0]), kx07f);
+    outVec[3] = _mm_min_epi16(_mm_max_epi16(out16_3, kZeros[0]), kx07f);
+#else
     const __m128i k0x7f80 = _mm_set1_epi16(0x7f80);
     const __m128i k0x0080 = _mm_set1_epi16(0x0080);
     const __m128i k0x8000 = _mm_set1_epi16(-0x8000);
-#define TMP(j) outVec[j] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out_in16_##j, k0x7f80), k0x0080), k0x8000);
-    LOOP_4(TMP);
-#undef TMP
+    outVec[0] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_0, k0x7f80), k0x0080), k0x8000);
+    outVec[1] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_1, k0x7f80), k0x0080), k0x8000);
+    outVec[2] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_2, k0x7f80), k0x0080), k0x8000);
+    outVec[3] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_3, k0x7f80), k0x0080), k0x8000);
+#endif
   }
 }
 #else /* generic fallback */
@@ -1002,7 +1011,7 @@ struct NetData {
   clipped_t hidden2_clipped[32];
 #else
   clipped_t hidden1_out[32];
-#if defined(USE_SSE2) && !defined(USE_SSSE3)
+#if defined(USE_SSE2) && !defined(AVX2)
   int16_t hidden2_out[32];
 #else
   int8_t hidden2_out[32];
