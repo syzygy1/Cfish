@@ -764,13 +764,10 @@ bool gives_check_special(const Position *pos, Stack *st, Move m)
 
 
 // do_move() makes a move. The move is assumed to be legal.
-#include "evaluate.h"
+
 void do_move(Position *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
-//if(pos->nodes==7381)
-//printf("hey\n");
-//printf("n = %lu, key = %08lx, m = %d, eval = %d\n", pos->nodes, key(), (int)m, !checkers() ? evaluate(pos) : 0);
 
   Key key = key() ^ zob.side;
 

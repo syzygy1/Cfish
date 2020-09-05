@@ -93,6 +93,7 @@ struct Stack {
   Value statScore;
   int moveCount;
   bool ttPv;
+  bool ttHit;
   uint8_t ply;
 
   // MovePicker data

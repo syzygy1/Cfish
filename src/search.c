@@ -685,7 +685,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   Move ttMove, move, excludedMove, bestMove;
   Depth extension, newDepth;
   Value bestValue, value, ttValue, eval, maxValue, probCutBeta;
-  bool ttHit, formerPv, givesCheck, improving, didLMR;
+  bool formerPv, givesCheck, improving, didLMR;
   bool captureOrPromotion, inCheck, doFullDepthSearch, moveCountPruning;
   bool ttCapture, singularQuietLMR;
   Piece movedPiece;
@@ -762,12 +762,13 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   // use a different position key in case of an excluded move.
   excludedMove = ss->excludedMove;
   posKey = !excludedMove ? key() : key() ^ make_key(excludedMove);
-  tte = tt_probe(posKey, &ttHit);
-  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
+  tte = tt_probe(posKey, &ss->ttHit);
+  ttValue = ss->ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
   ttMove =  rootNode ? pos->rootMoves->move[pos->pvIdx].pv[0]
-          : ttHit    ? tte_move(tte) : 0;
+          : ss->ttHit    ? tte_move(tte) : 0;
   if (!excludedMove)
-    ss->ttPv = PvNode || (ttHit && tte_is_pv(tte));
+    ss->ttPv = PvNode || (ss->ttHit && tte_is_pv(tte));
+  formerPv = ss->ttPv && !PvNode;
 
   if (   ss->ttPv
       && depth > 12
@@ -777,11 +778,11 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     lph_update(*pos->lowPlyHistory, ss->ply - 1, (ss-1)->currentMove, stat_bonus(depth - 5));
 
   // pos->ttHitAverage can be used to approximate the running average of ttHit
-  pos->ttHitAverage = (ttHitAverageWindow - 1) * pos->ttHitAverage / ttHitAverageWindow + ttHitAverageResolution * ttHit;
+  pos->ttHitAverage = (ttHitAverageWindow - 1) * pos->ttHitAverage / ttHitAverageWindow + ttHitAverageResolution * ss->ttHit;
 
   // At non-PV nodes we check for an early TT cutoff.
   if (  !PvNode
-      && ttHit
+      && ss->ttHit
       && tte_depth(tte) >= depth
       && ttValue != VALUE_NONE // Possible in case of TT access race.
       && (ttValue >= beta ? (tte_bound(tte) & BOUND_LOWER)
@@ -867,7 +868,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     ss->staticEval = eval = VALUE_NONE;
     improving = false;
     goto moves_loop;
-  } else if (ttHit) {
+  } else if (ss->ttHit) {
     // Never assume anything about values stored in TT
     if ((eval = tte_eval(tte)) == VALUE_NONE)
       eval = evaluate(pos);
@@ -964,12 +965,12 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   if (   !PvNode
       &&  depth > 4
       &&  abs(beta) < VALUE_TB_WIN_IN_MAX_PLY
-      && !(   ttHit
+      && !(   ss->ttHit
            && tte_depth(tte) >= depth - 3
            && ttValue != VALUE_NONE
            && ttValue < probCutBeta))
   {
-    if (   ttHit
+    if (   ss->ttHit
         && tte_depth(tte) >= depth - 3
         && ttValue != VALUE_NONE
         && ttValue >= probCutBeta
@@ -1007,7 +1008,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
         undo_move(pos, move);
         if (value >= probCutBeta) {
-          if (!(   ttHit
+          if (!(   ss->ttHit
                 && tte_depth(tte) >= depth - 3
                 && ttValue != VALUE_NONE))
             tte_save(tte, posKey, value_to_tt(value, ss->ply), ttPv,
@@ -1034,7 +1035,6 @@ moves_loop: // When in check search starts from here.
   value = bestValue;
   singularQuietLMR = moveCountPruning = false;
   ttCapture = ttMove && is_capture_or_promotion(pos, ttMove);
-  formerPv = ss->ttPv && !PvNode;
 
   // Check for a breadcrumb and leave one if none found
   _Atomic uint64_t *crumb = NULL;
@@ -1279,11 +1279,6 @@ moves_loop: // When in check search starts from here.
     {
       Depth r = reduction(improving, depth, moveCount);
 
-      // Decrease reduction at non-check cut nodes for second move at low
-      // depths
-      if (cutNode && depth <= 10 && moveCount <= 2 && !inCheck)
-        r--;
-
       // Decrease reduction if the ttHit runing average is large
       if (pos->ttHitAverage > 509 * ttHitAverageResolution * ttHitAverageWindow / 1024)
         r--;
@@ -1305,7 +1300,7 @@ moves_loop: // When in check search starts from here.
 
       // Decrease reduction if ttMove has been singularly extended
       if (singularQuietLMR)
-        r -= 1 + formerPv;
+        r--;
 
       if (!captureOrPromotion) {
         // Increase reduction if ttMove is a capture
@@ -1499,9 +1494,9 @@ moves_loop: // When in check search starts from here.
     update_capture_stats(pos, bestMove, capturesSearched, captureCount,
         stat_bonus(depth + 1));
 
-    // Extra penalty for a quiet TT or main killer move in previous ply
-    // when it gets refuted
-    if (  ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0])
+    // Extra penalty for a quiet early move that was not a TT move or main
+    // killer move in previous ply when it gets refuted
+    if (  ((ss-1)->moveCount == 1 + (ss-1)->ttHit || (ss-1)->currentMove == (ss-1)->killers[0])
         && !captured_piece())
       update_cm_stats(ss-1, piece_on(prevSq), prevSq,
           -stat_bonus(depth + 1));
@@ -1567,7 +1562,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
   Key posKey;
   Move ttMove, move, bestMove;
   Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
-  bool ttHit, pvHit, givesCheck;
+  bool pvHit, givesCheck;
   Depth ttDepth;
   int moveCount;
 
@@ -1594,13 +1589,13 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
   // Transposition table lookup
   posKey = key();
-  tte = tt_probe(posKey, &ttHit);
-  ttValue = ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
-  ttMove = ttHit ? tte_move(tte) : 0;
-  pvHit = ttHit && tte_is_pv(tte);
+  tte = tt_probe(posKey, &ss->ttHit);
+  ttValue = ss->ttHit ? value_from_tt(tte_value(tte), ss->ply, rule50_count()) : VALUE_NONE;
+  ttMove = ss->ttHit ? tte_move(tte) : 0;
+  pvHit = ss->ttHit && tte_is_pv(tte);
 
   if (  !PvNode
-      && ttHit
+      && ss->ttHit
       && tte_depth(tte) >= ttDepth
       && ttValue != VALUE_NONE // Only in case of TT access race
       && (ttValue >= beta ? (tte_bound(tte) &  BOUND_LOWER)
@@ -1612,7 +1607,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     ss->staticEval = VALUE_NONE;
     bestValue = futilityBase = -VALUE_INFINITE;
   } else {
-    if (ttHit) {
+    if (ss->ttHit) {
       // Never assume anything about values stored in TT
       if ((ss->staticEval = bestValue = tte_eval(tte)) == VALUE_NONE)
          ss->staticEval = bestValue = evaluate(pos);
@@ -1628,7 +1623,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
     // Stand pat. Return immediately if static value is at least beta
     if (bestValue >= beta) {
-      if (!ttHit)
+      if (!ss->ttHit)
         tte_save(tte, posKey, value_to_tt(bestValue, ss->ply), false,
             BOUND_LOWER, DEPTH_NONE, 0, ss->staticEval);
 
@@ -1682,7 +1677,9 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     }
 
     // Do not search moves with negative SEE values
-    if (!InCheck && !see_test(pos, move, 0))
+    if (   !InCheck
+        && !(givesCheck && is_discovery_check_on_king(pos, !stm(), move))
+        && !see_test(pos, move, 0))
       continue;
 
     // Speculative prefetch as early as possible

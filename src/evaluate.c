@@ -849,13 +849,15 @@ Value evaluate(const Position *pos)
 #ifdef NNUE
 
   if (useNNUE == EVAL_HYBRID) {
-    bool classical = abs(eg_value(psq_score())) * 16 >
+    bool useClassical = abs(eg_value(psq_score())) * 16 >
                               NNUEThreshold * (16 + rule50_count());
-    v =  classical
-       ? evaluate_classical(pos)
-       : nnue_evaluate(pos) * 5 / 4 + Tempo;
+    bool classical =   useClassical
+                    || (   abs(eg_value(psq_score())) > PawnValueMg / 8
+                        && !(pos->nodes & 0xF));
+    v =  classical ? evaluate_classical(pos)
+                   : nnue_evaluate(pos) * 5 / 4 + Tempo;
 
-    if (classical && abs(v) * 16 < NNUEThreshold2 * (16 + rule50_count()))
+    if (useClassical && abs(v) * 16 < NNUEThreshold2 * (16 + rule50_count()))
       v = nnue_evaluate(pos) * 5 / 4 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)
