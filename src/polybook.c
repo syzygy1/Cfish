@@ -299,7 +299,7 @@ static const union {
 } };
 
 static ssize_t keycount;
-static struct PolyHash *polyhash;
+static const struct PolyHash *polyhash;
 static map_t mapping;
 
 static int use_best_book_move = 1;
@@ -343,8 +343,8 @@ void pb_init(const char *bookfile)
   if (fd != FD_ERR) {
     keycount = file_size(fd) / 16;
     polyhash = map_file(fd, &mapping);
+    close_file(fd);
   }
-  close_file(fd);
 
   if (!polyhash) {
     printf("info string Could not open %s\n", bookfile);

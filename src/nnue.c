@@ -30,6 +30,11 @@
 #include "position.h"
 #include "uci.h"
 
+#ifdef NNUE_EMBEDDED
+#include "incbin.h"
+INCBIN(Network, DefaultEvalFile);
+#endif
+
 // Old gcc on Windows is unable to provide a 32-byte aligned stack.
 // We need to hack around this when using AVX2 and AVX512.
 #if     defined(__GNUC__ ) && (__GNUC__ < 9) && defined(_WIN32) \
@@ -168,14 +173,6 @@ typedef uint16_t mask_t;
 
 #define LOOP_4(f) f(0);f(1);f(2);f(3)
 #define LOOP_8(f) LOOP_4(f); f(4);f(5);f(6);f(7)
-#define LOOP_16(f) LOOP_8(f); f(8);f(9);f(10);f(11);f(12);f(13);f(14);f(15)
-
-static uint32_t read_uint32_t(FILE *F)
-{
-  uint32_t v;
-  fread(&v, 4, 1, F);
-  return from_le_u32(v);
-}
 
 typedef struct {
   size_t size;
@@ -1075,23 +1072,19 @@ Value nnue_evaluate(const Position *pos)
   return out_value / FV_SCALE;
 }
 
-bool read_weights(weight_t *output_buf, unsigned width, unsigned height,
-    FILE *F)
+const char *read_weights(weight_t *w, unsigned width, unsigned height,
+    const char *d)
 {
-  int8_t v;
-
-  for (unsigned i = 0; i < height; i++) {
+  for (unsigned i = 0; i < height; i++)
     for (unsigned j = 0; j < width; j++) {
-      fread(&v, 1, 1, F);
 #ifndef TRANSPOSE
-      output_buf[i * width + j] = v;
+      w[i * width + j] = *d++;
 #else
-      output_buf[j * height + i] = v;
+      w[j * height + i] = *d++;
 #endif
     }
-  }
 
-  return true;
+  return d;
 }
 
 #if defined(TRANSPOSE) && defined(USE_AVX2)
@@ -1111,44 +1104,78 @@ void permute_biases(int32_t *biases)
 }
 #endif
 
-bool load_eval_file(const char *evalFile)
+static const size_t TransformerStart = 3 * 4 + 177;
+static const size_t NetworkStart =
+    TransformerStart + 4 + 2 * 256 + 2 * 256 * 64 * 641;
+
+bool verify_net(const void *evalData, size_t size)
 {
-  FILE *F = fopen(evalFile, "rb");
+  if (size != 21022697) return false;
 
-  if (!F) return false;
+  const char *d = evalData;
+  if (readu_le_u32(d) != NnueVersion) return false;
+  if (readu_le_u32(d + 4) != 0x3e5aa6eeU) return false;
+  if (readu_le_u32(d + 8) != 177) return false;
+  if (readu_le_u32(d + TransformerStart) != 0x5d69d7b8) return false;
+  if (readu_le_u32(d + NetworkStart) != 0x63337156) return false;
 
-  // Read network header
-  uint32_t version = read_uint32_t(F);
-  uint32_t hash = read_uint32_t(F);
-  uint32_t len = read_uint32_t(F);
-  for (unsigned i = 0; i < len; i++)
-    fgetc(F);
-  if (version != NnueVersion) return false;
-  if (hash != 0x3e5aa6eeu) return false;
+  return true;
+}
 
-  // Read feature transformer
-  hash = read_uint32_t(F);
-  if (hash != 0x5d69d7b8) return false;
-  fread(ft_biases, sizeof(int16_t), kHalfDimensions, F);
-  fread(ft_weights, sizeof(int16_t), kHalfDimensions * FtInDims, F);
+void init_weights(const void *evalData)
+{
+  const char *d = (const char *)evalData + TransformerStart + 4;
+
+  // Read transformer
+  for (unsigned i = 0; i < kHalfDimensions; i++, d += 2)
+    ft_biases[i] = readu_le_u16(d);
+  for (unsigned i = 0; i < kHalfDimensions * FtInDims; i++, d += 2)
+    ft_weights[i] = readu_le_u16(d);
 
   // Read network
-  hash = read_uint32_t(F);
-  if (hash != 0x63337156) return false;
-  fread(hidden1_biases, sizeof(int32_t), 32, F);
-  read_weights(hidden1_weights, 512, 32, F);
-  fread(hidden2_biases, sizeof(int32_t), 32, F);
-  read_weights(hidden2_weights, 32 , 32 , F);
-  fread(output_biases, sizeof(int32_t), 1 , F);
-  read_weights(output_weights, 32, 1 , F);
+  d += 4;
+  for (unsigned i = 0; i < 32; i++, d += 4)
+    hidden1_biases[i] = readu_le_u32(d);
+  d = read_weights(hidden1_weights, 512, 32, d);
+  for (unsigned i = 0; i < 32; i++, d += 4)
+    hidden2_biases[i] = readu_le_u32(d);
+  d = read_weights(hidden2_weights, 32, 32, d);
+  for (unsigned i = 0; i < 1; i++, d += 4)
+    output_biases[i] = readu_le_u32(d);
+  read_weights(output_weights, 32, 1, d);
 
 #if defined(TRANSPOSE) && defined(USE_AVX2)
   permute_biases(hidden1_biases);
   permute_biases(hidden2_biases);
 #endif
+}
 
-  return true;
-//  return feof(F);
+static bool load_eval_file(const char *evalFile)
+{
+  const void *evalData;
+  map_t mapping;
+  size_t size;
+
+#ifdef NNUE_EMBEDDED
+  if (strcmp(evalFile, DefaultEvalFile) == 0) {
+    evalData = gNetworkData;
+    mapping = 0;
+    size = gNetworkSize;
+  } else
+#endif
+  {
+    FD fd = open_file(evalFile);
+    if (fd == FD_ERR) return false;
+    evalData = map_file(fd, &mapping);
+    size = file_size(fd);
+    close_file(fd);
+  }
+
+  bool success = verify_net(evalData, size);
+  if (success)
+    init_weights(evalData);
+  if (mapping) unmap_file(evalData, mapping);
+  return success;
 }
 
 static char *loadedFile = NULL;
@@ -1172,9 +1199,14 @@ void nnue_init(void)
   }
 
   printf("info string ERROR: The network file %s was not loaded successfully.\n"
+#ifdef NNUE_EMBEDDED
+         , evalFile
+#else
          "info string ERROR: The default net can be downloaded from:\n"
          "info string ERROR: https://tests.stockfishchess.org/api/nn/%s\n",
-         evalFile, option_default_string_value(OPT_EVAL_FILE));
+         evalFile, option_default_string_value(OPT_EVAL_FILE)
+#endif
+         );
   exit(EXIT_FAILURE);
 }
 

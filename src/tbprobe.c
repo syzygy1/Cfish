@@ -40,12 +40,12 @@ enum { WDL, DTM, DTZ };
 enum { PIECE_ENC, FILE_ENC, RANK_ENC };
 
 struct PairsData {
-  uint8_t *indexTable;
-  uint16_t *sizeTable;
-  uint8_t *data;
-  uint16_t *offset;
+  const uint8_t *indexTable;
+  const uint16_t *sizeTable;
+  const uint8_t *data;
+  const uint16_t *offset;
   uint8_t *symLen;
-  uint8_t *symPat;
+  const uint8_t *symPat;
   uint8_t blockSize;
   uint8_t idxBits;
   uint8_t minLen;
@@ -62,7 +62,7 @@ struct EncInfo {
 
 struct BaseEntry {
   Key key;
-  uint8_t *data[3];
+  const uint8_t *data[3];
   map_t mapping[3];
   atomic_bool ready[3];
   uint8_t num;
@@ -79,7 +79,7 @@ struct PieceEntry {
   struct EncInfo ei[5]; // 2 + 2 + 1
   uint16_t *dtmMap;
   uint16_t dtmMapIdx[2][2];
-  void *dtzMap;
+  const void *dtzMap;
   uint16_t dtzMapIdx[4];
   uint8_t dtzFlags;
 };
@@ -89,7 +89,7 @@ struct PawnEntry {
   struct EncInfo ei[24]; // 4 * 2 + 6 * 2 + 4
   uint16_t *dtmMap;
   uint16_t dtmMapIdx[6][2][2];
-  void *dtzMap;
+  const void *dtzMap;
   uint16_t dtzMapIdx[4][4];
   uint8_t dtzFlags[4];
   bool dtmSwitched;
@@ -192,13 +192,13 @@ static bool test_tb(const char *str, const char *suffix)
   return fd != FD_ERR;
 }
 
-static void *map_tb(const char *name, const char *suffix, map_t *mapping)
+static const void *map_tb(const char *name, const char *suffix, map_t *mapping)
 {
   FD fd = open_tb(name, suffix);
   if (fd == FD_ERR)
     return NULL;
 
-  void *data = map_file(fd, mapping);
+  const void *data = map_file(fd, mapping);
   if (data == NULL) {
     fprintf(stderr, "Could not map %s%s into memory.\n", name, suffix);
     exit(EXIT_FAILURE);
@@ -848,7 +848,7 @@ static size_t subfactor(size_t k, size_t n)
 }
 
 static size_t init_enc_info(struct EncInfo *ei, struct BaseEntry *be,
-    uint8_t *tb, int shift, int t, const int enc)
+    const uint8_t *tb, int shift, int t, const int enc)
 {
   bool morePawns = enc != PIECE_ENC && be->pawns[1] > 0;
 
@@ -897,7 +897,7 @@ static size_t init_enc_info(struct EncInfo *ei, struct BaseEntry *be,
 
 static void calc_symLen(struct PairsData *d, uint32_t s, char *tmp)
 {
-  uint8_t *w = d->symPat + 3 * s;
+  const uint8_t *w = d->symPat + 3 * s;
   uint32_t s2 = (w[2] << 4) | (w[1] >> 4);
   if (s2 == 0x0fff)
     d->symLen[s] = 0;
@@ -910,11 +910,11 @@ static void calc_symLen(struct PairsData *d, uint32_t s, char *tmp)
   tmp[s] = 1;
 }
 
-static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
+static struct PairsData *setup_pairs(const uint8_t **ptr, size_t tb_size,
     size_t *size, uint8_t *flags, int type)
 {
   struct PairsData *d;
-  uint8_t *data = *ptr;
+  const uint8_t *data = *ptr;
 
   *flags = data[0];
   if (data[0] & 0x80) {
@@ -968,7 +968,7 @@ static struct PairsData *setup_pairs(uint8_t **ptr, size_t tb_size,
 
 static NOINLINE bool init_table(struct BaseEntry *be, const char *str, int type)
 {
-  uint8_t *data = map_tb(str, tbSuffix[type], &be->mapping[type]);
+  const uint8_t *data = map_tb(str, tbSuffix[type], &be->mapping[type]);
   if (!data) return false;
 
   if (read_le_u32(data) != tbMagic[type]) {
@@ -1034,7 +1034,7 @@ static NOINLINE bool init_table(struct BaseEntry *be, const char *str, int type)
   }
 
   if (type == DTZ) {
-    void *map = data;
+    const void *map = data;
     *(be->hasPawns ? &PAWN(be)->dtzMap : &PIECE(be)->dtzMap) = map;
     uint16_t (*mapIdx)[4] = be->hasPawns ? &PAWN(be)->dtzMapIdx[0]
                                           : &PIECE(be)->dtzMapIdx;
@@ -1095,7 +1095,7 @@ static NOINLINE bool init_table(struct BaseEntry *be, const char *str, int type)
   return true;
 }
 
-static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
+static const uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
 {
   if (!d->idxBits)
     return d->constValue;
@@ -1119,7 +1119,7 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
   uint32_t *ptr = (uint32_t *)(d->data + ((size_t)block << d->blockSize));
 
   int m = d->minLen;
-  uint16_t *offset = d->offset;
+  const uint16_t *offset = d->offset;
   uint64_t *base = d->base - m;
   uint8_t *symLen = d->symLen;
   uint32_t sym, bitCnt;
@@ -1144,9 +1144,9 @@ static uint8_t *decompress_pairs(struct PairsData *d, size_t idx)
     }
   }
 
-  uint8_t *symPat = d->symPat;
+  const uint8_t *symPat = d->symPat;
   while (symLen[sym] != 0) {
-    uint8_t *w = symPat + (3 * sym);
+    const uint8_t *w = symPat + (3 * sym);
     int s1 = ((w[1] & 0xf) << 8) | w[0];
     if (litIdx < (int)symLen[s1] + 1)
       sym = s1;
@@ -1261,7 +1261,7 @@ INLINE int probe_table(Position *pos, int s, int *success, const int type)
     idx = type != DTM ? encode_pawn_f(p, ei, be) : encode_pawn_r(p, ei, be);
   }
 
-  uint8_t *w = decompress_pairs(ei->precomp, idx);
+  const uint8_t *w = decompress_pairs(ei->precomp, idx);
 
   if (type == WDL)
     return (int)w[0] - 2;
@@ -1270,7 +1270,7 @@ INLINE int probe_table(Position *pos, int s, int *success, const int type)
 
   if (type == DTM) {
     if (!be->dtmLossOnly)
-      v = from_le_u16(be->hasPawns
+      v =  from_le_u16(be->hasPawns
          ? PAWN(be)->dtmMap[PAWN(be)->dtmMapIdx[t][bside][s] + v]
          : PIECE(be)->dtmMap[PIECE(be)->dtmMapIdx[bside][s] + v]);
   } else {
@@ -1281,7 +1281,7 @@ INLINE int probe_table(Position *pos, int s, int *success, const int type)
            ? ((uint8_t *)PAWN(be)->dtzMap)[PAWN(be)->dtzMapIdx[t][m] + v]
            : ((uint8_t *)PIECE(be)->dtzMap)[PIECE(be)->dtzMapIdx[m] + v];
       else
-        v = from_le_u16(be->hasPawns
+        v =  from_le_u16(be->hasPawns
            ? ((uint16_t *)PAWN(be)->dtzMap)[PAWN(be)->dtzMapIdx[t][m] + v]
            : ((uint16_t *)PIECE(be)->dtzMap)[PIECE(be)->dtzMapIdx[m] + v]);
     }

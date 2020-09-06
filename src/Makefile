@@ -102,6 +102,7 @@ vnni = no
 neon = no
 ARCH = auto
 native = no
+embed = no
 
 ### 2.2 Architecture specific
 
@@ -640,10 +641,14 @@ ifeq ($(native),yes)
 	ifneq ($(findstring ppc,$(arch)),)
 		CFLAGS += -mcpu=native -mtune=native
 	else ifneq ($(findstring arm,$(arch)),)
-	#	CFLAGS += -march=native -mtune=native
+		CFLAGS += -march=native -mtune=native
 	else
 		CFLAGS += -march=native
 	endif
+endif
+
+ifeq ($(embed),yes)
+	CFLAGS += -DNNUE_EMBEDDED
 endif
 
 ### numa
@@ -824,7 +829,7 @@ clean: objclean profileclean
 	@rm -f .depend core
 
 net:
-	$(eval nnuenet := $(shell grep EvalFile ucioption.c | grep OPT_TYPE_STRING | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
+	$(eval nnuenet := $(shell grep DefaultEvalFile evaluate.h | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
 	@echo "Default net: $(nnuenet)"
 	$(eval nnuedownloadurl := https://tests.stockfishchess.org/api/nn/$(nnuenet))
 	$(eval curl_or_wget := $(shell if hash curl 2>/dev/null; then echo "curl -skL"; elif hash wget 2>/dev/null; then echo "wget -qO-"; fi))
@@ -874,6 +879,7 @@ config-sanity:
 	@echo "vnni: '$(vnni)'"
 	@echo "neon: '$(neon)'"
 	@echo "native: '$(native)'"
+	@echo "embed: '$(embed)'"
 	@echo ""
 	@echo "Flags:"
 	@echo "CC: $(CC)"
@@ -902,6 +908,7 @@ config-sanity:
 	@test "$(vnni)" = "yes" || test "$(vnni)" = "no"
 	@test "$(neon)" = "yes" || test "$(neon)" = "no"
 	@test "$(native)" = "yes" || test "$(native)" = "no"
+	@test "$(embed)" = "yes" || test "$(embed)" = "no"
 	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang"
 
 $(EXE): $(OBJS)

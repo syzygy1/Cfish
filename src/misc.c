@@ -325,7 +325,7 @@ size_t file_size(FD fd)
 #endif
 }
 
-void *map_file(FD fd, map_t *map)
+const void *map_file(FD fd, map_t *map)
 {
 #ifndef _WIN32
 
@@ -348,13 +348,13 @@ void *map_file(FD fd, map_t *map)
 #endif
 }
 
-void unmap_file(void *data, map_t map)
+void unmap_file(const void *data, map_t map)
 {
   if (!data) return;
 
 #ifndef _WIN32
 
-  munmap(data, map);
+  munmap((void *)data, map);
 
 #else
 
