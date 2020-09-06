@@ -152,7 +152,7 @@ typedef uint8_t mask_t; // irrelevant
 #else /* TRANSPOSE */
 
 typedef uint8_t clipped_t;
-#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(AVX2))
+#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_AVX2))
 typedef int16_t weight_t;
 #else
 typedef int8_t weight_t;
@@ -1011,7 +1011,7 @@ struct NetData {
   clipped_t hidden2_clipped[32];
 #else
   clipped_t hidden1_out[32];
-#if defined(USE_SSE2) && !defined(AVX2)
+#if defined(USE_SSE2) && !defined(USE_AVX2)
   int16_t hidden2_out[32];
 #else
   int8_t hidden2_out[32];
