@@ -911,7 +911,8 @@ config-sanity:
 	@test "$(neon)" = "yes" || test "$(neon)" = "no"
 	@test "$(native)" = "yes" || test "$(native)" = "no"
 	@test "$(embed)" = "yes" || test "$(embed)" = "no"
-	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang"
+	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang" \
+	  || test "$(comp)" = "armv7a-linux-androideabi16-clang"  || test "$(comp)" = "aarch64-linux-android21-clang"
 
 $(EXE): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
