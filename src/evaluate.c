@@ -852,8 +852,8 @@ Value evaluate(const Position *pos)
     bool useClassical = abs(eg_value(psq_score())) * 16 >
                               NNUEThreshold * (16 + rule50_count());
     bool classical =   useClassical
-                    || (   abs(eg_value(psq_score())) > PawnValueMg / 8
-                        && !(pos->nodes & 0xF));
+                    || (   abs(eg_value(psq_score())) > PawnValueMg / 4
+                        && !(pos->nodes & 0xB));
     v =  classical ? evaluate_classical(pos)
                    : nnue_evaluate(pos) * 5 / 4 + Tempo;
 
