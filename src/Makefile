@@ -479,7 +479,7 @@ ifeq ($(COMP),ndk)
 	ifeq ($(arch),armv7)
 		comp=armv7a-linux-androideabi16-clang
 		CC=armv7a-linux-androideabi16-clang
-		CCFLAGS += -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+		CFLAGS += -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon
 		STRIP=arm-linux-androideabi-strip
 	endif
 	ifeq ($(arch),armv8)
@@ -551,7 +551,6 @@ endif
 ifeq ($(prefetch),yes)
 	ifeq ($(sse),yes)
 		CFLAGS += -msse
-		DEPENDFLAGS += -msse
 	endif
 else
 	CFLAGS += -DNO_PREFETCH
