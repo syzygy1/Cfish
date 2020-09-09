@@ -19,10 +19,10 @@ struct PolyHash {
 static Key polyglot_key(const Position *pos);
 static Move pg_move_to_sf_move(const Position *pos, uint16_t pg_move);
 
-static int find_first_key(uint64_t key);
-static int get_key_data(void);
+static int find_first_key(PolyBook *pb, uint64_t key);
+static int get_key_data(PolyBook *pb);
 
-static bool check_do_search(const Position *pos);
+static bool check_do_search(PolyBook *pb, const Position *pos);
 static bool check_draw(Position *pos, Move m);
 
 // Random numbers from PolyGlot, used to compute book hash keys
@@ -298,111 +298,105 @@ static const union {
   0xF8D626AAAF278509ULL
 } };
 
-static ssize_t keycount;
-static const struct PolyHash *polyhash;
-static map_t mapping;
+PolyBook polybook, polybook2;
 
-static int use_best_book_move = 1;
-static int max_book_depth = 255;
-static int book_depth_count;
+static bool useBestBookMove = true;
+static int maxBookDepth = 255;
+PRNG sr;
 
-static ssize_t index_first;
-static int index_count;
-static ssize_t index_best;
-static ssize_t index_rand;
-static int index_weight_count;
+static bool initialised = false;
 
-static PRNG sr;
-
-static Bitboard last_position;
-static Bitboard akt_position;
-static int last_anz_pieces;
-static int akt_anz_pieces;
-static int search_counter;
-
-static bool enabled = false, do_search = true;
+static void pb_release(PolyBook *pb)
+{
+  if (pb->polyhash) {
+    unmap_file(pb->polyhash, pb->mapping);
+    pb->polyhash = NULL;
+  }
+}
 
 void pb_free(void)
 {
-  if (polyhash) {
-    unmap_file(polyhash, mapping);
-    polyhash = NULL;
-  }
+  pb_release(&polybook);
+  pb_release(&polybook2);
 }
 
-void pb_init(const char *bookfile)
+void pb_init(PolyBook *pb, const char *bookfile)
 {
+  if (!initialised) {
+    prng_init(&sr, time(NULL));
+    for (int i = 0; i < 10; i++)
+      prng_rand(&sr);
+    initialised = true;
+  }
+
   if (!bookfile || strlen(bookfile) == 0 || strcmp(bookfile, "<empty>") == 0) {
-    enabled = false;
+    pb->enabled = false;
     return;
   }
 
-  pb_free();
+  pb_release(pb);
 
   FD fd = open_file(bookfile);
   if (fd != FD_ERR) {
-    keycount = file_size(fd) / 16;
-    polyhash = map_file(fd, &mapping);
+    pb->keycount = file_size(fd) / 16;
+    pb->polyhash = map_file(fd, &pb->mapping);
     close_file(fd);
   }
 
-  if (!polyhash) {
+  if (!pb->polyhash) {
     printf("info string Could not open %s\n", bookfile);
-    enabled = false;
+    pb->enabled = false;
     return;
   }
 
-  prng_init(&sr, time(NULL));
-  for (int i = 0; i < 10; i++)
-    prng_rand(&sr);
-
   printf("info string Book loaded: %s\n", bookfile);
 
-  enabled = true;
+  pb->enabled = true;
+  pb->do_search = true;
 }
 
-void pb_set_best_book_move(int best_book_move)
+void pb_set_best_book_move(bool best_book_move)
 {
-  use_best_book_move = best_book_move;
+  useBestBookMove = best_book_move;
 }
 
 void pb_set_book_depth(int book_depth)
 {
-  max_book_depth = book_depth;
+  maxBookDepth = book_depth;
 }
 
-Move pb_probe(Position *pos)
+Move pb_probe(PolyBook *pb, Position *pos)
 {
   Move m1 = 0;
 
-  if (!enabled) return m1;
-  if (!check_do_search(pos)) return m1;
+  if (!pb->enabled) return m1;
+  if (!check_do_search(pb, pos)) return m1;
 
-  if (book_depth_count >= max_book_depth)
+  if (pb->book_depth_count >= maxBookDepth)
     return m1;
 
   Key key = polyglot_key(pos);
 
-  int n = find_first_key(key);
+  int n = find_first_key(pb, key);
 
   if (n < 1) {
-    search_counter++;
-    if (search_counter > 4) {
+    pb->search_counter++;
+    if (pb->search_counter > 4) {
       // Stop searching after 4 times not in the book till position changes
       // according to check_do_search()
-      do_search = false;
-      search_counter = 0;
-      book_depth_count = 0;
+      pb->do_search = false;
+      pb->search_counter = 0;
+      pb->book_depth_count = 0;
     }
 
     return m1;
   }
 
-  book_depth_count++;
+  pb->book_depth_count++;
 
-  ssize_t idx1 = use_best_book_move ? index_best : index_rand;
+  ssize_t idx1 = useBestBookMove ? pb->index_best : pb->index_rand;
 
-  m1 = pg_move_to_sf_move(pos, from_be_u16(polyhash[idx1].move));
+  m1 = pg_move_to_sf_move(pos, from_be_u16(pb->polyhash[idx1].move));
 
   if (!is_draw(pos)) return m1; // 64
   if (n == 1) return m1;
@@ -412,10 +406,10 @@ Move pb_probe(Position *pos)
   if (!check_draw(pos, m1))
     return m1;
 
-  ssize_t idx2 = index_first;
+  ssize_t idx2 = pb->index_first;
   if (idx1 == idx2) idx2++;
 
-  Move m2 = pg_move_to_sf_move(pos, from_be_u16(polyhash[idx2].move));
+  Move m2 = pg_move_to_sf_move(pos, from_be_u16(pb->polyhash[idx2].move));
 
   if (!check_draw(pos, m2))
     return m2;
@@ -484,107 +478,107 @@ static Move pg_move_to_sf_move(const Position *pos, uint16_t pg_move)
   return 0;
 }
 
-static int find_first_key(uint64_t key)
+static int find_first_key(PolyBook *pb, uint64_t key)
 {
-  index_first = -1;
-  index_count = 0;
-  index_weight_count = 0;
-  index_best = -1;
-  index_rand = -1;
+  pb->index_first = -1;
+  pb->index_count = 0;
+  pb->index_weight_count = 0;
+  pb->index_best = -1;
+  pb->index_rand = -1;
 
   ssize_t start = 0;
-  ssize_t end = keycount;
+  ssize_t end = pb->keycount;
 
   do {
     ssize_t mid = (end + start) / 2;
 
-    if (from_be_u64(polyhash[mid].key) < key)
+    if (from_be_u64(pb->polyhash[mid].key) < key)
       start = mid;
     else {
-      if (from_be_u64(polyhash[mid].key) > key)
+      if (from_be_u64(pb->polyhash[mid].key) > key)
         end = mid;
       else {
         start = max(mid - 4, 0);
-        end = min(mid + 4, keycount);
+        end = min(mid + 4, pb->keycount);
       }
     }
   } while (end - start > 8);
 
   for (ssize_t i = start; i < end; i++)
-    if (key == from_be_u64(polyhash[i].key)) {
-      index_first = i;
-      while (   index_first > 0
-             && key == from_be_u64(polyhash[index_first - 1].key))
-        index_first--;
-      return get_key_data();
+    if (key == from_be_u64(pb->polyhash[i].key)) {
+      pb->index_first = i;
+      while (   pb->index_first > 0
+             && key == from_be_u64(pb->polyhash[pb->index_first - 1].key))
+        pb->index_first--;
+      return get_key_data(pb);
     }
 
   return -1;
 }
 
-static int get_key_data(void)
+static int get_key_data(PolyBook *pb)
 {
-  int best_weight = from_be_u16(polyhash[index_first].weight);
-  index_weight_count = best_weight;
-  uint64_t key = polyhash[index_first].key;
+  int best_weight = from_be_u16(pb->polyhash[pb->index_first].weight);
+  pb->index_weight_count = best_weight;
+  uint64_t key = pb->polyhash[pb->index_first].key;
 
-  index_count = 1;
-  index_best = index_first;
+  pb->index_count = 1;
+  pb->index_best = pb->index_first;
 
-  for (ssize_t i = index_first + 1; i < keycount; i++) {
-    if (polyhash[i].key != key)
+  for (ssize_t i = pb->index_first + 1; i < pb->keycount; i++) {
+    if (pb->polyhash[i].key != key)
       break;
 
-    index_count++;
-    index_weight_count += from_be_u16(polyhash[i].weight);
-    if (from_be_u16(polyhash[i].weight) > best_weight) {
-      best_weight = from_be_u16(polyhash[i].weight);
-      index_best = i;
+    pb->index_count++;
+    pb->index_weight_count += from_be_u16(pb->polyhash[i].weight);
+    if (from_be_u16(pb->polyhash[i].weight) > best_weight) {
+      best_weight = from_be_u16(pb->polyhash[i].weight);
+      pb->index_best = i;
     }
   }
 
-  int rand_pos = prng_rand(&sr) % index_weight_count;
+  int rand_pos = prng_rand(&sr) % pb->index_weight_count;
   int weight_count = 0;
-  index_rand = index_best;
+  pb->index_rand = pb->index_best;
 
-  for (ssize_t i = index_first; i < index_first + index_count; i++) {
+  for (ssize_t i = pb->index_first; i < pb->index_first + pb->index_count; i++) {
     if (   rand_pos >= weight_count
-        && rand_pos < weight_count + from_be_u16(polyhash[i].weight))
+        && rand_pos < weight_count + from_be_u16(pb->polyhash[i].weight))
     {
-      index_rand = i;
+      pb->index_rand = i;
       break;
     }
-    weight_count += from_be_u16(polyhash[i].weight);
+    weight_count += from_be_u16(pb->polyhash[i].weight);
   }
 
-  return index_count;
+  return pb->index_count;
 }
 
-static bool check_do_search(const Position *pos)
+static bool check_do_search(PolyBook *pb, const Position *pos)
 {
-  akt_position = pieces();
-  akt_anz_pieces = popcount(akt_position);
+  pb->akt_position = pieces();
+  pb->akt_anz_pieces = popcount(pb->akt_position);
 
-  Bitboard b = akt_position ^ last_position;
+  Bitboard b = pb->akt_position ^ pb->last_position;
   int n2 = popcount(b);
 
   bool pos_changed =   n2 > 6
-                    || akt_position == last_position
-                    || akt_anz_pieces > last_anz_pieces
-                    || akt_anz_pieces < last_anz_pieces - 2
+                    || pb->akt_position == pb->last_position
+                    || pb->akt_anz_pieces > pb->last_anz_pieces
+                    || pb->akt_anz_pieces < pb->last_anz_pieces - 2
                     || key() == 0xB4D30CD15A43432D;
 
   // Reset do_search and book depth counter if postion changed more
   // than one move can do or in initial position
   if (pos_changed) {
-    book_depth_count = 0;
-    do_search = true;
+    pb->book_depth_count = 0;
+    pb->do_search = true;
   }
 
-  last_position = akt_position;
-  last_anz_pieces = akt_anz_pieces;
+  pb->last_position = pb->akt_position;
+  pb->last_anz_pieces = pb->akt_anz_pieces;
 
-  return do_search;
+  return pb->do_search;
 }
 
 static bool check_draw(Position *pos, Move m)

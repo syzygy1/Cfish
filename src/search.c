@@ -258,8 +258,11 @@ void mainthread_search(void)
   if (pos->rootMoves->size > 0) {
     Move bookMove = 0;
 
-    if (!Limits.infinite && !Limits.mate)
-      bookMove = pb_probe(pos);
+    if (!Limits.infinite && !Limits.mate) {
+      bookMove = pb_probe(&polybook, pos);
+      if (!bookMove)
+        bookMove = pb_probe(&polybook2, pos);
+    }
 
     for (int i = 0; i < pos->rootMoves->size; i++)
       if (pos->rootMoves->move[i].pv[0] == bookMove) {

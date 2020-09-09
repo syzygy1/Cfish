@@ -78,7 +78,12 @@ static void on_large_pages(Option *opt)
 
 static void on_book_file(Option *opt)
 {
-  pb_init(opt->valString);
+  pb_init(&polybook, opt->valString);
+}
+
+static void on_book_file2(Option *opt)
+{
+  pb_init(&polybook2, opt->valString);
 }
 
 static void on_best_book_move(Option *opt)
@@ -118,6 +123,7 @@ static Option optionsMap[] = {
   { "SyzygyProbeLimit", OPT_TYPE_SPIN, 7, 0, 7, NULL, NULL, 0, NULL },
   { "SyzygyUseDTM", OPT_TYPE_CHECK, 1, 0, 0, NULL, NULL, 0, NULL },
   { "BookFile", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_book_file, 0, NULL },
+  { "BookFile2", OPT_TYPE_STRING, 0, 0, 0, "<empty>", on_book_file2, 0, NULL },
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
 #ifdef NNUE
