@@ -489,7 +489,7 @@ ifeq ($(COMP),ndk)
 		CC=aarch64-linux-android21-clang
 		STRIP=aarch64-linux-android-strip
 	endif
-	LDFLAGS += -static -pie -lm -latomic
+	LDFLAGS += -static -latomic -z muldefs
 endif
 
 ### Allow overwriting CC from command line
@@ -728,7 +728,7 @@ endif
 ### breaks Android 4.0 and earlier.
 ifeq ($(arch),armv7)
 	CFLAGS += -fPIE
-	LDFLAGS += -fPIE -pie
+	LDFLAGS += -fPIE
 endif
 
 
