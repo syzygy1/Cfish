@@ -387,6 +387,10 @@ ifeq ($(COMP),gcc)
 		LDFLAGS += -m$(bits)
 	endif
 
+	ifeq ($(arch),$(filter $(arch),armv7))
+		LDFLAGS += -latomic
+	endif
+
 	ifneq ($(KERNEL),Darwin)
 		LDFLAGS += -Wl,--no-as-needed
 	endif
@@ -394,9 +398,6 @@ ifeq ($(COMP),gcc)
 	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
 		CFLAGS += -Wno-pedantic-ms-format
 	endif
-
-	gccversion = $(shell $(CC) --version)
-	gccisclang = $(findstring clang,$(gccversion))
 endif
 
 ifeq ($(COMP),mingw)
@@ -432,8 +433,14 @@ ifeq ($(COMP),clang)
 	comp=clang
 	CC=clang
 	CFLAGS += -pedantic -Wextra -Wshadow
-# -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
-	ifeq ($(ARCH),$(filter $(ARCH),armv7 armv8))
+
+	ifneq ($(KERNEL),Darwin)
+	ifneq ($(KERNEL),OpenBSD)
+		LDFLAGS += -latomic
+	endif
+	endif
+
+	ifeq ($(arch),$(filter $(arch),armv7 armv8))
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
@@ -441,11 +448,6 @@ ifeq ($(COMP),clang)
 	else
 		CFLAGS += -m$(bits)
 		LDFLAGS += -m$(bits)
-	endif
-
-	ifeq ($(KERNEL),Darwin)
-		CFLAGS +=
-		DEPENDFLAGS +=
 	endif
 endif
 
@@ -487,12 +489,22 @@ ifeq ($(COMP),ndk)
 		CC=aarch64-linux-android21-clang
 		STRIP=aarch64-linux-android-strip
 	endif
-	LDFLAGS += -pie -lm -latomic
+	LDFLAGS += -static -pie -lm -latomic
 endif
 
 ### Allow overwriting CC from command line
 ifdef COMPCC
 	CC=$(COMPCC)
+endif
+
+### Sometimes gcc is really clang
+ifeq ($(COMP),gcc)
+	gccversion = $(shell $(CC) --version)
+	gccisclang = $(findstring clang,$(gccversion))
+	ifneq ($(gccisclang),)
+		profile_make = clang-profile-make
+		profile_use = clang-profile-use
+	endif
 endif
 
 ### On mingw use Windows threads, otherwise POSIX
@@ -558,7 +570,7 @@ endif
 
 ### 3.6 popcnt
 ifeq ($(popcnt),yes)
-	ifeq ($(arch),$(filter $(arch),ppc64 armv8))
+	ifeq ($(arch),$(filter $(arch),ppc64 armv7 armv8 arm64))
 		CFLAGS += -DUSE_POPCNT
 	else
 	ifeq ($(comp),icc)
@@ -648,10 +660,6 @@ ifeq ($(native),yes)
 	endif
 endif
 
-ifeq ($(embed),yes)
-	CFLAGS += -DNNUE_EMBEDDED
-endif
-
 ### numa
 ifeq ($(numa),yes)
 	CFLAGS += -DNUMA
@@ -666,6 +674,9 @@ endif
 ifeq ($(nnue),yes)
 	CFLAGS += -DNNUE
 	OBJS += nnue.o
+	ifeq ($(embed),yes)
+		CFLAGS += -DNNUE_EMBEDDED
+	endif
 endif
 
 ### 3.9 Link Time Optimization
