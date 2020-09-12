@@ -1033,7 +1033,7 @@ Value nnue_evaluate(const Position *pos)
   int32_t out_value;
   alignas(8) mask_t input_mask[FtOutDims / (8 * sizeof(mask_t))];
 #ifdef TRANSPOSE
-  alignas(8) mask_t hidden1_mask[8 / sizeof(mask_t)];
+  alignas(8) mask_t hidden1_mask[8 / sizeof(mask_t)] = { 0 };
 #endif
 #ifdef ALIGNMENT_HACK // work around a bug in old gcc on Windows
   uint8_t buf[sizeof(struct NetData) + 63];
