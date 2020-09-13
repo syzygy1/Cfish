@@ -103,6 +103,7 @@ neon = no
 ARCH = auto
 native = no
 embed = no
+STRIP = strip
 
 ### 2.2 Architecture specific
 
@@ -474,7 +475,7 @@ ifeq ($(COMP),ndk)
 		STRIP=arm-linux-androideabi-strip
 	endif
 	ifeq ($(arch),armv8)
-		CC=aarch64-linux-android21-clang
+		CC=aarch64-linux-android30-clang
 		STRIP=aarch64-linux-android-strip
 	endif
 	LDFLAGS += -static -latomic -z muldefs
@@ -826,7 +827,7 @@ profile-build: net config-sanity objclean profileclean
 pgo: profile-build
 
 strip:
-	strip $(EXE)
+	$(STRIP) $(EXE)
 
 install:
 	-mkdir -p -m 755 $(BINDIR)
