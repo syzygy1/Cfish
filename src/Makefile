@@ -475,7 +475,7 @@ ifeq ($(COMP),ndk)
 		STRIP=arm-linux-androideabi-strip
 	endif
 	ifeq ($(arch),armv8)
-		CC=aarch64-linux-android30-clang
+		CC=aarch64-linux-android21-clang
 		STRIP=aarch64-linux-android-strip
 	endif
 	LDFLAGS += -static -latomic -z muldefs
