@@ -559,12 +559,8 @@ ifeq ($(bits),64)
 	CFLAGS += -DIS_64BIT
 endif
 
-### 3.5 prefetch
-ifeq ($(prefetch),yes)
-	ifeq ($(sse),yes)
-		CFLAGS += -msse
-	endif
-else
+### 3.5 prefetch and sse
+ifeq ($(prefetch),no)
 	CFLAGS += -DNO_PREFETCH
 endif
 
@@ -630,6 +626,10 @@ ifeq ($(sse2),yes)
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
 		CFLAGS += -msse2
 	endif
+endif
+
+ifeq ($(sse),yes)
+	CFLAGS += -msse -DUSE_SSE
 endif
 
 ifeq ($(mmx),yes)
