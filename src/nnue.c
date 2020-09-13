@@ -102,7 +102,7 @@ enum {
 #elif defined(USE_NEON)
 //#define TRANSPOSE
 
-#else
+#else /* fallback code */
 #define TRANSPOSE
 #endif
 
@@ -312,6 +312,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
   __m64 *inVec = (__m64 *)input;
 
 #elif defined(USE_NEON)
+  const unsigned numChunks = (inDims * 8) / SIMD_WIDTH;
   int8x8_t *inVec = (int8x8_t *)input;
 
 #endif
@@ -1171,7 +1172,6 @@ INLINE void transform(const Position *pos, clipped_t *output,
 #endif
 
 #elif defined(USE_NEON)
-  const unsigned numChunks = kHalfDimensions / 8;
   const int8x8_t kZero = {0};
 
 #endif
