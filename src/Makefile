@@ -426,7 +426,7 @@ endif
 ifeq ($(COMP),icc)
 	comp=icc
 	CC=icc
-	CFLAGS += -diag-disable 1476,10120 -Wcheck -Wabi -Wdeprecated -strict-ansi
+	CFLAGS += -diag-disable 344,711,2259,2330 -Wcheck -Wabi -Wdeprecated -strict-ansi
 endif
 
 ifeq ($(COMP),clang)
@@ -457,17 +457,6 @@ ifeq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
 endif
 endif
 
-ifeq ($(comp),icc)
-	profile_make = icc-profile-make
-	profile_use = icc-profile-use
-else ifeq ($(comp),clang)
-	profile_make = clang-profile-make
-	profile_use = clang-profile-use
-else
-	profile_make = gcc-profile-make
-	profile_use = gcc-profile-use
-endif
-
 ifeq ($(KERNEL),Darwin)
 	CFLAGS += -arch $(arch) -mmacosx-version-min=10.14
 	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.14
@@ -478,14 +467,13 @@ endif
 # binutils. Currently we don't know how to make PGO builds with the NDK yet.
 ifeq ($(COMP),ndk)
 	CFLAGS += -fPIE
+	comp=clang
 	ifeq ($(arch),armv7)
-		comp=armv7a-linux-androideabi16-clang
 		CC=armv7a-linux-androideabi16-clang
 		CFLAGS += -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon
 		STRIP=arm-linux-androideabi-strip
 	endif
 	ifeq ($(arch),armv8)
-		comp=aarch64-linux-android21-clang
 		CC=aarch64-linux-android21-clang
 		STRIP=aarch64-linux-android-strip
 	endif
@@ -495,6 +483,17 @@ endif
 ### Allow overwriting CC from command line
 ifdef COMPCC
 	CC=$(COMPCC)
+endif
+
+ifeq ($(comp),icc)
+	profile_make = icc-profile-make
+	profile_use = icc-profile-use
+else ifeq ($(comp),clang)
+	profile_make = clang-profile-make
+	profile_use = clang-profile-use
+else
+	profile_make = gcc-profile-make
+	profile_use = gcc-profile-use
 endif
 
 ### Sometimes gcc is really clang
@@ -685,10 +684,7 @@ endif
 ifeq ($(lto),yes)
 ifeq ($(optimize),yes)
 ifeq ($(debug),no)
-	ifeq ($(COMP),ndk)
-		CFLAGS += -fltho=thin
-		LDFLAGS += $(CFLAGS)
-	else ifeq ($(comp),clang)
+	ifeq ($(comp),clang)
 		CFLAGS += -flto=thin
 		ifneq ($(findstring MINGW,$(KERNEL)),)
 			CFLAGS += -fuse-ld=lld
