@@ -167,4 +167,16 @@ INLINE uint16_t read_le_u16(void *p)
   return from_le_u16(*(uint16_t *)p);
 }
 
+INLINE uint32_t readu_le_u32(const void *p)
+{
+  const uint8_t *q = p;
+  return q[0] | (q[1] << 8) | (q[2] << 16) | (q[3] << 24);
+}
+
+INLINE uint16_t readu_le_u16(const void *p)
+{
+  const uint8_t *q = p;
+  return q[0] | (q[1] << 8);
+}
+
 #endif

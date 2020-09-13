@@ -102,6 +102,8 @@ vnni = no
 neon = no
 ARCH = auto
 native = no
+embed = no
+STRIP = strip
 
 ### 2.2 Architecture specific
 
@@ -386,6 +388,10 @@ ifeq ($(COMP),gcc)
 		LDFLAGS += -m$(bits)
 	endif
 
+	ifeq ($(arch),$(filter $(arch),armv7))
+		LDFLAGS += -latomic
+	endif
+
 	ifneq ($(KERNEL),Darwin)
 		LDFLAGS += -Wl,--no-as-needed
 	endif
@@ -393,9 +399,6 @@ ifeq ($(COMP),gcc)
 	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
 		CFLAGS += -Wno-pedantic-ms-format
 	endif
-
-	gccversion = $(shell $(CC) --version)
-	gccisclang = $(findstring clang,$(gccversion))
 endif
 
 ifeq ($(COMP),mingw)
@@ -424,15 +427,21 @@ endif
 ifeq ($(COMP),icc)
 	comp=icc
 	CC=icc
-	CFLAGS += -diag-disable 1476,10120 -Wcheck -Wabi -Wdeprecated -strict-ansi
+	CFLAGS += -diag-disable 344,711,2259,2330 -Wcheck -Wabi -Wdeprecated -strict-ansi
 endif
 
 ifeq ($(COMP),clang)
 	comp=clang
 	CC=clang
 	CFLAGS += -pedantic -Wextra -Wshadow
-# -Wno-missing-braces -Wno-missing-field-initializers -Wno-unknown-attributes
-	ifeq ($(ARCH),$(filter $(ARCH),armv7 armv8))
+
+	ifneq ($(KERNEL),Darwin)
+	ifneq ($(KERNEL),OpenBSD)
+		LDFLAGS += -latomic
+	endif
+	endif
+
+	ifeq ($(arch),$(filter $(arch),armv7 armv8))
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
@@ -441,17 +450,40 @@ ifeq ($(COMP),clang)
 		CFLAGS += -m$(bits)
 		LDFLAGS += -m$(bits)
 	endif
-
-	ifeq ($(KERNEL),Darwin)
-		CFLAGS +=
-		DEPENDFLAGS +=
-	endif
 endif
 
 ifneq ($(COMP),mingw)
 ifeq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
 	CFLAGS += -D_DEFAULT_SOURCE -D_BSD_SOURCE
 endif
+endif
+
+ifeq ($(KERNEL),Darwin)
+	CFLAGS += -arch $(arch) -mmacosx-version-min=10.14
+	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.14
+endif
+
+# To cross-compile for Android, NDK version r21 or later is recommended.
+# In earlier NDK versions, you'll need to pass -fno-addrsig if using GNU
+# binutils. Currently we don't know how to make PGO builds with the NDK yet.
+ifeq ($(COMP),ndk)
+	CFLAGS += -fPIE
+	comp=clang
+	ifeq ($(arch),armv7)
+		CC=armv7a-linux-androideabi16-clang
+		CFLAGS += -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+		STRIP=arm-linux-androideabi-strip
+	endif
+	ifeq ($(arch),armv8)
+		CC=aarch64-linux-android21-clang
+		STRIP=aarch64-linux-android-strip
+	endif
+	LDFLAGS += -static -latomic -z muldefs
+endif
+
+### Allow overwriting CC from command line
+ifdef COMPCC
+	CC=$(COMPCC)
 endif
 
 ifeq ($(comp),icc)
@@ -465,33 +497,14 @@ else
 	profile_use = gcc-profile-use
 endif
 
-ifeq ($(KERNEL),Darwin)
-	CFLAGS += -arch $(arch) -mmacosx-version-min=10.14
-	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.14
-endif
-
-# To cross-compile for Android, NDK version r21 or later is recommended.
-# In earlier NDK versions, you'll need to pass -fno-addrsig if using GNU
-# binutils. Currently we don't know how to make PGO builds with the NDK yet.
-ifeq ($(COMP),ndk)
-	CFLAGS += -fPIE
-	ifeq ($(arch),armv7)
-		comp=armv7a-linux-androideabi16-clang
-		CC=armv7a-linux-androideabi16-clang
-		CCFLAGS += -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=neon
-		STRIP=arm-linux-androideabi-strip
+### Sometimes gcc is really clang
+ifeq ($(COMP),gcc)
+	gccversion = $(shell $(CC) --version)
+	gccisclang = $(findstring clang,$(gccversion))
+	ifneq ($(gccisclang),)
+		profile_make = clang-profile-make
+		profile_use = clang-profile-use
 	endif
-	ifeq ($(arch),armv8)
-		comp=aarch64-linux-android21-clang
-		CC=aarch64-linux-android21-clang
-		STRIP=aarch64-linux-android-strip
-	endif
-	LDFLAGS += -pie -lm -latomic
-endif
-
-### Allow overwriting CC from command line
-ifdef COMPCC
-	CC=$(COMPCC)
 endif
 
 ### On mingw use Windows threads, otherwise POSIX
@@ -500,7 +513,9 @@ ifneq ($(comp),mingw)
 	ifneq ($(OS),Android)
 		# Haiku has pthreads in its libroot, so only link it in on other platforms
 		ifneq ($(KERNEL),Haiku)
-			LDFLAGS += -lpthread
+			ifneq ($(COMP),ndk)
+				LDFLAGS += -lpthread
+			endif
 		endif
 	endif
 endif
@@ -544,19 +559,14 @@ ifeq ($(bits),64)
 	CFLAGS += -DIS_64BIT
 endif
 
-### 3.5 prefetch
-ifeq ($(prefetch),yes)
-	ifeq ($(sse),yes)
-		CFLAGS += -msse
-		DEPENDFLAGS += -msse
-	endif
-else
+### 3.5 prefetch and sse
+ifeq ($(prefetch),no)
 	CFLAGS += -DNO_PREFETCH
 endif
 
 ### 3.6 popcnt
 ifeq ($(popcnt),yes)
-	ifeq ($(arch),$(filter $(arch),ppc64 armv8))
+	ifeq ($(arch),$(filter $(arch),ppc64 armv7 armv8 arm64))
 		CFLAGS += -DUSE_POPCNT
 	else
 	ifeq ($(comp),icc)
@@ -618,6 +628,10 @@ ifeq ($(sse2),yes)
 	endif
 endif
 
+ifeq ($(sse),yes)
+	CFLAGS += -msse -DUSE_SSE
+endif
+
 ifeq ($(mmx),yes)
 	CFLAGS += -DUSE_MMX
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
@@ -660,6 +674,9 @@ endif
 ifeq ($(nnue),yes)
 	CFLAGS += -DNNUE
 	OBJS += nnue.o
+	ifeq ($(embed),yes)
+		CFLAGS += -DNNUE_EMBEDDED
+	endif
 endif
 
 ### 3.9 Link Time Optimization
@@ -668,10 +685,7 @@ endif
 ifeq ($(lto),yes)
 ifeq ($(optimize),yes)
 ifeq ($(debug),no)
-	ifeq ($(COMP),ndk)
-		CFLAGS += -fltho=thin
-		LDFLAGS += $(CFLAGS)
-	else ifeq ($(comp),clang)
+	ifeq ($(comp),clang)
 		CFLAGS += -flto=thin
 		ifneq ($(findstring MINGW,$(KERNEL)),)
 			CFLAGS += -fuse-ld=lld
@@ -711,7 +725,7 @@ endif
 ### breaks Android 4.0 and earlier.
 ifeq ($(arch),armv7)
 	CFLAGS += -fPIE
-	LDFLAGS += -fPIE -pie
+	LDFLAGS += -fPIE
 endif
 
 
@@ -813,7 +827,7 @@ profile-build: net config-sanity objclean profileclean
 pgo: profile-build
 
 strip:
-	strip $(EXE)
+	$(STRIP) $(EXE)
 
 install:
 	-mkdir -p -m 755 $(BINDIR)
@@ -824,7 +838,7 @@ clean: objclean profileclean
 	@rm -f .depend core
 
 net:
-	$(eval nnuenet := $(shell grep EvalFile ucioption.c | grep OPT_TYPE_STRING | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
+	$(eval nnuenet := $(shell grep DefaultEvalFile evaluate.h | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
 	@echo "Default net: $(nnuenet)"
 	$(eval nnuedownloadurl := https://tests.stockfishchess.org/api/nn/$(nnuenet))
 	$(eval curl_or_wget := $(shell if hash curl 2>/dev/null; then echo "curl -skL"; elif hash wget 2>/dev/null; then echo "wget -qO-"; fi))
@@ -874,6 +888,7 @@ config-sanity:
 	@echo "vnni: '$(vnni)'"
 	@echo "neon: '$(neon)'"
 	@echo "native: '$(native)'"
+	@echo "embed: '$(embed)'"
 	@echo ""
 	@echo "Flags:"
 	@echo "CC: $(CC)"
@@ -902,7 +917,9 @@ config-sanity:
 	@test "$(vnni)" = "yes" || test "$(vnni)" = "no"
 	@test "$(neon)" = "yes" || test "$(neon)" = "no"
 	@test "$(native)" = "yes" || test "$(native)" = "no"
-	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang"
+	@test "$(embed)" = "yes" || test "$(embed)" = "no"
+	@test "$(comp)" = "gcc" || test "$(comp)" = "icc" || test "$(comp)" = "mingw" || test "$(comp)" = "clang" \
+	  || test "$(comp)" = "armv7a-linux-androideabi16-clang"  || test "$(comp)" = "aarch64-linux-android21-clang"
 
 $(EXE): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
