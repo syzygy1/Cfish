@@ -1451,9 +1451,11 @@ static char *loadedFile = NULL;
 
 void nnue_init(void)
 {
+#ifndef NNUE_PURE
   const char *s = option_string_value(OPT_USE_NNUE);
   useNNUE =  strcmp(s, "classical") == 0 ? EVAL_CLASSICAL
            : strcmp(s, "pure"     ) == 0 ? EVAL_PURE : EVAL_HYBRID;
+#endif
 
   const char *evalFile = option_string_value(OPT_EVAL_FILE);
   if (loadedFile && strcmp(evalFile, loadedFile) == 0)

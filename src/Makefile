@@ -82,6 +82,7 @@ ifeq ($(ARCH),)
 endif
 
 nnue = yes
+pure = no
 optimize = yes
 lto = no
 debug = no
@@ -676,6 +677,9 @@ ifeq ($(nnue),yes)
 	OBJS += nnue.o
 	ifeq ($(embed),yes)
 		CFLAGS += -DNNUE_EMBEDDED
+	endif
+	ifeq ($(pure),yes)
+		CFLAGS += -DNNUE_PURE
 	endif
 endif
 

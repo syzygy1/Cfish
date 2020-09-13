@@ -18,6 +18,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef NNUE_PURE
+
 #include <assert.h>
 
 #include "bitboard.h"
@@ -819,3 +821,9 @@ static int ScaleKPKP(const Position *pos, Color strongSide)
   // a draw, it is probably at least a draw even with the pawn.
   return bitbases_probe(wksq, psq, bksq, us) ? SCALE_FACTOR_NONE : SCALE_FACTOR_DRAW;
 }
+
+#else
+
+typedef int make_iso_compilers_happy;
+
+#endif

@@ -18,6 +18,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef NNUE_PURE
+
 #include <assert.h>
 
 #include "bitboard.h"
@@ -266,3 +268,9 @@ NOINLINE Score do_king_safety_black(PawnEntry *pe, const Position *pos,
 {
   return do_king_safety(pe, pos, ksq, BLACK);
 }
+
+#else
+
+typedef int make_iso_compilers_happy;
+
+#endif

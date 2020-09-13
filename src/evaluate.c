@@ -28,6 +28,8 @@
 #endif
 #include "pawns.h"
 
+#ifndef NNUE_PURE
+
 // Struct EvalInfo contains various information computed and collected
 // by the evaluation functions.
 struct EvalInfo {
@@ -876,3 +878,16 @@ Value evaluate(const Position *pos)
 
   return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 }
+
+#else /* NNUE_PURE */
+
+Value evaluate(const Position *pos)
+{
+  Value v;
+
+  v = nnue_evaluate(pos) * 5 / 4 + Tempo;
+  v = v * (100 - rule50_count()) / 100;
+  return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
+}
+
+#endif

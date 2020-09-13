@@ -121,7 +121,7 @@ void benchmark(Position *current, char *str)
   int64_t limit   = (token = strtok(NULL, " ")) ? atoll(token) : 13;
   char *fenFile   = (token = strtok(NULL, " ")) ? token        : "default";
   char *limitType = (token = strtok(NULL, " ")) ? token        : "depth";
-#ifdef NNUE
+#if defined(NNUE) && !defined(NNUE_PURE)
   char *evalType  = (token = strtok(NULL, " ")) ? token        : "mixed";
 #endif
 
@@ -207,7 +207,7 @@ void benchmark(Position *current, char *str)
     if (strcasecmp(limitType, "perft") == 0)
       nodes += perft(&pos, Limits.depth);
     else {
-#ifdef NNUE
+#if defined(NNUE) && !defined(NNUE_PURE)
       if (strcasecmp(evalType, "classical") == 0)
         useNNUE = EVAL_CLASSICAL;
       else if (strcasecmp(evalType, "nnue") == 0)

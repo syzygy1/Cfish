@@ -18,6 +18,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef NNUE_PURE
+
 #include <assert.h>
 #include <string.h>   // For memset
 
@@ -191,3 +193,9 @@ void material_entry_fill(const Position *pos, MaterialEntry *e, Key key)
 #undef pc
   e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
 }
+
+#else
+
+typedef int make_iso_compilers_happy;
+
+#endif

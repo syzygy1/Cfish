@@ -338,9 +338,11 @@ static void set_castling_right(Position *pos, Color c, Square rfrom)
 static void set_state(Position *pos, Stack *st)
 {
   st->key = st->materialKey = 0;
+#ifndef NNUE_PURE
   st->pawnKey = zob.noPawns;
-  st->nonPawn = 0;
   st->psq = 0;
+#endif
+  st->nonPawn = 0;
 
   st->checkersBB = attackers_to(square_of(stm(), KING)) & pieces_c(!stm());
 
@@ -350,7 +352,9 @@ static void set_state(Position *pos, Stack *st)
     Square s = pop_lsb(&b);
     Piece pc = piece_on(s);
     st->key ^= zob.psq[pc][s];
+#ifndef NNUE_PURE
     st->psq += psqt.psq[pc][s];
+#endif
   }
 
   if (st->epSquare != 0)
@@ -361,10 +365,12 @@ static void set_state(Position *pos, Stack *st)
 
   st->key ^= zob.castling[st->castlingRights];
 
+#ifndef NNUE_PURE
   for (Bitboard b = pieces_p(PAWN); b; ) {
     Square s = pop_lsb(&b);
     st->pawnKey ^= zob.psq[piece_on(s)][s];
   }
+#endif
 
   for (PieceType pt = PAWN; pt <= KING; pt++) {
     st->materialKey += piece_count(WHITE, pt) * matKey[8 * WHITE + pt];
@@ -826,7 +832,9 @@ void do_move(Position *pos, Move m, int givesCheck)
     put_piece(pos, us, piece, to);
     put_piece(pos, us, captured, rto);
 
+#ifndef NNUE_PURE
     st->psq += psqt.psq[captured][rto] - psqt.psq[captured][rfrom];
+#endif
     key ^= zob.psq[captured][rfrom] ^ zob.psq[captured][rto];
     captured = 0;
   }
@@ -849,7 +857,9 @@ void do_move(Position *pos, Move m, int givesCheck)
         pos->board[capsq] = 0; // Not done by remove_piece()
       }
 
+#ifndef NNUE_PURE
       st->pawnKey ^= zob.psq[captured][capsq];
+#endif
     } else
       st->nonPawn -= NonPawnPieceValue[captured];
 
@@ -866,10 +876,12 @@ void do_move(Position *pos, Move m, int givesCheck)
     // Update material hash key and prefetch access to materialTable
     key ^= zob.psq[captured][capsq];
     st->materialKey -= matKey[captured];
+#ifndef NNUE_PURE
     prefetch(&pos->materialTable[st->materialKey >> (64 - 13)]);
 
     // Update incremental scores
     st->psq -= psqt.psq[captured][capsq];
+#endif
 
     // Reset ply counters
     st->plyCounters = 0;
@@ -936,26 +948,34 @@ void do_move(Position *pos, Move m, int givesCheck)
 
       // Update hash keys
       key ^= zob.psq[piece][to] ^ zob.psq[promotion][to];
+#ifndef NNUE_PURE
       st->pawnKey ^= zob.psq[piece][to];
+#endif
       st->materialKey += matKey[promotion] - matKey[piece];
 
+#ifndef NNUE_PURE
       // Update incremental score
       st->psq += psqt.psq[promotion][to] - psqt.psq[piece][to];
+#endif
 
       // Update material
       st->nonPawn += NonPawnPieceValue[promotion];
     }
 
+#ifndef NNUE_PURE
     // Update pawn hash key and prefetch access to pawnsTable
     st->pawnKey ^= zob.psq[piece][from] ^ zob.psq[piece][to];
     prefetch2(&pos->pawnTable[st->pawnKey & (PAWN_ENTRIES -1)]);
+#endif
 
     // Reset ply counters.
     st->plyCounters = 0;
   }
 
+#ifndef NNUE_PURE
   // Update incremental scores
   st->psq += psqt.psq[piece][to] - psqt.psq[piece][from];
+#endif
 
   // Update the key with the final value
   st->key = key;

@@ -39,7 +39,9 @@ int main(int argc, char **argv)
   bitboards_init();
   zob_init();
   bitbases_init();
+#ifndef NNUE_PURE
   endgames_init();
+#endif
   threads_init();
   options_init();
   search_clear();

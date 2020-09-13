@@ -87,8 +87,10 @@ static THREAD_FUNC thread_init(void *arg)
 
   if (settings.numaEnabled) {
     pos = numa_alloc(sizeof(Position));
+#ifndef NNUE_PURE
     pos->pawnTable = numa_alloc(PAWN_ENTRIES * sizeof(PawnEntry));
     pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
+#endif
     pos->counterMoves = numa_alloc(sizeof(CounterMoveStat));
     pos->history = numa_alloc(sizeof(ButterflyHistory));
     pos->captureHistory = numa_alloc(sizeof(CapturePieceToHistory));
@@ -98,8 +100,10 @@ static THREAD_FUNC thread_init(void *arg)
     pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
   } else {
     pos = calloc(sizeof(Position), 1);
+#ifndef NNUE_PURE
     pos->pawnTable = calloc(PAWN_ENTRIES * sizeof(PawnEntry), 1);
     pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
+#endif
     pos->counterMoves = calloc(sizeof(CounterMoveStat), 1);
     pos->history = calloc(sizeof(ButterflyHistory), 1);
     pos->captureHistory = calloc(sizeof(CapturePieceToHistory), 1);
@@ -191,8 +195,10 @@ static void thread_destroy(Position *pos)
 #endif
 
   if (settings.numaEnabled) {
+#ifndef NNUE_PURE
     numa_free(pos->pawnTable, PAWN_ENTRIES * sizeof(PawnEntry));
     numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
+#endif
     numa_free(pos->counterMoves, sizeof(CounterMoveStat));
     numa_free(pos->history, sizeof(ButterflyHistory));
     numa_free(pos->captureHistory, sizeof(CapturePieceToHistory));
@@ -202,8 +208,10 @@ static void thread_destroy(Position *pos)
     numa_free(pos->moveList, 10000 * sizeof(ExtMove));
     numa_free(pos, sizeof(Position));
   } else {
+#ifndef NNUE_PURE
     free(pos->pawnTable);
     free(pos->materialTable);
+#endif
     free(pos->counterMoves);
     free(pos->history);
     free(pos->captureHistory);

@@ -56,17 +56,16 @@ void zob_init(void);
 
 struct Stack {
   // Copied when making a move
+#ifndef NNUE_PURE
   Key pawnKey;
+#endif
   Key materialKey;
+#ifndef NNUE_PURE
+  Score psq;
+#endif
   union {
-    struct {
-      Score psq;
-      union {
-        uint16_t nonPawnMaterial[2];
-        uint32_t nonPawn;
-      };
-    };
-    uint64_t psqnpm;
+    uint16_t nonPawnMaterial[2];
+    uint32_t nonPawn;
   };
   union {
     struct {

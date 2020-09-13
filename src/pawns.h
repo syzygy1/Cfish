@@ -21,6 +21,8 @@
 #ifndef PAWNS_H
 #define PAWNS_H
 
+#ifndef NNUE_PURE
+
 #include "misc.h"
 #include "position.h"
 #include "types.h"
@@ -98,4 +100,5 @@ INLINE Score king_safety_black(PawnEntry *pe, const Position *pos, Square ksq)
     return pe->kingSafety[BLACK] = do_king_safety_black(pe, pos, ksq);
 }
 
+#endif
 #endif

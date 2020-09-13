@@ -4,6 +4,7 @@
 #define POLYBOOK_H_INCLUDED
 
 #include "bitboard.h"
+#include "misc.h"
 #include "position.h"
 
 struct PolyBook {

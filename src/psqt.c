@@ -21,10 +21,13 @@
 #include "types.h"
 
 Value PieceValue[2][16] = {
-{ 0, PawnValueMg, KnightValueMg, BishopValueMg, RookValueMg, QueenValueMg },
-{ 0, PawnValueEg, KnightValueEg, BishopValueEg, RookValueEg, QueenValueEg } };
+  { 0, PawnValueMg, KnightValueMg, BishopValueMg, RookValueMg, QueenValueMg },
+  { 0, PawnValueEg, KnightValueEg, BishopValueEg, RookValueEg, QueenValueEg }
+};
 
 uint32_t NonPawnPieceValue[16];
+
+#ifndef NNUE_PURE
 
 #define S(mg, eg) make_score(mg, eg)
 
@@ -101,17 +104,20 @@ static const Score PBonus[8][8] = {
 #undef S
 
 struct PSQT psqt;
+#endif
 
 // init() initializes piece-square tables: the white halves of the tables
 // are copied from Bonus[] adding the piece value, then the black  halves
 // of the tables are initialized by flipping and changing the sign of the
 // white scores.
 
-void psqt_init(void) {
+void psqt_init(void)
+{
   for (int pt = PAWN; pt <= KING; pt++) {
     PieceValue[MG][make_piece(BLACK, pt)] = PieceValue[MG][pt];
     PieceValue[EG][make_piece(BLACK, pt)] = PieceValue[EG][pt];
 
+#ifndef NNUE_PURE
     Score score = make_score(PieceValue[MG][pt], PieceValue[EG][pt]);
 
     for (Square s = 0; s < 64; s++) {
@@ -122,7 +128,9 @@ void psqt_init(void) {
       psqt.psq[make_piece(BLACK, pt)][s ^ 0x38] =
         -psqt.psq[make_piece(WHITE, pt)][s];
     }
+#endif
   }
+
   union {
     uint16_t val[2];
     uint32_t combi;
