@@ -27,6 +27,7 @@
 #include <sys/mman.h>
 #endif
 
+#include "evaluate.h"
 #include "misc.h"
 #include "numa.h"
 #include "polybook.h"
@@ -120,7 +121,7 @@ static Option optionsMap[] = {
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
 #ifdef NNUE
-  { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, "nn-82215d0fd0df.nnue", NULL, 0, NULL },
+  { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, DefaultEvalFile, NULL, 0, NULL },
   { "Use NNUE", OPT_TYPE_COMBO, 0, 0, 0,
     "Hybrid var Hybrid var Pure var Classical", NULL, 0, NULL },
 #endif
