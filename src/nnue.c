@@ -140,7 +140,9 @@ typedef __m64 vec_t;
 
 #elif USE_NEON
 #define SIMD_WIDTH 128
-typedef int8x8_t vec_t; // unused
+typedef int16x8_t vec_t;
+#define vec_add_16(a,b) vaddq_s16(a,b)
+#define vec_sub_16(a,b) vsubq_s16(a,b)
 
 #else
 #define SIMD_WIDTH 8 // dummy
@@ -158,6 +160,9 @@ typedef int8x8_t vec_t; // unused
 #define NUM_REGS 8
 
 #elif USE_MMX
+#define NUM_REGS 8
+
+#elif USE_NEON
 #define NUM_REGS 8
 
 #endif
@@ -416,7 +421,6 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output, unsigned inDims,
     output[i] = sum[0] + sum[1] + sum[2] + sum[3];
 
 #else
-    (void)numChunks;
     int32_t sum = biases[i];
     for (unsigned j = 0; j < inDims; j++)
       sum += weights[offset + j] * input[j];
@@ -434,13 +438,12 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 
 #if defined(USE_AVX512)
   (void)numDims;
-  const __m512i kZero = _mm512_setzero_si512();
   const __m512i kOffsets = _mm512_set_epi32(0,0,0,0,0,0,0,0,13,9,5,1,12,8,4,0);
   __m512i *in = (__m512i *)input;
   __m256i *out = (__m256i *)output;
   __m512i words = _mm512_srai_epi16(_mm512_packs_epi32(in[0], in[1]), SHIFT);
   out[0] = _mm256_max_epi8(_mm512_castsi512_si256(
-        _mm512_permutexvar_epi32(kOffsets, _mm512_packs_epi16(words, kZero))),
+        _mm512_permutexvar_epi32(kOffsets, _mm512_packs_epi16(words, words))),
         _mm256_setzero_si256());
 
 #elif defined(USE_AVX2)
@@ -958,7 +961,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 static alignas(64) int16_t ft_biases[kHalfDimensions];
 static alignas(64) int16_t ft_weights[kHalfDimensions * FtInDims];
 
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
 #define TILE_HEIGHT (NUM_REGS * SIMD_WIDTH / 16)
 #else
 #define TILE_HEIGHT kHalfDimensions
@@ -975,7 +978,7 @@ INLINE void refresh_accumulator(const Position *pos)
 
   for (unsigned c = 0; c < 2; c++) {
     for (unsigned i = 0; i < kHalfDimensions / TILE_HEIGHT; i++) {
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       vec_t *ft_biases_tile = (vec_t *)&ft_biases[i * TILE_HEIGHT];
       vec_t *accTile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
       vec_t acc[NUM_REGS];
@@ -991,17 +994,10 @@ INLINE void refresh_accumulator(const Position *pos)
         unsigned index = activeIndices[c].values[k];
         unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *column = (vec_t *)&ft_weights[offset];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = vec_add_16(acc[j], column[j]);
-
-#elif defined(USE_NEON)
-        int16x8_t *accumulation = (int16x8_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
-        int16x8_t *column = (int16x8_t *)&ft_weights[offset];
-        const unsigned numChunks = kHalfDimensions / 8;
-        for (unsigned j = 0; j < numChunks; j++)
-          accumulation[j] = vaddq_s16(accumulation[j], column[j]);
 
 #else
         for (unsigned j = 0; j < kHalfDimensions; j++)
@@ -1010,7 +1006,7 @@ INLINE void refresh_accumulator(const Position *pos)
 #endif
       }
 
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       for (unsigned j = 0; j < NUM_REGS; j++)
         accTile[j] = acc[j];
 
@@ -1039,18 +1035,13 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
   append_changed_indices(pos, removed_indices, added_indices, reset);
   for (unsigned i = 0; i< kHalfDimensions / TILE_HEIGHT; i++) {
     for (unsigned c = 0; c < 2; c++) {
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       vec_t *accTile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
       vec_t acc[NUM_REGS];
-
-#elif defined(USE_NEON)
-      const unsigned numChunks = kHalfDimensions / 8;
-      int16x8_t *accTile = (int16x8_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
-
 #endif
 
       if (reset[c]) {
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *ft_b_tile = (vec_t *)&ft_biases[i * TILE_HEIGHT];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = ft_b_tile[j];
@@ -1059,7 +1050,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
             &ft_biases[i * TILE_HEIGHT], TILE_HEIGHT * sizeof(int16_t));
 #endif
       } else {
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *prevAccTile = (vec_t *)&prevAccumulator->accumulation[c][i * TILE_HEIGHT];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = prevAccTile[j];
@@ -1073,15 +1064,10 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
           unsigned index = removed_indices[c].values[k];
           const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
           vec_t *column = (vec_t *)&ft_weights[offset];
           for (unsigned j = 0; j < NUM_REGS; j++)
             acc[j] = vec_sub_16(acc[j], column[j]);
-
-#elif defined(USE_NEON)
-          int16x8_t *column = (int16x8_t *)&ft_weights[offset];
-          for (unsigned j = 0; j < numChunks; j++)
-            accTile[j] = vsubq_s16(accTile[j], column[j]);
 
 #else
           for (unsigned j = 0; j < kHalfDimensions; j++)
@@ -1096,15 +1082,10 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
         unsigned index = added_indices[c].values[k];
         const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *column = (vec_t *)&ft_weights[offset];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = vec_add_16(acc[j], column[j]);
-
-#elif defined(USE_NEON)
-        int16x8_t *column = (int16x8_t *)&ft_weights[offset];
-        for (unsigned j = 0; j < numChunks; j++)
-          accTile[j] = vaddq_s16(accTile[j], column[j]);
 
 #else
         for (unsigned j = 0; j < TILE_HEIGHT; j++)
@@ -1113,7 +1094,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 #endif
       }
 
-#if defined(USE_SSE2) || defined(USE_MMX)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       for (unsigned j = 0; j < NUM_REGS; j++)
         accTile[j] = acc[j];
 
