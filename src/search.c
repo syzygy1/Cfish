@@ -600,7 +600,7 @@ skip_search:
 
       // If the best move is stable over several iterations, reduce time
       // accordingly
-      timeReduction =  lastBestMoveDepth + 9 < pos->completedDepth ? 1.92 : 0.95;
+      timeReduction = lastBestMoveDepth + 9 < pos->completedDepth ? 1.92 : 0.95;
       double reduction = (1.47 + mainThread.previousTimeReduction) / (2.32 * timeReduction);
 
       // Use part of the gained time from a previous stable move for this move
@@ -609,7 +609,7 @@ skip_search:
         Threads.pos[i]->bestMoveChanges = 0;
       }
 
-      double bestMoveInstability = 1 + totBestMoveChanges / Threads.numThreads;
+      double bestMoveInstability = 1 + 2 * totBestMoveChanges / Threads.numThreads;
 
       double totalTime = rm->size == 1 ? 0 : time_optimum() * fallingEval * reduction * bestMoveInstability;
 
@@ -1152,7 +1152,6 @@ moves_loop: // When in check search starts from here.
         if (   !givesCheck
             && lmrDepth < 6
             && !(PvNode && abs(bestValue) < 2)
-            && PieceValue[MG][type_of_p(movedPiece)] >= PieceValue[MG][type_of_p(piece_on(to_sq(move)))]
             && !inCheck
             && ss->staticEval + 169 + 244 * lmrDepth
                + PieceValue[MG][type_of_p(piece_on(to_sq(move)))] <= alpha)
@@ -1239,11 +1238,6 @@ moves_loop: // When in check search starts from here.
     // Last capture extension
     else if (   PieceValue[EG][captured_piece()] > PawnValueEg
              && non_pawn_material() <= 2 * RookValueMg)
-      extension = 1;
-
-    // Castling extension
-    if (   type_of_m(move) == CASTLING
-        && popcount(pieces_c(stm()) & ~pieces_p(PAWN) & (to_sq(move) & 0x03 ? KingSide : QueenSide)) <= 2)
       extension = 1;
 
     // Late irreversible move extension

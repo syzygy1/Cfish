@@ -203,6 +203,7 @@ void benchmark(Position *current, char *str)
     position(&pos, buf);
 
     fprintf(stderr, "\nPosition: %d/%d\n", ++j, numFens - numOpts);
+    printf("position fen %s\n", fens[i]);
 
     if (strcasecmp(limitType, "perft") == 0)
       nodes += perft(&pos, Limits.depth);
