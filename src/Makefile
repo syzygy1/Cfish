@@ -419,7 +419,7 @@ ifeq ($(COMP),mingw)
 			endif
 		else
 			ifeq ($(shell which i686-w64-mingw32-cc-posix),)
-				CC=i686-w64-mingw32-cc
+				CC=i686-w64-mingw32-gcc
 			else
 				CC=i686-w64-mingw32-cc-posix
 			endif

@@ -88,7 +88,7 @@ enum {
 #endif
 
 #if defined(USE_AVX512)
-//#define TRANSPOSE
+#define TRANSPOSE
 
 #elif defined(USE_AVX2)
 #define TRANSPOSE
@@ -114,56 +114,53 @@ enum {
 
 static_assert(kHalfDimensions % 256 == 0, "kHalfDimensions should be a multiple of 256");
 
+#define TILING
+
 #ifdef USE_AVX512
 #define SIMD_WIDTH 512
 typedef __m512i vec_t;
 #define vec_add_16(a,b) _mm512_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm512_sub_epi16(a,b)
+#define NUM_REGS 8 // only 8 are needed
 
 #elif USE_AVX2
 #define SIMD_WIDTH 256
 typedef __m256i vec_t;
 #define vec_add_16(a,b) _mm256_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm256_sub_epi16(a,b)
+#define NUM_REGS 16
 
 #elif USE_SSE2
 #define SIMD_WIDTH 128
 typedef __m128i vec_t;
 #define vec_add_16(a,b) _mm_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm_sub_epi16(a,b)
+#ifdef IS_64BIT
+#define NUM_REGS 16
+#else
+#define NUM_REGS 8
+#endif
 
 #elif USE_MMX
 #define SIMD_WIDTH 64
 typedef __m64 vec_t;
 #define vec_add_16(a,b) _mm_add_pi16(a,b)
 #define vec_sub_16(a,b) _mm_sub_pi16(a,b)
+#define NUM_REGS 8
 
 #elif USE_NEON
 #define SIMD_WIDTH 128
 typedef int16x8_t vec_t;
 #define vec_add_16(a,b) vaddq_s16(a,b)
 #define vec_sub_16(a,b) vsubq_s16(a,b)
-
+#ifdef IS_64BIT
+#define NUM_REGS 16
 #else
-#define SIMD_WIDTH 8 // dummy
-
+#define NUM_REGS 8
 #endif
 
-// NUM_REGS is used only in refresh/update_accumulator()
-#if defined(USE_AVX512)
-#define NUM_REGS 8 // only 8 are needed
-
-#elif defined(USE_SSE2) && defined(IS_64BIT)
-#define NUM_REGS 16
-
-#elif defined(USE_SSE2)
-#define NUM_REGS 8
-
-#elif USE_MMX
-#define NUM_REGS 8
-
-#elif USE_NEON
-#define NUM_REGS 8
+#else
+#undef TILING
 
 #endif
 
@@ -276,8 +273,13 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
 // OutputLayer = AffineTransform<HiddenLayer2, 1>
 // 32 x clipped_t -> 1 x int32_t
 
+#if !defined(TRANSPOSE) || !defined(USE_AVX512)
 static alignas(64) weight_t hidden1_weights[32 * 512];
 static alignas(64) weight_t hidden2_weights[32 * 32];
+#else
+static alignas(64) weight_t hidden1_weights[64 * 512];
+static alignas(64) weight_t hidden2_weights[64 * 32];
+#endif
 static alignas(64) weight_t output_weights [1 * 32];
 
 static alignas(64) int32_t hidden1_biases[32];
@@ -534,6 +536,7 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 
 static_assert(FtOutDims % 64 == 0, "FtOutDims not a multiple of 64");
 
+#ifdef USE_MASK
 INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
     mask_t *mask, unsigned inDims)
 {
@@ -546,10 +549,57 @@ INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
   *v &= *v - 1;
   return true;
 }
+#endif
 
-#if defined(USE_AVX2)
+#if defined(USE_AVX512)
 INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, weight_t *weights,
+    unsigned outDims, const int32_t *biases, const weight_t *weights,
+    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
+{
+  assert(outDims == 32);
+
+  (void)outDims;
+  const __m512i kZero = _mm512_setzero_si512();
+  __m512i out_0 = ((__m512i *)biases)[0];
+  __m512i out_1 = ((__m512i *)biases)[1];
+  __m512i first, second;
+  uint64_t v;
+  unsigned idx;
+
+  memcpy(&v, inMask, 8);
+  for (unsigned offset = 0; offset < inDims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+      break;
+    first = ((__m512i *)weights)[idx];
+    uint16_t factor = input[idx];
+    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
+      second = ((__m512i *)weights)[idx];
+      factor |= input[idx] << 8;
+    } else {
+      second = kZero;
+    }
+    __m512i mul = _mm512_set1_epi16(factor), prod, signs;
+    prod = _mm512_maddubs_epi16(mul, _mm512_unpacklo_epi8(first, second));
+    signs = _mm512_srai_epi16(prod, 15);
+    out_0 = _mm512_add_epi32(out_0, _mm512_unpacklo_epi16(prod, signs));
+    out_1 = _mm512_add_epi32(out_1, _mm512_unpackhi_epi16(prod, signs));
+  }
+
+  __m512i out16 = _mm512_srai_epi16(_mm512_packs_epi32(out_0, out_1), SHIFT);
+
+  __m256i *outVec = (__m256i *)output;
+  const __m512i kOffsets = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
+  const __m256i kZero256 = _mm256_setzero_si256();
+  outVec[0] = _mm512_castsi512_si256(
+      _mm512_permutexvar_epi64(kOffsets, _mm512_packs_epi16(out16, out16)));
+  if (pack8_and_calc_mask)
+    outMask[0] = (uint32_t)_mm256_movemask_epi8(_mm256_cmpgt_epi8(outVec[0], kZero256));
+  else
+    outVec[0] = _mm256_max_epi8(outVec[0], kZero256);
+}
+#elif defined(USE_AVX2)
+INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
+    unsigned outDims, const int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
@@ -569,7 +619,7 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
     first = ((__m256i *)weights)[idx];
-    uint16_t factor = (uint8_t)input[idx];
+    uint16_t factor = input[idx];
     if (next_idx(&idx, &offset, &v, inMask, inDims)) {
       second = ((__m256i *)weights)[idx];
       factor |= input[idx] << 8;
@@ -591,16 +641,15 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   __m256i out16_1 = _mm256_srai_epi16(_mm256_packs_epi32(out_2, out_3), SHIFT);
 
   __m256i *outVec = (__m256i *)output;
-  if (pack8_and_calc_mask) {
-    outVec[0] = _mm256_packs_epi16(out16_0, out16_1);
+  outVec[0] = _mm256_packs_epi16(out16_0, out16_1);
+  if (pack8_and_calc_mask)
     outMask[0] = _mm256_movemask_epi8(_mm256_cmpgt_epi8(outVec[0], kZero));
-  } else {
-    outVec[0] = _mm256_max_epi8(_mm256_packs_epi16(out16_0, out16_1), kZero);
-  }
+  else
+    outVec[0] = _mm256_max_epi8(outVec[0], kZero);
 }
 #elif AVOID_USE_SSSE3
 INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, weight_t *weights,
+    unsigned outDims, const int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
@@ -685,7 +734,7 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
 }
 #elif defined(USE_SSE2)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, weight_t *weights,
+    unsigned outDims, const int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
@@ -757,7 +806,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 }
 #elif defined(USE_MMX) && defined(USE_SSE)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, weight_t *weights,
+    unsigned outDims, const int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
@@ -847,7 +896,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 }
 #elif defined(USE_MMX)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, weight_t *weights,
+    unsigned outDims, const int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
@@ -933,7 +982,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 }
 #else /* generic fallback */
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, int32_t *biases, weight_t *weights,
+    unsigned outDims, int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask,
     const bool pack8_and_calc_mask)
 {
@@ -961,10 +1010,8 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 static alignas(64) int16_t ft_biases[kHalfDimensions];
 static alignas(64) int16_t ft_weights[kHalfDimensions * FtInDims];
 
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
+#ifdef TILING
 #define TILE_HEIGHT (NUM_REGS * SIMD_WIDTH / 16)
-#else
-#define TILE_HEIGHT kHalfDimensions
 #endif
 
 // Calculate cumulative value without using difference calculation
@@ -977,41 +1024,39 @@ INLINE void refresh_accumulator(const Position *pos)
   append_active_indices(pos, activeIndices);
 
   for (unsigned c = 0; c < 2; c++) {
+#ifdef TILING
     for (unsigned i = 0; i < kHalfDimensions / TILE_HEIGHT; i++) {
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       vec_t *ft_biases_tile = (vec_t *)&ft_biases[i * TILE_HEIGHT];
       vec_t *accTile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
       vec_t acc[NUM_REGS];
+
       for (unsigned j = 0; j < NUM_REGS; j++)
         acc[j] = ft_biases_tile[j];
 
-#else
-      memcpy(&(accumulator->accumulation[c][i * TILE_HEIGHT]), 
-          &ft_biases[i * TILE_HEIGHT], TILE_HEIGHT * sizeof(int16_t));
-
-#endif
       for (size_t k = 0; k < activeIndices[c].size; k++) {
         unsigned index = activeIndices[c].values[k];
         unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
-
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *column = (vec_t *)&ft_weights[offset];
+
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = vec_add_16(acc[j], column[j]);
-
-#else
-        for (unsigned j = 0; j < kHalfDimensions; j++)
-          accumulator->accumulation[c][i * TILE_HEIGHT + j] += ft_weights[offset + j];
-
-#endif
       }
 
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       for (unsigned j = 0; j < NUM_REGS; j++)
         accTile[j] = acc[j];
-
-#endif
     }
+#else
+    memcpy(accumulator->accumulation[c], ft_biases,
+        kHalfDimensions * sizeof(int16_t));
+
+    for (size_t k = 0; k < activeIndices[c].size; k++) {
+      unsigned index = activeIndices[c].values[k];
+      unsigned offset = kHalfDimensions * index;
+
+      for (unsigned j = 0; j < kHalfDimensions; j++)
+        accumulator->accumulation[c][j] += ft_weights[offset + j];
+    }
+#endif
   }
 
   accumulator->computedAccumulation = true;
@@ -1033,47 +1078,30 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
   added_indices[0].size = added_indices[1].size = 0;
   bool reset[2];
   append_changed_indices(pos, removed_indices, added_indices, reset);
+
+#ifdef TILING
   for (unsigned i = 0; i< kHalfDimensions / TILE_HEIGHT; i++) {
     for (unsigned c = 0; c < 2; c++) {
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       vec_t *accTile = (vec_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
       vec_t acc[NUM_REGS];
-#endif
 
       if (reset[c]) {
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *ft_b_tile = (vec_t *)&ft_biases[i * TILE_HEIGHT];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = ft_b_tile[j];
-#else
-        memcpy(&accumulator->accumulation[c][i * TILE_HEIGHT],
-            &ft_biases[i * TILE_HEIGHT], TILE_HEIGHT * sizeof(int16_t));
-#endif
       } else {
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *prevAccTile = (vec_t *)&prevAccumulator->accumulation[c][i * TILE_HEIGHT];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = prevAccTile[j];
-#else
-        memcpy(&accumulator->accumulation[c][i * TILE_HEIGHT],
-            &prevAccumulator->accumulation[c][i * TILE_HEIGHT],
-            TILE_HEIGHT * sizeof(int16_t));
-#endif
+
         // Difference calculation for the deactivated features
         for (unsigned k = 0; k < removed_indices[c].size; k++) {
           unsigned index = removed_indices[c].values[k];
           const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
           vec_t *column = (vec_t *)&ft_weights[offset];
           for (unsigned j = 0; j < NUM_REGS; j++)
             acc[j] = vec_sub_16(acc[j], column[j]);
-
-#else
-          for (unsigned j = 0; j < kHalfDimensions; j++)
-            accumulator->accumulation[c][i * TILE_HEIGHT + j] -= ft_weights[offset + j];
-
-#endif
         }
       }
 
@@ -1082,25 +1110,43 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
         unsigned index = added_indices[c].values[k];
         const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
         vec_t *column = (vec_t *)&ft_weights[offset];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = vec_add_16(acc[j], column[j]);
-
-#else
-        for (unsigned j = 0; j < TILE_HEIGHT; j++)
-          accumulator->accumulation[c][i * TILE_HEIGHT + j] += ft_weights[offset + j];
-
-#endif
       }
 
-#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
       for (unsigned j = 0; j < NUM_REGS; j++)
         accTile[j] = acc[j];
-
-#endif
     }
   }
+#else
+  for (unsigned c = 0; c < 2; c++) {
+    if (reset[c]) {
+      memcpy(accumulator->accumulation[c], ft_biases,
+          kHalfDimensions * sizeof(int16_t));
+    } else {
+      memcpy(accumulator->accumulation[c], prevAccumulator->accumulation[c],
+          kHalfDimensions * sizeof(int16_t));
+      // Difference calculation for the deactivated features
+      for (unsigned k = 0; k < removed_indices[c].size; k++) {
+        unsigned index = removed_indices[c].values[k];
+        const unsigned offset = kHalfDimensions * index;
+
+        for (unsigned j = 0; j < kHalfDimensions; j++)
+          accumulator->accumulation[c][j] -= ft_weights[offset + j];
+      }
+    }
+
+    // Difference calculation for the activated features
+    for (unsigned k = 0; k < added_indices[c].size; k++) {
+      unsigned index = added_indices[c].values[k];
+      const unsigned offset = kHalfDimensions * index;
+
+      for (unsigned j = 0; j < kHalfDimensions; j++)
+        accumulator->accumulation[c][j] += ft_weights[offset + j];
+    }
+  }
+#endif
 
   accumulator->computedAccumulation = true;
   return true;
@@ -1157,6 +1203,7 @@ INLINE void transform(const Position *pos, clipped_t *output,
 
 #endif
 
+  // TODO: get rid of the permutations by preparing weights and biases
   const Color perspectives[2] = { stm(), !stm() };
   for (unsigned p = 0; p < 2; p++) {
     const unsigned offset = kHalfDimensions * p;
@@ -1276,8 +1323,8 @@ struct NetData {
 Value nnue_evaluate(const Position *pos)
 {
   int32_t out_value;
-  alignas(8) mask_t input_mask[FtOutDims / (8 * sizeof(mask_t))];
 #ifdef TRANSPOSE
+  alignas(8) mask_t input_mask[FtOutDims / (8 * sizeof(mask_t))];
   alignas(8) mask_t hidden1_mask[8 / sizeof(mask_t)] = { 0 };
 #endif
 #ifdef ALIGNMENT_HACK // work around a bug in old gcc on Windows
@@ -1289,20 +1336,24 @@ Value nnue_evaluate(const Position *pos)
 #define B(x) (buf.x)
 #endif
 
-  transform(pos, B(input), input_mask);
-
 #ifndef TRANSPOSE
+
+  transform(pos, B(input), NULL);
 
   affine_propagate(B(input), B(hidden1_values), FtOutDims, 32,
       hidden1_biases, hidden1_weights);
   clip_propagate(B(hidden1_values), B(hidden1_clipped), 32);
+
   affine_propagate(B(hidden1_clipped), B(hidden2_values), 32, 32,
       hidden2_biases, hidden2_weights);
   clip_propagate(B(hidden2_values), B(hidden2_clipped), 32);
+
   affine_propagate(B(hidden2_clipped), &out_value, 32, 1, output_biases,
       output_weights);
 
 #else
+
+  transform(pos, B(input), input_mask);
 
   affine_txfm(B(input), B(hidden1_out), FtOutDims, 32,
       hidden1_biases, hidden1_weights, input_mask, hidden1_mask, true);
@@ -1322,17 +1373,29 @@ Value nnue_evaluate(const Position *pos)
   return out_value / FV_SCALE;
 }
 
-const char *read_weights(weight_t *w, unsigned width, unsigned height,
-    const char *d)
+void read_output_weights(weight_t *w, const char *d)
 {
-  for (unsigned i = 0; i < height; i++)
-    for (unsigned j = 0; j < width; j++) {
-#ifndef TRANSPOSE
-      w[i * width + j] = *d++;
+  for (unsigned i = 0; i < 32; i++)
+    w[i] = *d++;
+}
+
+const char *read_hidden_weights(weight_t *w, unsigned inDims, const char *d)
+{
+#if !defined(TRANSPOSE)
+  for (unsigned i = 0; i < 32 * inDims; i++)
+    w[i] = *d++;
+
+#elif !defined(USE_AVX512)
+  for (unsigned i = 0; i < 32; i++)
+    for (unsigned j = 0; j < inDims; j++)
+      w[j * 32 + i] = *d++;
+
 #else
-      w[j * height + i] = *d++;
+  for (unsigned i = 0; i < 32; i++)
+    for (unsigned j = 0; j < inDims; j++)
+      w[j * 64 + i + (i & ~7)] = *d++;
+
 #endif
-    }
 
   return d;
 }
@@ -1342,6 +1405,16 @@ void permute_biases(int32_t *biases)
 {
   __m128i *b = (__m128i *)biases;
   __m128i tmp[8];
+#ifdef USE_AVX512
+  tmp[0] = b[0];
+  tmp[1] = b[2];
+  tmp[2] = b[4];
+  tmp[3] = b[6];
+  tmp[4] = b[1];
+  tmp[5] = b[3];
+  tmp[6] = b[5];
+  tmp[7] = b[7];
+#elif USE_AVX2
   tmp[0] = b[0];
   tmp[1] = b[4];
   tmp[2] = b[1];
@@ -1350,6 +1423,7 @@ void permute_biases(int32_t *biases)
   tmp[5] = b[6];
   tmp[6] = b[3];
   tmp[7] = b[7];
+#endif
   memcpy(b, tmp, 8 * sizeof(__m128i));
 }
 #endif
@@ -1386,13 +1460,13 @@ void init_weights(const void *evalData)
   d += 4;
   for (unsigned i = 0; i < 32; i++, d += 4)
     hidden1_biases[i] = readu_le_u32(d);
-  d = read_weights(hidden1_weights, 512, 32, d);
+  d = read_hidden_weights(hidden1_weights, 512, d);
   for (unsigned i = 0; i < 32; i++, d += 4)
     hidden2_biases[i] = readu_le_u32(d);
-  d = read_weights(hidden2_weights, 32, 32, d);
+  d = read_hidden_weights(hidden2_weights, 32, d);
   for (unsigned i = 0; i < 1; i++, d += 4)
     output_biases[i] = readu_le_u32(d);
-  read_weights(output_weights, 32, 1, d);
+  read_output_weights(output_weights, d);
 
 #if defined(TRANSPOSE) && defined(USE_AVX2)
   permute_biases(hidden1_biases);
