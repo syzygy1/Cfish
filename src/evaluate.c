@@ -82,7 +82,7 @@ enum {
   LazyThreshold1 =  1400,
   LazyThreshold2 =  1300,
   SpaceThreshold = 12222,
-  NNUEThreshold  =   550,
+  NNUEThreshold1 =   550,
   NNUEThreshold2 =   150
 };
 
@@ -851,16 +851,16 @@ Value evaluate(const Position *pos)
 #ifdef NNUE
 
   if (useNNUE == EVAL_HYBRID) {
-    bool useClassical = abs(eg_value(psq_score())) * 16 >
-                              NNUEThreshold * (16 + rule50_count());
-    bool classical =   useClassical
-                    || (   abs(eg_value(psq_score())) > PawnValueMg / 4
-                        && !(pos->nodes & 0xB));
+    Value psq = abs(eg_value(psq_score()));
+    int r50 = 16 + rule50_count();
+    bool largePsq = psq * 16 > (NNUEThreshold1 + non_pawn_material() / 64) * r50;
+    bool classical = largePsq || (psq > PawnValueMg / 4 && !(pos->nodes & 0x0B));
+
     v =  classical ? evaluate_classical(pos)
                    : nnue_evaluate(pos) * 5 / 4 + Tempo;
 
-    if (useClassical && abs(v) * 16 < NNUEThreshold2 * (16 + rule50_count()))
-      v = nnue_evaluate(pos) * 5 / 4 + Tempo;
+    if (classical && largePsq && abs(v) * 16 < NNUEThreshold2 * r50)
+      v = nnue_evaluate(pos) * 5 /4 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)
     v = nnue_evaluate(pos) * 5 / 4 + Tempo;

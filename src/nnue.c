@@ -161,6 +161,7 @@ typedef int16x8_t vec_t;
 
 #else
 #undef TILING
+#define SIMD_WIDTH 16 // dummy
 
 #endif
 
