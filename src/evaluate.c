@@ -859,7 +859,11 @@ Value evaluate(const Position *pos)
     v =  classical ? evaluate_classical(pos)
                    : nnue_evaluate(pos) * 5 / 4 + Tempo;
 
-    if (classical && largePsq && abs(v) * 16 < NNUEThreshold2 * r50)
+    if (   classical && largePsq
+        && (   abs(v) * 16 < NNUEThreshold2 * r50
+            || (   opposite_bishops(pos)
+                && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50
+                && !(pos->nodes & 0xB))))
       v = nnue_evaluate(pos) * 5 /4 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)

@@ -137,7 +137,7 @@ static int extract_ponder_from_tt(RootMove *rm, Position *pos);
 void search_init(void)
 {
   for (int i = 1; i < MAX_MOVES; i++)
-    Reductions[i] = (22.0 + log(Threads.numThreads)) * log(i);
+    Reductions[i] = (22.0 + 2 * log(Threads.numThreads)) * log(i);
 }
 
 
@@ -547,10 +547,8 @@ void thread_search(Position *pos)
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
           failedHighCnt++;
-        } else {
-          rm->move[pvIdx].bestMoveCount++;
+        } else
           break;
-        }
 
         delta += delta / 4 + 5;
 
@@ -2152,7 +2150,7 @@ void start_thinking(Position *root, bool ponderMode)
       rm->move[i].pv[0] = moves->move[i].pv[0];
       rm->move[i].score = -VALUE_INFINITE;
       rm->move[i].previousScore = -VALUE_INFINITE;
-      rm->move[i].selDepth = rm->move[i].bestMoveCount = 0;
+      rm->move[i].selDepth = 0;
       rm->move[i].tbRank = moves->move[i].tbRank;
       rm->move[i].tbScore = moves->move[i].tbScore;
     }
