@@ -251,7 +251,7 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
     IndexList added[2], bool reset[2])
 {
   const DirtyPiece *dp = &(pos->st->dirtyPiece);
-  if (dp->dirtyNum == 0) return;
+  assert(dp->dirty_num != 0);
 
   for (unsigned c = 0; c < 2; c++) {
     reset[c] = dp->pc[0] == make_piece(c, KING);
@@ -441,12 +441,13 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 
 #if defined(USE_AVX512)
   (void)numDims;
-  const __m512i kOffsets = _mm512_set_epi32(0,0,0,0,0,0,0,0,13,9,5,1,12,8,4,0);
+//  const __m512i kOffsets = _mm512_set_epi32(0,0,0,0,0,0,0,0,13,9,5,1,12,8,4,0);
+  const __m512i kOffsets = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
   __m512i *in = (__m512i *)input;
   __m256i *out = (__m256i *)output;
   __m512i words = _mm512_srai_epi16(_mm512_packs_epi32(in[0], in[1]), SHIFT);
   out[0] = _mm256_max_epi8(_mm512_castsi512_si256(
-        _mm512_permutexvar_epi32(kOffsets, _mm512_packs_epi16(words, words))),
+        _mm512_permutexvar_epi64(kOffsets, _mm512_packs_epi16(words, words))),
         _mm256_setzero_si256());
 
 #elif defined(USE_AVX2)
@@ -981,11 +982,68 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[7] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_7, k0x7f80), k0x0080), k0x8000);
   }
 }
+#elif defined(USE_NEON)
+INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
+    unsigned outDims, const int32_t *biases, const weight_t *weights,
+    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
+{
+  assert(outDims == 32);
+
+  int32x4_t out_0 = ((int32x4_t *)biases)[0];
+  int32x4_t out_1 = ((int32x4_t *)biases)[1];
+  int32x4_t out_2 = ((int32x4_t *)biases)[2];
+  int32x4_t out_3 = ((int32x4_t *)biases)[3];
+  int32x4_t out_4 = ((int32x4_t *)biases)[4];
+  int32x4_t out_5 = ((int32x4_t *)biases)[5];
+  int32x4_t out_6 = ((int32x4_t *)biases)[6];
+  int32x4_t out_7 = ((int32x4_t *)biases)[7];
+  const int8x8_t *first;
+
+  (void)inMask;
+  for (unsigned idx = 0; idx < inDims; idx++) {
+    if (input[idx] <= 0)
+      continue;
+    first = (int8x8_t *)&weights[outDims * idx];
+    int16_t factor = input[idx];
+
+    int16x8_t prod;
+    prod = vmulq_n_s16(vmovl_s8(first[0]), factor);
+    out_0 = vaddq_s32(out_0, vmovl_s16(vget_low_s16(prod)));
+    out_1 = vaddq_s32(out_1, vmovl_high_s16(prod));
+    prod = vmulq_n_s16(vmovl_s8(first[1]), factor);
+    out_2 = vaddq_s32(out_2, vmovl_s16(vget_low_s16(prod)));
+    out_3 = vaddq_s32(out_3, vmovl_high_s16(prod));
+    prod = vmulq_n_s16(vmovl_s8(first[2]), factor);
+    out_4 = vaddq_s32(out_4, vmovl_s16(vget_low_s16(prod)));
+    out_5 = vaddq_s32(out_5, vmovl_high_s16(prod));
+    prod = vmulq_n_s16(vmovl_s8(first[3]), factor);
+    out_6 = vaddq_s32(out_6, vmovl_s16(vget_low_s16(prod)));
+    out_7 = vaddq_s32(out_7, vmovl_high_s16(prod));
+  }
+
+  int16x8_t out16_0 = vcombine_s16(vqshrn_n_s32(out_0, SHIFT), vqshrn_n_s32(out_1, SHIFT));
+  int16x8_t out16_1 = vcombine_s16(vqshrn_n_s32(out_2, SHIFT), vqshrn_n_s32(out_3, SHIFT));
+  int16x8_t out16_2 = vcombine_s16(vqshrn_n_s32(out_4, SHIFT), vqshrn_n_s32(out_5, SHIFT));
+  int16x8_t out16_3 = vcombine_s16(vqshrn_n_s32(out_6, SHIFT), vqshrn_n_s32(out_7, SHIFT));
+
+  int8x8_t *outVec = (int8x8_t *)output;
+  if (pack8_and_calc_mask) {
+    outVec[0] = vqmovn_s16(out16_0);
+    outVec[1] = vqmovn_s16(out16_1);
+    outVec[2] = vqmovn_s16(out16_2);
+    outVec[3] = vqmovn_s16(out16_3);
+  } else {
+    int8x8_t kZero = { 0 };
+    outVec[0] = vmax_s8(vqmovn_s16(out16_0), kZero);
+    outVec[1] = vmax_s8(vqmovn_s16(out16_1), kZero);
+    outVec[2] = vmax_s8(vqmovn_s16(out16_2), kZero);
+    outVec[3] = vmax_s8(vqmovn_s16(out16_3), kZero);
+  }
+}
 #else /* generic fallback */
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     unsigned outDims, int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask,
-    const bool pack8_and_calc_mask)
+    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
 {
   (void)inMask; (void)outMask; (void)pack8_and_calc_mask;
 
@@ -1200,7 +1258,9 @@ INLINE void transform(const Position *pos, clipped_t *output,
 #endif
 
 #elif defined(USE_NEON)
+#ifndef TRANSPOSE
   const int8x8_t kZero = {0};
+#endif
 
 #endif
 
@@ -1221,7 +1281,7 @@ INLINE void transform(const Position *pos, clipped_t *output,
       out[i] = _mm512_permutexvar_epi64(kOffsets, packed);
       *outMask++ = _mm512_cmpgt_epi8_mask(out[i], kZero);
 #endif
-     }
+    }
 
 #elif defined(USE_AVX2)
     __m256i *out = (__m256i *)&output[offset];
@@ -1288,7 +1348,13 @@ INLINE void transform(const Position *pos, clipped_t *output,
     int8x8_t *out = (int8x8_t *)&output[offset];
     for (unsigned i = 0; i < numChunks; i++) {
       int16x8_t sum = ((int16x8_t *)(*accumulation)[perspectives[p]])[i];
+#ifndef TRANSPOSE
       out[i] = vmax_s8(vqmovn_s16(sum), kZero);
+#else
+      out[i] = vqmovn_s16(sum);
+//     uint8x8_t gt = vcgt_s8(out[i], kZero);
+//      *outMask++ = vpaddl_u32(vpaddl_u16(vpaddl_u8(vandq_u8(gt, powers))));
+#endif
     }
 
 #else
@@ -1424,6 +1490,8 @@ void permute_biases(int32_t *biases)
   tmp[5] = b[6];
   tmp[6] = b[3];
   tmp[7] = b[7];
+#else
+#error
 #endif
   memcpy(b, tmp, 8 * sizeof(__m128i));
 }
