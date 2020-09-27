@@ -851,20 +851,21 @@ Value evaluate(const Position *pos)
 #ifdef NNUE
 
   if (useNNUE == EVAL_HYBRID) {
+    int mat = non_pawn_material();
     Value psq = abs(eg_value(psq_score()));
     int r50 = 16 + rule50_count();
-    bool largePsq = psq * 16 > (NNUEThreshold1 + non_pawn_material() / 64) * r50;
+    bool largePsq = psq * 16 > (NNUEThreshold1 + mat / 64) * r50;
     bool classical = largePsq || (psq > PawnValueMg / 4 && !(pos->nodes & 0x0B));
 
     v =  classical ? evaluate_classical(pos)
-                   : nnue_evaluate(pos) * 5 / 4 + Tempo;
+                   : nnue_evaluate(pos) * (1024 + mat / 32) / 1024 + Tempo;
 
     if (   classical && largePsq
         && (   abs(v) * 16 < NNUEThreshold2 * r50
             || (   opposite_bishops(pos)
                 && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50
                 && !(pos->nodes & 0xB))))
-      v = nnue_evaluate(pos) * 5 /4 + Tempo;
+      v = nnue_evaluate(pos) * (1024 + mat / 32) / 1024 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)
     v = nnue_evaluate(pos) * 5 / 4 + Tempo;
@@ -888,8 +889,9 @@ Value evaluate(const Position *pos)
 Value evaluate(const Position *pos)
 {
   Value v;
+  int mat = non_pawn_material();
 
-  v = nnue_evaluate(pos) * 5 / 4 + Tempo;
+  v = nnue_evaluate(pos) * (1024 + mat / 32) / 1024 + Tempo;
   v = v * (100 - rule50_count()) / 100;
   return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 }
