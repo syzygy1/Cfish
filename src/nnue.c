@@ -107,7 +107,7 @@ enum {
 #endif
 
 #ifdef TRANSPOSE
-#if defined(USE_SSE)
+#if defined(USE_SSE) || defined(USE_NEON)
 #define USE_MASK
 #endif
 #endif
@@ -193,6 +193,8 @@ typedef uint32_t mask_t;
 #elif defined(USE_SSE2)
 typedef uint16_t mask_t;
 #elif defined(USE_MMX)
+typedef uint8_t mask_t;
+#elif defined(USE_NEON)
 typedef uint8_t mask_t;
 #else
 typedef uint8_t mask_t; // dummy
@@ -549,6 +551,21 @@ INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
   *v &= *v - 1;
   return true;
 }
+
+#ifdef USE_NEON
+INLINE void neon_movemask(uint8_t *outMask, uint8x16_t out)
+{
+  const uint8_t __attribute__((aligned(16))) powers[16] =
+    { 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128 };
+  const uint8x16_t kPowers = vld1q_u8(powers);
+  const uint8x16_t kZero = { 0 };
+
+  uint8x16_t gt = vcgtq_s8(out, kZero);
+  uint64x2_t mask = vpaddlq_u32(vpaddlq_u16(vpaddlq_u8(vandq_u8(gt, kPowers))));
+  vst1q_lane_u8(outMask, (uint8x16_t)mask, 0);
+  vst1q_lane_u8(outMask + 1, (uint8x16_t)mask, 8);
+}
+#endif
 #endif
 
 #if defined(USE_AVX512)
@@ -996,11 +1013,13 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   int32x4_t out_6 = ((int32x4_t *)biases)[6];
   int32x4_t out_7 = ((int32x4_t *)biases)[7];
   const int8x8_t *first;
+  uint64_t v;
+  unsigned idx;
 
-  (void)inMask;
-  for (unsigned idx = 0; idx < inDims; idx++) {
-    if (input[idx] <= 0)
-      continue;
+  memcpy(&v, inMask, 8);
+  for (unsigned offset = 0; offset < inDims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+      break;
     first = (int8x8_t *)&weights[outDims * idx];
     int16_t factor = input[idx];
 
@@ -1027,7 +1046,9 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   if (pack8_and_calc_mask) {
     int8x16_t *outVec = (int8x16_t *)output;
     outVec[0] = vcombine_s8(vqmovn_s16(out16_0), vqmovn_s16(out16_1));
+    neon_movemask(outMask, outVec[0]);
     outVec[1] = vcombine_s8(vqmovn_s16(out16_2), vqmovn_s16(out16_3));
+    neon_movemask(outMask + 2, outVec[1]);
   } else {
     // The next step takes int8x8_t as input, so store as int8x8_t
     int8x8_t *outVec = (int8x8_t *)output;
@@ -1210,8 +1231,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 }
 
 // Convert input features
-INLINE void transform(const Position *pos, clipped_t *output,
-    mask_t *outMask)
+INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 {
   if (!update_accumulator_if_possible(pos))
     refresh_accumulator(pos);
@@ -1351,8 +1371,8 @@ INLINE void transform(const Position *pos, clipped_t *output,
       out[i] = vmaxq_s8(vcombine_s8(vqmovn_s16(sum), vqmovn_s16(sum1)), kZero);
 #else
       out[i] = vcombine_s8(vqmovn_s16(sum), vqmovn_s16(sum1));
-//     uint8x16_t gt = vcgtq_s8(out[i], kZero);
-//      *outMask++ = vpaddl_u32(vpaddl_u16(vpaddl_u8(vandq_u8(gt, powers))));
+      neon_movemask(outMask, out[i]);
+      outMask += 2;
 #endif
     }
 
