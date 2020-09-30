@@ -520,10 +520,8 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
   int32x4_t *in = (int32x4_t *)input;
   int8x8_t *out = (int8x8_t *)output;
   for (unsigned i = 0; i < numChunks; i++) {
-    int16x8_t shifted;
-    int16x4_t *pack = (int16x4_t *)&shifted;
-    pack[0] = vqshrn_n_s32(in[i * 2 + 0], SHIFT);
-    pack[1] = vqshrn_n_s32(in[i * 2 + 1], SHIFT);
+    int16x8_t shifted = vcombine_s16(
+        vqshrn_n_s32(in[i * 2], SHIFT), vqshrn_n_s32(in[i * 2 + 1], SHIFT));
     out[i] = vmax_s8(vqmovn_s16(shifted), kZero);
   }
 
@@ -1026,13 +1024,13 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   int16x8_t out16_2 = vcombine_s16(vqshrn_n_s32(out_4, SHIFT), vqshrn_n_s32(out_5, SHIFT));
   int16x8_t out16_3 = vcombine_s16(vqshrn_n_s32(out_6, SHIFT), vqshrn_n_s32(out_7, SHIFT));
 
-  int8x8_t *outVec = (int8x8_t *)output;
   if (pack8_and_calc_mask) {
-    outVec[0] = vqmovn_s16(out16_0);
-    outVec[1] = vqmovn_s16(out16_1);
-    outVec[2] = vqmovn_s16(out16_2);
-    outVec[3] = vqmovn_s16(out16_3);
+    int8x16_t *outVec = (int8x16_t *)output;
+    outVec[0] = vcombine_s8(vqmovn_s16(out16_0), vqmovn_s16(out16_1));
+    outVec[1] = vcombine_s8(vqmovn_s16(out16_2), vqmovn_s16(out16_3));
   } else {
+    // The next step takes int8x8_t as input, so store as int8x8_t
+    int8x8_t *outVec = (int8x8_t *)output;
     int8x8_t kZero = { 0 };
     outVec[0] = vmax_s8(vqmovn_s16(out16_0), kZero);
     outVec[1] = vmax_s8(vqmovn_s16(out16_1), kZero);
@@ -1259,7 +1257,7 @@ INLINE void transform(const Position *pos, clipped_t *output,
 
 #elif defined(USE_NEON)
 #ifndef TRANSPOSE
-  const int8x8_t kZero = {0};
+  const int8x16_t kZero = {0};
 #endif
 
 #endif
@@ -1345,14 +1343,15 @@ INLINE void transform(const Position *pos, clipped_t *output,
 #endif
 
 #elif defined(USE_NEON)
-    int8x8_t *out = (int8x8_t *)&output[offset];
-    for (unsigned i = 0; i < numChunks; i++) {
-      int16x8_t sum = ((int16x8_t *)(*accumulation)[perspectives[p]])[i];
+    int8x16_t *out = (int8x16_t *)&output[offset];
+    for (unsigned i = 0; i < numChunks / 2; i++) {
+      int16x8_t sum = ((int16x8_t *)(*accumulation)[perspectives[p]])[2 * i];
+      int16x8_t sum1 = ((int16x8_t *)(*accumulation)[perspectives[p]])[2 * i + 1];
 #ifndef TRANSPOSE
-      out[i] = vmax_s8(vqmovn_s16(sum), kZero);
+      out[i] = vmaxq_s8(vcombine_s8(vqmovn_s16(sum), vqmovn_s16(sum1)), kZero);
 #else
-      out[i] = vqmovn_s16(sum);
-//     uint8x8_t gt = vcgt_s8(out[i], kZero);
+      out[i] = vcombine_s8(vqmovn_s16(sum), vqmovn_s16(sum1));
+//     uint8x16_t gt = vcgtq_s8(out[i], kZero);
 //      *outMask++ = vpaddl_u32(vpaddl_u16(vpaddl_u8(vandq_u8(gt, powers))));
 #endif
     }
