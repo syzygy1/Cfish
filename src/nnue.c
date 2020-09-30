@@ -100,7 +100,7 @@ enum {
 //#define TRANSPOSE
 
 #elif defined(USE_NEON)
-//#define TRANSPOSE
+#define TRANSPOSE
 
 #else /* fallback code */
 #define TRANSPOSE
