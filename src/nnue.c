@@ -217,7 +217,7 @@ INLINE unsigned make_index(Color c, Square s, Piece pc, Square ksq)
   return orient(c, s) + PieceToIndex[c][pc] + PS_END * ksq;
 }
 
-static void half_kp_append_active_indices(const Position *pos, Color c,
+static void half_kp_append_active_indices(const Position *pos, const Color c,
     IndexList *active)
 {
   Square ksq = orient(c, square_of(c, KING));
@@ -228,11 +228,10 @@ static void half_kp_append_active_indices(const Position *pos, Color c,
   }
 }
 
-static void half_kp_append_changed_indices(const Position *pos, Color c,
-    IndexList *removed, IndexList *added)
+static void half_kp_append_changed_indices(const Position *pos, const Color c,
+    const DirtyPiece *dp, IndexList *removed, IndexList *added)
 {
   Square ksq = orient(c, square_of(c, KING));
-  DirtyPiece *dp = &(pos->st->dirtyPiece);
   for (int i = 0; i < dp->dirtyNum; i++) {
     Piece pc = dp->pc[i];
     if (type_of_p(pc) == KING) continue;
@@ -255,12 +254,26 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
   const DirtyPiece *dp = &(pos->st->dirtyPiece);
   assert(dp->dirty_num != 0);
 
-  for (unsigned c = 0; c < 2; c++) {
-    reset[c] = dp->pc[0] == make_piece(c, KING);
-    if (reset[c])
-      half_kp_append_active_indices(pos, c, &added[c]);
-    else
-      half_kp_append_changed_indices(pos, c, &removed[c], &added[c]);
+  if ((pos->st-1)->accumulator.computedAccumulation) {
+    for (unsigned c = 0; c < 2; c++) {
+      reset[c] = dp->pc[0] == make_piece(c, KING);
+      if (reset[c])
+        half_kp_append_active_indices(pos, c, &added[c]);
+      else
+        half_kp_append_changed_indices(pos, c, dp, &removed[c], &added[c]);
+    }
+  } else {
+    const DirtyPiece *dp2 = &((pos->st-1)->dirtyPiece);
+    for (unsigned c = 0; c < 2; c++) {
+      reset[c] =   dp->pc[0] == make_piece(c, KING)
+                || dp2->pc[0] == make_piece(c, KING);
+      if (reset[c])
+        half_kp_append_active_indices(pos, c, &added[c]);
+      else {
+        half_kp_append_changed_indices(pos, c, dp, &removed[c], &added[c]);
+        half_kp_append_changed_indices(pos, c, dp2, &removed[c], &added[c]);
+      }
+    }
   }
 }
 
@@ -443,7 +456,6 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 
 #if defined(USE_AVX512)
   (void)numDims;
-//  const __m512i kOffsets = _mm512_set_epi32(0,0,0,0,0,0,0,0,13,9,5,1,12,8,4,0);
   const __m512i kOffsets = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
   __m512i *in = (__m512i *)input;
   __m256i *out = (__m256i *)output;
@@ -1147,8 +1159,9 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
   if (accumulator->computedAccumulation)
     return true;
 
-  Accumulator *prevAccumulator = &((pos->st-1)->accumulator);
-  if (!prevAccumulator->computedAccumulation)
+  Accumulator *prevAcc;
+  if (   !(prevAcc = &(pos->st-1)->accumulator)->computedAccumulation
+      && !(prevAcc = &(pos->st-2)->accumulator)->computedAccumulation)
     return false;
 
   IndexList removed_indices[2], added_indices[2];
@@ -1168,7 +1181,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = ft_b_tile[j];
       } else {
-        vec_t *prevAccTile = (vec_t *)&prevAccumulator->accumulation[c][i * TILE_HEIGHT];
+        vec_t *prevAccTile = (vec_t *)&prevAcc->accumulation[c][i * TILE_HEIGHT];
         for (unsigned j = 0; j < NUM_REGS; j++)
           acc[j] = prevAccTile[j];
 
@@ -1203,7 +1216,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
       memcpy(accumulator->accumulation[c], ft_biases,
           kHalfDimensions * sizeof(int16_t));
     } else {
-      memcpy(accumulator->accumulation[c], prevAccumulator->accumulation[c],
+      memcpy(accumulator->accumulation[c], prevAcc->accumulation[c],
           kHalfDimensions * sizeof(int16_t));
       // Difference calculation for the deactivated features
       for (unsigned k = 0; k < removed_indices[c].size; k++) {
