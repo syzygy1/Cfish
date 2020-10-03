@@ -46,6 +46,13 @@ INCBIN(Network, DefaultEvalFile);
 #define ALIGNMENT_HACK
 #endif
 
+#if defined(USE_NEON) && !defined(IS_64BIT)
+INLINE int16x8_t vmovl_high_s16(int8x16_t v)
+{
+  return vmovl_s16(vget_high_s16(v));
+}
+#endif
+
 enum {
   PS_W_PAWN   =  1,
   PS_B_PAWN   =  1 * 64 + 1,
