@@ -572,14 +572,14 @@ INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
 }
 
 #ifdef USE_NEON
-INLINE void neon_movemask(uint8_t *outMask, uint8x16_t out)
+INLINE void neon_movemask(uint8_t *outMask, int8x16_t out)
 {
   const uint8_t __attribute__((aligned(16))) powers[16] =
     { 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128 };
   const uint8x16_t kPowers = vld1q_u8(powers);
   const uint8x16_t kZero = { 0 };
 
-  uint8x16_t gt = vcgtq_s8(out, kZero);
+ int8x16_t gt = vcgtq_s8(out, kZero);
   uint64x2_t mask = vpaddlq_u32(vpaddlq_u16(vpaddlq_u8(vandq_u8(gt, kPowers))));
   vst1q_lane_u8(outMask, (uint8x16_t)mask, 0);
   vst1q_lane_u8(outMask + 1, (uint8x16_t)mask, 8);
