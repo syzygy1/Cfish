@@ -92,7 +92,7 @@ INLINE Bitboard inv_sq(Bitboard b, Square s)
 }
 #endif
 
-INLINE uint64_t more_than_one(Bitboard b)
+INLINE bool more_than_one(Bitboard b)
 {
   return b & (b - 1);
 }

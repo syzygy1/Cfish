@@ -90,11 +90,8 @@ enum {
 static const int KingAttackWeights[8] = { 0, 0, 81, 52, 44, 10 };
 
 // Penalties for enemy's safe checks
-enum {
-  QueenSafeCheck  = 772,
-  RookSafeCheck   = 1084,
-  BishopSafeCheck = 645,
-  KnightSafeCheck = 792
+static const int SafeCheck[][2] = {
+  {0}, {0}, { 803, 1292 }, { 639, 974 }, { 1087, 1878 }, { 759, 1132 }
 };
 
 #define V(v) (Value)(v)
@@ -105,22 +102,22 @@ enum {
 // mobility area.
 static const Score MobilityBonus[4][32] = {
   // Knight
-  { S(-62,-81), S(-53,-56), S(-12,-31), S( -4,-16), S(  3,  5), S( 13, 11),
-    S( 22, 17), S( 28, 20), S( 33, 25) },
+  { S(-62,-79), S(-53,-57), S(-12,-31), S( -3,-17), S(  3,  7), S( 12, 13),
+    S( 21, 16), S( 28, 21), S( 37, 26) },
   // Bishop
-  { S(-48,-59), S(-20,-23), S( 16, -3), S( 26, 13), S( 38, 24), S( 51, 42),
-    S( 55, 54), S( 63, 57), S( 63, 65), S( 68, 73), S( 81, 78), S( 81, 86),
-    S( 91, 88), S( 98, 97) },
+  { S(-47,-59), S(-20,-25), S( 14, -8), S( 29, 12), S( 39, 21), S( 53, 40),
+    S( 53, 56), S( 60, 58), S( 62, 65), S( 69, 72), S( 78, 78), S( 83, 87),
+    S( 91, 88), S( 96, 98) },
   // Rook
-  { S(-60,-78), S(-20,-17), S(  2, 23), S(  3, 39), S(  3, 70), S( 11, 99), // Rook
-    S( 22,103), S( 31,121), S( 40,134), S( 40,139), S( 41,158), S( 48,164),
-    S( 57,168), S( 57,169), S( 62,172) },
+  { S(-61,-82), S(-20,-17), S(  2, 23) ,S(  3, 40), S(  4, 72), S( 11,100),
+    S( 22,104), S( 31,120), S( 39,134), S(40 ,138), S( 41,158), S( 47,163),
+    S( 59,168), S( 60,169), S( 64,173) },
   // Queen
-  { S(-30,-48), S(-12,-30), S( -8, -7), S( -9, 19), S( 20, 40), S( 23, 55), // Queen
-    S( 23, 59), S( 35, 75), S( 38, 78), S( 53, 96), S( 64, 96), S( 65,100),
-    S( 65,121), S( 66,127), S( 67,131), S( 67,133), S( 72,136), S( 72,141),
-    S( 77,147), S( 79,150), S( 93,151), S(108,168), S(108,168), S(108,171),
-    S(110,182), S(114,182), S(114,192), S(116,219) }
+  { S(-29,-49), S(-16,-29), S( -8, -8), S( -8, 17), S( 18, 39), S( 25, 54),
+    S( 23, 59), S( 37, 73), S( 41, 76), S( 54, 95), S( 65, 95) ,S( 68,101),
+    S( 69,124), S( 70,128), S( 70,132), S( 70,133) ,S( 71,136), S( 72,140),
+    S( 74,147), S( 76,149), S( 90,153), S(104,169), S(105,171), S(106,171),
+    S(112,178), S(114,185), S(114,187), S(119,221) }
 };
 
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
@@ -391,32 +388,28 @@ INLINE Score evaluate_king(const Position *pos, EvalInfo *ei, Score *mobility,
   // Enemy rooks checks
   rookChecks = b1 & ei->attackedBy[Them][ROOK] & safe;
   if (rookChecks)
-    kingDanger += more_than_one(rookChecks) ? RookSafeCheck * 175/100
-                                            : RookSafeCheck;
+    kingDanger += SafeCheck[ROOK][more_than_one(rookChecks)];
   else
     unsafeChecks |= b1 & ei->attackedBy[Them][ROOK];
 
   queenChecks =  (b1 | b2) & ei->attackedBy[Them][QUEEN] & safe
                & ~(ei->attackedBy[Us][QUEEN] | rookChecks);
   if (queenChecks)
-    kingDanger += more_than_one(queenChecks) ? QueenSafeCheck * 145/100
-                                             : QueenSafeCheck;
+    kingDanger += SafeCheck[QUEEN][more_than_one(queenChecks)];
 
   // Enemy bishops checks: we count them only if they are from squares from
   // which we can't give a queen check, because queen checks are more valuable.
   bishopChecks =  b2 & ei->attackedBy[Them][BISHOP] & safe
                 & ~queenChecks;
   if (bishopChecks)
-    kingDanger += more_than_one(bishopChecks) ? BishopSafeCheck * 3/2
-                                              : BishopSafeCheck;
+    kingDanger += SafeCheck[BISHOP][more_than_one(bishopChecks)];
   else
     unsafeChecks |= b2 & ei->attackedBy[Them][BISHOP];
 
   // Enemy knights checks
   knightChecks = attacks_from_knight(ksq) & ei->attackedBy[Them][KNIGHT];
   if (knightChecks & safe)
-    kingDanger += more_than_one(knightChecks & safe) ? KnightSafeCheck * 162/100 
-                                                     : KnightSafeCheck;
+    kingDanger += SafeCheck[KNIGHT][more_than_one(knightChecks & safe)];
   else
     unsafeChecks |= knightChecks;
 
@@ -851,21 +844,21 @@ Value evaluate(const Position *pos)
 #ifdef NNUE
 
   if (useNNUE == EVAL_HYBRID) {
-    int mat = non_pawn_material();
+    const int mat = non_pawn_material() + PieceValue[MG][PAWN] * popcount(pieces_p(PAWN));
     Value psq = abs(eg_value(psq_score()));
     int r50 = 16 + rule50_count();
-    bool largePsq = psq * 16 > (NNUEThreshold1 + mat / 64) * r50;
+    bool largePsq = psq * 16 > (NNUEThreshold1 + non_pawn_material() / 64) * r50;
     bool classical = largePsq || (psq > PawnValueMg / 4 && !(pos->nodes & 0x0B));
 
     v =  classical ? evaluate_classical(pos)
-                   : nnue_evaluate(pos) * (1024 + mat / 32) / 1024 + Tempo;
+                   : nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
 
     if (   classical && largePsq
         && (   abs(v) * 16 < NNUEThreshold2 * r50
             || (   opposite_bishops(pos)
                 && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50
                 && !(pos->nodes & 0xB))))
-      v = nnue_evaluate(pos) * (1024 + mat / 32) / 1024 + Tempo;
+      v = nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)
     v = nnue_evaluate(pos) * 5 / 4 + Tempo;
@@ -889,9 +882,9 @@ Value evaluate(const Position *pos)
 Value evaluate(const Position *pos)
 {
   Value v;
-  int mat = non_pawn_material();
+  int mat = non_pawn_material() + PieceValue[MG][PAWN] * popcount(pieces_p(PAWN));
 
-  v = nnue_evaluate(pos) * (1024 + mat / 32) / 1024 + Tempo;
+  v = nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
   v = v * (100 - rule50_count()) / 100;
   return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 }

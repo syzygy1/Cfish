@@ -137,7 +137,7 @@ static int extract_ponder_from_tt(RootMove *rm, Position *pos);
 void search_init(void)
 {
   for (int i = 1; i < MAX_MOVES; i++)
-    Reductions[i] = (22.0 + 2 * log(Threads.numThreads)) * log(i);
+    Reductions[i] = (22.0 + 2 * log(Threads.numThreads)) * log(i + 0.25 * log(i));
 }
 
 
@@ -922,7 +922,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = (817 + 71 * depth) / 213 + min((eval - beta) / 192, 3);
+    Depth R = (952 + 85 * depth) / 256 + min((eval - beta) / 192, 3);
 
     ss->currentMove = MOVE_NULL;
     ss->history = &(*pos->counterMoveHistory)[0][0][0][0];
