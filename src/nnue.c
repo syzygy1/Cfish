@@ -104,7 +104,7 @@ enum {
 #define TRANSPOSE
 
 #elif defined(USE_MMX)
-//#define TRANSPOSE
+#define TRANSPOSE
 
 #elif defined(USE_NEON)
 #define TRANSPOSE
@@ -114,7 +114,7 @@ enum {
 #endif
 
 #ifdef TRANSPOSE
-#if defined(USE_SSE) || defined(USE_NEON)
+#if defined(USE_MMX) || defined(USE_NEON)
 #define USE_MASK
 #endif
 #endif
@@ -571,15 +571,25 @@ INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
   return true;
 }
 
-#ifdef USE_NEON
+#if defined(USE_MMX) && !defined(USE_SSE)
+INLINE int _mm_movemask_pi8(__m64 v)
+{
+  const __m64 powers = _mm_set_pi8(-128, 64, 32, 16, 8, 4, 2, 1);
+  __m64 m = _mm_and_si64(v, powers);
+  m = _mm_or_si64(m, _mm_srli_si64(m, 32));
+  m = _mm_or_si64(m, _mm_srli_pi32(m, 16));
+  m = _mm_or_si64(m, _mm_srli_pi16(m, 8));
+  return _mm_cvtsi64_si32(m) & 0xff;
+}
+#elif defined(USE_NEON)
 INLINE void neon_movemask(uint8_t *outMask, int8x16_t out)
 {
   const uint8_t __attribute__((aligned(16))) powers[16] =
     { 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128 };
   const uint8x16_t kPowers = vld1q_u8(powers);
-  const uint8x16_t kZero = { 0 };
+  const int8x16_t kZero = { 0 };
 
- int8x16_t gt = vcgtq_s8(out, kZero);
+  int8x16_t gt = vcgtq_s8(out, kZero);
   uint64x2_t mask = vpaddlq_u32(vpaddlq_u16(vpaddlq_u8(vandq_u8(gt, kPowers))));
   vst1q_lane_u8(outMask, (uint8x16_t)mask, 0);
   vst1q_lane_u8(outMask + 1, (uint8x16_t)mask, 8);
@@ -840,7 +850,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 #endif
   }
 }
-#elif defined(USE_MMX) && defined(USE_SSE)
+#elif defined(USE_MMX) && defined(USE_MASK)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     unsigned outDims, const int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
@@ -919,6 +929,7 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[3] = _mm_packs_pi16(out16_6, out16_7);
     outMask[3] = _mm_movemask_pi8(_mm_cmpgt_pi8(outVec[3], kZeros[0]));
   } else {
+#ifdef USE_SSE
     const __m64 kx07f = _mm_set1_pi16(127);
     outVec[0] = _mm_min_pi16(_mm_max_pi16(out16_0, kZeros[0]), kx07f);
     outVec[1] = _mm_min_pi16(_mm_max_pi16(out16_1, kZeros[0]), kx07f);
@@ -928,7 +939,20 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[5] = _mm_min_pi16(_mm_max_pi16(out16_5, kZeros[0]), kx07f);
     outVec[6] = _mm_min_pi16(_mm_max_pi16(out16_6, kZeros[0]), kx07f);
     outVec[7] = _mm_min_pi16(_mm_max_pi16(out16_7, kZeros[0]), kx07f);
-  }
+#else
+    const __m64 k0x7f80 = _mm_set1_pi16(0x7f80);
+    const __m64 k0x0080 = _mm_set1_pi16(0x0080);
+    const __m64 k0x8000 = _mm_set1_pi16(-0x8000);
+    outVec[0] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_0, k0x7f80), k0x0080), k0x8000);
+    outVec[1] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_1, k0x7f80), k0x0080), k0x8000);
+    outVec[2] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_2, k0x7f80), k0x0080), k0x8000);
+    outVec[3] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_3, k0x7f80), k0x0080), k0x8000);
+    outVec[4] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_4, k0x7f80), k0x0080), k0x8000);
+    outVec[5] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_5, k0x7f80), k0x0080), k0x8000);
+    outVec[6] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_6, k0x7f80), k0x0080), k0x8000);
+    outVec[7] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_7, k0x7f80), k0x0080), k0x8000);
+#endif
+ }
 }
 #elif defined(USE_MMX)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
@@ -1291,7 +1315,7 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
   const __m64 k0x0080 = _mm_set1_pi16(0x0080);
   const __m64 k0x8000 = _mm_set1_pi16(-0x8000);
 #endif
-#elif USE_SSE
+#else
   const __m64 kZero = _mm_setzero_si64();
 #endif
 
