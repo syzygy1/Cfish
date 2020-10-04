@@ -598,7 +598,7 @@ INLINE void neon_movemask(uint8_t *outMask, int8x16_t out)
   const uint8x16_t kPowers = vld1q_u8(powers);
   const int8x16_t kZero = { 0 };
 
-  int8x16_t gt = vcgtq_s8(out, kZero);
+  uint8x16_t gt = vcgtq_s8(out, kZero);
   uint64x2_t mask = vpaddlq_u32(vpaddlq_u16(vpaddlq_u8(vandq_u8(gt, kPowers))));
   vst1q_lane_u8(outMask, (uint8x16_t)mask, 0);
   vst1q_lane_u8(outMask + 1, (uint8x16_t)mask, 8);
