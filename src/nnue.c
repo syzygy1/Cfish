@@ -468,12 +468,12 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 
 #if defined(USE_AVX512)
   (void)numDims;
-  const __m512i kOffsets = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
+  const __m512i kOffsets = _mm512_set_epi32(0,0,0,0,0,0,0,0,13,9,5,1,12,8,4,0);
   __m512i *in = (__m512i *)input;
   __m256i *out = (__m256i *)output;
   __m512i words = _mm512_srai_epi16(_mm512_packs_epi32(in[0], in[1]), SHIFT);
   out[0] = _mm256_max_epi8(_mm512_castsi512_si256(
-        _mm512_permutexvar_epi64(kOffsets, _mm512_packs_epi16(words, words))),
+        _mm512_permutexvar_epi32(kOffsets, _mm512_packs_epi16(words, words))),
         _mm256_setzero_si256());
 
 #elif defined(USE_AVX2)
@@ -1263,7 +1263,6 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
   const unsigned numChunks = (16 * kHalfDimensions) / SIMD_WIDTH;
 #if defined(USE_AVX512)
   const __m512i kZero = _mm512_setzero_si512();
-  const __m512i kOffsets = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
 
 #elif defined(USE_AVX2)
   const __m256i kZero = _mm256_setzero_si256();
@@ -1302,7 +1301,6 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 
 #endif
 
-  // TODO: get rid of the permutations by preparing weights and biases
   const Color perspectives[2] = { stm(), !stm() };
   for (unsigned p = 0; p < 2; p++) {
     const unsigned offset = kHalfDimensions * p;
@@ -1310,13 +1308,13 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 #if defined(USE_AVX512)
     __m512i *out = (__m512i *)&output[offset];
     for (unsigned i = 0; i < numChunks / 2; i++) {
-      __m512i sum0 = ((__m512i *)(*accumulation)[perspectives[p]])[i * 2 + 0];
+      __m512i sum0 = ((__m512i *)(*accumulation)[perspectives[p]])[i * 2];
       __m512i sum1 = ((__m512i *)(*accumulation)[perspectives[p]])[i * 2 + 1];
       __m512i packed = _mm512_packs_epi16(sum0, sum1);
 #ifndef TRANSPOSE
-      out[i] = _mm512_permutexvar_epi64(kOffsets, _mm512_max_epi8(packed, kZero));
+      out[i] = _mm512_max_epi8(packed, kZero);
 #else
-      out[i] = _mm512_permutexvar_epi64(kOffsets, packed);
+      out[i] = packed;
       *outMask++ = _mm512_cmpgt_epi8_mask(out[i], kZero);
 #endif
     }
@@ -1324,14 +1322,14 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 #elif defined(USE_AVX2)
     __m256i *out = (__m256i *)&output[offset];
     for (unsigned i = 0; i < numChunks / 2; i++) {
-      __m256i sum0 = ((__m256i *)(*accumulation)[perspectives[p]])[i * 2 + 0];
+      __m256i sum0 = ((__m256i *)(*accumulation)[perspectives[p]])[i * 2];
       __m256i sum1 = ((__m256i *)(*accumulation)[perspectives[p]])[i * 2 + 1];
       __m256i packed = _mm256_packs_epi16(sum0, sum1);
 #ifndef TRANSPOSE
-      out[i] = _mm256_permute4x64_epi64(_mm256_max_epi8(packed, kZero), 0xd8);
+      out[i] = _mm256_max_epi8(packed, kZero);
 #else
-      out[i] = _mm256_permute4x64_epi64(packed, 0xd8);
-      *outMask++ = _mm256_movemask_epi8(_mm256_cmpgt_epi8(out[i], kZero));
+      out[i] = packed;
+      *outMask++ = _mm256_movemask_epi8(_mm256_cmpgt_epi8(packed, kZero));
 #endif
     }
 
@@ -1350,7 +1348,7 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 #endif
 #else
       out[i] = packed;
-      *outMask++ = _mm_movemask_epi8(_mm_cmpgt_epi8(packed, kZero));
+      *outMask++ = _mm_movemask_epi8(_mm_cmpgt_epi8(out[i], kZero));
 #endif
     }
 #else /* USE_SSE2 && !TRANSPOSE */
@@ -1479,35 +1477,56 @@ Value nnue_evaluate(const Position *pos)
   return out_value / FV_SCALE;
 }
 
-void read_output_weights(weight_t *w, const char *d)
+static void read_output_weights(weight_t *w, const char *d)
 {
   for (unsigned i = 0; i < 32; i++)
     w[i] = *d++;
 }
 
-const char *read_hidden_weights(weight_t *w, unsigned inDims, const char *d)
+INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
 {
-#if !defined(TRANSPOSE)
-  for (unsigned i = 0; i < 32 * inDims; i++)
-    w[i] = *d++;
+  (void)dims;
 
-#elif !defined(USE_AVX512)
-  for (unsigned i = 0; i < 32; i++)
-    for (unsigned j = 0; j < inDims; j++)
-      w[j * 32 + i] = *d++;
+#if defined(USE_AVX512)
+  if (dims > 32) {
+    unsigned b = c & 0x38;
+    b = (b << 1) | (b >> 2);
+    c = (c & ~0x38) | (b & 0x38);
+  }
 
-#else
-  for (unsigned i = 0; i < 32; i++)
-    for (unsigned j = 0; j < inDims; j++)
-      w[j * 64 + i + (i & ~7)] = *d++;
+#elif defined(USE_AVX2)
+  if (dims > 32) {
+    unsigned b = c & 0x18;
+    b = (b << 1) | (b >> 1);
+    c = (c & ~0x18) | (b & 0x18);
+  }
 
 #endif
+
+#if !defined(TRANSPOSE)
+  return r * dims + c;
+
+#elif defined(USE_AVX512)
+  return c * 64 + r + (r & ~7);
+
+#else
+  return c * 32 + r;
+
+#endif
+}
+
+static const char *read_hidden_weights(weight_t *w, unsigned dims,
+    const char *d)
+{
+  for (unsigned r = 0; r < 32; r++)
+    for (unsigned c = 0; c < dims; c++)
+      w[wt_idx(r, c, dims)] = *d++;
 
   return d;
 }
 
 #if defined(TRANSPOSE) && defined(USE_AVX2)
-void permute_biases(int32_t *biases)
+static void permute_biases(int32_t *biases)
 {
   __m128i *b = (__m128i *)biases;
   __m128i tmp[8];
@@ -1536,11 +1555,12 @@ void permute_biases(int32_t *biases)
 }
 #endif
 
-static const size_t TransformerStart = 3 * 4 + 177;
-static const size_t NetworkStart =
-    TransformerStart + 4 + 2 * 256 + 2 * 256 * 64 * 641;
+enum {
+  TransformerStart = 3 * 4 + 177,
+  NetworkStart = TransformerStart + 4 + 2 * 256 + 2 * 256 * 64 * 641
+};
 
-bool verify_net(const void *evalData, size_t size)
+static bool verify_net(const void *evalData, size_t size)
 {
   if (size != 21022697) return false;
 
@@ -1554,7 +1574,7 @@ bool verify_net(const void *evalData, size_t size)
   return true;
 }
 
-void init_weights(const void *evalData)
+static void init_weights(const void *evalData)
 {
   const char *d = (const char *)evalData + TransformerStart + 4;
 
