@@ -114,8 +114,13 @@ enum {
 #endif
 
 #ifdef TRANSPOSE
-#if defined(USE_MMX) || defined(USE_NEON)
+#if defined(USE_SSE2) || defined(USE_MMX) || defined(USE_NEON)
 #define USE_MASK
+#ifdef IS_64BIT
+typedef uint64_t mask2_t;
+#else
+typedef uint32_t mask2_t;
+#endif
 #endif
 #endif
 
@@ -558,15 +563,19 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 static_assert(FtOutDims % 64 == 0, "FtOutDims not a multiple of 64");
 
 #ifdef USE_MASK
-INLINE bool next_idx(unsigned *idx, unsigned *offset, uint64_t *v,
+INLINE bool next_idx(unsigned *idx, unsigned *offset, mask2_t *v,
     mask_t *mask, unsigned inDims)
 {
   while (*v == 0) {
-    *offset += 64;
+    *offset += 8 * sizeof(mask2_t);
     if (*offset >= inDims) return false;
-    memcpy(v, (char *)mask + (*offset / 8), 8);
+    memcpy(v, (char *)mask + (*offset / 8), sizeof(mask2_t));
   }
+#ifdef IS_64BIT
   *idx = *offset + __builtin_ctzll(*v);
+#else
+  *idx = *offset + __builtin_ctzl(*v);
+#endif
   *v &= *v - 1;
   return true;
 }
@@ -609,10 +618,10 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   __m512i out_0 = ((__m512i *)biases)[0];
   __m512i out_1 = ((__m512i *)biases)[1];
   __m512i first, second;
-  uint64_t v;
+  mask2_t v;
   unsigned idx;
 
-  memcpy(&v, inMask, 8);
+  memcpy(&v, inMask, sizeof(mask2_t));
   for (unsigned offset = 0; offset < inDims;) {
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
@@ -657,10 +666,10 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   __m256i out_2 = ((__m256i *)biases)[2];
   __m256i out_3 = ((__m256i *)biases)[3];
   __m256i first, second;
-  uint64_t v;
+  mask2_t v;
   unsigned idx;
 
-  memcpy(&v, inMask, 8);
+  memcpy(&v, inMask, sizeof(mask2_t));
   for (unsigned offset = 0; offset < inDims;) {
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
@@ -710,10 +719,10 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   __m128i out_6 = ((__m128i *)biases)[6];
   __m128i out_7 = ((__m128i *)biases)[7];
   const __m128i *first, *second;
-  uint64_t v;
+  mask2_t v;
   unsigned idx;
 
-  memcpy(&v, inMask, 8);
+  memcpy(&v, inMask, sizeof(mask2_t));
   for (unsigned offset = 0; offset < inDims;) {
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
@@ -795,10 +804,10 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   __m128i out_6 = ((__m128i *)biases)[6];
   __m128i out_7 = ((__m128i *)biases)[7];
   const __m128i *first, *second;
-  uint64_t v;
+  mask2_t v;
   unsigned idx;
 
-  memcpy(&v, inMask, 8);
+  memcpy(&v, inMask, sizeof(mask2_t));
   for (unsigned offset = 0; offset < inDims;) {
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
@@ -850,13 +859,65 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 #endif
   }
 }
-#elif defined(USE_MMX) && defined(USE_MASK)
+#elif defined(USE_MMX)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     unsigned outDims, const int32_t *biases, const weight_t *weights,
     mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
 {
   assert(outDims == 32);
 
+#if 0
+  const __m64 kZeros[2] = { 0 };
+  for (unsigned t = 0; t < 4; t++) {
+    __m64 out_0 = ((__m64 *)biases)[4 * t + 0];
+    __m64 out_1 = ((__m64 *)biases)[4 * t + 1];
+    __m64 out_2 = ((__m64 *)biases)[4 * t + 2];
+    __m64 out_3 = ((__m64 *)biases)[4 * t + 3];
+    const __m64 *first, *second;
+    mask2_t v;
+    unsigned idx;
+
+    memcpy(&v, inMask, sizeof(mask2_t));
+    for (unsigned offset = 0; offset < inDims;) {
+      if (!next_idx(&idx, &offset, &v, inMask, inDims))
+        break;
+      first = &((__m64 *)&weights[outDims * idx])[2  * t];
+      uint32_t factor = input[idx];
+      if (next_idx(&idx, &offset, &v, inMask, inDims)) {
+        second = &((__m64 *)&weights[outDims * idx])[2 * t];
+        factor |= input[idx] << 16;
+      } else {
+        second = kZeros;
+      }
+      __m64 mul = _mm_set1_pi32(factor);
+      out_0 = _mm_add_pi32(out_0, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[0],second[0])));
+      out_1 = _mm_add_pi32(out_1, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[0],second[0])));
+      out_2 = _mm_add_pi32(out_2, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[1],second[1])));
+      out_3 = _mm_add_pi32(out_3, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[1],second[1])));
+    }
+
+    __m64 out16_0 = _mm_srai_pi16(_mm_packs_pi32(out_0, out_1), SHIFT);
+    __m64 out16_1 = _mm_srai_pi16(_mm_packs_pi32(out_2, out_3), SHIFT);
+
+    __m64 *outVec = (__m64 *)output;
+    if (pack8_and_calc_mask) {
+      outVec[t] = _mm_packs_pi16(out16_0, out16_1);
+      outMask[t] = _mm_movemask_pi8(_mm_cmpgt_pi8(outVec[t], kZeros[0]));
+    } else {
+#ifdef USE_SSE
+      const __m64 kx07f = _mm_set1_pi16(127);
+      outVec[2 * t] = _mm_min_pi16(_mm_max_pi16(out16_0, kZeros[0]), kx07f);
+      outVec[2 * t + 1] = _mm_min_pi16(_mm_max_pi16(out16_1, kZeros[0]), kx07f);
+#else
+      const __m64 k0x7f80 = _mm_set1_pi16(0x7f80);
+      const __m64 k0x0080 = _mm_set1_pi16(0x0080);
+      const __m64 k0x8000 = _mm_set1_pi16(-0x8000);
+      outVec[2 * t] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_0, k0x7f80), k0x0080), k0x8000);
+      outVec[2 * t + 1] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_1, k0x7f80), k0x0080), k0x8000);
+#endif
+    }
+  }
+#else
   const __m64 kZeros[8] = { 0 };
   __m64 out_0 = ((__m64 *)biases)[0];
   __m64 out_1 = ((__m64 *)biases)[1];
@@ -875,10 +936,10 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   __m64 out_14 = ((__m64 *)biases)[14];
   __m64 out_15 = ((__m64 *)biases)[15];
   const __m64 *first, *second;
-  uint64_t v;
+  mask2_t v;
   unsigned idx;
 
-  memcpy(&v, inMask, 8);
+  memcpy(&v, inMask, sizeof(mask2_t));
   for (unsigned offset = 0; offset < inDims;) {
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
@@ -952,93 +1013,8 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[6] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_6, k0x7f80), k0x0080), k0x8000);
     outVec[7] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_7, k0x7f80), k0x0080), k0x8000);
 #endif
- }
-}
-#elif defined(USE_MMX)
-INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
-{
-  assert(outDims == 32);
-
-  (void)inMask; (void)outMask;
-  const __m64 kZeros[8] = { 0 };
-  __m64 out_0 = ((__m64 *)biases)[0];
-  __m64 out_1 = ((__m64 *)biases)[1];
-  __m64 out_2 = ((__m64 *)biases)[2];
-  __m64 out_3 = ((__m64 *)biases)[3];
-  __m64 out_4 = ((__m64 *)biases)[4];
-  __m64 out_5 = ((__m64 *)biases)[5];
-  __m64 out_6 = ((__m64 *)biases)[6];
-  __m64 out_7 = ((__m64 *)biases)[7];
-  __m64 out_8 = ((__m64 *)biases)[8];
-  __m64 out_9 = ((__m64 *)biases)[9];
-  __m64 out_10 = ((__m64 *)biases)[10];
-  __m64 out_11 = ((__m64 *)biases)[11];
-  __m64 out_12 = ((__m64 *)biases)[12];
-  __m64 out_13 = ((__m64 *)biases)[13];
-  __m64 out_14 = ((__m64 *)biases)[14];
-  __m64 out_15 = ((__m64 *)biases)[15];
-  const __m64 *first, *second;
-
-  for (unsigned idx = 0; idx < inDims; idx++) {
-    if (input[idx] <= 0)
-      continue;
-    uint32_t factor = input[idx];
-    first = (__m64 *)&weights[outDims * idx];
-    while (++idx < inDims && input[idx] <= 0);
-    if (idx < inDims) {
-      second = (__m64 *)&weights[outDims * idx];
-      factor |= input[idx] << 16;
-    } else
-      second = kZeros;
-    __m64 mul = _mm_set1_pi32(factor);
-    out_0 = _mm_add_pi32(out_0, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[0],second[0])));
-    out_1 = _mm_add_pi32(out_1, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[0],second[0])));
-    out_2 = _mm_add_pi32(out_2, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[1],second[1])));
-    out_3 = _mm_add_pi32(out_3, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[1],second[1])));
-    out_4 = _mm_add_pi32(out_4, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[2],second[2])));
-    out_5 = _mm_add_pi32(out_5, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[2],second[2])));
-    out_6 = _mm_add_pi32(out_6, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[3],second[3])));
-    out_7 = _mm_add_pi32(out_7, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[3],second[3])));
-    out_8 = _mm_add_pi32(out_8, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[4],second[4])));
-    out_9 = _mm_add_pi32(out_9, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[4],second[4])));
-    out_10 = _mm_add_pi32(out_10, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[5],second[5])));
-    out_11 = _mm_add_pi32(out_11, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[5],second[5])));
-    out_12 = _mm_add_pi32(out_12, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[6],second[6])));
-    out_13 = _mm_add_pi32(out_13, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[6],second[6])));
-    out_14 = _mm_add_pi32(out_14, _mm_madd_pi16(mul, _mm_unpacklo_pi16(first[7],second[7])));
-    out_15 = _mm_add_pi32(out_15, _mm_madd_pi16(mul, _mm_unpackhi_pi16(first[7],second[7])));
   }
-
-  __m64 out16_0 = _mm_srai_pi16(_mm_packs_pi32(out_0, out_1), SHIFT);
-  __m64 out16_1 = _mm_srai_pi16(_mm_packs_pi32(out_2, out_3), SHIFT);
-  __m64 out16_2 = _mm_srai_pi16(_mm_packs_pi32(out_4, out_5), SHIFT);
-  __m64 out16_3 = _mm_srai_pi16(_mm_packs_pi32(out_6, out_7), SHIFT);
-  __m64 out16_4 = _mm_srai_pi16(_mm_packs_pi32(out_8, out_9), SHIFT);
-  __m64 out16_5 = _mm_srai_pi16(_mm_packs_pi32(out_10, out_11), SHIFT);
-  __m64 out16_6 = _mm_srai_pi16(_mm_packs_pi32(out_12, out_13), SHIFT);
-  __m64 out16_7 = _mm_srai_pi16(_mm_packs_pi32(out_14, out_15), SHIFT);
-
-  __m64 *outVec = (__m64 *)output;
-  if (pack8_and_calc_mask) {
-    outVec[0] = _mm_packs_pi16(out16_0, out16_1);
-    outVec[1] = _mm_packs_pi16(out16_2, out16_3);
-    outVec[2] = _mm_packs_pi16(out16_4, out16_5);
-    outVec[3] = _mm_packs_pi16(out16_6, out16_7);
-  } else {
-    const __m64 k0x7f80 = _mm_set1_pi16(0x7f80);
-    const __m64 k0x0080 = _mm_set1_pi16(0x0080);
-    const __m64 k0x8000 = _mm_set1_pi16(-0x8000);
-    outVec[0] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_0, k0x7f80), k0x0080), k0x8000);
-    outVec[1] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_1, k0x7f80), k0x0080), k0x8000);
-    outVec[2] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_2, k0x7f80), k0x0080), k0x8000);
-    outVec[3] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_3, k0x7f80), k0x0080), k0x8000);
-    outVec[4] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_4, k0x7f80), k0x0080), k0x8000);
-    outVec[5] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_5, k0x7f80), k0x0080), k0x8000);
-    outVec[6] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_6, k0x7f80), k0x0080), k0x8000);
-    outVec[7] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(out16_7, k0x7f80), k0x0080), k0x8000);
-  }
+#endif
 }
 #elif defined(USE_NEON)
 INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
@@ -1056,10 +1032,10 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   int32x4_t out_6 = ((int32x4_t *)biases)[6];
   int32x4_t out_7 = ((int32x4_t *)biases)[7];
   const int8x8_t *first;
-  uint64_t v;
+  mask2_t v;
   unsigned idx;
 
-  memcpy(&v, inMask, 8);
+  memcpy(&v, inMask, sizeof(mask2_t));
   for (unsigned offset = 0; offset < inDims;) {
     if (!next_idx(&idx, &offset, &v, inMask, inDims))
       break;
@@ -1184,7 +1160,7 @@ INLINE void refresh_accumulator(const Position *pos)
 }
 
 // Calculate cumulative value using difference calculation if possible
-INLINE bool update_accumulator_if_possible(const Position *pos)
+INLINE bool update_accumulator(const Position *pos)
 {
   Accumulator *accumulator = &(pos->st->accumulator);
   if (accumulator->computedAccumulation)
@@ -1277,7 +1253,7 @@ INLINE bool update_accumulator_if_possible(const Position *pos)
 // Convert input features
 INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 {
-  if (!update_accumulator_if_possible(pos))
+  if (!update_accumulator(pos))
     refresh_accumulator(pos);
 
   int16_t (*accumulation)[2][256] = &pos->st->accumulator.accumulation;
@@ -1668,12 +1644,14 @@ void nnue_init(void)
   exit(EXIT_FAILURE);
 }
 
+#if 0
 // Incrementally update the accumulator if possible
 void update_eval(const Position *pos)
 {
-  update_accumulator_if_possible(pos);
+  update_accumulator(pos);
 
 #ifdef USE_MMX
   _mm_empty();
 #endif
 }
+#endif
