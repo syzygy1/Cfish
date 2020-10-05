@@ -468,18 +468,16 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 
 #if defined(USE_AVX512)
   (void)numDims;
-  const __m512i kOffsets = _mm512_set_epi32(0,0,0,0,0,0,0,0,13,9,5,1,12,8,4,0);
   __m512i *in = (__m512i *)input;
   __m256i *out = (__m256i *)output;
   __m512i words = _mm512_srai_epi16(_mm512_packs_epi32(in[0], in[1]), SHIFT);
-  out[0] = _mm256_max_epi8(_mm512_castsi512_si256(
-        _mm512_permutexvar_epi32(kOffsets, _mm512_packs_epi16(words, words))),
-        _mm256_setzero_si256());
+  __m256i packed = _mm256_packs_epi16(
+      _mm512_castsi512_si256(words),_mm512_extracti64x4_epi64(words, 1));
+  out[0] = _mm256_max_epi8(packed, _mm256_setzero_si256());
 
 #elif defined(USE_AVX2)
   const unsigned numChunks = numDims / 32;
   const __m256i kZero = _mm256_setzero_si256();
-  const __m256i kOffsets = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
   __m256i *in = (__m256i *)input;
   __m256i *out = (__m256i *)output;
   for (unsigned i = 0; i < numChunks; i++) {
@@ -487,8 +485,7 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
           in[i * 4 + 0], in[i * 4 + 1]), SHIFT);
     __m256i words1 = _mm256_srai_epi16(_mm256_packs_epi32(
           in[i * 4 + 2], in[i * 4 + 3]), SHIFT);
-    out[i] = _mm256_permutevar8x32_epi32(_mm256_max_epi8(
-          _mm256_packs_epi16(words0, words1), kZero), kOffsets);
+    out[i] = _mm256_max_epi8(_mm256_packs_epi16(words0, words1), kZero);
   }
 
 #elif defined(USE_SSSE3) || (defined(TRANSPOSE) && defined(USE_SSE2))
@@ -506,11 +503,11 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
         _mm_packs_epi32(in[i * 4 + 0], in[i * 4 + 1]), SHIFT);
     __m128i words1 = _mm_srai_epi16(
         _mm_packs_epi32(in[i * 4 + 2], in[i * 4 + 3]), SHIFT);
-    __m128i packedbytes = _mm_packs_epi16(words0, words1);
+    __m128i packed = _mm_packs_epi16(words0, words1);
 #ifdef USE_SSE41
-    out[i] = _mm_max_epi8(packedbytes, kZero);
+    out[i] = _mm_max_epi8(packed, kZero);
 #else
-    out[i] = _mm_subs_epi8(_mm_adds_epi8(packedbytes, k0x80s), k0x80s);
+    out[i] = _mm_subs_epi8(_mm_adds_epi8(packed, k0x80s), k0x80s);
 #endif
   }
 
@@ -643,10 +640,9 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   __m512i out16 = _mm512_srai_epi16(_mm512_packs_epi32(out_0, out_1), SHIFT);
 
   __m256i *outVec = (__m256i *)output;
-  const __m512i kOffsets = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
   const __m256i kZero256 = _mm256_setzero_si256();
-  outVec[0] = _mm512_castsi512_si256(
-      _mm512_permutexvar_epi64(kOffsets, _mm512_packs_epi16(out16, out16)));
+  outVec[0] = _mm256_packs_epi16(
+      _mm512_castsi512_si256(out16),_mm512_extracti64x4_epi64(out16, 1));
   if (pack8_and_calc_mask)
     outMask[0] = (uint32_t)_mm256_movemask_epi8(_mm256_cmpgt_epi8(outVec[0], kZero256));
   else
@@ -1479,8 +1475,25 @@ Value nnue_evaluate(const Position *pos)
 
 static void read_output_weights(weight_t *w, const char *d)
 {
-  for (unsigned i = 0; i < 32; i++)
-    w[i] = *d++;
+  for (unsigned i = 0; i < 32; i++) {
+    unsigned c = i;
+#if !defined(TRANSPOSE)
+#if defined(USE_AVX512)
+    unsigned b = c & 0x14;
+    b = (b << 2) | (b >> 2);
+    c = (c & ~0x14) | (b & 0x14);
+#elif defined(USE_AVX2)
+    unsigned b = c & 0x1c;
+    b = (b << 2) | (b >> 1);
+    c = (c & ~0x1c) | (b & 0x1c);
+#endif
+#elif defined(USE_AVX512)
+    unsigned b = c & 0x18;
+    b = (b << 1) | (b >> 1);
+    c = (c & ~0x18) | (b & 0x18);
+#endif
+    w[c] = *d++;
+  }
 }
 
 INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
@@ -1493,6 +1506,17 @@ INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
     b = (b << 1) | (b >> 2);
     c = (c & ~0x38) | (b & 0x38);
   }
+  else if (dims == 32) {
+#if !defined(TRANSPOSE)
+    unsigned b = c & 0x14;
+    b = (b << 2) | (b >> 2);
+    c = (c & ~0x14) | (b & 0x14);
+#else
+    unsigned b = c & 0x18;
+    b = (b << 1) | (b >> 1);
+    c = (c & ~0x18) | (b & 0x18);
+#endif
+  }
 
 #elif defined(USE_AVX2)
   if (dims > 32) {
@@ -1500,6 +1524,13 @@ INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
     b = (b << 1) | (b >> 1);
     c = (c & ~0x18) | (b & 0x18);
   }
+#if !defined(TRANSPOSE)
+  else if (dims == 32) {
+    unsigned b = c & 0x1c;
+    b = (b << 2) | (b >> 1);
+    c = (c & ~0x1c) | (b & 0x1c);
+  }
+#endif
 
 #endif
 
