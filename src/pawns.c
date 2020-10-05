@@ -31,21 +31,21 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Backward        = S( 8, 27);
-static const Score Doubled         = S(11, 55);
-static const Score Isolated        = S( 5, 17);
-static const Score WeakLever       = S( 2, 54);
-static const Score WeakUnopposed   = S(15, 25);
+static const Score Backward        = S( 8, 25);
+static const Score Doubled         = S(10, 55);
+static const Score Isolated        = S( 3, 15);
+static const Score WeakLever       = S( 3, 55);
+static const Score WeakUnopposed   = S(13, 25);
 
 // Bonus for blocked pawns at 5th or 6th rank
-static const Score BlockedPawn[2] = { S(-13, -4), S(-4, 3) };
+static const Score BlockedPawn[2] = { S(-13, -4), S(-5, 2) };
 
 static const int BlockedStorm[8][2] = {
   {0, 0}, {0, 0}, {76, 78}, {-10, 15}, {-7, 10}, {-4, 6}, {-1, 2}
 };
 
 // Connected pawn bonus
-static const int Connected[8] = { 0, 7, 8, 11, 24, 45, 85 };
+static const int Connected[8] = { 0, 5, 7, 11, 24, 48, 86 };
 
 // Strength of pawn shelter for our king by [distance from edge][rank].
 // RANK_1 = 0 is used for files where we have no pawn, or pawn is behind
@@ -145,7 +145,7 @@ INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
     // Score this pawn
     if (support | phalanx) {
       int v =  Connected[r] * (2 + !!phalanx - !!opposed)
-             + 21 * popcount(support);
+             + 22 * popcount(support);
       score += make_score(v, v * (r - 2) / 4);
     }
 

@@ -1146,15 +1146,6 @@ moves_loop: // When in check search starts from here.
             && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(piece_on(to_sq(move)))] < 0)
           continue;
 
-        // Futility pruning for captures
-        if (   !givesCheck
-            && lmrDepth < 6
-            && !(PvNode && abs(bestValue) < 2)
-            && !inCheck
-            && ss->staticEval + 169 + 244 * lmrDepth
-               + PieceValue[MG][type_of_p(piece_on(to_sq(move)))] <= alpha)
-          continue;
-
         // See based pruning
         if (!see_test(pos, move, -221 * depth))
           continue;
