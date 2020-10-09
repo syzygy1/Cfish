@@ -264,7 +264,7 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
     IndexList added[2], bool reset[2])
 {
   const DirtyPiece *dp = &(pos->st->dirtyPiece);
-  assert(dp->dirty_num != 0);
+  assert(dp->dirtyNum != 0);
 
   if ((pos->st-1)->accumulator.computedAccumulation) {
     for (unsigned c = 0; c < 2; c++) {
@@ -513,28 +513,36 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 
 #elif defined(USE_SSE2)
   const unsigned numChunks = numDims / 8;
-  const __m128i k0x7f80 = _mm_set1_epi16(0x7f80);
-  const __m128i k0x0080 = _mm_set1_epi16(0x0080);
-  const __m128i k0x8000 = _mm_set1_epi16(-0x8000);
+  const __m128i kZero = _mm_setzero_si128();
+  const __m128i k0x7f = _mm_set1_epi16(0x7f);
   __m128i *in = (__m128i *)input;
   __m128i *out = (__m128i *)output;
   for (unsigned i = 0; i < numChunks; i++) {
     __m128i words = _mm_srai_epi16(_mm_packs_epi32(in[i * 2], in[i * 2 + 1]),
         SHIFT);
-    out[i] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(words, k0x7f80), k0x0080), k0x8000);
+    out[i] = _mm_min_epi16(_mm_max_epi16(words, kZero), k0x7f);
   }
 
 #elif defined(USE_MMX)
   const unsigned numChunks = numDims / 4;
+#ifdef USE_SSE
+  const __m64 kZero = _mm_setzero_si64();
+  const __m64 k0x7f = _mm_set1_pi16(0x7f);
+#else
   const __m64 k0x7f80 = _mm_set1_pi16(0x7f80);
   const __m64 k0x0080 = _mm_set1_pi16(0x0080);
   const __m64 k0x8000 = _mm_set1_pi16(-0x8000);
+#endif
   __m64 *in = (__m64 *)input;
   __m64 *out = (__m64 *)output;
   for (unsigned i = 0; i < numChunks; i++) {
     __m64 words = _mm_srai_pi16(_mm_packs_pi32(in[i * 2], in[i * 2 + 1]),
         SHIFT);
+#ifdef USE_SSE
+    out[i] = _mm_min_epi16(_mm_max_epi16(words, kZero), k0x7f);
+#else
     out[i] = _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(words, k0x7f80), k0x0080), k0x8000);
+#endif
   }
 
 #elif defined(USE_NEON)
@@ -730,35 +738,23 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
     } else {
       second = kZeros;
     }
-    __m128i mul = _mm_set1_epi16(factor), prod;
+    __m128i mul = _mm_set1_epi16(factor), prod, signs;
     prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[0], second[0]));
-#if defined(USE_SSE41)
-    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[0], second[0]));
-    out_0 = _mm_add_epi32(out_0, _mm_cvtepi16_epi32(prod));
-    out_1 = _mm_add_epi32(out_1, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
+    signs = _mm_cmpgt_epi16(kZeros[0], prod);
+    out_0 = _mm_add_epi32(out_0, _mm_unpacklo_epi16(prod, signs));
+    out_1 = _mm_add_epi32(out_1, _mm_unpackhi_epi16(prod, signs));
     prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[0], second[0]));
-    out_2 = _mm_add_epi32(out_2, _mm_cvtepi16_epi32(prod));
-    out_3 = _mm_add_epi32(out_3, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
+    signs = _mm_cmpgt_epi16(kZeros[0], prod);
+    out_2 = _mm_add_epi32(out_2, _mm_unpacklo_epi16(prod, signs));
+    out_3 = _mm_add_epi32(out_3, _mm_unpackhi_epi16(prod, signs));
     prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[1], second[1]));
-    out_4 = _mm_add_epi32(out_4, _mm_cvtepi16_epi32(prod));
-    out_5 = _mm_add_epi32(out_5, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
+    signs = _mm_cmpgt_epi16(kZeros[0], prod);
+    out_4 = _mm_add_epi32(out_4, _mm_unpacklo_epi16(prod, signs));
+    out_5 = _mm_add_epi32(out_5, _mm_unpackhi_epi16(prod, signs));
     prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[1], second[1]));
-    out_6 = _mm_add_epi32(out_6, _mm_cvtepi16_epi32(prod));
-    out_7 = _mm_add_epi32(out_7, _mm_cvtepi16_epi32(_mm_shuffle_epi32(prod, 0xE)));
-#else
-    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[0], second[0]));
-    out_0 = _mm_add_epi32(out_0, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
-    out_1 = _mm_add_epi32(out_1, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
-    prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[0], second[0]));
-    out_2 = _mm_add_epi32(out_2, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
-    out_3 = _mm_add_epi32(out_3, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
-    prod = _mm_maddubs_epi16(mul, _mm_unpacklo_epi8(first[1], second[1]));
-    out_4 = _mm_add_epi32(out_4, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
-    out_5 = _mm_add_epi32(out_5, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
-    prod = _mm_maddubs_epi16(mul, _mm_unpackhi_epi8(first[1], second[1]));
-    out_6 = _mm_add_epi32(out_6, _mm_srai_epi32(_mm_unpacklo_epi16(prod, prod), 16));
-    out_7 = _mm_add_epi32(out_7, _mm_srai_epi32(_mm_unpackhi_epi16(prod, prod), 16));
-#endif
+    signs = _mm_cmpgt_epi16(kZeros[0], prod);
+    out_6 = _mm_add_epi32(out_6, _mm_unpacklo_epi16(prod, signs));
+    out_7 = _mm_add_epi32(out_7, _mm_unpackhi_epi16(prod, signs));
   }
 
   __m128i out16_0 = _mm_srai_epi16(_mm_packs_epi32(out_0, out_1), SHIFT);
@@ -777,9 +773,10 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
     outVec[0] = _mm_max_epi8(_mm_packs_epi16(out16_0, out16_1), kZeros[0]);
     outVec[1] = _mm_max_epi8(_mm_packs_epi16(out16_2, out16_3), kZeros[0]);
 #else
-    const __m128i k0x80s = _mm_set1_epi8(-128);
-    outVec[0] = _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(out16_0, out16_1), k0x80s), k0x80s);
-    outVec[1] = _mm_subs_epi8(_mm_adds_epi8(_mm_packs_epi16(out16_2, out16_3), k0x80s), k0x80s);
+    outVec[0] = _mm_packs_epi16(
+        _mm_max_epi16(out16_0, kZeros[0]), _mm_max_epi16(out16_1, kZeros[0]));
+    outVec[1] = _mm_packs_epi16(
+        _mm_max_epi16(out16_2, kZeros[0]), _mm_max_epi16(out16_3, kZeros[0]));
 #endif
   }
 }
@@ -838,21 +835,11 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[1] = _mm_packs_epi16(out16_2, out16_3);
     outMask[1] = _mm_movemask_epi8(_mm_cmpgt_epi8(outVec[1], kZeros[0]));
   } else {
-#if defined(USE_SSE41)
     const __m128i kx07f = _mm_set1_epi16(127);
     outVec[0] = _mm_min_epi16(_mm_max_epi16(out16_0, kZeros[0]), kx07f);
     outVec[1] = _mm_min_epi16(_mm_max_epi16(out16_1, kZeros[0]), kx07f);
     outVec[2] = _mm_min_epi16(_mm_max_epi16(out16_2, kZeros[0]), kx07f);
     outVec[3] = _mm_min_epi16(_mm_max_epi16(out16_3, kZeros[0]), kx07f);
-#else
-    const __m128i k0x7f80 = _mm_set1_epi16(0x7f80);
-    const __m128i k0x0080 = _mm_set1_epi16(0x0080);
-    const __m128i k0x8000 = _mm_set1_epi16(-0x8000);
-    outVec[0] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_0, k0x7f80), k0x0080), k0x8000);
-    outVec[1] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_1, k0x7f80), k0x0080), k0x8000);
-    outVec[2] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_2, k0x7f80), k0x0080), k0x8000);
-    outVec[3] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(out16_3, k0x7f80), k0x0080), k0x8000);
-#endif
   }
 }
 #elif defined(USE_MMX)
@@ -1268,9 +1255,8 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
   const __m128i kZero = _mm_setzero_si128();
 #else
 #if !defined(USE_SSSE3)
-  const __m128i k0x7f80 = _mm_set1_epi16(0x7f80);
-  const __m128i k0x0080 = _mm_set1_epi16(0x0080);
-  const __m128i k0x8000 = _mm_set1_epi16(-0x8000);
+  const __m128i kZero = _mm_setzero_si128();
+  const __m128i k0x7f = _mm_set1_epi16(127);
 #else
   const __m128i k0x80s = _mm_set1_epi8(-128);
 #endif
@@ -1350,7 +1336,7 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 #else /* USE_SSE2 && !TRANSPOSE */
     for (unsigned i = 0; i < numChunks; i++) {
       __m128i sum = ((__m128i *)(*accumulation)[perspectives[p]])[i];
-      out[i] = _mm_subs_epu16(_mm_add_epi16(_mm_adds_epi16(sum, k0x7f80), k0x0080), k0x8000);
+      out[i] = _mm_min_epi16(_mm_max_epi16(sum, kZero), k0x7f);
     }
 #endif
 
