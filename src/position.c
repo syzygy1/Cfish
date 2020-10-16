@@ -1081,10 +1081,8 @@ void do_null_move(Position *pos)
   Stack *st = ++pos->st;
   memcpy(st, st - 1, (StateSize + 7) & ~7);
 #ifdef NNUE
-  if ((st-1)->accumulator.computedAccumulation)
-    st->accumulator = (st-1)->accumulator;
-  else
-    st->accumulator.computedAccumulation = false;
+  st->accumulator.computedAccumulation = false;
+  st->dirtyPiece.dirtyNum = 0;
 #endif
 
   if (unlikely(st->epSquare)) {
