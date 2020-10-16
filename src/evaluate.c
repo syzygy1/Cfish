@@ -168,7 +168,6 @@ static const Score PawnlessFlank       = S( 17, 95);
 static const Score ReachableOutpost    = S( 31, 22);
 static const Score RestrictedPiece     = S(  7,  7);
 static const Score RookOnKingRing      = S( 16,  0);
-static const Score RookOnQueenFile     = S(  6, 11);
 static const Score SliderOnQueen       = S( 60, 18);
 static const Score ThreatByKing        = S( 24, 89);
 static const Score ThreatByPawnPush    = S( 48, 39);
@@ -325,10 +324,6 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
     }
 
     if (Pt == ROOK) {
-      // Bonus for rook on the same file as a queen
-      if (file_bb_s(s) & pieces_p(QUEEN))
-        score += RookOnQueenFile;
-
       // Bonus for rook on an open or semi-open file
       if (semiopen_file(ei->pe, Us, file_of(s)))
         score += RookOnFile[!!semiopen_file(ei->pe, Them, file_of(s))];
@@ -737,7 +732,9 @@ INLINE Value evaluate_winnable(const Position *pos, EvalInfo *ei, Score score)
       sf = 37 + 3 * (pieces_cp(WHITE, QUEEN) ? piece_count(BLACK, BISHOP) + piece_count(BLACK, KNIGHT)
                                              : piece_count(WHITE, BISHOP) + piece_count(WHITE, KNIGHT));
     else
-      sf = min(sf, 36 + 7 * piece_count(strongSide, PAWN));
+      sf = min(sf, 36 + 7 * piece_count(strongSide, PAWN)) - 4 * !pawnsOnBothFlanks;;
+
+    sf -= 4 * !pawnsOnBothFlanks;
   }
 
   // Interpolate between the middlegame and the scaled endgame score
