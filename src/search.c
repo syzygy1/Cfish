@@ -508,9 +508,9 @@ void thread_search(Position *pos)
       // Start with a small aspiration window and, in the case of a fail
       // high/low, re-search with a bigger window until we're not failing
       // high/low anymore.
-      int failedHighCnt = 0;
+      pos->failedHighCnt = 0;
       while (true) {
-        Depth adjustedDepth = max(1, pos->rootDepth - failedHighCnt - searchAgainCounter);
+        Depth adjustedDepth = max(1, pos->rootDepth - pos->failedHighCnt - searchAgainCounter);
         bestValue = search_PV(pos, ss, alpha, beta, adjustedDepth);
 
         // Bring the best move to the front. It is critical that sorting
@@ -541,12 +541,12 @@ void thread_search(Position *pos)
           beta = (alpha + beta) / 2;
           alpha = max(bestValue - delta, -VALUE_INFINITE);
 
-          failedHighCnt = 0;
+          pos->failedHighCnt = 0;
           if (pos->threadIdx == 0)
             Threads.stopOnPonderhit = false;
         } else if (bestValue >= beta) {
           beta = min(bestValue + delta, VALUE_INFINITE);
-          failedHighCnt++;
+          pos->failedHighCnt++;
         } else
           break;
 
@@ -1290,6 +1290,10 @@ moves_loop: // When in check search starts from here.
         // Increase reduction if ttMove is a capture
         if (ttCapture)
           r++;
+
+        // Increase reduction at root if failing high
+        if (rootNode)
+          r += pos->failedHighCnt * pos->failedHighCnt * moveCount / 512;
 
         // Increase reduction for cut nodes
         if (cutNode)
