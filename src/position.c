@@ -789,7 +789,8 @@ void do_move(Position *pos, Move m, int givesCheck)
   st->plyCounters += 0x101; // Increment both rule50 and pliesFromNull
 
 #ifdef NNUE
-  st->accumulator.computedAccumulation = false;
+  st->accumulator.state[WHITE] = ACC_EMPTY;
+  st->accumulator.state[BLACK] = ACC_EMPTY;
   DirtyPiece *dp = &(st->dirtyPiece);
   dp->dirtyNum = 1;
 #endif
@@ -1081,10 +1082,9 @@ void do_null_move(Position *pos)
   Stack *st = ++pos->st;
   memcpy(st, st - 1, (StateSize + 7) & ~7);
 #ifdef NNUE
-  if ((st-1)->accumulator.computedAccumulation)
-    st->accumulator = (st-1)->accumulator;
-  else
-    st->accumulator.computedAccumulation = false;
+  st->accumulator.state[WHITE] = ACC_EMPTY;
+  st->accumulator.state[BLACK] = ACC_EMPTY;
+  st->dirtyPiece.dirtyNum = 0;
 #endif
 
   if (unlikely(st->epSquare)) {

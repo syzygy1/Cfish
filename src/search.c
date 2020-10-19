@@ -402,7 +402,8 @@ void thread_search(Position *pos)
   for (int i = -7; i < 3; i++) {
     memset(SStackBegin(ss[i]), 0, SStackSize);
 #ifdef NNUE
-    ss[i].accumulator.computedAccumulation = false;
+    ss[i].accumulator.state[WHITE] = ACC_INIT;
+    ss[i].accumulator.state[BLACK] = ACC_INIT;
 #endif
   }
   (ss-1)->endMoves = pos->moveList;

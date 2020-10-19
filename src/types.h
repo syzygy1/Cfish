@@ -423,11 +423,17 @@ CLAMP(long)
 
 #ifdef NNUE
 
+typedef struct {
+  unsigned size;
+  unsigned values[2];
+} IndexList;
+
 struct DirtyPiece {
   int dirtyNum;
   Piece pc[3];
   Square from[3];
   Square to[3];
+  IndexList add, sub;
 };
 
 typedef struct DirtyPiece DirtyPiece;

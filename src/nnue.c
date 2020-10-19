@@ -118,7 +118,11 @@ typedef uint32_t mask_t;
 #define vec_sub_16(a,b) _mm256_sub_epi16(a,b)
 #define vec_packs(a,b) _mm256_packs_epi16(a,b)
 #define vec_mask_pos(a) _mm256_movemask_epi8(_mm256_cmpgt_epi8(a,_mm256_setzero_si256()))
+#ifdef IS_64BIT
 #define NUM_REGS 16
+#else
+#define NUM_REGS 8
+#endif
 
 #elif USE_SSE2
 #define SIMD_WIDTH 128
@@ -184,7 +188,7 @@ typedef int8_t weight_t;
 typedef struct {
   size_t size;
   unsigned values[30];
-} IndexList;
+} IndexList30;
 
 INLINE Square orient(Color c, Square s)
 {
@@ -196,64 +200,34 @@ INLINE unsigned make_index(Color c, Square s, Piece pc, Square ksq)
   return orient(c, s) + PieceToIndex[c][pc] + PS_END * ksq;
 }
 
-static void half_kp_append_active_indices(const Position *pos, const Color c,
-    IndexList *active)
+static void half_kp_get_active_indices(const Position *pos, const Color c,
+    IndexList30 *active)
 {
   Square ksq = orient(c, square_of(c, KING));
   Bitboard bb = pieces() & ~pieces_p(KING);
+  unsigned i = 0;
   while (bb) {
     Square s = pop_lsb(&bb);
-    active->values[active->size++] = make_index(c, s, piece_on(s), ksq);
+    active->values[i++] = make_index(c, s, piece_on(s), ksq);
   }
+  active->size = i;
 }
 
-static void half_kp_append_changed_indices(const Position *pos, const Color c,
+static void half_kp_get_changed_indices(const Position *pos, const Color c,
     const DirtyPiece *dp, IndexList *removed, IndexList *added)
 {
   Square ksq = orient(c, square_of(c, KING));
+  unsigned k = 0, l = 0;
   for (int i = 0; i < dp->dirtyNum; i++) {
     Piece pc = dp->pc[i];
     if (type_of_p(pc) == KING) continue;
     if (dp->from[i] != SQ_NONE)
-      removed->values[removed->size++] = make_index(c, dp->from[i], pc, ksq);
+      removed->values[k++] = make_index(c, dp->from[i], pc, ksq);
     if (dp->to[i] != SQ_NONE)
-      added->values[added->size++] = make_index(c, dp->to[i], pc, ksq);
+      added->values[l++] = make_index(c, dp->to[i], pc, ksq);
   }
-}
-
-static void append_active_indices(const Position *pos, IndexList active[2])
-{
-  for (unsigned c = 0; c < 2; c++)
-    half_kp_append_active_indices(pos, c, &active[c]);
-}
-
-static void append_changed_indices(const Position *pos, IndexList removed[2],
-    IndexList added[2], bool reset[2])
-{
-  const DirtyPiece *dp = &(pos->st->dirtyPiece);
-  assert(dp->dirtyNum != 0);
-
-  if ((pos->st-1)->accumulator.computedAccumulation) {
-    for (unsigned c = 0; c < 2; c++) {
-      reset[c] = dp->pc[0] == make_piece(c, KING);
-      if (reset[c])
-        half_kp_append_active_indices(pos, c, &added[c]);
-      else
-        half_kp_append_changed_indices(pos, c, dp, &removed[c], &added[c]);
-    }
-  } else {
-    const DirtyPiece *dp2 = &((pos->st-1)->dirtyPiece);
-    for (unsigned c = 0; c < 2; c++) {
-      reset[c] =   dp->pc[0] == make_piece(c, KING)
-                || dp2->pc[0] == make_piece(c, KING);
-      if (reset[c])
-        half_kp_append_active_indices(pos, c, &added[c]);
-      else {
-        half_kp_append_changed_indices(pos, c, dp, &removed[c], &added[c]);
-        half_kp_append_changed_indices(pos, c, dp2, &removed[c], &added[c]);
-      }
-    }
-  }
+  removed->size = k;
+  added->size = l;
 }
 
 // InputLayer = InputSlice<256 * 2>
@@ -880,27 +854,94 @@ static alignas(64) int16_t ft_weights[kHalfDimensions * FtInDims];
 #define TILE_HEIGHT (NUM_REGS * SIMD_WIDTH / 16)
 #endif
 
-// Calculate cumulative value without using difference calculation
-INLINE void refresh_accumulator(const Position *pos)
+// Calculate cumulative value using difference calculation if possible
+INLINE void update_accumulator(const Position *pos, const Color c)
 {
-  Accumulator *accumulator = &(pos->st->accumulator);
+#ifdef VECTOR
+  vec16_t acc[NUM_REGS];
+#endif
+  Stack *st = pos->st;
+  while (st->accumulator.state[c] == ACC_EMPTY) {
+    DirtyPiece *dp = &st->dirtyPiece;
+    if (dp->dirtyNum != 0 && dp->pc[0] == make_piece(c, KING))
+      break;
+    st--;
+  }
+  if (st->accumulator.state[c] == ACC_COMPUTED) {
+    for (Stack *st2 = st + 1; st2 <= pos->st; st2++) {
+      DirtyPiece *dp = &st2->dirtyPiece;
+      half_kp_get_changed_indices(pos, c, dp, &dp->sub, &dp->add);
+      st2->accumulator.state[c] = ACC_COMPUTED;
+    }
+#ifdef VECTOR
+    for (unsigned i = 0; i < kHalfDimensions / TILE_HEIGHT; i++) {
+      vec16_t *accTile = (vec16_t *)&st->accumulator.accumulation[c][i * TILE_HEIGHT];
+      for (unsigned j = 0; j < NUM_REGS; j++)
+        acc[j] = accTile[j];
+      for (Stack *st2 = st + 1; st2 <= pos->st; st2++) {
+        // Difference calculation for the deactivated features
+        for (unsigned k = 0; k < st2->dirtyPiece.sub.size; k++) {
+          unsigned index = st2->dirtyPiece.sub.values[k];
+          const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
 
-  IndexList activeIndices[2];
-  activeIndices[0].size = activeIndices[1].size = 0;
-  append_active_indices(pos, activeIndices);
+          vec16_t *column = (vec16_t *)&ft_weights[offset];
+          for (unsigned j = 0; j < NUM_REGS; j++)
+            acc[j] = vec_sub_16(acc[j], column[j]);
+        }
 
-  for (unsigned c = 0; c < 2; c++) {
+        // Difference calculation for the activated features
+        for (unsigned k = 0; k < st2->dirtyPiece.add.size; k++) {
+          unsigned index = st2->dirtyPiece.add.values[k];
+          const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
+
+          vec16_t *column = (vec16_t *)&ft_weights[offset];
+          for (unsigned j = 0; j < NUM_REGS; j++)
+            acc[j] = vec_add_16(acc[j], column[j]);
+        }
+
+        accTile = (vec16_t *)&st2->accumulator.accumulation[c][i * TILE_HEIGHT];
+        for (unsigned j = 0; j < NUM_REGS; j++)
+          accTile[j] = acc[j];
+      }
+    }
+#else
+    for (Stack *st2 = st + 1; st2 <= pos->st; st2++) {
+      memcpy(&st2->accumulator.accumulation[c],
+          &(st2-1)->accumulator.accumulation[c],
+          kHalfDimensions * sizeof(int16_t));
+
+      // Difference calculation for the deactivated features
+      for (unsigned k = 0; k < st2->dirtyPiece.sub.size; k++) {
+        unsigned index = st2->dirtyPiece.sub.values[k];
+        const unsigned offset = kHalfDimensions * index;
+
+        for (unsigned j = 0; j < kHalfDimensions; j++)
+          st2->accumulator.accumulation[c][j] -= ft_weights[offset + j];
+      }
+
+      // Difference calculation for the activated features
+      for (unsigned k = 0; k < st2->dirtyPiece.add.size; k++) {
+        unsigned index = st2->dirtyPiece.add.values[k];
+        const unsigned offset = kHalfDimensions * index;
+
+        for (unsigned j = 0; j < kHalfDimensions; j++)
+          st2->accumulator.accumulation[c][j] += ft_weights[offset + j];
+      }
+    }
+#endif
+  } else {
+    Accumulator *accumulator = &pos->st->accumulator;
+    accumulator->state[c] = ACC_COMPUTED;
+    IndexList30 active;
+    half_kp_get_active_indices(pos, c, &active);
 #ifdef VECTOR
     for (unsigned i = 0; i < kHalfDimensions / TILE_HEIGHT; i++) {
       vec16_t *ft_biases_tile = (vec16_t *)&ft_biases[i * TILE_HEIGHT];
-      vec16_t *accTile = (vec16_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
-      vec16_t acc[NUM_REGS];
-
       for (unsigned j = 0; j < NUM_REGS; j++)
         acc[j] = ft_biases_tile[j];
 
-      for (size_t k = 0; k < activeIndices[c].size; k++) {
-        unsigned index = activeIndices[c].values[k];
+      for (unsigned k = 0; k < active.size; k++) {
+        unsigned index = active.values[k];
         unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
         vec16_t *column = (vec16_t *)&ft_weights[offset];
 
@@ -908,6 +949,7 @@ INLINE void refresh_accumulator(const Position *pos)
           acc[j] = vec_add_16(acc[j], column[j]);
       }
 
+      vec16_t *accTile = (vec16_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
       for (unsigned j = 0; j < NUM_REGS; j++)
         accTile[j] = acc[j];
     }
@@ -915,8 +957,8 @@ INLINE void refresh_accumulator(const Position *pos)
     memcpy(accumulator->accumulation[c], ft_biases,
         kHalfDimensions * sizeof(int16_t));
 
-    for (size_t k = 0; k < activeIndices[c].size; k++) {
-      unsigned index = activeIndices[c].values[k];
+    for (unsigned k = 0; k < active.size; k++) {
+      unsigned index = active.values[k];
       unsigned offset = kHalfDimensions * index;
 
       for (unsigned j = 0; j < kHalfDimensions; j++)
@@ -924,106 +966,13 @@ INLINE void refresh_accumulator(const Position *pos)
     }
 #endif
   }
-
-  accumulator->computedAccumulation = true;
-}
-
-// Calculate cumulative value using difference calculation if possible
-INLINE bool update_accumulator(const Position *pos)
-{
-  Accumulator *accumulator = &(pos->st->accumulator);
-  if (accumulator->computedAccumulation)
-    return true;
-
-  Accumulator *prevAcc;
-  if (   !(prevAcc = &(pos->st-1)->accumulator)->computedAccumulation
-      && !(prevAcc = &(pos->st-2)->accumulator)->computedAccumulation)
-    return false;
-
-  IndexList removed_indices[2], added_indices[2];
-  removed_indices[0].size = removed_indices[1].size = 0;
-  added_indices[0].size = added_indices[1].size = 0;
-  bool reset[2];
-  append_changed_indices(pos, removed_indices, added_indices, reset);
-
-#ifdef VECTOR
-  for (unsigned i = 0; i< kHalfDimensions / TILE_HEIGHT; i++) {
-    for (unsigned c = 0; c < 2; c++) {
-      vec16_t *accTile = (vec16_t *)&accumulator->accumulation[c][i * TILE_HEIGHT];
-      vec16_t acc[NUM_REGS];
-
-      if (reset[c]) {
-        vec16_t *ft_b_tile = (vec16_t *)&ft_biases[i * TILE_HEIGHT];
-        for (unsigned j = 0; j < NUM_REGS; j++)
-          acc[j] = ft_b_tile[j];
-      } else {
-        vec16_t *prevAccTile = (vec16_t *)&prevAcc->accumulation[c][i * TILE_HEIGHT];
-        for (unsigned j = 0; j < NUM_REGS; j++)
-          acc[j] = prevAccTile[j];
-
-        // Difference calculation for the deactivated features
-        for (unsigned k = 0; k < removed_indices[c].size; k++) {
-          unsigned index = removed_indices[c].values[k];
-          const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
-
-          vec16_t *column = (vec16_t *)&ft_weights[offset];
-          for (unsigned j = 0; j < NUM_REGS; j++)
-            acc[j] = vec_sub_16(acc[j], column[j]);
-        }
-      }
-
-      // Difference calculation for the activated features
-      for (unsigned k = 0; k < added_indices[c].size; k++) {
-        unsigned index = added_indices[c].values[k];
-        const unsigned offset = kHalfDimensions * index + i * TILE_HEIGHT;
-
-        vec16_t *column = (vec16_t *)&ft_weights[offset];
-        for (unsigned j = 0; j < NUM_REGS; j++)
-          acc[j] = vec_add_16(acc[j], column[j]);
-      }
-
-      for (unsigned j = 0; j < NUM_REGS; j++)
-        accTile[j] = acc[j];
-    }
-  }
-#else
-  for (unsigned c = 0; c < 2; c++) {
-    if (reset[c]) {
-      memcpy(accumulator->accumulation[c], ft_biases,
-          kHalfDimensions * sizeof(int16_t));
-    } else {
-      memcpy(accumulator->accumulation[c], prevAcc->accumulation[c],
-          kHalfDimensions * sizeof(int16_t));
-      // Difference calculation for the deactivated features
-      for (unsigned k = 0; k < removed_indices[c].size; k++) {
-        unsigned index = removed_indices[c].values[k];
-        const unsigned offset = kHalfDimensions * index;
-
-        for (unsigned j = 0; j < kHalfDimensions; j++)
-          accumulator->accumulation[c][j] -= ft_weights[offset + j];
-      }
-    }
-
-    // Difference calculation for the activated features
-    for (unsigned k = 0; k < added_indices[c].size; k++) {
-      unsigned index = added_indices[c].values[k];
-      const unsigned offset = kHalfDimensions * index;
-
-      for (unsigned j = 0; j < kHalfDimensions; j++)
-        accumulator->accumulation[c][j] += ft_weights[offset + j];
-    }
-  }
-#endif
-
-  accumulator->computedAccumulation = true;
-  return true;
 }
 
 // Convert input features
 INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 {
-  if (!update_accumulator(pos))
-    refresh_accumulator(pos);
+  update_accumulator(pos, WHITE);
+  update_accumulator(pos, BLACK);
 
   int16_t (*accumulation)[2][256] = &pos->st->accumulator.accumulation;
   (void)outMask; // avoid compiler warning
