@@ -1085,6 +1085,7 @@ void do_null_move(Position *pos)
   st->accumulator.state[WHITE] = ACC_EMPTY;
   st->accumulator.state[BLACK] = ACC_EMPTY;
   st->dirtyPiece.dirtyNum = 0;
+  st->dirtyPiece.pc[0] = 0;
 #endif
 
   if (unlikely(st->epSquare)) {
