@@ -38,9 +38,9 @@ void time_init(Color us, int ply)
   int slowMover       = option_value(OPT_SLOW_MOVER);
   int npmsec          = option_value(OPT_NODES_TIME);
 
-  // opt_scale is a percentage of available time to use for the current move.
-  // max_scale is a multiplier applied to optimumTime.
-  double opt_scale, max_scale;
+  // optScale is a percentage of available time to use for the current move.
+  // maxScale is a multiplier applied to optimumTime.
+  double optScale, maxScale;
 
   // If we have to play in 'nodes as time' mode, then convert from time
   // to nodes, and use resulting values in time management formulas.
@@ -72,20 +72,20 @@ void time_init(Color us, int ply)
   // If there is a healthy increment, timeLeft can exceed actual available
   // game time for the current move, so also cap to 20% of available game time.
   if (Limits.movestogo == 0) {
-    opt_scale = min(0.008 + pow(ply + 3.0, 0.5) / 250.0,
+    optScale = min(0.0084 + pow(ply + 3.0, 0.5) * 0.0042,
                     0.2 * Limits.time[us] / (double)timeLeft);
-    max_scale = min(7.0, 4.0 + ply / 12.0);
+    maxScale = min(7.0, 4.0 + ply / 12.0);
   }
   // x moves in y seconds (+z increment)
   else {
-    opt_scale = min((0.8 + ply / 120.0) / mtg,
+    optScale = min((0.8 + ply / 120.0) / mtg,
                      0.8 * Limits.time[us] / (double)timeLeft);
-    max_scale = min(6.3, 1.5 + 0.11 * mtg);
+    maxScale = min(6.3, 1.5 + 0.11 * mtg);
   }
 
   // Never use more than 80% of the available time for this move
-  Time.optimumTime = opt_scale * timeLeft;
-  Time.maximumTime = min(0.8 * Limits.time[us] - moveOverhead, max_scale * Time.optimumTime);
+  Time.optimumTime = optScale * timeLeft;
+  Time.maximumTime = min(0.8 * Limits.time[us] - moveOverhead, maxScale * Time.optimumTime);
 
   if (option_value(OPT_PONDER))
     Time.optimumTime += Time.optimumTime / 4;

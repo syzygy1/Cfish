@@ -653,6 +653,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
 {
   const bool PvNode = NT == PV;
   const bool rootNode = PvNode && ss->ply == 0;
+  const Depth maxNextDepth = rootNode ? depth : depth + 1;
 
   // Check if we have an upcoming move which draws by repetition, or if the
   // opponent had an alternative move earlier to this position.
@@ -1371,7 +1372,7 @@ moves_loop: // When in check search starts from here.
       (ss+1)->pv = pv;
       (ss+1)->pv[0] = 0;
 
-      value = -search_PV(pos, ss+1, -beta, -alpha, newDepth);
+      value = -search_PV(pos, ss+1, -beta, -alpha, min(maxNextDepth, newDepth));
     }
 
     // Step 18. Undo move

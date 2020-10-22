@@ -100,8 +100,7 @@ static_assert(kHalfDimensions % 256 == 0, "kHalfDimensions should be a multiple 
 
 #ifdef USE_AVX512
 #define SIMD_WIDTH 512
-typedef __m512i vec16_t;
-typedef __m512i vec8_t;
+typedef __m512i vec8_t, vec16_t;
 typedef __mmask64 mask_t;
 #define vec_add_16(a,b) _mm512_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm512_sub_epi16(a,b)
@@ -111,8 +110,7 @@ typedef __mmask64 mask_t;
 
 #elif USE_AVX2
 #define SIMD_WIDTH 256
-typedef __m256i vec16_t;
-typedef __m256i vec8_t;
+typedef __m256i vec8_t, vec16_t;
 typedef uint32_t mask_t;
 #define vec_add_16(a,b) _mm256_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm256_sub_epi16(a,b)
@@ -126,8 +124,7 @@ typedef uint32_t mask_t;
 
 #elif USE_SSE2
 #define SIMD_WIDTH 128
-typedef __m128i vec16_t;
-typedef __m128i vec8_t;
+typedef __m128i vec8_t, vec16_t;
 typedef uint16_t mask_t;
 #define vec_add_16(a,b) _mm_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm_sub_epi16(a,b)
@@ -141,8 +138,7 @@ typedef uint16_t mask_t;
 
 #elif USE_MMX
 #define SIMD_WIDTH 64
-typedef __m64 vec16_t;
-typedef __m64 vec8_t;
+typedef __m64 vec8_t, vec16_t;
 typedef uint8_t mask_t;
 #define vec_add_16(a,b) _mm_add_pi16(a,b)
 #define vec_sub_16(a,b) _mm_sub_pi16(a,b)
@@ -152,8 +148,8 @@ typedef uint8_t mask_t;
 
 #elif USE_NEON
 #define SIMD_WIDTH 128
-typedef int16x8_t vec16_t;
 typedef int8x16_t vec8_t;
+typedef int16x8_t vec16_t;
 typedef uint16_t mask_t;
 #define vec_add_16(a,b) vaddq_s16(a,b)
 #define vec_sub_16(a,b) vsubq_s16(a,b)
@@ -980,7 +976,6 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
   update_accumulator(pos, BLACK);
 
   int16_t (*accumulation)[2][256] = &pos->st->accumulator.accumulation;
-  (void)outMask; // avoid compiler warning
 
   const Color perspectives[2] = { stm(), !stm() };
   for (unsigned p = 0; p < 2; p++) {
@@ -997,6 +992,7 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
     }
 
 #else
+    (void)outMask; // avoid compiler warning
     for (unsigned i = 0; i < kHalfDimensions; i++) {
       int16_t sum = (*accumulation)[perspectives[p]][i];
       output[offset + i] = clamp(sum, 0, 127);
