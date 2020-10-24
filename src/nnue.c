@@ -86,7 +86,6 @@ enum {
 enum {
   kHalfDimensions = 256,
   FtInDims = 64 * PS_END, // 64 * 641
-  FtOutDims = kHalfDimensions * 2
 };
 
 // USE_MMX generates _mm_empty() instructions, so undefine if not needed
@@ -174,11 +173,12 @@ typedef uint64_t mask2_t;
 typedef uint32_t mask2_t;
 #endif
 
-typedef int8_t clipped_t;
 #if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_AVX2))
 typedef int16_t weight_t;
+typedef int16_t out_t;
 #else
 typedef int8_t weight_t;
+typedef int8_t out_t;
 #endif
 
 typedef struct {
@@ -222,16 +222,16 @@ static void append_changed_indices(const Position *pos, const Color c,
 }
 
 // InputLayer = InputSlice<256 * 2>
-// out: 512 x clipped_t
+// out: 512 x int8_t
 
 // Hidden1Layer = ClippedReLu<AffineTransform<InputLayer, 32>>
-// 512 x clipped_t -> 32 x int32_t -> 32 x clipped_t
+// 512 x int8_t -> 32 x int32_t -> 32 x int8_t
 
 // Hidden2Layer = ClippedReLu<AffineTransform<hidden1, 32>>
-// 32 x clipped_t -> 32 x int32_t -> 32 x clipped_t
+// 32 x int8_t -> 32 x int32_t -> 32 x out_t
 
 // OutputLayer = AffineTransform<HiddenLayer2, 1>
-// 32 x clipped_t -> 1 x int32_t
+// 32 x out_t -> 1 x int32_t
 
 #if !defined(USE_AVX512)
 static alignas(64) weight_t hidden1_weights[32 * 512];
@@ -240,14 +240,14 @@ static alignas(64) weight_t hidden2_weights[32 * 32];
 static alignas(64) weight_t hidden1_weights[64 * 512];
 static alignas(64) weight_t hidden2_weights[64 * 32];
 #endif
-static alignas(64) weight_t output_weights [1 * 32];
+static alignas(64) out_t output_weights[1 * 32];
 
 static alignas(64) int32_t hidden1_biases[32];
 static alignas(64) int32_t hidden2_biases[32];
 static int32_t output_biases[1];
 
-INLINE int32_t affine_propagate(clipped_t *input, int32_t *biases,
-    weight_t *weights)
+INLINE int32_t output_layer(const out_t *input, const int32_t *biases,
+    const out_t *weights)
 {
 #if defined(USE_AVX2)
   __m256i *iv = (__m256i *)input;
@@ -288,8 +288,8 @@ INLINE int32_t affine_propagate(clipped_t *input, int32_t *biases,
 
 #elif defined(USE_MMX)
   __m64 *iv = (__m64 *)input;
-  __m64 s0 = _mm_setzero_si64(), s1 = s0;
   __m64 *row = (__m64 *)weights;
+  __m64 s0 = _mm_setzero_si64(), s1 = s0;
   for (unsigned j = 0; j < 4; j++) {
     s0 = _mm_add_pi32(s0, _mm_madd_pi16(row[2 * j], iv[2 * j]));
     s1 = _mm_add_pi32(s1, _mm_madd_pi16(row[2 * j + 1], iv[2 * j + 1]));
@@ -300,8 +300,8 @@ INLINE int32_t affine_propagate(clipped_t *input, int32_t *biases,
 
 #elif defined(USE_NEON)
   int8x8_t *iv = (int8x8_t *)input;
-  int32x4_t sum = {biases[0]};
   int8x8_t *row = (int8x8_t *)weights;
+  int32x4_t sum = {biases[0]};
   int16x8_t p0 = vmull_s8(iv[0], row[0]);
   int16x8_t p1 = vmull_s8(iv[1], row[1]);
   p0 = vmlal_s8(p0, iv[2], row[2]);
@@ -319,15 +319,13 @@ INLINE int32_t affine_propagate(clipped_t *input, int32_t *biases,
 #endif
 }
 
-static_assert(FtOutDims % 64 == 0, "FtOutDims not a multiple of 64");
-
 #ifdef VECTOR
 INLINE bool next_idx(unsigned *idx, unsigned *offset, mask2_t *v,
-    mask_t *mask, unsigned inDims)
+    mask_t *mask, unsigned dims)
 {
   while (*v == 0) {
     *offset += 8 * sizeof(mask2_t);
-    if (*offset >= inDims) return false;
+    if (*offset >= dims) return false;
     memcpy(v, (char *)mask + (*offset / 8), sizeof(mask2_t));
   }
 #ifdef IS_64BIT
@@ -363,14 +361,11 @@ INLINE int neon_movemask(uint8x16_t v)
 #endif
 #endif
 
-#if defined(USE_AVX512)
-INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
+INLINE void hidden_layer(const int8_t *input, void *output, unsigned dims,
+    const int32_t *biases, const weight_t *weights, mask_t *inMask,
+    mask_t *outMask, const bool pack8_and_calc_mask)
 {
-  assert(outDims == 32);
-
-  (void)outDims;
+#if defined(USE_AVX512)
   const __m512i kZero = _mm512_setzero_si512();
   __m512i out_0 = ((__m512i *)biases)[0];
   __m512i out_1 = ((__m512i *)biases)[1];
@@ -379,12 +374,12 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   unsigned idx;
 
   memcpy(&v, inMask, sizeof(mask2_t));
-  for (unsigned offset = 0; offset < inDims;) {
-    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+  for (unsigned offset = 0; offset < dims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, dims))
       break;
     first = ((__m512i *)weights)[idx];
     uint16_t factor = input[idx];
-    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
+    if (next_idx(&idx, &offset, &v, inMask, dims)) {
       second = ((__m512i *)weights)[idx];
       factor |= input[idx] << 8;
     } else {
@@ -407,15 +402,8 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
     outMask[0] = (uint32_t)_mm256_movemask_epi8(_mm256_cmpgt_epi8(outVec[0], kZero256));
   else
     outVec[0] = _mm256_max_epi8(outVec[0], kZero256);
-}
-#elif defined(USE_AVX2)
-INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
-{
-  assert(outDims == 32);
 
-  (void)outDims;
+#elif defined(USE_AVX2)
   const __m256i kZero = _mm256_setzero_si256();
   __m256i out_0 = ((__m256i *)biases)[0];
   __m256i out_1 = ((__m256i *)biases)[1];
@@ -426,12 +414,12 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   unsigned idx;
 
   memcpy(&v, inMask, sizeof(mask2_t));
-  for (unsigned offset = 0; offset < inDims;) {
-    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+  for (unsigned offset = 0; offset < dims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, dims))
       break;
     first = ((__m256i *)weights)[idx];
     uint16_t factor = input[idx];
-    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
+    if (next_idx(&idx, &offset, &v, inMask, dims)) {
       second = ((__m256i *)weights)[idx];
       factor |= input[idx] << 8;
     } else {
@@ -457,14 +445,8 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
     outMask[0] = _mm256_movemask_epi8(_mm256_cmpgt_epi8(outVec[0], kZero));
   else
     outVec[0] = _mm256_max_epi8(outVec[0], kZero);
-}
-#elif AVOID_USE_SSSE3
-INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
-{
-  assert(outDims == 32);
 
+#elif AVOID_USE_SSSE3
   const __m128i kZeros[2] = { 0 };
   __m128i out_0 = ((__m128i *)biases)[0];
   __m128i out_1 = ((__m128i *)biases)[1];
@@ -479,13 +461,13 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
   unsigned idx;
 
   memcpy(&v, inMask, sizeof(mask2_t));
-  for (unsigned offset = 0; offset < inDims;) {
-    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+  for (unsigned offset = 0; offset < dims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, dims))
       break;
-    first = (__m128i *)&weights[outDims * idx];
+    first = (__m128i *)&weights[32 * idx];
     uint16_t factor = input[idx];
-    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
-      second = (__m128i *)&weights[outDims * idx];
+    if (next_idx(&idx, &offset, &v, inMask, dims)) {
+      second = (__m128i *)&weights[32 * idx];
       factor |= input[idx] << 8;
     } else {
       second = kZeros;
@@ -531,14 +513,8 @@ INLINE void affine_txfm(int8_t *input, void *output, unsigned inDims,
         _mm_max_epi16(out16_2, kZeros[0]), _mm_max_epi16(out16_3, kZeros[0]));
 #endif
   }
-}
-#elif defined(USE_SSE2)
-INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
-{
-  assert(outDims == 32);
 
+#elif defined(USE_SSE2)
   const __m128i kZeros[4] = { 0 };
   __m128i out_0 = ((__m128i *)biases)[0];
   __m128i out_1 = ((__m128i *)biases)[1];
@@ -553,13 +529,13 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   unsigned idx;
 
   memcpy(&v, inMask, sizeof(mask2_t));
-  for (unsigned offset = 0; offset < inDims;) {
-    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+  for (unsigned offset = 0; offset < dims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, dims))
       break;
-    first = (__m128i *)&weights[outDims * idx];
+    first = (__m128i *)&weights[32 * idx];
     uint32_t factor = input[idx];
-    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
-      second = (__m128i *)&weights[outDims * idx];
+    if (next_idx(&idx, &offset, &v, inMask, dims)) {
+      second = (__m128i *)&weights[32 * idx];
       factor |= input[idx] << 16;
     } else {
       second = kZeros;
@@ -593,13 +569,8 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[2] = _mm_min_epi16(_mm_max_epi16(out16_2, kZeros[0]), kx07f);
     outVec[3] = _mm_min_epi16(_mm_max_epi16(out16_3, kZeros[0]), kx07f);
   }
-}
+
 #elif defined(USE_MMX)
-INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
-{
-  assert(outDims == 32);
 
 #if 0
   const __m64 kZeros[2] = { 0 };
@@ -613,13 +584,13 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     unsigned idx;
 
     memcpy(&v, inMask, sizeof(mask2_t));
-    for (unsigned offset = 0; offset < inDims;) {
-      if (!next_idx(&idx, &offset, &v, inMask, inDims))
+    for (unsigned offset = 0; offset < dims;) {
+      if (!next_idx(&idx, &offset, &v, inMask, dims))
         break;
-      first = &((__m64 *)&weights[outDims * idx])[2  * t];
+      first = &((__m64 *)&weights[32 * idx])[2  * t];
       uint32_t factor = input[idx];
-      if (next_idx(&idx, &offset, &v, inMask, inDims)) {
-        second = &((__m64 *)&weights[outDims * idx])[2 * t];
+      if (next_idx(&idx, &offset, &v, inMask, dims)) {
+        second = &((__m64 *)&weights[32 * idx])[2 * t];
         factor |= input[idx] << 16;
       } else {
         second = kZeros;
@@ -675,13 +646,13 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   unsigned idx;
 
   memcpy(&v, inMask, sizeof(mask2_t));
-  for (unsigned offset = 0; offset < inDims;) {
-    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+  for (unsigned offset = 0; offset < dims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, dims))
       break;
-    first = (__m64 *)&weights[outDims * idx];
+    first = (__m64 *)&weights[32 * idx];
     uint32_t factor = input[idx];
-    if (next_idx(&idx, &offset, &v, inMask, inDims)) {
-      second = (__m64 *)&weights[outDims * idx];
+    if (next_idx(&idx, &offset, &v, inMask, dims)) {
+      second = (__m64 *)&weights[32 * idx];
       factor |= input[idx] << 16;
     } else {
       second = kZeros;
@@ -750,14 +721,8 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
 #endif
   }
 #endif
-}
-#elif defined(USE_NEON)
-INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, const int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
-{
-  assert(outDims == 32);
 
+#elif defined(USE_NEON)
   int32x4_t out_0 = ((int32x4_t *)biases)[0];
   int32x4_t out_1 = ((int32x4_t *)biases)[1];
   int32x4_t out_2 = ((int32x4_t *)biases)[2];
@@ -771,10 +736,10 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
   unsigned idx;
 
   memcpy(&v, inMask, sizeof(mask2_t));
-  for (unsigned offset = 0; offset < inDims;) {
-    if (!next_idx(&idx, &offset, &v, inMask, inDims))
+  for (unsigned offset = 0; offset < dims;) {
+    if (!next_idx(&idx, &offset, &v, inMask, dims))
       break;
-    first = (int8x8_t *)&weights[outDims * idx];
+    first = (int8x8_t *)&weights[32 * idx];
     int16_t factor = input[idx];
 
     int16x8_t prod;
@@ -813,29 +778,26 @@ INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
     outVec[2] = vmax_s8(vqmovn_s16(out16_2), kZero);
     outVec[3] = vmax_s8(vqmovn_s16(out16_3), kZero);
   }
-}
+
 #else /* generic fallback */
-INLINE void affine_txfm(clipped_t *input, void *output, unsigned inDims,
-    unsigned outDims, int32_t *biases, const weight_t *weights,
-    mask_t *inMask, mask_t *outMask, const bool pack8_and_calc_mask)
-{
   (void)inMask; (void)outMask; (void)pack8_and_calc_mask;
 
-  int32_t tmp[outDims];
+  int32_t tmp[32];
 
-  for (unsigned i = 0; i < outDims; i++)
+  for (unsigned i = 0; i < 32; i++)
     tmp[i] = biases[i];
 
-  for (unsigned idx = 0; idx < inDims; idx++)
+  for (unsigned idx = 0; idx < dims; idx++)
     if (input[idx])
-      for (unsigned i = 0; i < outDims; i++)
-        tmp[i] += (int8_t)input[idx] * weights[outDims * idx + i];
+      for (unsigned i = 0; i < 32; i++)
+        tmp[i] += (int8_t)input[idx] * weights[32 * idx + i];
 
-  clipped_t *outVec = (clipped_t *)output;
-  for (unsigned i = 0; i < outDims; i++)
+  int8_t *outVec = (int8_t *)output;
+  for (unsigned i = 0; i < 32; i++)
     outVec[i] = clamp(tmp[i] >> SHIFT, 0, 127);
-}
+
 #endif
+}
 
 // Input feature converter
 static alignas(64) int16_t ft_biases[kHalfDimensions];
@@ -970,7 +932,7 @@ INLINE void update_accumulator(const Position *pos, const Color c)
 }
 
 // Convert input features
-INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
+INLINE void transform(const Position *pos, int8_t *output, mask_t *outMask)
 {
   update_accumulator(pos, WHITE);
   update_accumulator(pos, BLACK);
@@ -1004,21 +966,17 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 }
 
 struct NetData {
-  alignas(64) clipped_t input[FtOutDims];
-  clipped_t hidden1_out[32];
-#if (defined(USE_SSE2) || defined(USE_MMX)) && !defined(USE_AVX2)
-  int16_t hidden2_out[32];
-#else
-  int8_t hidden2_out[32];
-#endif
+  alignas(64) int8_t input[512];
+  int8_t hidden1_out[32];
+  out_t hidden2_out[32];
 };
 
 // Evaluation function
 Value nnue_evaluate(const Position *pos)
 {
   int32_t out_value;
-  alignas(8) mask_t input_mask[FtOutDims / (8 * sizeof(mask_t))];
-  alignas(8) mask_t hidden1_mask[8 / sizeof(mask_t)] = { 0 };
+  alignas(8) mask_t hidden1_mask[512 / (8 * sizeof(mask_t))];
+  alignas(8) mask_t hidden2_mask[8 / sizeof(mask_t)] = { 0 };
 #ifdef ALIGNMENT_HACK // work around a bug in old gcc on Windows
   uint8_t buf[sizeof(struct NetData) + 63];
   struct NetData *b = (struct NetData *)(buf + ((((uintptr_t)buf-1) ^ 0x3f) & 0x3f));
@@ -1028,16 +986,15 @@ Value nnue_evaluate(const Position *pos)
 #define B(x) (buf.x)
 #endif
 
-  transform(pos, B(input), input_mask);
+  transform(pos, B(input), hidden1_mask);
 
-  affine_txfm(B(input), B(hidden1_out), FtOutDims, 32,
-      hidden1_biases, hidden1_weights, input_mask, hidden1_mask, true);
+  hidden_layer(B(input), B(hidden1_out), 512, hidden1_biases,
+      hidden1_weights, hidden1_mask, hidden2_mask, true);
 
-  affine_txfm(B(hidden1_out), B(hidden2_out), 32, 32,
-      hidden2_biases, hidden2_weights, hidden1_mask, NULL, false);
+  hidden_layer(B(hidden1_out), B(hidden2_out), 32, hidden2_biases,
+      hidden2_weights, hidden2_mask, NULL, false);
 
-  out_value = affine_propagate((int8_t *)B(hidden2_out), output_biases,
-      output_weights);
+  out_value = output_layer(B(hidden2_out), output_biases, output_weights);
 
 #if defined(USE_MMX)
   _mm_empty();
@@ -1046,14 +1003,21 @@ Value nnue_evaluate(const Position *pos)
   return out_value / FV_SCALE;
 }
 
-static void read_output_weights(weight_t *w, const char *d)
+#ifndef USE_NEON
+INLINE unsigned bit_shuffle(unsigned v, int left, int right, unsigned mask)
+{
+  unsigned w = v & mask;
+  w = (w << left) | (w >> right);
+  return (v & ~mask) | (w & mask);
+}
+#endif
+
+static void read_output_weights(out_t *w, const char *d)
 {
   for (unsigned i = 0; i < 32; i++) {
     unsigned c = i;
 #if defined(USE_AVX512)
-    unsigned b = c & 0x18;
-    b = (b << 1) | (b >> 1);
-    c = (c & ~0x18) | (b & 0x18);
+    c = bit_shuffle(c, 1, 1, 0x18);
 #endif
     w[c] = *d++;
   }
@@ -1064,23 +1028,14 @@ INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
   (void)dims;
 
 #if defined(USE_AVX512)
-  if (dims > 32) {
-    unsigned b = c & 0x38;
-    b = (b << 1) | (b >> 2);
-    c = (c & ~0x38) | (b & 0x38);
-  }
-  else if (dims == 32) {
-    unsigned b = c & 0x18;
-    b = (b << 1) | (b >> 1);
-    c = (c & ~0x18) | (b & 0x18);
-  }
+  if (dims > 32)
+    c = bit_shuffle(c, 1, 2, 0x38);
+  else if (dims == 32)
+    c = bit_shuffle(c, 1, 1, 0x18);
 
 #elif defined(USE_AVX2)
-  if (dims > 32) {
-    unsigned b = c & 0x18;
-    b = (b << 1) | (b >> 1);
-    c = (c & ~0x18) | (b & 0x18);
-  }
+  if (dims > 32)
+    c = bit_shuffle(c, 1, 1, 0x18);
 
 #endif
 
