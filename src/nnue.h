@@ -14,6 +14,7 @@ typedef struct {
 } Accumulator;
 
 void nnue_init(void);
+void nnue_free(void);
 Value nnue_evaluate(const Position *pos);
 
 #endif

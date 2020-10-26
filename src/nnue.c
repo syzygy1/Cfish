@@ -31,6 +31,7 @@
 #include "misc.h"
 #include "nnue.h"
 #include "position.h"
+#include "settings.h"
 #include "uci.h"
 
 #ifdef NNUE_EMBEDDED
@@ -800,8 +801,8 @@ INLINE void hidden_layer(const int8_t *input, void *output, unsigned dims,
 }
 
 // Input feature converter
-static alignas(64) int16_t ft_biases[kHalfDimensions];
-static alignas(64) int16_t ft_weights[kHalfDimensions * FtInDims];
+static int16_t *ft_biases; // [kHalfDimensions]
+static int16_t *ft_weights; // [kHalfDimenions * FtInDims]
 
 #ifdef VECTOR
 #define TILE_HEIGHT (NUM_REGS * SIMD_WIDTH / 16)
@@ -1107,8 +1108,24 @@ static bool verify_net(const void *evalData, size_t size)
   return true;
 }
 
+static alloc_t ft_alloc;
+
 static void init_weights(const void *evalData)
 {
+  if (!ft_biases) {
+    if (settings.largePages)
+      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1), true,
+          &ft_alloc);
+    if (!ft_biases)
+      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1), false,
+          &ft_alloc);
+    if (!ft_biases) {
+      fprintf(stdout, "Could not allocate enough memory.\n");
+      exit(EXIT_FAILURE);
+    }
+    ft_weights = ft_biases + kHalfDimensions;
+  }
+
   const char *d = (const char *)evalData + TransformerStart + 4;
 
   // Read transformer
@@ -1195,4 +1212,10 @@ void nnue_init(void)
 #endif
          );
   exit(EXIT_FAILURE);
+}
+
+void nnue_free(void)
+{
+  if (ft_biases)
+    free_memory(&ft_alloc);
 }

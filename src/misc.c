@@ -141,6 +141,9 @@ void print_compiler_info(void)
 #ifdef USE_AVX2
          " AVX2"
 #endif
+#ifdef USE_AVX
+         " AVX"
+#endif
 #ifdef USE_SSE41
          " SSE41"
 #endif
@@ -297,9 +300,11 @@ FD open_file(const char *name)
 {
 #ifndef _WIN32
   return open(name, O_RDONLY);
+
 #else
   return CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
       FILE_FLAG_RANDOM_ACCESS, NULL);
+
 #endif
 }
 
@@ -307,8 +312,10 @@ void close_file(FD fd)
 {
 #ifndef _WIN32
   close(fd);
+
 #else
   CloseHandle(fd);
+
 #endif
 }
 
@@ -318,17 +325,18 @@ size_t file_size(FD fd)
   struct stat statbuf;
   fstat(fd, &statbuf);
   return statbuf.st_size;
+
 #else
   DWORD sizeLow, sizeHigh;
   sizeLow = GetFileSize(fd, &sizeHigh);
   return ((uint64_t)sizeHigh << 32) | sizeLow;
+
 #endif
 }
 
 const void *map_file(FD fd, map_t *map)
 {
 #ifndef _WIN32
-
   *map = file_size(fd);
   void *data = mmap(NULL, *map, PROT_READ, MAP_SHARED, fd, 0);
 #ifdef MADV_RANDOM
@@ -337,7 +345,6 @@ const void *map_file(FD fd, map_t *map)
   return data == MAP_FAILED ? NULL : data;
 
 #else
-
   DWORD sizeLow, sizeHigh;
   sizeLow = GetFileSize(fd, &sizeHigh);
   *map = CreateFileMapping(fd, NULL, PAGE_READONLY, sizeHigh, sizeLow, NULL);
@@ -353,13 +360,65 @@ void unmap_file(const void *data, map_t map)
   if (!data) return;
 
 #ifndef _WIN32
-
   munmap((void *)data, map);
 
 #else
-
   UnmapViewOfFile(data);
   CloseHandle(map);
 
+#endif
+}
+
+void *allocate_memory(size_t size, bool lp, alloc_t *alloc)
+{
+  void *ptr = NULL;
+
+#ifdef _WIN32
+  if (lp) {
+    size_t pageSize = largePageMinimum;
+    size_t lpSize = (size + pageSize - 1) & ~(pageSize - 1);
+    ptr = VirtualAlloc(NULL, lpSize,
+        MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES, PAGE_READWRITE);
+  } else
+    ptr = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  alloc->ptr = ptr;
+  return ptr;
+
+#else /* Unix */
+  size_t alignment = lp ? 1ULL << 21 : 1;
+  size_t allocSize = size + alignment - 1;
+
+#if defined(__APPLE__) && defined(VM_FLAGS_SUPERPAGE_SIZE_2MB)
+  if (lp)
+    ptr = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, VM_FLAGS_SUPERPAGE_SIZE_2MB, 0);
+  else
+    ptr = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+#else
+  ptr = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
+      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#if defined(__linux__) && defined(MADV_HUGEPAGE)
+  // Advise the kernel to allocate large pages.
+  if (lp)
+    madvise(ptr, allocSize, MADV_HUGEPAGE);
+#endif
+
+#endif
+
+  alloc->ptr = ptr;
+  alloc->size = allocSize;
+  return (void *)(((uintptr_t)ptr + alignment - 1) & ~(alignment - 1));
+
+#endif
+}
+
+void free_memory(alloc_t *alloc)
+{
+#ifdef _WIN32
+  VirtualFree(alloc->ptr, 0, MEM_RELEASE);
+#else
+  munmap(alloc->ptr, alloc->size);
 #endif
 }

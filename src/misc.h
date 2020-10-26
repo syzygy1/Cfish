@@ -80,6 +80,9 @@ extern size_t largePageMinimum;
 typedef HANDLE FD;
 #define FD_ERR INVALID_HANDLE_VALUE
 typedef HANDLE map_t;
+typedef struct {
+  void *ptr;
+} alloc_t;
 
 void flockfile(FILE *F);
 void funlockfile(FILE *F);
@@ -89,6 +92,10 @@ void funlockfile(FILE *F);
 typedef int FD;
 #define FD_ERR -1
 typedef size_t map_t;
+typedef struct {
+  void *ptr;
+  size_t size;
+} alloc_t;
 
 #endif
 
@@ -99,6 +106,8 @@ void close_file(FD fd);
 size_t file_size(FD fd);
 const void *map_file(FD fd, map_t *map);
 void unmap_file(const void *data, map_t map);
+void *allocate_memory(size_t size, bool lp, alloc_t *alloc);
+void free_memory(alloc_t *alloc);
 
 struct PRNG
 {

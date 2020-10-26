@@ -39,14 +39,9 @@ TranspositionTable TT; // Our global transposition table
 
 void tt_free(void)
 {
-#ifdef _WIN32
-  if (TT.mem)
-    VirtualFree(TT.mem, 0, MEM_RELEASE);
-#else
-  if (TT.mem)
-    munmap(TT.mem, TT.allocSize);
-#endif
-  TT.mem = NULL;
+  if (TT.table)
+    free_memory(&TT.alloc);
+  TT.table = NULL;
 }
 
 
@@ -57,71 +52,22 @@ void tt_allocate(size_t mbSize)
   TT.clusterCount = mbSize * 1024 * 1024 / sizeof(Cluster);
   size_t size = TT.clusterCount * sizeof(Cluster);
 
-#ifdef _WIN32
-
-  TT.mem = NULL;
+  TT.table = NULL;
   if (settings.largePages) {
-    size_t pageSize = largePageMinimum;
-    size_t lpSize = (size + pageSize - 1) & ~(pageSize - 1);
-    TT.mem = VirtualAlloc(NULL, lpSize,
-                          MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES,
-                          PAGE_READWRITE);
-    if (!TT.mem)
+    TT.table = allocate_memory(size, true, &TT.alloc);
+#if !defined(__linux__)
+    if (!TT.table)
       printf("info string Unable to allocate large pages for the "
              "transposition table.\n");
     else
       printf("info string Transposition table allocated using large pages.\n");
     fflush(stdout);
+#endif
   }
-
-  if (!TT.mem)
-    TT.mem = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-  if (!TT.mem)
+  if (!TT.table)
+    TT.table = allocate_memory(size, false, &TT.alloc);
+  if (!TT.table)
     goto failed;
-  TT.table = (Cluster *)TT.mem;
-
-#else /* Unix */
-
-  size_t alignment = settings.largePages ? (1ULL << 21) : 1;
-  size_t allocSize = size + alignment - 1;
-
-#if defined(__APPLE__) && defined(VM_FLAGS_SUPERPAGE_SIZE_2MB)
-
-  if (settings.largePages) {
-    TT.mem = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, VM_FLAGS_SUPERPAGE_SIZE_2MB, 0);
-    if (!TT.mem)
-      printf("info string Unable to allocate large pages for the "
-             "transposition table.\n");
-    else
-      printf("info string Transposition table allocated using large pages.\n");
-    fflush(stdout);
-  }
-  if (!TT.mem)
-    TT.mem = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-#else
-
-  TT.mem = mmap(NULL, allocSize, PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-#endif
-
-  TT.allocSize = allocSize;
-  TT.table = (Cluster *)(  (((uintptr_t)TT.mem) + alignment - 1)
-                         & ~(alignment - 1));
-  if (!TT.mem)
-    goto failed;
-
-#if defined(__linux__) && defined(MADV_HUGEPAGE)
-
-  // Advise the kernel to allocate large pages.
-  if (settings.largePages)
-    madvise(TT.table, size, MADV_HUGEPAGE);
-
-#endif
-#endif
 
   // Clear the TT table to page in the memory immediately. This avoids
   // an initial slow down during the first second or minutes of the search.

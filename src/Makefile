@@ -66,6 +66,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # sse2 = yes/no       --- -msse2           --- Use Intel Streaming SIMD Extensions 2
 # ssse3 = yes/no      --- -mssse3          --- Use Intel Supplemental Streaming SIMD Extensions 3
 # sse41 = yes/no      --- -msse4.1         --- Use Intel Streaming SIMD Extensions 4.1
+# avx = yes/no        --- -mavx            --- Use Intel Advanced Vector Extensions
 # avx2 = yes/no       --- -mavx2           --- Use Intel Advanced Vector Extensions 2
 # avx512 = yes/no     --- -mavx512bw       --- Use Intel Advanced Vector Extensions 512
 # vnni = yes/no       --- -mavx512vnni     --- Use Intel Vector Neural Network Instructions 512
@@ -97,6 +98,7 @@ mmx = no
 sse2 = no
 ssse3 = no
 sse41 = no
+avx = no
 avx2 = no
 avx512 = no
 vnni = no
@@ -161,6 +163,9 @@ ifeq ($(x86),yes)
 	endif
 	ifneq ($(findstring __AVX2__,$(props)),)
 		avx2 = yes
+	endif
+	ifneq ($(findstring __AVX__,$(props)),)
+		avx = yes
 	endif
 	ifneq ($(findstring __SSE4_1__,$(props)),)
 		sse41 = yes
@@ -250,6 +255,15 @@ ifneq ($(findstring -modern,$(ARCH)),)
 	sse2 = yes
 	ssse3 = yes
 	sse41 = yes
+endif
+
+ifneq ($(findstring -avx,$(ARCH)),)
+	popcnt = yes
+	sse = yes
+	sse2 = yes
+	ssse3 = yes
+	sse41 = yes
+	avx = yes
 endif
 
 ifneq ($(findstring -avx2,$(ARCH)),)
@@ -596,6 +610,10 @@ ifeq ($(avx2),yes)
 	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
 		CFLAGS += -mavx2
 	endif
+else ifeq ($(avx),yes)
+	ifeq ($(comp),$(filter $(comp),gcc clang mingw))
+		CFLAGS += -mavx
+	endif
 endif
 
 ifeq ($(avx512),yes)
@@ -765,6 +783,7 @@ help:
 	@echo "x86-64-vnni             > x86 64-bit with 256-bit AVX2/VNNI support"
 	@echo "x86-64-bmi2             > x86 64-bit with AVX2 and BMI2 support"
 	@echo "x86-64-avx2             > x86 64-bit with 256-bit AVX2 support"
+	@echo "x86-64-avx              > x86 64-bit with AVX support (VEX encoding)"
 	@echo "x86-64-sse41-popcnt     > x86 64-bit with SSE4.1 and popcount support"
 	@echo "x86-64-modern           > common modern CPU, currently x86-64-sse41-popcnt"
 	@echo "x86-64-ssse3            > x86 64-bit with SSSE3 support"
@@ -891,6 +910,7 @@ config-sanity: net
 	@echo "sse2: '$(sse2)'"
 	@echo "ssse3: '$(ssse3)'"
 	@echo "sse41: '$(sse41)'"
+	@echo "avx: '$(avx)'"
 	@echo "avx2: '$(avx2)'"
 	@echo "avx512: '$(avx512)'"
 	@echo "vnni: '$(vnni)'"
@@ -919,6 +939,7 @@ config-sanity: net
 	@test "$(sse2)" = "yes" || test "$(sse2)" = "no"
 	@test "$(ssse3)" = "yes" || test "$(ssse3)" = "no"
 	@test "$(sse41)" = "yes" || test "$(sse41)" = "no"
+	@test "$(avx)" = "yes" || test "$(avx)" = "no"
 	@test "$(avx2)" = "yes" || test "$(avx2)" = "no"
 	@test "$(pext)" = "yes" || test "$(pext)" = "no"
 	@test "$(avx512)" = "yes" || test "$(avx512)" = "no"

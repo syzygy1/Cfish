@@ -53,6 +53,7 @@ int main(int argc, char **argv)
   options_free();
   tt_free();
   pb_free();
+  nnue_free();
 
   return 0;
 }
