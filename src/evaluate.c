@@ -120,6 +120,12 @@ static const Score MobilityBonus[4][32] = {
     S(112,178), S(114,185), S(114,187), S(119,221) }
 };
 
+// BishopsPawns[distance from edge] contains a file-dependent penalty for
+// pawns on squares of the same color as our bishop.
+static const Score BishopPawns[8] = {
+  S(3, 8), S(3, 9), S(1, 8), S(3, 7), S(3, 7), S(1, 8), S(3, 9), S(3, 8)
+};
+
 // RookOnFile[semiopen/open] contains bonuses for each rook when there is
 // no friendly pawn on the rook file.
 static const Score RookOnFile[2] = { S(19, 7), S(48, 27) };
@@ -154,7 +160,6 @@ static const Score BadOutpost          = S( -7, 36);
 static const Score BishopKingProtector = S(  6,  9);
 static const Score BishopOnKingRing    = S( 24,  0);
 static const Score BishopOutpost       = S( 31, 23);
-static const Score BishopPawns         = S(  3,  7);
 static const Score BishopXRayPawns     = S(  4,  5);
 static const Score CorneredBishop      = S( 50, 50);
 static const Score FlankAttacks        = S(  8,  0);
@@ -297,8 +302,10 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
         // and smaller when the bishop is outside the pawn chain
         Bitboard blocked = pieces_cp(Us, PAWN) & shift_bb(Down, pieces());
 
-        score -= BishopPawns * pawns_on_same_color_squares(ei->pe, Us, s)
-                             * (!(ei->attackedBy[Us][PAWN] & sq_bb(s)) + popcount(blocked & CenterFiles));
+        score -=  BishopPawns[file_of(s)]
+                             *  pawns_on_same_color_squares(ei->pe, Us, s)
+                             * (!(ei->attackedBy[Us][PAWN] & sq_bb(s))
+                + popcount(blocked & CenterFiles));
 
         // Penalty for all enemy pawns x-rayed
         score -= BishopXRayPawns * popcount(PseudoAttacks[BISHOP][s] & pieces_cp(Them, PAWN));
