@@ -7,6 +7,7 @@
 # Precompiled Headers
 *.gch
 *.pch
+.depend
 
 # Libraries
 *.lib
@@ -27,7 +28,13 @@
 *.i*86
 *.x86_64
 *.hex
+cfish*
 
 # Debug files
 *.dSYM/
 *.su
+*.gcda
+*.s
+
+# NNUE network files
+*.nnue

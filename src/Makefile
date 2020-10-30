@@ -84,6 +84,7 @@ endif
 
 nnue = yes
 pure = no
+sparse = yes
 optimize = yes
 lto = no
 debug = no
@@ -377,6 +378,10 @@ ifeq ($(ARCH),ppc-64)
 	prefetch = yes
 endif
 
+endif
+
+ifeq ($(avx2),yes)
+	sparse=no
 endif
 
 ### ==========================================================================
@@ -702,6 +707,9 @@ ifeq ($(nnue),yes)
 	endif
 	ifeq ($(pure),yes)
 		CFLAGS += -DNNUE_PURE
+	endif
+	ifeq ($(sparse),yes)
+		CFLAGS += -DNNUE_SPARSE
 	endif
 endif
 
