@@ -415,8 +415,8 @@ void pos_fen(const Position *pos, char *str)
   } else {
     if (cr & WHITE_OO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(WHITE, KING_SIDE)));
     if (cr & WHITE_OOO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(WHITE, QUEEN_SIDE)));
-    if (cr & BLACK_OO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(BLACK, KING_SIDE)));
-    if (cr & BLACK_OOO) *str++ = 'A' + file_of(castling_rook_square(make_castling_right(BLACK, QUEEN_SIDE)));
+    if (cr & BLACK_OO) *str++ = 'a' + file_of(castling_rook_square(make_castling_right(BLACK, KING_SIDE)));
+    if (cr & BLACK_OOO) *str++ = 'a' + file_of(castling_rook_square(make_castling_right(BLACK, QUEEN_SIDE)));
   }
   if (!cr)
       *str++ = '-';
