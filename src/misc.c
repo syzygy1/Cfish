@@ -162,11 +162,12 @@ void print_compiler_info(void)
 #ifdef USE_NEON
          " NEON"
 #endif
-
+#ifdef NNUE_SPARSE
+         " sparse"
+#endif
 #ifndef NDEBUG
          " DEBUG"
 #endif
-
          "\n__VERSION__ macro expands to: "
 #ifdef __VERSION__
          __VERSION__
