@@ -1689,7 +1689,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
                                            [to_sq(move)];
 
     if (  !captureOrPromotion
-        && moveCount
+        && bestValue > VALUE_TB_LOSS_IN_MAX_PLY
         && (*(ss-1)->history)[moved_piece(move)][to_sq(move)] < CounterMovePruneThreshold
         && (*(ss-2)->history)[moved_piece(move)][to_sq(move)] < CounterMovePruneThreshold)
       continue;
