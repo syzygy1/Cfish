@@ -251,7 +251,7 @@ void mainthread_search(void)
 #endif
 
   base_ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
-  Limits.depth  = option_value(OPT_DEPTH);
+  //Limits.depth  = option_value(OPT_DEPTH);
   int sleepseconds = option_value(OPT_SLEEP);
   sleep (sleepseconds);
 

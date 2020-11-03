@@ -106,7 +106,7 @@ vnni = no
 neon = no
 ARCH = auto
 native = no
-embed = no
+embed = yes
 STRIP = strip
 
 ### 2.2 Architecture specific
