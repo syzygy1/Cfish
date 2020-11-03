@@ -106,6 +106,8 @@ static Option optionsMap[] = {
   { "Contempt", OPT_TYPE_SPIN, 24, -100, 100, NULL, NULL, 0, NULL },
   { "Analysis Contempt", OPT_TYPE_COMBO, 0, 0, 0,
     "Off var Off var White var Black", NULL, 0, NULL },
+  { "Depth", OPT_TYPE_SPIN, 0, 0, 20, NULL, NULL, 0, NULL },
+  { "Sleep", OPT_TYPE_SPIN, 0, 0,180, NULL, NULL, 0, NULL },  
   { "Threads", OPT_TYPE_SPIN, 1, 1, MAX_THREADS, NULL, on_threads, 0, NULL },
   { "Hash", OPT_TYPE_SPIN, 16, 1, MAXHASHMB, NULL, on_hash_size, 0, NULL },
   { "Clear Hash", OPT_TYPE_BUTTON, 0, 0, 0, NULL, on_clear_hash, 0, NULL },
@@ -127,7 +129,7 @@ static Option optionsMap[] = {
   { "BestBookMove", OPT_TYPE_CHECK, 1, 0, 0, NULL, on_best_book_move, 0, NULL },
   { "BookDepth", OPT_TYPE_SPIN, 255, 1, 255, NULL, on_book_depth, 0, NULL },
 #ifdef NNUE
-  { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, DefaultEvalFile, NULL, 0, NULL },
+  { "EvalFile", OPT_TYPE_STRING, 0, 0, 0, EvalFileDefaultName, NULL, 0, NULL },
 #ifndef NNUE_PURE
   { "Use NNUE", OPT_TYPE_COMBO, 0, 0, 0,
     "Hybrid var Hybrid var Pure var Classical", NULL, 0, NULL },

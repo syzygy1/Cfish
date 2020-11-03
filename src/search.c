@@ -15,7 +15,11 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
 #include <assert.h>
 #include <inttypes.h>
 #include <math.h>
@@ -247,6 +251,11 @@ void mainthread_search(void)
 #endif
 
   base_ct = option_value(OPT_CONTEMPT) * PawnValueEg / 100;
+  Limits.depth  = option_value(OPT_DEPTH);
+  int sleepseconds = option_value(OPT_SLEEP);
+  sleep (sleepseconds);
+
+
 
   const char *s = option_string_value(OPT_ANALYSIS_CONTEMPT);
   if (Limits.infinite || option_value(OPT_ANALYSE_MODE))

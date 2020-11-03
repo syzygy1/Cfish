@@ -40,7 +40,7 @@
 
 #ifdef NNUE_EMBEDDED
 #include "incbin.h"
-INCBIN(Network, DefaultEvalFile);
+INCBIN(Network, EvalFileDefaultName);
 #endif
 
 // Old gcc on Windows is unable to provide a 32-byte aligned stack.

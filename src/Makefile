@@ -844,7 +844,7 @@ endif
 build: net config-sanity
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) all
 
-profile-build: net config-sanity objclean profileclean
+profile-build: objclean profileclean
 	@echo ""
 	@echo "Step 1/4. Building instrumented executable ..."
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) $(profile_make)
@@ -873,7 +873,7 @@ clean: objclean profileclean
 	@rm -f .depend core
 
 net:
-	$(eval nnuenet := $(shell grep DefaultEvalFile evaluate.h | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
+	$(eval nnuenet := $(shell grep EvalFileDefaultName evaluate.h | sed 's/.*\(nn-[a-z0-9]\{12\}.nnue\).*/\1/'))
 	@echo "Default net: $(nnuenet)"
 	$(eval nnuedownloadurl := https://tests.stockfishchess.org/api/nn/$(nnuenet))
 	$(eval curl_or_wget := $(shell if hash curl 2>/dev/null; then echo "curl -skL"; elif hash wget 2>/dev/null; then echo "wget -qO-"; fi))
