@@ -166,7 +166,7 @@ typedef uint16_t mask_t;
 #define vec_sub_16(a,b) vsubq_s16(a,b)
 #define vec_packs(a,b) vcombine_s8(vqmovn_s16(a),vqmovn_s16(b))
 #define vec_mask_pos(a) neon_movemask(vcgtq_s8(a,vdupq_n_s8(0)))
-#define vec_clip_8(a) vmaxq_s8(vec_packs(a,b),vdupq_n_s8(0))
+#define vec_clip_8(a,b) vmaxq_s8(vec_packs(a,b),vdupq_n_s8(0))
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
