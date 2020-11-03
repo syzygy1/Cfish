@@ -569,16 +569,6 @@ INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
 #endif
 }
 
-static const char *read_hidden_weights(weight_t *w, unsigned dims,
-    const char *d)
-{
-  for (unsigned r = 0; r < 32; r++)
-    for (unsigned c = 0; c < dims; c++)
-      w[wt_idx(r, c, dims)] = *d++;
-
-  return d;
-}
-
 #ifdef USE_AVX2
 static void permute_biases(int32_t *biases)
 {
@@ -608,47 +598,5 @@ static void permute_biases(int32_t *biases)
   memcpy(b, tmp, 8 * sizeof(__m128i));
 }
 #endif
-
-static void init_weights(const void *evalData)
-{
-  if (!ft_biases) {
-    if (settings.largePages)
-      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1), true,
-          &ft_alloc);
-    if (!ft_biases)
-      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1), false,
-          &ft_alloc);
-    if (!ft_biases) {
-      fprintf(stdout, "Could not allocate enough memory.\n");
-      exit(EXIT_FAILURE);
-    }
-    ft_weights = ft_biases + kHalfDimensions;
-  }
-
-  const char *d = (const char *)evalData + TransformerStart + 4;
-
-  // Read transformer
-  for (unsigned i = 0; i < kHalfDimensions; i++, d += 2)
-    ft_biases[i] = readu_le_u16(d);
-  for (unsigned i = 0; i < kHalfDimensions * FtInDims; i++, d += 2)
-    ft_weights[i] = readu_le_u16(d);
-
-  // Read network
-  d += 4;
-  for (unsigned i = 0; i < 32; i++, d += 4)
-    hidden1_biases[i] = readu_le_u32(d);
-  d = read_hidden_weights(hidden1_weights, 512, d);
-  for (unsigned i = 0; i < 32; i++, d += 4)
-    hidden2_biases[i] = readu_le_u32(d);
-  d = read_hidden_weights(hidden2_weights, 32, d);
-  for (unsigned i = 0; i < 1; i++, d += 4)
-    output_biases[i] = readu_le_u32(d);
-  read_output_weights(output_weights, d);
-
-#ifdef USE_AVX2
-  permute_biases(hidden1_biases);
-  permute_biases(hidden2_biases);
-#endif
-}
 
 #endif
