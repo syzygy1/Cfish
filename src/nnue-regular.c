@@ -117,7 +117,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
 #else
     const __m512i kOnes = _mm512_set1_epi16(1);
     __m512i s0, s1, s2, s3, p;
-    for (unsigned i = 0; i < outDims / 8; i++) {
+    for (unsigned i = 0; i < outDims / 16; i++) {
       __m512i *w = (__m512i *)&weights[16 * i * 32];
       s0 = _mm512_maddubs_epi16(in0, w[0]); // first half of rows 0,4,8,12
       s0 = _mm512_madd_epi16(s0, kOnes);
