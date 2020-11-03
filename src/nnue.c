@@ -103,6 +103,7 @@ typedef __mmask64 mask_t;
 #define vec_sub_16(a,b) _mm512_sub_epi16(a,b)
 #define vec_packs(a,b) _mm512_packs_epi16(a,b)
 #define vec_mask_pos(a) _mm512_cmpgt_epi8_mask(a,_mm512_setzero_si512())
+#define vec_clip_8(a,b) _mm512_max_epi8(vec_packs(a,b),_mm512_setzero_si512())
 #define NUM_REGS 8 // only 8 are needed
 
 #elif USE_AVX2
@@ -113,6 +114,7 @@ typedef uint32_t mask_t;
 #define vec_sub_16(a,b) _mm256_sub_epi16(a,b)
 #define vec_packs(a,b) _mm256_packs_epi16(a,b)
 #define vec_mask_pos(a) _mm256_movemask_epi8(_mm256_cmpgt_epi8(a,_mm256_setzero_si256()))
+#define vec_clip_8(a,b) _mm256_max_epi8(vec_packs(a,b),_mm256_setzero_si256())
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
@@ -127,6 +129,13 @@ typedef uint16_t mask_t;
 #define vec_sub_16(a,b) _mm_sub_epi16(a,b)
 #define vec_packs(a,b) _mm_packs_epi16(a,b)
 #define vec_mask_pos(a) _mm_movemask_epi8(_mm_cmpgt_epi8(a,_mm_setzero_si128()))
+#ifdef USE_SSE41
+#define vec_clip_8(a,b) _mm_max_epi8(vec_packs(a,b),_mm_setzero_si128())
+#elif USE_SSSE3
+#define vec_clip_8(a,b) vec_packs(_mm_max_epi16(a,_mm_setzero_si128()),_mm_max_epi16(b,_mm_setzero_si128()))
+#else
+#define vec_clip_16(a) _mm_min_epi16(_mm_max_epi16(a,_mm_setzero_si128()),_mm_set1_epi16(127))
+#endif
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
@@ -141,6 +150,11 @@ typedef uint8_t mask_t;
 #define vec_sub_16(a,b) _mm_sub_pi16(a,b)
 #define vec_packs(a,b) _mm_packs_pi16(a,b)
 #define vec_mask_pos(a) _mm_movemask_pi8(_mm_cmpgt_pi8(a,_mm_setzero_si64()))
+#ifdef USE_SSE
+#define vec_clip_16(a) _mm_min_pi16(_mm_max_pi16(a,_mm_setzero_si64()),_mm_set1_pi16(127))
+#else
+#define vec_clip_16(a) _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(a, _mm_set1_pi16(0x7f80)), _mm_set1_pi16(0x8000)), _mm_set1_pi16(-0x8000))
+#endif
 #define NUM_REGS 8
 
 #elif USE_NEON
@@ -152,6 +166,7 @@ typedef uint16_t mask_t;
 #define vec_sub_16(a,b) vsubq_s16(a,b)
 #define vec_packs(a,b) vcombine_s8(vqmovn_s16(a),vqmovn_s16(b))
 #define vec_mask_pos(a) neon_movemask(vcgtq_s8(a,vdupq_n_s8(0)))
+#define vec_clip_8(a) vmaxq_s8(vec_packs(a,b),vdupq_n_s8(0))
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
@@ -163,6 +178,44 @@ typedef uint16_t mask_t;
 #define SIMD_WIDTH 16 // dummy
 typedef uint8_t mask_t; // dummy
 
+#endif
+
+#ifdef NNUE_SPARSE
+typedef int8_t clipped_t;
+#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_AVX2))
+typedef int16_t weight_t, out_t;
+#else
+typedef int8_t weight_t, out_t;
+#endif
+#else
+#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_SSSE3))
+typedef int16_t weight_t, out_t, clipped_t;
+#else
+typedef int8_t weight_t, out_t, clipped_t;
+#endif
+#endif
+
+#if defined(USE_MMX) && !defined(USE_SSE)
+INLINE int _mm_movemask_pi8(__m64 v)
+{
+  const __m64 powers = _mm_set_pi8(-128, 64, 32, 16, 8, 4, 2, 1);
+  __m64 m = _mm_and_si64(v, powers);
+  m = _mm_or_si64(m, _mm_srli_si64(m, 32));
+  m = _mm_or_si64(m, _mm_srli_pi32(m, 16));
+  m = _mm_or_si64(m, _mm_srli_pi16(m, 8));
+  return _mm_cvtsi64_si32(m) & 0xff;
+}
+#elif defined(USE_NEON)
+INLINE int neon_movemask(uint8x16_t v)
+{
+  const uint8_t __attribute__((aligned(16))) powers[16] =
+    { 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128 };
+  const uint8x16_t kPowers = vld1q_u8(powers);
+
+  uint64x2_t mask = vpaddlq_u32(vpaddlq_u16(vpaddlq_u8(vandq_u8(v, kPowers))));
+  return   vgetq_lane_u8((uint8x16_t)mask, 0)
+        | (vgetq_lane_u8((uint8x16_t)mask, 8) << 8);
+}
 #endif
 
 typedef struct {
@@ -203,6 +256,78 @@ static void append_changed_indices(const Position *pos, const Color c,
     if (dp->to[i] != SQ_NONE)
       added->values[added->size++] = make_index(c, dp->to[i], pc, ksq);
   }
+}
+
+INLINE int32_t output_layer(const out_t *input, const int32_t *biases,
+    const out_t *weights)
+{
+#if defined(USE_AVX2)
+  __m256i *iv = (__m256i *)input;
+  __m256i *row = (__m256i *)weights;
+#if defined(USE_VNNI)
+  __m256i prod = _mm256_dpbusd_epi32(_mm256_setzero_si256(), iv[0], row[0]);
+#else
+  __m256i prod = _mm256_maddubs_epi16(iv[0], row[0]);
+  prod = _mm256_madd_epi16(prod, _mm256_set1_epi16(1));
+#endif
+  __m128i sum = _mm_add_epi32(
+      _mm256_castsi256_si128(prod), _mm256_extracti128_si256(prod, 1));
+  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
+  return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1) + biases[0];
+
+#elif defined(USE_SSE2)
+  __m128i *iv = (__m128i *)input;
+  __m128i *row = (__m128i *)weights;
+#if defined(USE_SSSE3) && !defined(NNUE_SPARSE)
+  const __m128i kOnes = _mm_set1_epi16(1);
+  __m128i p0 = _mm_madd_epi16(_mm_maddubs_epi16(iv[0], row[0]), kOnes);
+  __m128i p1 = _mm_madd_epi16(_mm_maddubs_epi16(iv[1], row[1]), kOnes);
+  __m128i sum = _mm_add_epi32(p0, p1);
+#else
+  __m128i p0 = _mm_madd_epi16(iv[0], row[0]);
+  __m128i p1 = _mm_madd_epi16(iv[1], row[1]);
+  __m128i p2 = _mm_madd_epi16(iv[2], row[2]);
+  __m128i p3 = _mm_madd_epi16(iv[3], row[3]);
+  __m128i sum = _mm_add_epi32(_mm_add_epi32(p0, p1), _mm_add_epi32(p2, p3));
+#endif
+  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xb));
+#if defined(USE_SSE41)
+  return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1) + biases[0];
+#else
+  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1));
+  return _mm_cvtsi128_si32(sum) + biases[0];
+#endif
+
+#elif defined(USE_MMX)
+  __m64 *iv = (__m64 *)input;
+  __m64 *row = (__m64 *)weights;
+  __m64 s0 = _mm_setzero_si64(), s1 = s0;
+  for (unsigned j = 0; j < 4; j++) {
+    s0 = _mm_add_pi32(s0, _mm_madd_pi16(row[2 * j], iv[2 * j]));
+    s1 = _mm_add_pi32(s1, _mm_madd_pi16(row[2 * j + 1], iv[2 * j + 1]));
+  }
+  __m64 sum = _mm_add_pi32(s0, s1);
+  sum = _mm_add_pi32(sum, _mm_unpackhi_pi32(sum, sum));
+  return _mm_cvtsi64_si32(sum) + biases[0];
+
+#elif defined(USE_NEON)
+  int8x8_t *iv = (int8x8_t *)input;
+  int8x8_t *row = (int8x8_t *)weights;
+  int32x4_t sum = {biases[0]};
+  for (unsigned j = 0 ; j < 2; j++) {
+    int16x8_t prod = vmull_s8(iv[2 * j], row[2 * j]);
+    prod = vmlal_s8(prod, iv[2 * j + 1], row[2 * j + 1]);
+    sum = vpadalq_s16(sum, prod);
+  }
+  return sum[0] + sum[1] + sum[2] + sum[3];
+
+#else
+  int32_t sum = biases[0];
+  for (unsigned j = 0; j < 32; j++)
+    sum += weights[j] * input[j];
+  return sum;
+
+#endif
 }
 
 // Input feature converter
@@ -338,10 +463,10 @@ INLINE void update_accumulator(const Position *pos, const Color c)
   }
 }
 
-#if 0
 // Convert input features
-INLINE void transform(const Position *pos, int8_t *output, mask_t *outMask)
+INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 {
+  (void)outMask;
   update_accumulator(pos, WHITE);
   update_accumulator(pos, BLACK);
 
@@ -353,16 +478,30 @@ INLINE void transform(const Position *pos, int8_t *output, mask_t *outMask)
 
 #ifdef VECTOR
     const unsigned numChunks = (16 * kHalfDimensions) / SIMD_WIDTH;
+
+#if defined(NNUE_SPARSE) || defined(USE_SSSE3) || defined(USE_NEON)
     vec8_t *out = (vec8_t *)&output[offset];
     for (unsigned i = 0; i < numChunks / 2; i++) {
       vec16_t s0 = ((vec16_t *)(*accumulation)[perspectives[p]])[i * 2];
       vec16_t s1 = ((vec16_t *)(*accumulation)[perspectives[p]])[i * 2 + 1];
+#ifdef NNUE_SPARSE
       out[i] = vec_packs(s0, s1);
       *outMask++ = vec_mask_pos(out[i]);
+#else
+      out[i] = vec_clip_8(s0, s1);
+#endif
     }
 
 #else
-    (void)outMask; // avoid compiler warning
+    vec16_t *out = (vec16_t *)&output[offset];
+    for (unsigned i = 0; i < numChunks; i++) {
+      vec16_t sum = ((vec16_t *)(*accumulation)[perspectives[p]])[i];
+      out[i] = vec_clip_16(sum);
+    }
+
+#endif
+
+#else
     for (unsigned i = 0; i < kHalfDimensions; i++) {
       int16_t sum = (*accumulation)[perspectives[p]][i];
       output[offset + i] = clamp(sum, 0, 127);
@@ -372,39 +511,13 @@ INLINE void transform(const Position *pos, int8_t *output, mask_t *outMask)
 
   }
 }
-#endif
 
-#if 0
-// Evaluation function
-Value nnue_evaluate(const Position *pos)
+#ifndef USE_NEON
+INLINE unsigned bit_shuffle(unsigned v, int left, int right, unsigned mask)
 {
-  int32_t out_value;
-  alignas(8) mask_t hidden1_mask[512 / (8 * sizeof(mask_t))];
-  alignas(8) mask_t hidden2_mask[8 / sizeof(mask_t)] = { 0 };
-#ifdef ALIGNMENT_HACK // work around a bug in old gcc on Windows
-  uint8_t buf[sizeof(struct NetData) + 63];
-  struct NetData *b = (struct NetData *)(buf + ((((uintptr_t)buf-1) ^ 0x3f) & 0x3f));
-#define B(x) (b->x)
-#else
-  struct NetData buf;
-#define B(x) (buf.x)
-#endif
-
-  transform(pos, B(input), hidden1_mask);
-
-  hidden_layer(B(input), B(hidden1_out), 512, hidden1_biases,
-      hidden1_weights, hidden1_mask, hidden2_mask, true);
-
-  hidden_layer(B(hidden1_out), B(hidden2_out), 32, hidden2_biases,
-      hidden2_weights, hidden2_mask, NULL, false);
-
-  out_value = output_layer(B(hidden2_out), output_biases, output_weights);
-
-#if defined(USE_MMX)
-  _mm_empty();
-#endif
-
-  return out_value / FV_SCALE;
+  unsigned w = v & mask;
+  w = (w << left) | (w >> right);
+  return (v & ~mask) | (w & mask);
 }
 #endif
 

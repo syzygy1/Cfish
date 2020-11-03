@@ -13,14 +13,6 @@ typedef uint64_t mask2_t;
 typedef uint32_t mask2_t;
 #endif
 
-#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_AVX2))
-typedef int16_t weight_t;
-typedef int16_t out_t;
-#else
-typedef int8_t weight_t;
-typedef int8_t out_t;
-#endif
-
 // InputLayer = InputSlice<256 * 2>
 // out: 512 x int8_t
 
@@ -46,79 +38,6 @@ static alignas(64) int32_t hidden1_biases[32];
 static alignas(64) int32_t hidden2_biases[32];
 static int32_t output_biases[1];
 
-INLINE int32_t output_layer(const out_t *input, const int32_t *biases,
-    const out_t *weights)
-{
-#if defined(USE_AVX2)
-  __m256i *iv = (__m256i *)input;
-  __m256i *row = (__m256i *)weights;
-#if defined(USE_VNNI)
-  __m256i prod = _mm256_dpbusd_epi32(_mm256_setzero_si256(), iv[0], row[0]);
-#else
-  __m256i prod = _mm256_maddubs_epi16(iv[0], row[0]);
-  prod = _mm256_madd_epi16(prod, _mm256_set1_epi16(1));
-#endif
-  __m128i sum = _mm_add_epi32(
-      _mm256_castsi256_si128(prod), _mm256_extracti128_si256(prod, 1));
-  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1b));
-  return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1) + biases[0];
-
-#elif defined(USE_SSE2)
-  __m128i *iv = (__m128i *)input;
-  __m128i *row = (__m128i *)weights;
-#if defined(AVOID_USE_SSSE3)
-  const __m128i kOnes = _mm_set1_epi16(1);
-  __m128i p0 = _mm_madd_epi16(_mm_maddubs_epi16(iv[0], row[0]), kOnes);
-  __m128i p1 = _mm_madd_epi16(_mm_maddubs_epi16(iv[1], row[1]), kOnes);
-  __m128i sum = _mm_add_epi32(p0, p1);
-#else
-  __m128i p0 = _mm_madd_epi16(iv[0], row[0]);
-  __m128i p1 = _mm_madd_epi16(iv[1], row[1]);
-  __m128i p2 = _mm_madd_epi16(iv[2], row[2]);
-  __m128i p3 = _mm_madd_epi16(iv[3], row[3]);
-  __m128i sum = _mm_add_epi32(_mm_add_epi32(p0, p1), _mm_add_epi32(p2, p3));
-#endif
-  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xb));
-#if defined(USE_SSE41)
-  return _mm_cvtsi128_si32(sum) + _mm_extract_epi32(sum, 1) + biases[0];
-#else
-  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x1));
-  return _mm_cvtsi128_si32(sum) + biases[0];
-#endif
-
-#elif defined(USE_MMX)
-  __m64 *iv = (__m64 *)input;
-  __m64 *row = (__m64 *)weights;
-  __m64 s0 = _mm_setzero_si64(), s1 = s0;
-  for (unsigned j = 0; j < 4; j++) {
-    s0 = _mm_add_pi32(s0, _mm_madd_pi16(row[2 * j], iv[2 * j]));
-    s1 = _mm_add_pi32(s1, _mm_madd_pi16(row[2 * j + 1], iv[2 * j + 1]));
-  }
-  __m64 sum = _mm_add_pi32(s0, s1);
-  sum = _mm_add_pi32(sum, _mm_unpackhi_pi32(sum, sum));
-  return _mm_cvtsi64_si32(sum) + biases[0];
-
-#elif defined(USE_NEON)
-  int8x8_t *iv = (int8x8_t *)input;
-  int8x8_t *row = (int8x8_t *)weights;
-  int32x4_t sum = {biases[0]};
-  int16x8_t p0 = vmull_s8(iv[0], row[0]);
-  int16x8_t p1 = vmull_s8(iv[1], row[1]);
-  p0 = vmlal_s8(p0, iv[2], row[2]);
-  sum = vpadalq_s16(sum, p0);
-  p1 = vmlal_s8(p1, iv[3], row[3]);
-  sum = vpadalq_s16(sum, p1);
-  return sum[0] + sum[1] + sum[2] + sum[3];
-
-#else
-  int32_t sum = biases[0];
-  for (unsigned j = 0; j < 32; j++)
-    sum += weights[j] * input[j];
-  return sum;
-
-#endif
-}
-
 #ifdef VECTOR
 INLINE bool next_idx(unsigned *idx, unsigned *offset, mask2_t *v,
     mask_t *mask, unsigned dims)
@@ -136,29 +55,6 @@ INLINE bool next_idx(unsigned *idx, unsigned *offset, mask2_t *v,
   *v &= *v - 1;
   return true;
 }
-
-#if defined(USE_MMX) && !defined(USE_SSE)
-INLINE int _mm_movemask_pi8(__m64 v)
-{
-  const __m64 powers = _mm_set_pi8(-128, 64, 32, 16, 8, 4, 2, 1);
-  __m64 m = _mm_and_si64(v, powers);
-  m = _mm_or_si64(m, _mm_srli_si64(m, 32));
-  m = _mm_or_si64(m, _mm_srli_pi32(m, 16));
-  m = _mm_or_si64(m, _mm_srli_pi16(m, 8));
-  return _mm_cvtsi64_si32(m) & 0xff;
-}
-#elif defined(USE_NEON)
-INLINE int neon_movemask(uint8x16_t v)
-{
-  const uint8_t __attribute__((aligned(16))) powers[16] =
-    { 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128 };
-  const uint8x16_t kPowers = vld1q_u8(powers);
-
-  uint64x2_t mask = vpaddlq_u32(vpaddlq_u16(vpaddlq_u8(vandq_u8(v, kPowers))));
-  return   vgetq_lane_u8((uint8x16_t)mask, 0)
-        | (vgetq_lane_u8((uint8x16_t)mask, 8) << 8);
-}
-#endif
 #endif
 
 INLINE void hidden_layer(const int8_t *input, void *output, unsigned dims,
@@ -599,40 +495,6 @@ INLINE void hidden_layer(const int8_t *input, void *output, unsigned dims,
 #endif
 }
 
-// Convert input features
-INLINE void transform(const Position *pos, int8_t *output, mask_t *outMask)
-{
-  update_accumulator(pos, WHITE);
-  update_accumulator(pos, BLACK);
-
-  int16_t (*accumulation)[2][256] = &pos->st->accumulator.accumulation;
-
-  const Color perspectives[2] = { stm(), !stm() };
-  for (unsigned p = 0; p < 2; p++) {
-    const unsigned offset = kHalfDimensions * p;
-
-#ifdef VECTOR
-    const unsigned numChunks = (16 * kHalfDimensions) / SIMD_WIDTH;
-    vec8_t *out = (vec8_t *)&output[offset];
-    for (unsigned i = 0; i < numChunks / 2; i++) {
-      vec16_t s0 = ((vec16_t *)(*accumulation)[perspectives[p]])[i * 2];
-      vec16_t s1 = ((vec16_t *)(*accumulation)[perspectives[p]])[i * 2 + 1];
-      out[i] = vec_packs(s0, s1);
-      *outMask++ = vec_mask_pos(out[i]);
-    }
-
-#else
-    (void)outMask; // avoid compiler warning
-    for (unsigned i = 0; i < kHalfDimensions; i++) {
-      int16_t sum = (*accumulation)[perspectives[p]][i];
-      output[offset + i] = clamp(sum, 0, 127);
-    }
-
-#endif
-
-  }
-}
-
 struct NetData {
   alignas(64) int8_t input[512];
   int8_t hidden1_out[32];
@@ -670,15 +532,6 @@ Value nnue_evaluate(const Position *pos)
 
   return out_value / FV_SCALE;
 }
-
-#ifndef USE_NEON
-INLINE unsigned bit_shuffle(unsigned v, int left, int right, unsigned mask)
-{
-  unsigned w = v & mask;
-  w = (w << left) | (w >> right);
-  return (v & ~mask) | (w & mask);
-}
-#endif
 
 static void read_output_weights(out_t *w, const char *d)
 {
