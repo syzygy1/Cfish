@@ -174,17 +174,13 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
       __m256i prod;
       for (unsigned j = 0; j < inDims / 32; j++) {
         prod = _mm256_maddubs_epi16(inVec[j], w[0 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum0 = _mm256_add_epi32(sum0, prod);
+        sum0 = _mm256_add_epi32(sum0, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[1 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum1 = _mm256_add_epi32(sum1, prod);
+        sum1 = _mm256_add_epi32(sum1, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[2 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum2 = _mm256_add_epi32(sum2, prod);
+        sum2 = _mm256_add_epi32(sum2, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[3 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum3 = _mm256_add_epi32(sum3, prod);
+        sum3 = _mm256_add_epi32(sum3, _mm256_madd_epi16(prod, kOnes));
       }
 #endif
       sum0 = _mm256_hadd_epi32(sum0, sum1);
@@ -281,29 +277,21 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
       __m256i prod;
       for (unsigned j = 0; j < inDims / 32; j++) {
         prod = _mm256_maddubs_epi16(inVec[j], w[0 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum0 = _mm256_add_epi32(sum0, prod);
+        sum0 = _mm256_add_epi32(sum0, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[1 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum1 = _mm256_add_epi32(sum1, prod);
+        sum1 = _mm256_add_epi32(sum1, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[2 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum2 = _mm256_add_epi32(sum2, prod);
+        sum2 = _mm256_add_epi32(sum2, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[3 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum3 = _mm256_add_epi32(sum3, prod);
+        sum3 = _mm256_add_epi32(sum3, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[4 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum4 = _mm256_add_epi32(sum4, prod);
+        sum4 = _mm256_add_epi32(sum4, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[5 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum5 = _mm256_add_epi32(sum5, prod);
+        sum5 = _mm256_add_epi32(sum5, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[6 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum6 = _mm256_add_epi32(sum6, prod);
+        sum6 = _mm256_add_epi32(sum6, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[7 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum7 = _mm256_add_epi32(sum7, prod);
+        sum7 = _mm256_add_epi32(sum7, _mm256_madd_epi16(prod, kOnes));
       }
 #endif
       sum0 = _mm256_hadd_epi32(sum0, sum1);
