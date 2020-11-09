@@ -41,7 +41,7 @@ PGOBENCH = ./$(EXE) bench 16 1 15 default depth nnue
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 	material.o misc.o movegen.o movepick.o pawns.o position.o psqt.o \
 	search.o tbprobe.o thread.o timeman.o tt.o uci.o ucioption.o \
-        numa.o settings.o polybook.o
+        settings.o polybook.o
 
 ### ==========================================================================
 ### Section 2. High-level Configuration
@@ -402,11 +402,19 @@ ifeq ($(COMP),gcc)
 	comp=gcc
 	CC=gcc
 	CFLAGS += -pedantic -Wextra -Wshadow
-	ifeq ($(ARCH),$(filter $(ARCH),armv7 armv8))
+	ifeq ($(ARCH),armv7)
+	CFLAGS += -mcpu=native -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=native
+	endif
+	ifeq ($(ARCH),armv7)
 		ifeq ($(OS),Android)
 			CFLAGS += -m$(bits)
 			LDFLAGS += -m$(bits)
 		endif
+	else ifeq ($(ARCH),armv8)
+	  ifeq ($(OS),Android)
+		  CFLAGS += -m$(bits)
+		  LDFLAGS += -m$(bits)
+	  endif
 	else
 		CFLAGS += -m$(bits)
 		LDFLAGS += -m$(bits)
@@ -420,14 +428,14 @@ ifeq ($(COMP),gcc)
 		LDFLAGS += -Wl,--no-as-needed
 	endif
 
-	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Darwin Haiku))
+	ifneq ($(KERNEL),$(filter $(KERNEL),Linux Haiku))
 		CFLAGS += -Wno-pedantic-ms-format
 	endif
 endif
 
 ifeq ($(COMP),mingw)
 	comp=mingw
-	CFLAGS += -pedantic -Wextra -Wshadow -Wno-pedantic-ms-format -m$(bits)
+	CFLAGS += -pedantic -Wextra -Wshadow  -m$(bits)
 	LDFLAGS += -m$(bits)
 	ifeq ($(KERNEL),Linux)
 		ifeq ($(bits),64)
@@ -968,7 +976,7 @@ clang-profile-make:
 	all
 
 clang-profile-use:
-	llvm-profdata merge -output=cfish.profdata *.profraw
+	$(llvm) merge -output=cfish.profdata *.profraw
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
 	EXTRACFLAGS='-fprofile-instr-use=cfish.profdata' \
 	EXTRALDFLAGS='-fprofile-use ' \
