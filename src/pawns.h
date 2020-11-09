@@ -72,9 +72,9 @@ INLINE PawnEntry *pawn_probe(const Position *pos)
   return e;
 }
 
-INLINE int semiopen_file(PawnEntry *pe, Color c, int f)
+INLINE bool is_on_semiopen_file(const PawnEntry *pe, Color c, Square s)
 {
-  return pe->semiopenFiles[c] & (1 << f);
+  return pe->semiopenFiles[c] & (1 << file_of(s));
 }
 
 INLINE int pawns_on_same_color_squares(PawnEntry *pe, Color c, Square s)

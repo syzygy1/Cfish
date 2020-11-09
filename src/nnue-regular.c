@@ -87,12 +87,72 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
       outVec[i] = _mm_add_epi32(sum128, biasVec[i]);
 #endif
     }
-  }
-  else
+  } else { // 32 x 32 multiplication
+    __m512i *outVec = (__m512i *)output;
+    __m512i *biasVec = (__m512i *)biases;
+    __m128i *inVec = (__m128i *)input;
+    __m512i in0 = _mm512_broadcast_i32x4(inVec[0]);
+    __m512i in1 = _mm512_broadcast_i32x4(inVec[1]);
+#if defined(USE_VNNI)
+    const __m512i kZero = _mm512_setzero_si512();
+    __m512i s0, s1, s2, s3;
+    for (unsigned i = 0; i < outDims / 16; i++) {
+      __m512i *w = (__m512i *)&weights[16 * i * 32];
+      s0 = _mm512_dpbusd_epi32(kZero, in0, w[0]); // first half rows 0,4,8,12
+      s0 = _mm512_dpbusd_epi32(s0, in1, w[1]); // second half rows 0,4,8,12
+      s1 = _mm512_dpbusd_epi32(kZero, in0, w[2]); // first half rows 1,5,9,13
+      s1 = _mm512_dpbusd_epi32(s1, in1, w[3]);
+      s2 = _mm512_dpbusd_epi32(kZero, in0, w[4]);
+      s2 = _mm512_dpbusd_epi32(s2, in1, w[5]);
+      s3 = _mm512_dpbusd_epi32(kZero, in0, w[6]);
+      s3 = _mm512_dpbusd_epi32(s3, in1, w[7]);
+      s0 = _mm512_add_epi32(
+          _mm512_unpacklo_epi32(s0, s1), _mm512_unpackhi_epi32(s0, s1));
+      s2 = _mm512_add_epi32(
+          _mm512_unpacklo_epi32(s2, s3), _mm512_unpackhi_epi32(s2, s3));
+      s0 = _mm512_add_epi32(
+          _mm512_unpacklo_epi64(s0, s2), _mm512_unpackhi_epi64(s0, s2));
+      outVec[i] = _mm512_add_epi32(s0, biasVec[i]);
+    }
+#else
+    const __m512i kOnes = _mm512_set1_epi16(1);
+    __m512i s0, s1, s2, s3, p;
+    for (unsigned i = 0; i < outDims / 16; i++) {
+      __m512i *w = (__m512i *)&weights[16 * i * 32];
+      s0 = _mm512_maddubs_epi16(in0, w[0]); // first half of rows 0,4,8,12
+      s0 = _mm512_madd_epi16(s0, kOnes);
+      p  = _mm512_maddubs_epi16(in1, w[1]); // second half of rows 0,4,8,12
+      p  = _mm512_madd_epi16(p, kOnes);
+      s0 = _mm512_add_epi32(s0, p);
+      s1 = _mm512_maddubs_epi16(in0, w[2]); // first half of rows 1,5,9,13
+      s1 = _mm512_madd_epi16(s1, kOnes);
+      p  = _mm512_maddubs_epi16(in1, w[3]);
+      p  = _mm512_madd_epi16(p, kOnes);
+      s1 = _mm512_add_epi32(s1, p);
+      s2 = _mm512_maddubs_epi16(in0, w[4]);
+      s2 = _mm512_madd_epi16(s2, kOnes);
+      p  = _mm512_maddubs_epi16(in1, w[5]);
+      p  = _mm512_madd_epi16(p, kOnes);
+      s2 = _mm512_add_epi32(s2, p);
+      s3 = _mm512_maddubs_epi16(in0, w[6]);
+      s3 = _mm512_madd_epi16(s3, kOnes);
+      p  = _mm512_maddubs_epi16(in1, w[7]);
+      p  = _mm512_madd_epi16(p, kOnes);
+      s3 = _mm512_add_epi32(s3, p);
+      s0 = _mm512_add_epi32(
+          _mm512_unpacklo_epi32(s0, s1), _mm512_unpackhi_epi32(s0, s1));
+      s2 = _mm512_add_epi32(
+          _mm512_unpacklo_epi32(s2, s3), _mm512_unpackhi_epi32(s2, s3));
+      s0 = _mm512_add_epi32(
+          _mm512_unpacklo_epi64(s0, s2), _mm512_unpackhi_epi64(s0, s2));
+      outVec[i] = _mm512_add_epi32(s0, biasVec[i]);
+    }
 #endif
-#if defined(USE_AVX2)
+  }
+
+#elif defined(USE_AVX2)
 #if 1
-  {
+  if (inDims > 32) {
     __m128i *outVec = (__m128i *)output;
     __m128i *biasVec = (__m128i *)biases;
     __m256i *inVec = (__m256i *)input;
@@ -114,17 +174,13 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
       __m256i prod;
       for (unsigned j = 0; j < inDims / 32; j++) {
         prod = _mm256_maddubs_epi16(inVec[j], w[0 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum0 = _mm256_add_epi32(sum0, prod);
+        sum0 = _mm256_add_epi32(sum0, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[1 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum1 = _mm256_add_epi32(sum1, prod);
+        sum1 = _mm256_add_epi32(sum1, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[2 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum2 = _mm256_add_epi32(sum2, prod);
+        sum2 = _mm256_add_epi32(sum2, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[3 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum3 = _mm256_add_epi32(sum3, prod);
+        sum3 = _mm256_add_epi32(sum3, _mm256_madd_epi16(prod, kOnes));
       }
 #endif
       sum0 = _mm256_hadd_epi32(sum0, sum1);
@@ -134,6 +190,61 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
           _mm256_extracti128_si256(sum0, 1));
       outVec[i] = _mm_add_epi32(sum128, biasVec[i]);
     }
+  } else { // 32x32 multiplication
+    __m256i *outVec = (__m256i *)output;
+    __m256i *biasVec = (__m256i *)biases;
+    __m128i *inVec = (__m128i *)input;
+    __m256i in0 = _mm256_broadcastsi128_si256(inVec[0]);
+    __m256i in1 = _mm256_broadcastsi128_si256(inVec[1]);
+#if defined(USE_VNNI)
+    const __m256i kZero = _mm256_setzero_si256();
+    __m256i s0, s1, s2, s3;
+    for (unsigned i = 0; i < outDims / 8; i++) {
+      __m256i *w = (__m256i *)&weights[8 * i * 32];
+      s0 = _mm256_dpbusd_epi32(kZero, in0, w[0]);
+      s0 = _mm256_dpbusd_epi32(s0, in1, w[1]);
+      s1 = _mm256_dpbusd_epi32(kZero, in0, w[2]);
+      s1 = _mm256_dpbusd_epi32(s1, in1, w[3]);
+      s2 = _mm256_dpbusd_epi32(kZero, in0, w[4]);
+      s2 = _mm256_dpbusd_epi32(s2, in1, w[5]);
+      s3 = _mm256_dpbusd_epi32(kZero, in0, w[6]);
+      s3 = _mm256_dpbusd_epi32(s3, in1, w[7]);
+      s0 = _mm256_hadd_epi32(s0, s1);
+      s2 = _mm256_hadd_epi32(s2, s3);
+      s0 = _mm256_hadd_epi32(s0, s2);
+      outVec[i] = _mm256_add_epi32(s0, biasVec[i]);
+    }
+#else
+    const __m256i kOnes = _mm256_set1_epi16(1);
+    __m256i s0, s1, s2, s3, p;
+    for (unsigned i = 0; i < outDims / 8; i++) {
+      __m256i *w = (__m256i *)&weights[8 * i * 32];
+      s0 = _mm256_maddubs_epi16(in0, w[0]); // first half of rows 0,4
+      s0 = _mm256_madd_epi16(s0, kOnes);
+      p  = _mm256_maddubs_epi16(in1, w[1]); // second half of rows 0,4
+      p  = _mm256_madd_epi16(p, kOnes);
+      s0 = _mm256_add_epi32(s0, p);
+      s1 = _mm256_maddubs_epi16(in0, w[2]); // first half of rows 1,5
+      s1 = _mm256_madd_epi16(s1, kOnes);
+      p  = _mm256_maddubs_epi16(in1, w[3]); // second half of rows 1,5
+      p  = _mm256_madd_epi16(p, kOnes);
+      s1 = _mm256_add_epi32(s1, p);
+      s2 = _mm256_maddubs_epi16(in0, w[4]); // first half of rows 2,6
+      s2 = _mm256_madd_epi16(s2, kOnes);
+      p  = _mm256_maddubs_epi16(in1, w[5]); // second half of rows 2,6
+      p  = _mm256_madd_epi16(p, kOnes);
+      s2 = _mm256_add_epi32(s2, p);
+      s3 = _mm256_maddubs_epi16(in0, w[6]); // first half of rows 3,7
+      s3 = _mm256_madd_epi16(s3, kOnes);
+      p  = _mm256_maddubs_epi16(in1, w[7]); // second half of rows 3,7
+      p  = _mm256_madd_epi16(p, kOnes);
+      s3 = _mm256_add_epi32(s3, p);
+      s0 = _mm256_hadd_epi32(s0, s1);
+      s2 = _mm256_hadd_epi32(s2, s3);
+      s0 = _mm256_hadd_epi32(s0, s2);
+      outVec[i] = _mm256_add_epi32(s0, biasVec[i]);
+    }
+#endif
   }
 #else
   { // 8 at a time does not seem to be an improvement
@@ -166,29 +277,21 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
       __m256i prod;
       for (unsigned j = 0; j < inDims / 32; j++) {
         prod = _mm256_maddubs_epi16(inVec[j], w[0 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum0 = _mm256_add_epi32(sum0, prod);
+        sum0 = _mm256_add_epi32(sum0, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[1 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum1 = _mm256_add_epi32(sum1, prod);
+        sum1 = _mm256_add_epi32(sum1, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[2 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum2 = _mm256_add_epi32(sum2, prod);
+        sum2 = _mm256_add_epi32(sum2, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[3 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum3 = _mm256_add_epi32(sum3, prod);
+        sum3 = _mm256_add_epi32(sum3, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[4 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum4 = _mm256_add_epi32(sum4, prod);
+        sum4 = _mm256_add_epi32(sum4, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[5 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum5 = _mm256_add_epi32(sum5, prod);
+        sum5 = _mm256_add_epi32(sum5, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[6 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum6 = _mm256_add_epi32(sum6, prod);
+        sum6 = _mm256_add_epi32(sum6, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[7 * inDims / 32 + j]);
-        prod = _mm256_madd_epi16(prod, kOnes);
-        sum7 = _mm256_add_epi32(sum7, prod);
+        sum7 = _mm256_add_epi32(sum7, _mm256_madd_epi16(prod, kOnes));
       }
 #endif
       sum0 = _mm256_hadd_epi32(sum0, sum1);
@@ -491,21 +594,27 @@ INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
 {
   (void)dims;
 
+  unsigned k = r * dims + c;
+
 #if defined(USE_AVX512)
   if (dims > 32)
-    c = bit_shuffle(c, 1, 2, 0x38);
-  else if (dims == 32)
-    c = bit_shuffle(c, 2, 2, 0x14);
+    k = bit_shuffle(k, 1, 2, 0x38);
+  else if (dims == 32) {
+    k = bit_shuffle(k, 2, 2, 0x14);
+    k = bit_shuffle(k, 2, 3, 0x1f0);
+  }
 
 #elif defined(USE_AVX2)
   if (dims > 32)
-    c = bit_shuffle(c, 1, 1, 0x18);
-  else if (dims == 32)
-    c = bit_shuffle(c, 2, 1, 0x1c);
+    k = bit_shuffle(k, 1, 1, 0x18);
+  else if (dims == 32) {
+    k = bit_shuffle(k, 2, 1, 0x1c);
+    k = bit_shuffle(k, 1, 3, 0xf0);
+  }
 
 #endif
 
-  return r * dims + c;
+  return k;
 }
 
 #endif

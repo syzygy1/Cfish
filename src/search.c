@@ -619,9 +619,13 @@ skip_search:
 
       double bestMoveInstability = 1 + 2 * totBestMoveChanges / Threads.numThreads;
 
-      double totalTime = rm->size == 1 ? 0 : time_optimum() * fallingEval * reduction * bestMoveInstability;
+      double totalTime = time_optimum() * fallingEval * reduction * bestMoveInstability;
 
-      // Stop the search if we have exceeded the totalTime (at least 1ms)
+      // In the case of a single legal move, cap total time to 500ms.
+      if (rm->size == 1)
+        totalTime = min(500.0, totalTime);
+
+      // Stop the search if we have exceeded the totalTime
       if (time_elapsed() > totalTime) {
         // If we are allowed to ponder do not stop the search now but
         // keep pondering until the GUI sends "ponderhit" or "stop".
@@ -1652,7 +1656,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     moveCount++;
 
     // Futility pruning
-    if (   !InCheck
+    if (    bestValue > VALUE_TB_LOSS_IN_MAX_PLY
         && !givesCheck
         &&  futilityBase > -VALUE_KNOWN_WIN
         && !advanced_pawn_push(pos, move))
@@ -1676,7 +1680,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
     }
 
     // Do not search moves with negative SEE values
-    if (   !InCheck
+    if (    bestValue > VALUE_TB_LOSS_IN_MAX_PLY
         && !(givesCheck && is_discovery_check_on_king(pos, !stm(), move))
         && !see_test(pos, move, 0))
       continue;

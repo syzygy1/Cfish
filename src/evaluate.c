@@ -332,8 +332,8 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
 
     if (Pt == ROOK) {
       // Bonus for rook on an open or semi-open file
-      if (semiopen_file(ei->pe, Us, file_of(s)))
-        score += RookOnFile[!!semiopen_file(ei->pe, Them, file_of(s))];
+      if (is_on_semiopen_file(ei->pe, Us, s))
+        score += RookOnFile[is_on_semiopen_file(ei->pe, Them, s)];
 
       // Penalty when trapped by the king, even more if the king cannot castle
       else if (mob <= 3) {

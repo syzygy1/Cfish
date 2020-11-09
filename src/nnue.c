@@ -166,7 +166,7 @@ typedef uint16_t mask_t;
 #define vec_sub_16(a,b) vsubq_s16(a,b)
 #define vec_packs(a,b) vcombine_s8(vqmovn_s16(a),vqmovn_s16(b))
 #define vec_mask_pos(a) neon_movemask(vcgtq_s8(a,vdupq_n_s8(0)))
-#define vec_clip_8(a) vmaxq_s8(vec_packs(a,b),vdupq_n_s8(0))
+#define vec_clip_8(a,b) vmaxq_s8(vec_packs(a,b),vdupq_n_s8(0))
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
@@ -314,7 +314,7 @@ INLINE int32_t output_layer(const out_t *input, const int32_t *biases,
   int8x8_t *iv = (int8x8_t *)input;
   int8x8_t *row = (int8x8_t *)weights;
   int32x4_t sum = {biases[0]};
-  for (unsigned j = 0 ; j < 2; j++) {
+  for (unsigned j = 0; j < 2; j++) {
     int16x8_t prod = vmull_s8(iv[2 * j], row[2 * j]);
     prod = vmlal_s8(prod, iv[2 * j + 1], row[2 * j + 1]);
     sum = vpadalq_s16(sum, prod);
