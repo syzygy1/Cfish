@@ -33,11 +33,11 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
     for (unsigned i = 0; i < outDims / 4; i++) {
       __m512i *inVec = (__m512i *)input;
       __m512i *w = (__m512i *)&weights[4 * i * inDims];
+#if defined(USE_VNNI)
       __m512i sum0 = _mm512_setzero_si512();
       __m512i sum1 = _mm512_setzero_si512();
       __m512i sum2 = _mm512_setzero_si512();
       __m512i sum3 = _mm512_setzero_si512();
-#if defined(USE_VNNI)
       for (unsigned j = 0; j < inDims / 64; j++) {
         sum0 = _mm512_dpbusd_epi32(sum0, inVec[j], w[0 * inDims / 64 + j]);
         sum1 = _mm512_dpbusd_epi32(sum1, inVec[j], w[1 * inDims / 64 + j]);
@@ -47,7 +47,15 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
 #else
       const __m512i kOnes = _mm512_set1_epi16(1);
       __m512i prod;
-      for (unsigned j = 0; j < inDims / 64; j++) {
+      prod = _mm512_maddubs_epi16(inVec[0], w[0 * inDims / 64]);
+      __m512i sum0 = _mm512_madd_epi16(prod, kOnes);
+      prod = _mm512_maddubs_epi16(inVec[0], w[1 * inDims / 64]);
+      __m512i sum1 = _mm512_madd_epi16(prod, kOnes);
+      prod = _mm512_maddubs_epi16(inVec[0], w[2 * inDims / 64]);
+      __m512i sum2 = _mm512_madd_epi16(prod, kOnes);
+      prod = _mm512_maddubs_epi16(inVec[0], w[3 * inDims / 64]);
+      __m512i sum3 = _mm512_madd_epi16(prod, kOnes);
+      for (unsigned j = 1; j < inDims / 64; j++) {
         prod = _mm512_maddubs_epi16(inVec[j], w[0 * inDims / 64 + j]);
         prod = _mm512_madd_epi16(prod, kOnes);
         sum0 = _mm512_add_epi32(sum0, prod);
@@ -158,11 +166,11 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
     __m256i *inVec = (__m256i *)input;
     for (unsigned i = 0; i < outDims / 4; i++) {
       __m256i *w = (__m256i *)&weights[4 * i * inDims];
+#if defined(USE_VNNI)
       __m256i sum0 = _mm256_setzero_si256();
       __m256i sum1 = _mm256_setzero_si256();
       __m256i sum2 = _mm256_setzero_si256();
       __m256i sum3 = _mm256_setzero_si256();
-#if defined(USE_VNNI)
       for (unsigned j = 0; j < inDims / 32; j++) {
         sum0 = _mm256_dpbusd_epi32(sum0, inVec[j], w[0 * inDims / 32 + j]);
         sum1 = _mm256_dpbusd_epi32(sum1, inVec[j], w[1 * inDims / 32 + j]);
@@ -172,7 +180,15 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
 #else
       const __m256i kOnes = _mm256_set1_epi16(1);
       __m256i prod;
-      for (unsigned j = 0; j < inDims / 32; j++) {
+      prod = _mm256_maddubs_epi16(inVec[0], w[0 * inDims / 32]);
+      __m256i sum0 = _mm256_madd_epi16(prod, kOnes);
+      prod = _mm256_maddubs_epi16(inVec[0], w[1 * inDims / 32]);
+      __m256i sum1 = _mm256_madd_epi16(prod, kOnes);
+      prod = _mm256_maddubs_epi16(inVec[0], w[2 * inDims / 32]);
+      __m256i sum2 = _mm256_madd_epi16(prod, kOnes);
+      prod = _mm256_maddubs_epi16(inVec[0], w[3 * inDims / 32]);
+      __m256i sum3 = _mm256_madd_epi16(prod, kOnes);
+      for (unsigned j = 1; j < inDims / 32; j++) {
         prod = _mm256_maddubs_epi16(inVec[j], w[0 * inDims / 32 + j]);
         sum0 = _mm256_add_epi32(sum0, _mm256_madd_epi16(prod, kOnes));
         prod = _mm256_maddubs_epi16(inVec[j], w[1 * inDims / 32 + j]);
@@ -314,11 +330,15 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
   const __m128i kOnes = _mm_set1_epi16(1);
   for (unsigned i = 0; i < outDims / 4; i++) {
     __m128i *w = (__m128i *)&weights[4 * i * inDims], prod;
-    __m128i sum0 = _mm_setzero_si128();
-    __m128i sum1 = _mm_setzero_si128();
-    __m128i sum2 = _mm_setzero_si128();
-    __m128i sum3 = _mm_setzero_si128();
-    for (unsigned j = 0; j < inDims / 16; j++) {
+    prod = _mm_maddubs_epi16(inVec[0], w[0 * inDims / 16]);
+    __m128i sum0 = _mm_madd_epi16(prod, kOnes);
+    prod = _mm_maddubs_epi16(inVec[0], w[1 * inDims / 16]);
+    __m128i sum1 = _mm_madd_epi16(prod, kOnes);
+    prod = _mm_maddubs_epi16(inVec[0], w[2 * inDims / 16]);
+    __m128i sum2 = _mm_madd_epi16(prod, kOnes);
+    prod = _mm_maddubs_epi16(inVec[0], w[3 * inDims / 16]);
+    __m128i sum3 = _mm_madd_epi16(prod, kOnes);
+    for (unsigned j = 1; j < inDims / 16; j++) {
       prod = _mm_maddubs_epi16(inVec[j], w[0 * inDims / 16 + j]);
       prod = _mm_madd_epi16(prod, kOnes);
       sum0 = _mm_add_epi32(sum0, prod);
