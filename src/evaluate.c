@@ -79,11 +79,11 @@ static const Bitboard KingFlank[8] = {
 
 // Thresholds for lazy and space evaluation
 enum {
-  LazyThreshold1 =  1400,
-  LazyThreshold2 =  1300,
-  SpaceThreshold = 12222,
-  NNUEThreshold1 =   550,
-  NNUEThreshold2 =   150
+  LazyThreshold1 =  1565,
+  LazyThreshold2 =  1102,
+  SpaceThreshold = 11551,
+  NNUEThreshold1 =   682,
+  NNUEThreshold2 =   176
 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -848,7 +848,7 @@ Value evaluate(const Position *pos)
 #ifdef NNUE
 
   if (useNNUE == EVAL_HYBRID) {
-    const int mat = non_pawn_material() + PieceValue[MG][PAWN] * popcount(pieces_p(PAWN));
+    const int mat = non_pawn_material() + PawnValueMg * popcount(pieces_p(PAWN));
     Value psq = abs(eg_value(psq_score()));
     int r50 = 16 + rule50_count();
     bool largePsq = psq * 16 > (NNUEThreshold1 + non_pawn_material() / 64) * r50;

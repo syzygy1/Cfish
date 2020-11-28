@@ -173,8 +173,8 @@ INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
       score -=  (doubled ? Doubled : 0)
               + (more_than_one(lever) ? WeakLever : 0);
 
-    if (blocked && r > RANK_4)
-      score += BlockedPawn[r - 4];
+    if (blocked && r >= RANK_5)
+      score += BlockedPawn[r - RANK_5];
   }
 
   return score;
