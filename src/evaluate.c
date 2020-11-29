@@ -860,14 +860,14 @@ Value evaluate(const Position *pos)
     bool strongClassical = non_pawn_material() < 2 * RookValueMg && popcount(pieces_p(PAWN)) < 2;
     v =  classical || strongClassical
        ? evaluate_classical(pos)
-       : nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
+       : nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
 
     if (   classical && largePsq && !strongClassical
         && (   abs(v) * 16 < NNUEThreshold2 * r50
             || (   opposite_bishops(pos)
                 && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50
                 && !(pos->nodes & 0xB))))
-      v = nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
+      v = nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)
     v = nnue_evaluate(pos) * 5 / 4 + Tempo;
