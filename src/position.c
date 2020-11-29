@@ -55,7 +55,6 @@ INLINE void put_piece(Position *pos, Color c, Piece piece, Square s)
   pos->byTypeBB[0] |= sq_bb(s);
   pos->byTypeBB[type_of_p(piece)] |= sq_bb(s);
   pos->byColorBB[c] |= sq_bb(s);
-  pos->pieceCount[piece]++;
 }
 
 INLINE void remove_piece(Position *pos, Color c, Piece piece, Square s)
@@ -64,7 +63,6 @@ INLINE void remove_piece(Position *pos, Color c, Piece piece, Square s)
   pos->byTypeBB[type_of_p(piece)] ^= sq_bb(s);
   pos->byColorBB[c] ^= sq_bb(s);
   /* board[s] = 0;  Not needed, overwritten by the capturing one */
-  pos->pieceCount[piece]--;
 }
 
 INLINE void move_piece(Position *pos, Color c, Piece piece, Square from,
@@ -229,6 +227,7 @@ void pos_set(Position *pos, char *fen, int isChess960)
       for (int piece = 0; piece < 16; piece++)
         if (PieceToChar[piece] == token) {
           put_piece(pos, color_of(piece), piece, sq++);
+          pos->pieceCount[piece]++;
           break;
         }
     }
@@ -862,6 +861,7 @@ void do_move(Position *pos, Move m, int givesCheck)
 
     // Update board and piece lists
     remove_piece(pos, them, captured, capsq);
+    pos->pieceCount[captured]--;
 
     // Update material hash key and prefetch access to materialTable
     key ^= zob.psq[captured][capsq];
@@ -926,7 +926,9 @@ void do_move(Position *pos, Move m, int givesCheck)
       assert(type_of_p(promotion) >= KNIGHT && type_of_p(promotion) <= QUEEN);
 
       remove_piece(pos, us, piece, to);
+      pos->pieceCount[piece]--;
       put_piece(pos, us, promotion, to);
+      pos->pieceCount[promotion]++;
 
 #ifdef NNUE
       dp->to[0] = SQ_NONE;   // pawn to SQ_NONE, promoted piece from SQ_NONE
@@ -1016,8 +1018,10 @@ void undo_move(Position *pos, Move m)
     assert(type_of_p(pc) >= KNIGHT && type_of_p(pc) <= QUEEN);
 
     remove_piece(pos, us, pc, to);
+    pos->pieceCount[pc]--;
     pc = make_piece(us, PAWN);
     put_piece(pos, us, pc, to);
+    pos->pieceCount[pc]++;
   }
 
   if (unlikely(type_of_m(m) == CASTLING)) {
@@ -1052,6 +1056,7 @@ void undo_move(Position *pos, Move m)
       }
 
       put_piece(pos, !us, pos->st->capturedPiece, capsq); // Restore the captured piece
+      pos->pieceCount[pos->st->capturedPiece]++;
     }
   }
 
