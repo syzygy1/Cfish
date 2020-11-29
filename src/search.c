@@ -1281,7 +1281,7 @@ moves_loop: // When in check search starts from here.
       if (ss->ttPv)
         r -= 2;
 
-      // Increase reduction at root and onn-PV nodes when the best move
+      // Increase reduction at root and non-PV nodes when the best move
       // does not change frequently
       if ((rootNode || !PvNode) && depth > 10 && pos->bestMoveChanges <= 2)
         r++;

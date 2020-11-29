@@ -19,7 +19,7 @@ Further options:
 <table>
 <tr><td><code>nnue=no</code></td><td>Do not include NNUE code</td></tr>
 <tr><td><code>pure=yes</code></td><td>NNUE pure only (no hybrid or classical mode)</td></tr>
-<tr><td><code>sparse=yes/no</code></td><td>Enable/disbable NNUE sparse multiplication</td></tr>
+<tr><td><code>sparse=yes/no</code></td><td>Enable/disable NNUE sparse multiplication</td></tr>
 <tr><td><code>numa=no</code></td><td>Disable NUMA support</td></tr>
 <tr><td><code>lto=yes</code></td><td>Compile with link-time optimization</td></tr>
 <tr><td><code>extra=yes</code></td><td>Compile with extra optimization options (gcc-7.x and higher)</td></tr>
