@@ -126,9 +126,8 @@ static const Score BishopPawns[8] = {
   S(3, 8), S(3, 9), S(1, 8), S(3, 7), S(3, 7), S(1, 8), S(3, 9), S(3, 8)
 };
 
-// RookOnFile[semiopen/open] contains bonuses for each rook when there is
-// no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(19, 7), S(48, 27) };
+static const Score RookOnClosedFile = S(10, 5);
+static const Score RookOnOpenFile[2] = { S(19, 7), S(48, 27) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
@@ -144,7 +143,7 @@ static const Score ThreatByRook[8] = {
 // PassedRank[mg/eg][Rank] contains midgame and endgame bonuses for passed
 // pawns. We don't use a Score because we process the two components
 // independently.
-static const Value PassedRank[][8] = {
+static const Value PassedRank[2][8] = {
   { V(0), V( 9), V(15), V(17), V(64), V(171), V(277) },
   { V(0), V(28), V(31), V(39), V(70), V(177), V(260) }
 };
@@ -331,16 +330,20 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
     }
 
     if (Pt == ROOK) {
-      // Bonus for rook on an open or semi-open file
+      // Bonuses for rook on a (semi-)open or closed file
       if (is_on_semiopen_file(ei->pe, Us, s))
-        score += RookOnFile[is_on_semiopen_file(ei->pe, Them, s)];
+        score += RookOnOpenFile[is_on_semiopen_file(ei->pe, Them, s)];
+      else {
+        // If our pawn on this file is blocked, increase penalty
+        if (pieces_cp(Us, PAWN) & shift_bb(Down, pieces()) & file_bb_s(s))
+          score -= RookOnClosedFile;
 
-      // Penalty when trapped by the king, even more if the king cannot castle
-      else if (mob <= 3) {
-        File kf = file_of(square_of(Us, KING));
-
-        if ((kf < FILE_E) == (file_of(s) < kf))
-          score -= TrappedRook * (1 + !can_castle_c(Us));
+        // Penalty when trapped by the king. Even more if the king cannot castle
+        if (mob <= 3) {
+          File kf = file_of(square_of(Us, KING));
+          if ((kf < FILE_E) == (file_of(s) < kf))
+            score -= TrappedRook * (1 + !can_castle_c(Us));
+        }
       }
     }
 
