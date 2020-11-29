@@ -189,10 +189,10 @@ static const Score WeakQueenProtection = S( 14,  0);
 
 INLINE void evalinfo_init(const Position *pos, EvalInfo *ei, const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Down = (Us == WHITE ? SOUTH : NORTH);
-  const Bitboard LowRanks = (Us == WHITE ? Rank2BB | Rank3BB
-                                         : Rank7BB | Rank6BB);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Down = Us == WHITE ? SOUTH : NORTH;
+  const Bitboard LowRanks = Us == WHITE ? Rank2BB | Rank3BB
+                                        : Rank7BB | Rank6BB;
 
   const Square ksq = square_of(Us, KING);
 
@@ -210,7 +210,7 @@ INLINE void evalinfo_init(const Position *pos, EvalInfo *ei, const Color Us)
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
   ei->attackedBy[Us][PAWN] = ei->pe->pawnAttacks[Us];
   ei->attackedBy[Us][0] = b | ei->attackedBy[Us][PAWN];
-  ei->attackedBy2[Us]   = (b & ei->attackedBy[Us][PAWN]) | dblAttackByPawn;
+  ei->attackedBy2[Us] = (b & ei->attackedBy[Us][PAWN]) | dblAttackByPawn;
 
   // Init our king safety tables only if we are going to use them
   Square s = make_square(clamp(file_of(ksq), FILE_B, FILE_G),
@@ -231,10 +231,10 @@ INLINE void evalinfo_init(const Position *pos, EvalInfo *ei, const Color Us)
 INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
     const Color Us, const int Pt)
 {
-  const Color Them  = (Us == WHITE ? BLACK      : WHITE);
-  const int   Down  = (Us == WHITE ? SOUTH      : NORTH);
-  const Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
-                                             : Rank5BB | Rank4BB | Rank3BB);
+  const Color Them  = Us == WHITE ? BLACK : WHITE;
+  const int   Down  = Us == WHITE ? SOUTH : NORTH;
+  const Bitboard OutpostRanks = Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
+                                            : Rank5BB | Rank4BB | Rank3BB;
 
   Bitboard b, bb;
   Square s;
@@ -458,9 +458,9 @@ INLINE Score evaluate_king(const Position *pos, EvalInfo *ei, Score *mobility,
 
 INLINE Score evaluate_threats(const Position *pos, EvalInfo *ei, const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Up   = (Us == WHITE ? NORTH : SOUTH);
-  const Bitboard TRank3BB = (Us == WHITE ? Rank3BB : Rank6BB);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Up   = Us == WHITE ? NORTH : SOUTH;
+  const Bitboard TRank3BB = Us == WHITE ? Rank3BB : Rank6BB;
 
   enum { Minor, Rook };
 
@@ -561,9 +561,9 @@ INLINE int capped_distance(Square s1, Square s2)
 
 INLINE Score evaluate_passed(const Position *pos, EvalInfo *ei, const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Up   = (Us == WHITE ? NORTH : SOUTH);
-  const int   Down = (Us == WHITE ? SOUTH : NORTH);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Up   = Us == WHITE ? NORTH : SOUTH;
+  const int   Down = Us == WHITE ? SOUTH : NORTH;
 
   Bitboard b, bb, squaresToQueen, unsafeSquares, blockedPassers, helpers;
   Score score = SCORE_ZERO;
@@ -653,11 +653,11 @@ INLINE Score evaluate_space(const Position *pos, EvalInfo *ei, const Color Us)
   if (non_pawn_material() < SpaceThreshold)
     return SCORE_ZERO;
 
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Down = (Us == WHITE ? SOUTH : NORTH);
-  const Bitboard SpaceMask =
-    Us == WHITE ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)
-                : (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Down = Us == WHITE ? SOUTH : NORTH;
+  const Bitboard SpaceMask = Us == WHITE
+    ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)
+    : (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB);
 
   // Find the available squares for our pieces inside the SpaceMask area
   Bitboard safe =   SpaceMask

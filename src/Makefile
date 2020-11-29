@@ -51,6 +51,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # ----------------------------------------------------------------------------
 #
 # nnue = yes/no       --- -DNNUE           --- Enable/Disable NNUE
+# pure = yes/no       --- -DNNUE_PURE      --- Enable/Disable NNUE pure only
 # debug = yes/no      --- -DNDEBUG         --- Enable/Disable debug mode
 # optimize = yes/no   --- (-O3/-fast etc.) --- Enable/Disable optimizations
 # arch = (name)       --- (-arch)          --- Target architecture
