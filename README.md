@@ -18,12 +18,17 @@ Further options:
 
 <table>
 <tr><td><code>nnue=no</code></td><td>Do not include NNUE code</td></tr>
+<tr><td><code>pure=yes</code></td><td>NNUE pure only (no hybrid or classical mode)</td></tr>
+<tr><td><code>sparse=yes/no</code></td><td>Enable/disbable NNUE sparse multiplication</td></tr>
 <tr><td><code>numa=no</code></td><td>Disable NUMA support</td></tr>
 <tr><td><code>lto=yes</code></td><td>Compile with link-time optimization</td></tr>
 <tr><td><code>extra=yes</code></td><td>Compile with extra optimization options (gcc-7.x and higher)</td></tr>
 </table>
 
-Add `numa=no` to fix the error `cannot find -lnuma`.
+The `sparse` option selects between two different NNUE implementations.
+The option `sparse=yes` is likely superior (i.e. higher nps) for ARM-based CPUs, for Intel CPUs that do not support AVX2, and for AMD CPUs before Zen 3 (i.e. Ryzen 5000).
+
+Add `numa=no` if compilation fails with`numa.h: No such file or directory` or `cannot find -lnuma`.
 
 The optimization options currently enabled with `extra=yes` appear to be less effective now that the NNUE code has been added.
 
