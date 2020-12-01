@@ -538,9 +538,9 @@ bool is_legal(const Position *pos, Move m)
 // due to SMP concurrent access or hash position key aliasing.
 
 #if 0
-int is_pseudo_legal_old(Position *pos, Move m)
+bool is_pseudo_legal_old(Position *pos, Move m)
 {
-  int us = stm();
+  Color us = stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
   Piece pc = moved_piece(m);
@@ -551,29 +551,29 @@ int is_pseudo_legal_old(Position *pos, Move m)
     ExtMove *last = generate_legal(pos, list);
     for (ExtMove *p = list; p < last; p++)
       if (p->move == m)
-        return 1;
-    return 0;
+        return true;
+    return false;
   }
 
   // Is not a promotion, so promotion piece must be empty
   if (promotion_type(m) - KNIGHT != 0)
-    return 0;
+    return false;
 
   // If the 'from' square is not occupied by a piece belonging to the side to
   // move, the move is obviously not legal.
   if (pc == 0 || color_of(pc) != us)
-    return 0;
+    return false;
 
   // The destination square cannot be occupied by a friendly piece
   if (pieces_c(us) & sq_bb(to))
-    return 0;
+    return false;
 
   // Handle the special case of a pawn move
   if (type_of_p(pc) == PAWN) {
     // We have already handled promotion moves, so destination
     // cannot be on the 8th/1st rank.
     if (!((to + 0x08) & 0x30))
-      return 0;
+      return false;
 
     if (   !(attacks_from_pawn(from, us) & pieces_c(!us) & sq_bb(to)) // Not a capture
         && !((from + pawn_push(us) == to) && is_empty(to))       // Not a single push
@@ -581,10 +581,10 @@ int is_pseudo_legal_old(Position *pos, Move m)
            && (rank_of(from) == relative_rank(us, RANK_2))
            && is_empty(to)
            && is_empty(to - pawn_push(us))))
-      return 0;
+      return false;
   }
   else if (!(attacks_from(pc, from) & sq_bb(to)))
-    return 0;
+    return false;
 
   // Evasions generator already takes care to avoid some kind of illegal moves
   // and legal() relies on this. We therefore have to take care that the same
@@ -593,19 +593,19 @@ int is_pseudo_legal_old(Position *pos, Move m)
     if (type_of_p(pc) != KING) {
       // Double check? In this case a king move is required
       if (more_than_one(checkers()))
-        return 0;
+        return false;
 
       // Our move must be a blocking evasion or a capture of the checking piece
       if (!((between_bb(lsb(checkers()), square_of(us, KING)) | checkers()) & sq_bb(to)))
-        return 0;
+        return false;
     }
     // In case of king moves under check we have to remove king so as to catch
     // invalid moves like b1a1 when opposite queen is on c1.
     else if (attackers_to_occ(pos, to, pieces() ^ sq_bb(from)) & pieces_c(!us))
-      return 0;
+      return false;
   }
 
-  return 1;
+  return true;
 }
 #endif
 
@@ -653,7 +653,7 @@ bool is_pseudo_legal(const Position *pos, Move m)
       break;
     case KING:
       if (!(attacks_from_king(from) & sq_bb(to)))
-        return 0;
+        return false;
       // is_legal() does not remove the "from" square from the "occupied"
       // bitboard when checking that the king is not in check on the "to"
       // square. So we need to be careful here.
@@ -671,9 +671,9 @@ bool is_pseudo_legal(const Position *pos, Move m)
         return false;
       if (   !(attacks_from_pawn(from, us) & pieces_c(!us) & sq_bb(to))
           && !((from + pawn_push(us) == to) && is_empty(to))
-          && !( (from + 2 * pawn_push(us) == to)
-            && (rank_of(from) == relative_rank(us, RANK_2))
-            && is_empty(to) && is_empty(to - pawn_push(us))))
+          && !(   from + 2 * pawn_push(us) == to
+               && rank_of(from) == relative_rank(us, RANK_2)
+               && is_empty(to) && is_empty(to - pawn_push(us))))
         return false;
     }
     else if (likely(type_of_m(m) == PROMOTION)) {
@@ -859,7 +859,7 @@ void do_move(Position *pos, Move m, int givesCheck)
     dp->to[1] = SQ_NONE;
 #endif
 
-    // Update board and piece lists
+    // Update board
     remove_piece(pos, them, captured, capsq);
     pos->pieceCount[captured]--;
 

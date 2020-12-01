@@ -850,8 +850,8 @@ Value evaluate(const Position *pos)
 
 #ifdef NNUE
 
+  const int mat = non_pawn_material() + PawnValueMg * popcount(pieces_p(PAWN));
   if (useNNUE == EVAL_HYBRID) {
-    const int mat = non_pawn_material() + PawnValueMg * popcount(pieces_p(PAWN));
     Value psq = abs(eg_value(psq_score()));
     int r50 = 16 + rule50_count();
     bool largePsq = psq * 16 > (NNUEThreshold1 + non_pawn_material() / 64) * r50;
@@ -870,7 +870,7 @@ Value evaluate(const Position *pos)
       v = nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)
-    v = nnue_evaluate(pos) * 5 / 4 + Tempo;
+    v = nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
   else
     v = evaluate_classical(pos);
 
@@ -893,7 +893,7 @@ Value evaluate(const Position *pos)
   Value v;
   int mat = non_pawn_material() + PieceValue[MG][PAWN] * popcount(pieces_p(PAWN));
 
-  v = nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
+  v = nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
   v = v * (100 - rule50_count()) / 100;
   return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 }
