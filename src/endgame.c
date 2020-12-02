@@ -626,8 +626,8 @@ static int ScaleKRPPKRP(const Position *pos, Color strongSide)
   assert(verify_material(pos, strongSide, RookValueMg, 2));
   assert(verify_material(pos, weakSide,   RookValueMg, 1));
 
-  Square wpsq1 = piece_list(strongSide, PAWN)[0];
-  Square wpsq2 = piece_list(strongSide, PAWN)[1];
+  Square wpsq1 = lsb(pieces_cp(strongSide, PAWN));
+  Square wpsq2 = msb(pieces_cp(strongSide, PAWN));
   Square bksq = square_of(weakSide, KING);
 
   // Does the stronger side have a passed pawn?
@@ -716,8 +716,8 @@ static int ScaleKBPPKB(const Position *pos, Color strongSide)
     return SCALE_FACTOR_NONE;
 
   Square ksq = square_of(weakSide, KING);
-  Square psq1 = piece_list(strongSide, PAWN)[0];
-  Square psq2 = piece_list(strongSide, PAWN)[1];
+  Square psq1 = lsb(pieces_cp(strongSide, PAWN));
+  Square psq2 = msb(pieces_cp(strongSide, PAWN));
   int r1 = rank_of(psq1);
   int r2 = rank_of(psq2);
   Square blockSq1, blockSq2;

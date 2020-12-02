@@ -31,11 +31,11 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Backward        = S( 8, 25);
-static const Score Doubled         = S(10, 55);
-static const Score Isolated        = S( 3, 15);
-static const Score WeakLever       = S( 3, 55);
-static const Score WeakUnopposed   = S(13, 25);
+static const Score Backward      = S( 8, 25);
+static const Score Doubled       = S(10, 55);
+static const Score Isolated      = S( 3, 15);
+static const Score WeakLever     = S( 3, 55);
+static const Score WeakUnopposed = S(13, 25);
 
 // Bonus for blocked pawns at 5th or 6th rank
 static const Score BlockedPawn[2] = { S(-13, -4), S(-5, 2) };
@@ -81,8 +81,8 @@ static const Score KingOnFile[2][2] = {
 
 INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
 {
-  const Color Them  = (Us == WHITE ? BLACK      : WHITE);
-  const int   Up    = (Us == WHITE ? NORTH      : SOUTH);
+  const Color Them  = Us == WHITE ? BLACK : WHITE;
+  const int   Up    = Us == WHITE ? NORTH : SOUTH;
 
   Bitboard neighbours, stoppers, doubled, support, phalanx, opposed;
   Bitboard lever, leverPush, blocked;
@@ -125,8 +125,8 @@ INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
 
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot safely advance.
-    backward =   !(neighbours & forward_ranks_bb(Them, rank_of(s + Up)))
-              &&  (leverPush | blocked);
+    backward =  !(neighbours & forward_ranks_bb(Them, rank_of(s + Up)))
+              && (leverPush | blocked);
 
     // Compute additional span if pawn is neither backward nor blocked
     if (!backward && !blocked)
@@ -137,7 +137,7 @@ INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
     // (b) the only stoppers are the leverPush, but we outnumber them
     // (c) there is only one front stopper which can be levered
     //     (Refined in evaluation_passed())
-    passed =   !(stoppers ^ lever)
+    passed =  !(stoppers ^ lever)
             || (   !(stoppers ^ leverPush)
                 && popcount(phalanx) >= popcount(leverPush))
             || (   stoppers == blocked && r >= RANK_5
@@ -200,7 +200,7 @@ void pawn_entry_fill(const Position *pos, PawnEntry *e, Key key)
 INLINE Score evaluate_shelter(const PawnEntry *pe, const Position *pos,
     Square ksq, const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
   
   Bitboard b =  pieces_p(PAWN) & ~forward_ranks_bb(Them, rank_of(ksq));
   Bitboard ourPawns = b & pieces_c(Us) & ~pe->pawnAttacks[Them];

@@ -1335,11 +1335,6 @@ moves_loop: // When in check search starts from here.
 
       } else {
 
-        // Increase reduction for captures/promotions if late move and at
-        // low depth
-        if (depth < 8 && moveCount > 2)
-          r++;
-
         // Unless giving check, this capture is likely bad
         if (   !givesCheck
             && ss->staticEval + PieceValue[EG][captured_piece()] + 210 * depth <= alpha)
@@ -1364,9 +1359,6 @@ moves_loop: // When in check search starts from here.
       if (didLMR && !captureOrPromotion) {
         int bonus = value > alpha ?  stat_bonus(newDepth)
                                   : -stat_bonus(newDepth);
-
-        if (move == ss->killers[0])
-          bonus += bonus / 4;
 
         update_cm_stats(ss, movedPiece, to_sq(move), bonus);
       }
@@ -1677,7 +1669,6 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
     // Do not search moves with negative SEE values
     if (    bestValue > VALUE_TB_LOSS_IN_MAX_PLY
-        && !(givesCheck && is_discovery_check_on_king(pos, !stm(), move))
         && !see_test(pos, move, 0))
       continue;
 

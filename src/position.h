@@ -148,8 +148,6 @@ struct Position {
   uint8_t chess960;
   uint8_t board[64];
   uint8_t pieceCount[16];
-  uint8_t pieceList[256];
-  uint8_t index[64];
   uint8_t castlingRightsMask[64];
   uint8_t castlingRookSquare[16];
   Bitboard castlingPath[16];
@@ -235,12 +233,11 @@ PURE bool has_game_cycle(const Position *pos, int ply);
 #define piece_on(s) (pos->board[s])
 #define ep_square() (pos->st->epSquare)
 #define is_empty(s) (!piece_on(s))
-#define piece_count(c,p) (pos->pieceCount[8 * (c) + (p)] - (8*(c)+(p)) * 16)
-#define piece_list(c,p) (&pos->pieceList[16 * (8 * (c) + (p))])
-#define square_of(c,p) (pos->pieceList[16 * (8 * (c) + (p))])
+#define piece_count(c,p) (pos->pieceCount[make_piece(c,p)])
+#define square_of(c,p) lsb(pieces_cp(c,p))
 #define loop_through_pieces(c,p,s) \
-  const uint8_t *pl = piece_list(c,p); \
-  while ((s = *pl++) != SQ_NONE)
+  for (Bitboard bb_pieces = pieces_cp(c,p); \
+      bb_pieces && (s = pop_lsb(&bb_pieces), true);)
 #define piece_count_mk(c, p) (((material_key()) >> (20 * (c) + 4 * (p) + 4)) & 15)
 
 // Castling
