@@ -721,7 +721,7 @@ ifeq ($(lto),yes)
 ifeq ($(optimize),yes)
 ifeq ($(debug),no)
 	ifeq ($(comp),clang)
-		CFLAGS += -flto=thin
+		CFLAGS += -flto
 		ifneq ($(findstring MINGW,$(KERNEL)),)
 			CFLAGS += -fuse-ld=lld
 		else ifneq ($(findstring MSYS,$(KERNEL)),)
