@@ -166,7 +166,8 @@ void search_clear(void)
   for (int idx = 0; idx < Threads.numThreads; idx++) {
     Position *pos = Threads.pos[idx];
     stats_clear(pos->counterMoves);
-    stats_clear(pos->history);
+    stats_clear(pos->mainHistory);
+    stats_clear(pos->staticHistory);
     stats_clear(pos->captureHistory);
     stats_clear(pos->lowPlyHistory);
   }
@@ -806,7 +807,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
       // Penalty for a quiet ttMove that fails low
       else if (!is_capture_or_promotion(pos, ttMove)) {
         int penalty = -stat_bonus(depth);
-        history_update(*pos->history, stm(), ttMove, penalty);
+        history_update(*pos->mainHistory, stm(), ttMove, penalty);
         update_cm_stats(ss, moved_piece(ttMove), to_sq(ttMove), penalty);
       }
     }
@@ -894,6 +895,14 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
     tte_save(tte, posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_NONE, 0,
         eval);
+  }
+
+  // Update static history for previous move
+  if (move_is_ok((ss-1)->currentMove) && !(ss-1)->checkersBB && !captured_piece()) {
+    int bonus =  ss->staticEval > -(ss-1)->staticEval + 2 * Tempo ? -stat_bonus(depth)
+               : ss->staticEval < -(ss-1)->staticEval + 2 * Tempo ? stat_bonus(depth)
+               : 0;
+    history_update(*pos->staticHistory, !stm(), (ss-1)->currentMove, bonus);
   }
 
   // Step 7. Razoring
@@ -1320,7 +1329,7 @@ moves_loop: // When in check search starts from here.
         ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
                        + (*fmh )[movedPiece][to_sq(move)]
                        + (*fmh2)[movedPiece][to_sq(move)]
-                       + (*pos->history)[!stm()][from_to(move)]
+                       + (*pos->mainHistory)[!stm()][from_to(move)]
                        - 5287;
 
         // Decrease/increase reduction by comparing with opponent's stat score.
@@ -1476,7 +1485,7 @@ moves_loop: // When in check search starts from here.
 
       // Decrease all the other played quiet moves
       for (int i = 0; i < quietCount; i++) {
-        history_update(*pos->history, stm(), quietsSearched[i], -bonus);
+        history_update(*pos->mainHistory, stm(), quietsSearched[i], -bonus);
         update_cm_stats(ss, moved_piece(quietsSearched[i]),
             to_sq(quietsSearched[i]), -bonus);
       }
@@ -1881,11 +1890,11 @@ static void update_quiet_stats(const Position *pos, Stack *ss, Move move,
   }
 
   Color c = stm();
-  history_update(*pos->history, c, move, bonus);
+  history_update(*pos->mainHistory, c, move, bonus);
   update_cm_stats(ss, moved_piece(move), to_sq(move), bonus);
 
   if (type_of_p(moved_piece(move)) != PAWN)
-    history_update(*pos->history, c, reverse_move(move), -bonus);
+    history_update(*pos->mainHistory, c, reverse_move(move), -bonus);
 
   if (move_is_ok((ss-1)->currentMove)) {
     Square prevSq = to_sq((ss-1)->currentMove);
