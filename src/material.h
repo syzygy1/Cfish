@@ -39,8 +39,8 @@
 
 struct MaterialEntry {
   Key key;
-  int gamePhase;
-  int16_t value;
+  int16_t gamePhase;
+  Score score;
   uint8_t eval_func;
   uint8_t eval_func_side;
   uint8_t scal_func[2];
@@ -66,7 +66,7 @@ INLINE MaterialEntry *material_probe(const Position *pos)
 
 INLINE Score material_imbalance(MaterialEntry *me)
 {
-  return make_score((unsigned)me->value, me->value);
+  return me->score;
 }
 
 INLINE bool material_specialized_eval_exists(MaterialEntry *me)

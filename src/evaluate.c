@@ -428,7 +428,7 @@ INLINE Score evaluate_king(const Position *pos, EvalInfo *ei, Score *mobility,
   int kingFlankDefense = popcount(b3);
 
   kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
-               + 185 * popcount(ei->kingRing[Us] & weak)
+               + 183 * popcount(ei->kingRing[Us] & weak)
                + 148 * popcount(unsafeChecks)
                +  98 * popcount(blockers_for_king(pos, Us))
                +  69 * ei->kingAttacksCount[Them]
