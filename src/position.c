@@ -55,36 +55,25 @@ INLINE void put_piece(Position *pos, Color c, Piece piece, Square s)
   pos->byTypeBB[0] |= sq_bb(s);
   pos->byTypeBB[type_of_p(piece)] |= sq_bb(s);
   pos->byColorBB[c] |= sq_bb(s);
-  pos->index[s] = pos->pieceCount[piece]++;
-  pos->pieceList[pos->index[s]] = s;
 }
 
 INLINE void remove_piece(Position *pos, Color c, Piece piece, Square s)
 {
-  // WARNING: This is not a reversible operation.
   pos->byTypeBB[0] ^= sq_bb(s);
   pos->byTypeBB[type_of_p(piece)] ^= sq_bb(s);
   pos->byColorBB[c] ^= sq_bb(s);
   /* board[s] = 0;  Not needed, overwritten by the capturing one */
-  Square lastSquare = pos->pieceList[--pos->pieceCount[piece]];
-  pos->index[lastSquare] = pos->index[s];
-  pos->pieceList[pos->index[lastSquare]] = lastSquare;
-  pos->pieceList[pos->pieceCount[piece]] = SQ_NONE;
 }
 
 INLINE void move_piece(Position *pos, Color c, Piece piece, Square from,
     Square to)
 {
-  // index[from] is not updated and becomes stale. This works as long as
-  // index[] is accessed just by known occupied squares.
   Bitboard fromToBB = sq_bb(from) ^ sq_bb(to);
   pos->byTypeBB[0] ^= fromToBB;
   pos->byTypeBB[type_of_p(piece)] ^= fromToBB;
   pos->byColorBB[c] ^= fromToBB;
   pos->board[from] = 0;
   pos->board[to] = piece;
-  pos->index[to] = pos->index[from];
-  pos->pieceList[pos->index[to]] = to;
 }
 
 
@@ -225,10 +214,8 @@ void pos_set(Position *pos, char *fen, int isChess960)
   memset(pos, 0, offsetof(Position, moveList));
   pos->st = st;
   memset(st, 0, StateSize);
-  for (int i = 0; i < 256; i++)
-    pos->pieceList[i] = SQ_NONE;
   for (int i = 0; i < 16; i++)
-    pos->pieceCount[i] = 16 * i;
+    pos->pieceCount[i] = 0;
 
   // Piece placement
   while ((token = *fen++) && token != ' ') {
@@ -240,6 +227,7 @@ void pos_set(Position *pos, char *fen, int isChess960)
       for (int piece = 0; piece < 16; piece++)
         if (PieceToChar[piece] == token) {
           put_piece(pos, color_of(piece), piece, sq++);
+          pos->pieceCount[piece]++;
           break;
         }
     }
@@ -550,9 +538,9 @@ bool is_legal(const Position *pos, Move m)
 // due to SMP concurrent access or hash position key aliasing.
 
 #if 0
-int is_pseudo_legal_old(Position *pos, Move m)
+bool is_pseudo_legal_old(Position *pos, Move m)
 {
-  int us = stm();
+  Color us = stm();
   Square from = from_sq(m);
   Square to = to_sq(m);
   Piece pc = moved_piece(m);
@@ -563,29 +551,29 @@ int is_pseudo_legal_old(Position *pos, Move m)
     ExtMove *last = generate_legal(pos, list);
     for (ExtMove *p = list; p < last; p++)
       if (p->move == m)
-        return 1;
-    return 0;
+        return true;
+    return false;
   }
 
   // Is not a promotion, so promotion piece must be empty
   if (promotion_type(m) - KNIGHT != 0)
-    return 0;
+    return false;
 
   // If the 'from' square is not occupied by a piece belonging to the side to
   // move, the move is obviously not legal.
   if (pc == 0 || color_of(pc) != us)
-    return 0;
+    return false;
 
   // The destination square cannot be occupied by a friendly piece
   if (pieces_c(us) & sq_bb(to))
-    return 0;
+    return false;
 
   // Handle the special case of a pawn move
   if (type_of_p(pc) == PAWN) {
     // We have already handled promotion moves, so destination
     // cannot be on the 8th/1st rank.
     if (!((to + 0x08) & 0x30))
-      return 0;
+      return false;
 
     if (   !(attacks_from_pawn(from, us) & pieces_c(!us) & sq_bb(to)) // Not a capture
         && !((from + pawn_push(us) == to) && is_empty(to))       // Not a single push
@@ -593,10 +581,10 @@ int is_pseudo_legal_old(Position *pos, Move m)
            && (rank_of(from) == relative_rank(us, RANK_2))
            && is_empty(to)
            && is_empty(to - pawn_push(us))))
-      return 0;
+      return false;
   }
   else if (!(attacks_from(pc, from) & sq_bb(to)))
-    return 0;
+    return false;
 
   // Evasions generator already takes care to avoid some kind of illegal moves
   // and legal() relies on this. We therefore have to take care that the same
@@ -605,19 +593,19 @@ int is_pseudo_legal_old(Position *pos, Move m)
     if (type_of_p(pc) != KING) {
       // Double check? In this case a king move is required
       if (more_than_one(checkers()))
-        return 0;
+        return false;
 
       // Our move must be a blocking evasion or a capture of the checking piece
       if (!((between_bb(lsb(checkers()), square_of(us, KING)) | checkers()) & sq_bb(to)))
-        return 0;
+        return false;
     }
     // In case of king moves under check we have to remove king so as to catch
     // invalid moves like b1a1 when opposite queen is on c1.
     else if (attackers_to_occ(pos, to, pieces() ^ sq_bb(from)) & pieces_c(!us))
-      return 0;
+      return false;
   }
 
-  return 1;
+  return true;
 }
 #endif
 
@@ -665,7 +653,7 @@ bool is_pseudo_legal(const Position *pos, Move m)
       break;
     case KING:
       if (!(attacks_from_king(from) & sq_bb(to)))
-        return 0;
+        return false;
       // is_legal() does not remove the "from" square from the "occupied"
       // bitboard when checking that the king is not in check on the "to"
       // square. So we need to be careful here.
@@ -683,9 +671,9 @@ bool is_pseudo_legal(const Position *pos, Move m)
         return false;
       if (   !(attacks_from_pawn(from, us) & pieces_c(!us) & sq_bb(to))
           && !((from + pawn_push(us) == to) && is_empty(to))
-          && !( (from + 2 * pawn_push(us) == to)
-            && (rank_of(from) == relative_rank(us, RANK_2))
-            && is_empty(to) && is_empty(to - pawn_push(us))))
+          && !(   from + 2 * pawn_push(us) == to
+               && rank_of(from) == relative_rank(us, RANK_2)
+               && is_empty(to) && is_empty(to - pawn_push(us))))
         return false;
     }
     else if (likely(type_of_m(m) == PROMOTION)) {
@@ -871,8 +859,9 @@ void do_move(Position *pos, Move m, int givesCheck)
     dp->to[1] = SQ_NONE;
 #endif
 
-    // Update board and piece lists
+    // Update board
     remove_piece(pos, them, captured, capsq);
+    pos->pieceCount[captured]--;
 
     // Update material hash key and prefetch access to materialTable
     key ^= zob.psq[captured][capsq];
@@ -937,7 +926,9 @@ void do_move(Position *pos, Move m, int givesCheck)
       assert(type_of_p(promotion) >= KNIGHT && type_of_p(promotion) <= QUEEN);
 
       remove_piece(pos, us, piece, to);
+      pos->pieceCount[piece]--;
       put_piece(pos, us, promotion, to);
+      pos->pieceCount[promotion]++;
 
 #ifdef NNUE
       dp->to[0] = SQ_NONE;   // pawn to SQ_NONE, promoted piece from SQ_NONE
@@ -1027,8 +1018,10 @@ void undo_move(Position *pos, Move m)
     assert(type_of_p(pc) >= KNIGHT && type_of_p(pc) <= QUEEN);
 
     remove_piece(pos, us, pc, to);
+    pos->pieceCount[pc]--;
     pc = make_piece(us, PAWN);
     put_piece(pos, us, pc, to);
+    pos->pieceCount[pc]++;
   }
 
   if (unlikely(type_of_m(m) == CASTLING)) {
@@ -1063,6 +1056,7 @@ void undo_move(Position *pos, Move m)
       }
 
       put_piece(pos, !us, pos->st->capturedPiece, capsq); // Restore the captured piece
+      pos->pieceCount[pos->st->capturedPiece]++;
     }
   }
 
@@ -1308,15 +1302,9 @@ static int pos_is_ok(Position *pos, int *failedStep)
 
     if (step == Lists)
       for (int c = 0; c < 2; c++)
-        for (int pt = PAWN; pt <= KING; pt++) {
+        for (int pt = PAWN; pt <= KING; pt++)
           if (piece_count(c, pt) != popcount(pieces_cp(c, pt)))
             return 0;
-
-          for (int i = 0; i < piece_count(c, pt); i++)
-            if (   piece_on(piece_list(c, pt)[i]) != make_piece(c, pt)
-                || pos->index[piece_list(c, pt)[i]] != i)
-              return 0;
-        }
 
     if (step == Castling)
       for (int c = 0; c < 2; c++)

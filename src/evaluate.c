@@ -79,11 +79,11 @@ static const Bitboard KingFlank[8] = {
 
 // Thresholds for lazy and space evaluation
 enum {
-  LazyThreshold1 =  1400,
-  LazyThreshold2 =  1300,
-  SpaceThreshold = 12222,
-  NNUEThreshold1 =   550,
-  NNUEThreshold2 =   150
+  LazyThreshold1 =  1565,
+  LazyThreshold2 =  1102,
+  SpaceThreshold = 11551,
+  NNUEThreshold1 =   682,
+  NNUEThreshold2 =   176
 };
 
 // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -109,9 +109,9 @@ static const Score MobilityBonus[4][32] = {
     S( 53, 56), S( 60, 58), S( 62, 65), S( 69, 72), S( 78, 78), S( 83, 87),
     S( 91, 88), S( 96, 98) },
   // Rook
-  { S(-61,-82), S(-20,-17), S(  2, 23) ,S(  3, 40), S(  4, 72), S( 11,100),
-    S( 22,104), S( 31,120), S( 39,134), S(40 ,138), S( 41,158), S( 47,163),
-    S( 59,168), S( 60,169), S( 64,173) },
+  { S(-60,-82), S(-24,-15), S(  0, 17), S(  3, 43), S(  4, 72), S( 14,100),
+    S( 20,102), S( 30,122), S( 41,133), S( 41,139), S( 41,153), S( 45,160),
+    S( 57,165), S( 58,170), S( 67,175) },
   // Queen
   { S(-29,-49), S(-16,-29), S( -8, -8), S( -8, 17), S( 18, 39), S( 25, 54),
     S( 23, 59), S( 37, 73), S( 41, 76), S( 54, 95), S( 65, 95) ,S( 68,101),
@@ -126,9 +126,8 @@ static const Score BishopPawns[8] = {
   S(3, 8), S(3, 9), S(1, 8), S(3, 7), S(3, 7), S(1, 8), S(3, 9), S(3, 8)
 };
 
-// RookOnFile[semiopen/open] contains bonuses for each rook when there is
-// no friendly pawn on the rook file.
-static const Score RookOnFile[2] = { S(19, 7), S(48, 27) };
+static const Score RookOnClosedFile = S(10, 5);
+static const Score RookOnOpenFile[2] = { S(19, 7), S(48, 27) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
@@ -144,7 +143,7 @@ static const Score ThreatByRook[8] = {
 // PassedRank[mg/eg][Rank] contains midgame and endgame bonuses for passed
 // pawns. We don't use a Score because we process the two components
 // independently.
-static const Value PassedRank[][8] = {
+static const Value PassedRank[2][8] = {
   { V(0), V( 9), V(15), V(17), V(64), V(171), V(277) },
   { V(0), V(28), V(31), V(39), V(70), V(177), V(260) }
 };
@@ -189,10 +188,10 @@ static const Score WeakQueenProtection = S( 14,  0);
 
 INLINE void evalinfo_init(const Position *pos, EvalInfo *ei, const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Down = (Us == WHITE ? SOUTH : NORTH);
-  const Bitboard LowRanks = (Us == WHITE ? Rank2BB | Rank3BB
-                                         : Rank7BB | Rank6BB);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Down = Us == WHITE ? SOUTH : NORTH;
+  const Bitboard LowRanks = Us == WHITE ? Rank2BB | Rank3BB
+                                        : Rank7BB | Rank6BB;
 
   const Square ksq = square_of(Us, KING);
 
@@ -210,7 +209,7 @@ INLINE void evalinfo_init(const Position *pos, EvalInfo *ei, const Color Us)
   b = ei->attackedBy[Us][KING] = attacks_from_king(square_of(Us, KING));
   ei->attackedBy[Us][PAWN] = ei->pe->pawnAttacks[Us];
   ei->attackedBy[Us][0] = b | ei->attackedBy[Us][PAWN];
-  ei->attackedBy2[Us]   = (b & ei->attackedBy[Us][PAWN]) | dblAttackByPawn;
+  ei->attackedBy2[Us] = (b & ei->attackedBy[Us][PAWN]) | dblAttackByPawn;
 
   // Init our king safety tables only if we are going to use them
   Square s = make_square(clamp(file_of(ksq), FILE_B, FILE_G),
@@ -231,10 +230,10 @@ INLINE void evalinfo_init(const Position *pos, EvalInfo *ei, const Color Us)
 INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
     const Color Us, const int Pt)
 {
-  const Color Them  = (Us == WHITE ? BLACK      : WHITE);
-  const int   Down  = (Us == WHITE ? SOUTH      : NORTH);
-  const Bitboard OutpostRanks = (Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
-                                             : Rank5BB | Rank4BB | Rank3BB);
+  const Color Them  = Us == WHITE ? BLACK : WHITE;
+  const int   Down  = Us == WHITE ? SOUTH : NORTH;
+  const Bitboard OutpostRanks = Us == WHITE ? Rank4BB | Rank5BB | Rank6BB
+                                            : Rank5BB | Rank4BB | Rank3BB;
 
   Bitboard b, bb;
   Square s;
@@ -331,16 +330,20 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
     }
 
     if (Pt == ROOK) {
-      // Bonus for rook on an open or semi-open file
+      // Bonuses for rook on a (semi-)open or closed file
       if (is_on_semiopen_file(ei->pe, Us, s))
-        score += RookOnFile[is_on_semiopen_file(ei->pe, Them, s)];
+        score += RookOnOpenFile[is_on_semiopen_file(ei->pe, Them, s)];
+      else {
+        // If our pawn on this file is blocked, increase penalty
+        if (pieces_cp(Us, PAWN) & shift_bb(Down, pieces()) & file_bb_s(s))
+          score -= RookOnClosedFile;
 
-      // Penalty when trapped by the king, even more if the king cannot castle
-      else if (mob <= 3) {
-        File kf = file_of(square_of(Us, KING));
-
-        if ((kf < FILE_E) == (file_of(s) < kf))
-          score -= TrappedRook * (1 + !can_castle_c(Us));
+        // Penalty when trapped by the king. Even more if the king cannot castle
+        if (mob <= 3) {
+          File kf = file_of(square_of(Us, KING));
+          if ((kf < FILE_E) == (file_of(s) < kf))
+            score -= TrappedRook * (1 + !can_castle_c(Us));
+        }
       }
     }
 
@@ -425,7 +428,7 @@ INLINE Score evaluate_king(const Position *pos, EvalInfo *ei, Score *mobility,
   int kingFlankDefense = popcount(b3);
 
   kingDanger +=  ei->kingAttackersCount[Them] * ei->kingAttackersWeight[Them]
-               + 185 * popcount(ei->kingRing[Us] & weak)
+               + 183 * popcount(ei->kingRing[Us] & weak)
                + 148 * popcount(unsafeChecks)
                +  98 * popcount(blockers_for_king(pos, Us))
                +  69 * ei->kingAttacksCount[Them]
@@ -458,9 +461,9 @@ INLINE Score evaluate_king(const Position *pos, EvalInfo *ei, Score *mobility,
 
 INLINE Score evaluate_threats(const Position *pos, EvalInfo *ei, const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Up   = (Us == WHITE ? NORTH : SOUTH);
-  const Bitboard TRank3BB = (Us == WHITE ? Rank3BB : Rank6BB);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Up   = Us == WHITE ? NORTH : SOUTH;
+  const Bitboard TRank3BB = Us == WHITE ? Rank3BB : Rank6BB;
 
   enum { Minor, Rook };
 
@@ -561,9 +564,9 @@ INLINE int capped_distance(Square s1, Square s2)
 
 INLINE Score evaluate_passed(const Position *pos, EvalInfo *ei, const Color Us)
 {
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Up   = (Us == WHITE ? NORTH : SOUTH);
-  const int   Down = (Us == WHITE ? SOUTH : NORTH);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Up   = Us == WHITE ? NORTH : SOUTH;
+  const int   Down = Us == WHITE ? SOUTH : NORTH;
 
   Bitboard b, bb, squaresToQueen, unsafeSquares, blockedPassers, helpers;
   Score score = SCORE_ZERO;
@@ -653,11 +656,11 @@ INLINE Score evaluate_space(const Position *pos, EvalInfo *ei, const Color Us)
   if (non_pawn_material() < SpaceThreshold)
     return SCORE_ZERO;
 
-  const Color Them = (Us == WHITE ? BLACK : WHITE);
-  const int   Down = (Us == WHITE ? SOUTH : NORTH);
-  const Bitboard SpaceMask =
-    Us == WHITE ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)
-                : (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB);
+  const Color Them = Us == WHITE ? BLACK : WHITE;
+  const int   Down = Us == WHITE ? SOUTH : NORTH;
+  const Bitboard SpaceMask = Us == WHITE
+    ? (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB)
+    : (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB);
 
   // Find the available squares for our pieces inside the SpaceMask area
   Bitboard safe =   SpaceMask
@@ -847,25 +850,27 @@ Value evaluate(const Position *pos)
 
 #ifdef NNUE
 
+  const int mat = non_pawn_material() + PawnValueMg * popcount(pieces_p(PAWN));
   if (useNNUE == EVAL_HYBRID) {
-    const int mat = non_pawn_material() + PieceValue[MG][PAWN] * popcount(pieces_p(PAWN));
     Value psq = abs(eg_value(psq_score()));
     int r50 = 16 + rule50_count();
     bool largePsq = psq * 16 > (NNUEThreshold1 + non_pawn_material() / 64) * r50;
     bool classical = largePsq || (psq > PawnValueMg / 4 && !(pos->nodes & 0x0B));
 
-    v =  classical ? evaluate_classical(pos)
-                   : nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
+    bool strongClassical = non_pawn_material() < 2 * RookValueMg && popcount(pieces_p(PAWN)) < 2;
+    v =  classical || strongClassical
+       ? evaluate_classical(pos)
+       : nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
 
-    if (   classical && largePsq
+    if (   classical && largePsq && !strongClassical
         && (   abs(v) * 16 < NNUEThreshold2 * r50
             || (   opposite_bishops(pos)
                 && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50
                 && !(pos->nodes & 0xB))))
-      v = nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
+      v = nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
 
   } else if (useNNUE == EVAL_PURE)
-    v = nnue_evaluate(pos) * 5 / 4 + Tempo;
+    v = nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
   else
     v = evaluate_classical(pos);
 
@@ -888,7 +893,7 @@ Value evaluate(const Position *pos)
   Value v;
   int mat = non_pawn_material() + PieceValue[MG][PAWN] * popcount(pieces_p(PAWN));
 
-  v = nnue_evaluate(pos) * (720 + mat / 32) / 1024 + Tempo;
+  v = nnue_evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
   v = v * (100 - rule50_count()) / 100;
   return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 }

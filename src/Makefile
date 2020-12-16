@@ -51,6 +51,7 @@ OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 # ----------------------------------------------------------------------------
 #
 # nnue = yes/no       --- -DNNUE           --- Enable/Disable NNUE
+# pure = yes/no       --- -DNNUE_PURE      --- Enable/Disable NNUE pure only
 # debug = yes/no      --- -DNDEBUG         --- Enable/Disable debug mode
 # optimize = yes/no   --- (-O3/-fast etc.) --- Enable/Disable optimizations
 # arch = (name)       --- (-arch)          --- Target architecture
@@ -148,17 +149,19 @@ ifeq ($(x86),yes)
 		arch = x86_64
 		bits = 64
 	endif
-#	ifneq ($(findstring __AVX512__,$(props)),)
-#		avx512 = yes
-#	endif
+	ifneq ($(findstring __AVX512__,$(props)),)
+		avx512 = yes
+	endif
 	ifneq ($(findstring __VNNI__,$(props)),)
 		vnni = yes
 	endif
 	ifeq ($(bits),64)
 	ifneq ($(findstring __BMI2__,$(props)),)
-	# Let's not use pext on Zen
-	ifeq ($(findstring __znver,$(props)),)
+	# Let's not use pext on Zen 1 and Zen 2
+	ifeq ($(findstring __znver1,$(props)),)
+	ifeq ($(findstring __znver2,$(props)),)
 		pext = yes
+	endif
 	endif
 	endif
 	endif
@@ -728,7 +731,7 @@ ifeq ($(lto),yes)
 ifeq ($(optimize),yes)
 ifeq ($(debug),no)
 	ifeq ($(comp),clang)
-		CFLAGS += -flto=thin
+		CFLAGS += -flto
 		ifneq ($(findstring MINGW,$(KERNEL)),)
 			CFLAGS += -fuse-ld=lld
 		else ifneq ($(findstring MSYS,$(KERNEL)),)

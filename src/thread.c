@@ -92,7 +92,8 @@ static THREAD_FUNC thread_init(void *arg)
     pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
 #endif
     pos->counterMoves = numa_alloc(sizeof(CounterMoveStat));
-    pos->history = numa_alloc(sizeof(ButterflyHistory));
+    pos->mainHistory = numa_alloc(sizeof(ButterflyHistory));
+    pos->staticHistory = numa_alloc(sizeof(ButterflyHistory));
     pos->captureHistory = numa_alloc(sizeof(CapturePieceToHistory));
     pos->lowPlyHistory = numa_alloc(sizeof(LowPlyHistory));
     pos->rootMoves = numa_alloc(sizeof(RootMoves));
@@ -105,7 +106,8 @@ static THREAD_FUNC thread_init(void *arg)
     pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
 #endif
     pos->counterMoves = calloc(sizeof(CounterMoveStat), 1);
-    pos->history = calloc(sizeof(ButterflyHistory), 1);
+    pos->mainHistory = calloc(sizeof(ButterflyHistory), 1);
+    pos->staticHistory = calloc(sizeof(ButterflyHistory), 1);
     pos->captureHistory = calloc(sizeof(CapturePieceToHistory), 1);
     pos->lowPlyHistory = calloc(sizeof(LowPlyHistory), 1);
     pos->rootMoves = calloc(sizeof(RootMoves), 1);
@@ -200,7 +202,8 @@ static void thread_destroy(Position *pos)
     numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
 #endif
     numa_free(pos->counterMoves, sizeof(CounterMoveStat));
-    numa_free(pos->history, sizeof(ButterflyHistory));
+    numa_free(pos->mainHistory, sizeof(ButterflyHistory));
+    numa_free(pos->staticHistory, sizeof(ButterflyHistory));
     numa_free(pos->captureHistory, sizeof(CapturePieceToHistory));
     numa_free(pos->lowPlyHistory, sizeof(LowPlyHistory));
     numa_free(pos->rootMoves, sizeof(RootMoves));
@@ -213,7 +216,8 @@ static void thread_destroy(Position *pos)
     free(pos->materialTable);
 #endif
     free(pos->counterMoves);
-    free(pos->history);
+    free(pos->mainHistory);
+    free(pos->staticHistory);
     free(pos->captureHistory);
     free(pos->lowPlyHistory);
     free(pos->rootMoves);

@@ -27,28 +27,27 @@
 #include "position.h"
 
 // Polynomial material imbalance parameters.
+#define S(mg,eg) make_score(mg,eg)
 
-static const int QuadraticOurs[][8] = {
-  //            OUR PIECES
-  // pair pawn knight bishop rook queen
-  {1438                               }, // Bishop pair
-  {  40,   38                         }, // Pawn
-  {  32,  255, -62                    }, // Knight      OUR PIECES
-  {   0,  104,   4,    0              }, // Bishop
-  { -26,   -2,  47,   105,  -208      }, // Rook
-  {-189,   24, 117,   133,  -134, -6  }  // Queen
+static const Score QuadraticOurs[][8] = {
+  { S(1419, 1455) },
+  { S( 101,   28), S( 37,  39) },
+  { S(  57,   64), S(249, 187), S(-49, -62) },
+  { S(   0,    0), S(118, 137), S( 10,  27), S(  0,   0) },
+  { S( -63,  -68), S( -5,   3), S(100,  81), S(132, 118), S(-246, -244) },
+  { S(-210, -211), S( 37,  14), S(147, 141), S(161, 105), S(-158, -174), S(-9, -31) }
 };
 
-static const int QuadraticTheirs[][8] = {
-  //           THEIR PIECES
-  // pair pawn knight bishop rook queen
-  {   0                               }, // Bishop pair
-  {  36,    0                         }, // Pawn
-  {   9,   63,   0                    }, // Knight      OUR PIECES
-  {  59,   65,  42,     0             }, // Bishop
-  {  46,   39,  24,   -24,    0       }, // Rook
-  {  97,  100, -42,   137,  268,    0 }  // Queen
+static const Score QuadraticTheirs[][8] = {
+  { 0 },
+  { S(  33,  30) },
+  { S(  46,  18), S(106,  84) },
+  { S(  75,  35), S( 59,  44), S( 60,  15) },
+  { S(  26,  35), S(  6,  22), S( 38,  39), S(-12,  -2) },
+  { S(  97,  93), S(100, 163), S(-58, -91), S(112, 192), S(276, 225) }
 };
+
+#undef S
 
 // Helper used to detect a given material distribution.
 INLINE bool is_KXK(const Position *pos, int us)
@@ -72,11 +71,11 @@ INLINE bool is_KQKRPs(const Position *pos, int us) {
 
 // imbalance() calculates the imbalance by comparing the piece count of each
 // piece type for both colors.
-static int imbalance(int us, int pieceCount[][8])
+static Score imbalance(int us, int pieceCount[][8])
 {
   int *pc_us = pieceCount[us];
   int *pc_them = pieceCount[!us];
-  int bonus = 0;
+  Score bonus = SCORE_ZERO;
 
   // Second-degree polynomial material imbalance, by Tord Romstad
   for (int pt1 = 0; pt1 <= QUEEN; pt1++) {
@@ -191,7 +190,8 @@ void material_entry_fill(const Position *pos, MaterialEntry *e, Key key)
       pc(1, BISHOP)    , pc(1, ROOK), pc(1, QUEEN) }
   };
 #undef pc
-  e->value = (int16_t)((imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount)) / 16);
+  Score tmp = imbalance(WHITE, PieceCount) - imbalance(BLACK, PieceCount);
+  e->score = make_score(mg_value(tmp) / 16, eg_value(tmp) / 16);
 }
 
 #else
