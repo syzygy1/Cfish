@@ -79,7 +79,6 @@ static void score_quiets(const Position *pos)
 {
   Stack *st = pos->st;
   ButterflyHistory *history = pos->mainHistory;
-  ButterflyHistory *staticHistory = pos->staticHistory;
   LowPlyHistory *lph = pos->lowPlyHistory;
 
   PieceToHistory *cmh = (st-1)->history;
@@ -94,7 +93,6 @@ static void score_quiets(const Position *pos)
     Square to = move & 63;
     Square from = move >> 6;
     m->value =      (*history)[c][move]
-              +     (*staticHistory)[c][move]
               + 2 * (*cmh)[piece_on(from)][to]
               + 2 * (*fmh)[piece_on(from)][to]
               + 2 * (*fmh2)[piece_on(from)][to]

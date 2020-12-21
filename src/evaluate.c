@@ -127,7 +127,7 @@ static const Score BishopPawns[8] = {
 };
 
 static const Score RookOnClosedFile = S(10, 5);
-static const Score RookOnOpenFile[2] = { S(19, 7), S(48, 27) };
+static const Score RookOnOpenFile[2] = { S(19, 6), S(47, 26) };
 
 // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
 // which piece type attacks which one. Attacks on lesser pieces which are
@@ -144,8 +144,8 @@ static const Score ThreatByRook[8] = {
 // pawns. We don't use a Score because we process the two components
 // independently.
 static const Value PassedRank[2][8] = {
-  { V(0), V( 9), V(15), V(17), V(64), V(171), V(277) },
-  { V(0), V(28), V(31), V(39), V(70), V(177), V(260) }
+  { V(0), V( 7), V(16), V(17), V(64), V(170), V(278) },
+  { V(0), V(27), V(32), V(40), V(71), V(174), V(262) }
 };
 
 // PassedFile[File] contains a bonus according to the file of a passed pawn
@@ -617,11 +617,11 @@ INLINE Score evaluate_passed(const Position *pos, EvalInfo *ei, const Color Us)
         bb = forward_file_bb(Them, s) & pieces_pp(ROOK, QUEEN);
 
         if (!(pieces_c(Them) & bb))
-          unsafeSquares &= ei->attackedBy[Them][0];
+          unsafeSquares &= ei->attackedBy[Them][0] | pieces_c(Them);
 
-        // If there are no enemy attacks on passed pawn span, assign a big
-        // bonus. Otherwise, assign a smaller bonus if the path to queen is
-        // not attacked and an even smaller bonus if it is attacked but
+        // If there are no enemy pieces or attacks on passed pawn span, assign
+        // a big bonus. Otherwise, assign a smaller bonus if the path to queen
+        // is not attacked and an even smaller bonus if it is attacked but
         // block square is not.
         int k =  !unsafeSquares                    ? 35
                : !(unsafeSquares & squaresToQueen) ? 20
