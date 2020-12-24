@@ -623,9 +623,10 @@ INLINE Score evaluate_passed(const Position *pos, EvalInfo *ei, const Color Us)
         // a big bonus. Otherwise, assign a smaller bonus if the path to queen
         // is not attacked and an even smaller bonus if it is attacked but
         // block square is not.
-        int k =  !unsafeSquares                    ? 35
-               : !(unsafeSquares & squaresToQueen) ? 20
-               : !(unsafeSquares & sq_bb(blockSq)) ? 9 : 0;
+        int k =  !unsafeSquares                               ? 36
+               : !(unsafeSquares & ~ei->attackedBy[Us][PAWN]) ? 30
+               : !(unsafeSquares & squaresToQueen)            ? 17
+               : !(unsafeSquares & sq_bb(blockSq))            ?  7 : 0;
 
         // Assign a larger bonus if the block square is defended
         if ((pieces_c(Us) & bb) || (ei->attackedBy[Us][0] & sq_bb(blockSq)))
@@ -685,8 +686,8 @@ INLINE Score evaluate_space(const Position *pos, EvalInfo *ei, const Color Us)
 // A single value is derived from the mg and eg values and returned.
 INLINE Value evaluate_winnable(const Position *pos, EvalInfo *ei, Score score)
 {
-  int outflanking =  distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
-                   - distance_r(square_of(WHITE, KING), square_of(BLACK, KING));
+  int outflanking = distance_f(square_of(WHITE, KING), square_of(BLACK, KING))
+          + rank_of(square_of(WHITE, KING)) - rank_of(square_of(BLACK, KING));
 
   bool pawnsOnBothFlanks =   (pieces_p(PAWN) & QueenSide)
                           && (pieces_p(PAWN) & KingSide);
