@@ -52,8 +52,6 @@ enum { NonPV, PV };
 static const uint64_t ttHitAverageWindow     = 4096;
 static const uint64_t ttHitAverageResolution = 1024;
 
-static const int RazorMargin = 510;
-
 INLINE int futility_margin(Depth d, bool improving) {
   return 234 * (d - improving);
 }
@@ -77,7 +75,7 @@ INLINE int futility_move_count(bool improving, Depth depth)
 static Value stat_bonus(Depth depth)
 {
   int d = depth;
-  return d > 13 ? 29 : 17 * d * d + 134 * d - 134;
+  return d > 14 ? 29 : 8 * d * d + 224 * d - 215;
 }
 
 // Add a small random component to draw evaluations to keep search dynamic
@@ -904,25 +902,18 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     history_update(*pos->mainHistory, !stm(), (ss-1)->currentMove, bonus);
   }
 
-  // Step 7. Razoring
-  if (   !rootNode
-      && depth == 1
-      && eval <= alpha - RazorMargin)
-    return PvNode ? qsearch_PV_false(pos, ss, alpha, beta, 0)
-                  : qsearch_NonPV_false(pos, ss, alpha, 0);
-
   improving =  (ss-2)->staticEval == VALUE_NONE
              ? (ss->staticEval > (ss-4)->staticEval || (ss-4)->staticEval == VALUE_NONE)
              :  ss->staticEval > (ss-2)->staticEval;
 
-  // Step 8. Futility pruning: child node
+  // Step 7. Futility pruning: child node
   if (   !PvNode
-      &&  depth < 8
+      &&  depth < 9
       &&  eval - futility_margin(depth, improving) >= beta
       &&  eval < VALUE_KNOWN_WIN)  // Do not return unproven wins
     return eval; // - futility_margin(depth); (do not do the right thing)
 
-  // Step 9. Null move search with verification search (is omitted in PV nodes)
+  // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && (ss-1)->currentMove != MOVE_NULL
       && (ss-1)->statScore < 22977
@@ -970,9 +961,9 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     }
   }
 
-  probCutBeta = beta + 183 - 49 * improving;
+  probCutBeta = beta + 194 - 49 * improving;
 
-  // Step 10. ProbCut
+  // Step 9. ProbCut
   // If we have a good enough capture and a reduced search returns a value
   // much above beta, we can (almost) safely prune the previous move.
   if (   !PvNode
@@ -1032,7 +1023,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     ss->ttPv = ttPv;
   }
 
-  // Step 11. If the position is not in TT, decrease depth by 2
+  // Step 10. If the position is not in TT, decrease depth by 2
   if (PvNode && depth >= 6 && !ttMove)
     depth -= 2;
 
@@ -1069,7 +1060,7 @@ moves_loop: // When in check search starts from here.
     }
   }
 
-  // Step 12. Loop through moves
+  // Step 11. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
   // cutoff occurs
   while ((move = next_move(pos, moveCountPruning))) {
@@ -1118,7 +1109,7 @@ moves_loop: // When in check search starts from here.
     // Calculate new depth for this move
     newDepth = depth - 1;
 
-    // Step 13. Pruning at shallow depth
+    // Step 12. Pruning at shallow depth
     if (  !rootNode
         && non_pawn_material_c(stm())
         && bestValue > VALUE_TB_LOSS_IN_MAX_PLY)
@@ -1141,11 +1132,11 @@ moves_loop: // When in check search starts from here.
         // Futility pruning: parent node
         if (   lmrDepth < 7
             && !inCheck
-            && ss->staticEval + 266 + 170 * lmrDepth <= alpha
+            && ss->staticEval + 254 + 159 * lmrDepth <= alpha
             &&  (*cmh )[movedPiece][to_sq(move)]
               + (*fmh )[movedPiece][to_sq(move)]
               + (*fmh2)[movedPiece][to_sq(move)]
-              + (*fmh3)[movedPiece][to_sq(move)] / 2 < 27376)
+              + (*fmh3)[movedPiece][to_sq(move)] / 2 < 26394)
           continue;
 
         // Prune moves with negative SEE at low depths and below a decreasing
@@ -1161,12 +1152,12 @@ moves_loop: // When in check search starts from here.
           continue;
 
         // SEE based pruning
-        if (!see_test(pos, move, -213 * depth))
+        if (!see_test(pos, move, -218 * depth))
           continue;
       }
     }
 
-    // Step 14. Extensions
+    // Step 13. Extensions
 
     // Singular extension search. If all moves but one fail low on a search
     // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
@@ -1243,12 +1234,6 @@ moves_loop: // When in check search starts from here.
              && non_pawn_material() <= 2 * RookValueMg)
       extension = 1;
 
-    // Late irreversible move extension
-    if (   move == ttMove
-        && rule50_count() > 80
-        && (captureOrPromotion || type_of_p(movedPiece) == PAWN))
-      extension = 2;
-
     // Add extension to new depth
     newDepth += extension;
 
@@ -1260,12 +1245,12 @@ moves_loop: // When in check search starts from here.
     ss->currentMove = move;
     ss->history = &(*pos->counterMoveHistory)[inCheck][captureOrPromotion][movedPiece][to_sq(move)];
 
-    // Step 15. Make the move.
+    // Step 14. Make the move.
     do_move(pos, move, givesCheck);
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
-    // Step 16. Reduced depth search (LMR). If the move fails high it will be
+    // Step 15. Reduced depth search (LMR). If the move fails high it will be
     // re-searched at full depth.
     if (    depth >= 3
         &&  moveCount > 1 + 2 * rootNode
@@ -1273,7 +1258,7 @@ moves_loop: // When in check search starts from here.
             || moveCountPruning
             || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha
             || cutNode
-            || (!PvNode && !formerPv)
+            || (!PvNode && !formerPv && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(captured_piece())] < 4506)
             || pos->ttHitAverage < 432 * ttHitAverageResolution * ttHitAverageWindow / 1024))
     {
       Depth r = reduction(improving, depth, moveCount);
@@ -1361,7 +1346,7 @@ moves_loop: // When in check search starts from here.
       didLMR = false;
     }
 
-    // Step 17. Full depth search when LMR is skipped or fails high.
+    // Step 16. Full depth search when LMR is skipped or fails high.
     if (doFullDepthSearch) {
       value = -search_NonPV(pos, ss+1, -(alpha+1), newDepth, !cutNode);
 
@@ -1385,14 +1370,14 @@ moves_loop: // When in check search starts from here.
       value = -search_PV(pos, ss+1, -beta, -alpha, min(maxNextDepth, newDepth));
     }
 
-    // Step 18. Undo move
+    // Step 17. Undo move
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
     undo_move(pos, move);
 
     assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
 
-    // Step 19. Check for a new best move
+    // Step 18. Check for a new best move
     // Finished searching the move. If a stop occurred, the return value of
     // the search cannot be trusted, and we return immediately without
     // updating best move, PV and TT.
@@ -1470,7 +1455,7 @@ moves_loop: // When in check search starts from here.
     return VALUE_DRAW;
   */
 
-  // Step 20. Check for mate and stalemate
+  // Step 19. Check for mate and stalemate
   // All legal moves have been searched and if there are no legal moves,
   // it must be a mate or a stalemate. If we are in a singular extension
   // search then return a fail low score.
