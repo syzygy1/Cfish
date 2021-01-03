@@ -3,6 +3,7 @@
 *.exe
 *.out
 *.gcda
+*.profraw
 *.s
 *.nnue
 *.txt
