@@ -488,6 +488,7 @@ endif
 ifeq ($(KERNEL),Darwin)
 	CFLAGS += -arch $(arch) -mmacosx-version-min=10.14
 	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.14
+	XCRUN = xcrun
 endif
 
 # To cross-compile for Android, NDK version r21 or later is recommended.
@@ -971,7 +972,7 @@ clang-profile-make:
 	all
 
 clang-profile-use:
-	llvm-profdata merge -output=cfish.profdata *.profraw
+	$(XCRUN) llvm-profdata merge -output=cfish.profdata *.profraw
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
 	EXTRACFLAGS='-fprofile-instr-use=cfish.profdata' \
 	EXTRALDFLAGS='-fprofile-use ' \
