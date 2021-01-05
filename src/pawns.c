@@ -31,11 +31,11 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Backward      = S( 8, 25);
-static const Score Doubled       = S(10, 55);
-static const Score Isolated      = S( 3, 15);
-static const Score WeakLever     = S( 3, 55);
-static const Score WeakUnopposed = S(13, 25);
+static const Score Backward      = S( 6, 23);
+static const Score Doubled       = S(13, 53);
+static const Score Isolated      = S( 2, 15);
+static const Score WeakLever     = S( 5, 57);
+static const Score WeakUnopposed = S(16, 22);
 
 // Bonus for blocked pawns at 5th or 6th rank
 static const Score BlockedPawn[2] = { S(-15, -3), S(-6, 3) };
@@ -73,7 +73,7 @@ static const Score UnblockedStorm[4][8] = {
 // KingOnFile[semi-open Us][semi-open Them] contains bonuses/penalties
 // for king when the king is on a semi-open or open file.
 static const Score KingOnFile[2][2] = {
-  { S(-19,12), S(-6, 7) }, { S(0, 2), S(6, -5) }
+  { S(-21,10), S(-7, 1) }, { S(0, -3), S(9, -4) }
 };
 
 #undef S
@@ -163,11 +163,11 @@ INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
           && !(theirPawns & adjacent_files_bb(f)))
         score -= Doubled;
       else
-        score -= Isolated + (opposed ? 0 : WeakUnopposed);
+        score -= Isolated + (!opposed ? WeakUnopposed : 0);
     }
 
     else if (backward)
-      score -= Backward + (opposed ? 0 : WeakUnopposed);
+      score -= Backward + (!opposed && ((s+1) & 0x06) ? WeakUnopposed : 0);
 
     if (!support)
       score -=  (doubled ? Doubled : 0)

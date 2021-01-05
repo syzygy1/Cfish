@@ -186,7 +186,7 @@ static void go(Position *pos, char *str)
     else if (strcmp(token, "depth") == 0)
       Limits.depth = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "nodes") == 0)
-      Limits.nodes = atoi(strtok(NULL, " \t"));
+      Limits.nodes = strtoull(strtok(NULL, " \t"), NULL, 10);
     else if (strcmp(token, "movetime") == 0)
       Limits.movetime = atoi(strtok(NULL, " \t"));
     else if (strcmp(token, "mate") == 0)
