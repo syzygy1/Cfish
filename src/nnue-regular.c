@@ -421,6 +421,7 @@ INLINE void affine_propagate(clipped_t *input, int32_t *output,
 
 #else
   for (unsigned i = 0; i < outDims; i++) {
+    unsigned int offset = i * inDims;
     int32_t sum = biases[i];
     for (unsigned j = 0; j < inDims; j++)
       sum += weights[offset + j] * input[j];
