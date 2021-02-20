@@ -368,6 +368,7 @@ ifeq ($(ARCH),apple-silicon)
 	popcnt = yes
 	neon = yes
 	lto = yes
+	numa = no
 endif
 
 ifeq ($(ARCH),ppc-32)
