@@ -70,7 +70,7 @@ void position(Position *pos, char *str)
     for (moves = strtok(moves, " \t"); moves; moves = strtok(NULL, " \t")) {
       Move m = uci_to_move(pos, moves);
       if (!m) break;
-      do_move(pos, m, gives_check(pos, pos->st, m));
+      do_move(pos, m);
       pos->gamePly++;
       // Roll over if we reach 100 plies.
       if (++ply == 100) {

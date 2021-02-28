@@ -211,7 +211,7 @@ PURE bool is_pseudo_legal(const Position *pos, Move m);
 PURE bool gives_check_special(const Position *pos, Stack *st, Move m);
 
 // Doing and undoing moves
-void do_move(Position *pos, Move m, int givesCheck);
+void do_move(Position *pos, Move m);
 void undo_move(Position *pos, Move m);
 void do_null_move(Position *pos);
 INLINE void undo_null_move(Position *pos);

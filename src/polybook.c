@@ -583,7 +583,7 @@ static bool check_do_search(PolyBook *pb, const Position *pos)
 
 static bool check_draw(Position *pos, Move m)
 {
-  do_move(pos, m, gives_check(pos, pos->st, m));
+  do_move(pos, m);
   bool draw = is_draw(pos); // 64
   undo_move(pos, m);
 

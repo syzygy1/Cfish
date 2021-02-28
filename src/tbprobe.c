@@ -1343,7 +1343,7 @@ static int probe_ab(Position *pos, int alpha, int beta, int *success)
     Move move = m->move;
     if (!is_capture(pos, move) || !is_legal(pos, move))
       continue;
-    do_move(pos, move, gives_check(pos, pos->st, move));
+    do_move(pos, move);
     int v = -probe_ab(pos, -beta, -alpha, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -1395,7 +1395,7 @@ int TB_probe_wdl(Position *pos, int *success)
     Move move = m->move;
     if (!is_capture(pos, move) || !is_legal(pos, move))
       continue;
-    do_move(pos, move, gives_check(pos, pos->st, move));
+    do_move(pos, move);
     int v = -probe_ab(pos, -2, -bestCap, success);
     undo_move(pos, move);
     if (*success == 0) return 0;
@@ -1526,7 +1526,7 @@ static Value probe_dtm_loss(Position *pos, int *success)
       continue;
     if (type_of_m(move) == ENPASSANT)
       numEp++;
-    do_move(pos, move, gives_check(pos, pos->st, move));
+    do_move(pos, move);
     v = -probe_dtm_win(pos, success) + 1;
     undo_move(pos, move);
     best = max(best, v);
@@ -1558,7 +1558,7 @@ static Value probe_dtm_win(Position *pos, int *success)
     Move move = m->move;
     if (!is_legal(pos, move))
       continue;
-    do_move(pos, move, gives_check(pos, pos->st, move));
+    do_move(pos, move);
     if (   (ep_square() ? TB_probe_wdl(pos, success)
                         : probe_ab(pos, -1, 0, success)) < 0
         && *success)
@@ -1704,7 +1704,7 @@ int TB_probe_dtz(Position *pos, int *success)
       if (type_of_p(moved_piece(move)) != PAWN || is_capture(pos, move)
                 || !is_legal(pos, move))
         continue;
-      do_move(pos, move, gives_check(pos, pos->st, move));
+      do_move(pos, move);
       int v = -TB_probe_wdl(pos, success);
       undo_move(pos, move);
       if (*success == 0) return 0;
@@ -1749,7 +1749,7 @@ int TB_probe_dtz(Position *pos, int *success)
     if (is_capture(pos, move) || type_of_p(moved_piece(move)) == PAWN
               || !is_legal(pos, move))
       continue;
-    do_move(pos, move, gives_check(pos, pos->st, move));
+    do_move(pos, move);
     int v = -TB_probe_dtz(pos, success);
     if (   v == 1
         && checkers()
@@ -1790,7 +1790,7 @@ bool TB_root_probe_dtz(Position *pos, RootMoves *rm)
   pos->st->endMoves = (pos->st-1)->endMoves;
   for (int i = 0; i < rm->size; i++) {
     RootMove *m = &rm->move[i];
-    do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
+    do_move(pos, m->pv[0]);
 
     // Calculate dtz for the current move counting from the root position.
     if (rule50_count() == 0) {
@@ -1856,7 +1856,7 @@ bool TB_root_probe_wdl(Position *pos, RootMoves *rm)
   pos->st->endMoves = (pos->st-1)->endMoves;
   for (int i = 0; i < rm->size; i++) {
     RootMove *m = &rm->move[i];
-    do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
+    do_move(pos, m->pv[0]);
     v = -TB_probe_wdl(pos, &success);
     undo_move(pos, m->pv[0]);
     if (!success) return false;
@@ -1890,7 +1890,7 @@ bool TB_root_probe_dtm(Position *pos, RootMoves *rm)
       tmpScore[i] = 0;
     else {
       // Probe and adjust mate score by 1 ply.
-      do_move(pos, m->pv[0], gives_check(pos, pos->st, m->pv[0]));
+      do_move(pos, m->pv[0]);
       Value v = -TB_probe_dtm(pos, -wdl, &success);
       tmpScore[i] = wdl > 0 ? v - 1 : v + 1;
       undo_move(pos, m->pv[0]);
@@ -1931,7 +1931,7 @@ void TB_expand_mate(Position *pos, RootMove *move)
     v = v > 0 ? -v - 1 : -v + 1;
     wdl = -wdl;
     pos->st->endMoves = (pos->st-1)->endMoves;
-    do_move(pos, move->pv[i], gives_check(pos, pos->st, move->pv[i]));
+    do_move(pos, move->pv[i]);
   }
 
   // Now try to expand until the actual mate.
@@ -1941,7 +1941,7 @@ void TB_expand_mate(Position *pos, RootMove *move)
       wdl = -wdl;
       pos->st->endMoves = generate_legal(pos, (pos->st-1)->endMoves);
       for (m = (pos->st-1)->endMoves; m < pos->st->endMoves; m++) {
-        do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+    do_move(pos, m->move);
         if (wdl < 0)
           chk = TB_probe_wdl(pos, &success); // verify that m->move wins
         w =  success && (wdl > 0 || chk < 0)
@@ -1953,7 +1953,7 @@ void TB_expand_mate(Position *pos, RootMove *move)
       if (!success || v != w)
         break;
       move->pv[move->pvSize++] = m->move;
-      do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+      do_move(pos, m->move);
     }
 
   // Get back to the root position.
