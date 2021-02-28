@@ -140,6 +140,7 @@ void search_init(void)
 
 
 // search_clear() resets search state to zero, to obtain reproducible results
+// Search clear is done each time a GO command is sent from the gui to clear history stats
 
 void search_clear(void)
 {

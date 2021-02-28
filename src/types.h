@@ -325,12 +325,13 @@ typedef struct MaterialEntry MaterialEntry;
 
 enum { MAX_LPH = 4 };
 
-typedef Move CounterMoveStat[16][64];
-typedef int16_t PieceToHistory[16][64];
+typedef Move CounterMoveStat[16][64];//[colored moved piece type] [move to square]
+typedef int16_t PieceToHistory[16][64];//[cmpt] [mts]
 typedef PieceToHistory CounterMoveHistoryStat[2][2][16][64];
-typedef int16_t ButterflyHistory[2][4096];
-typedef int16_t CapturePieceToHistory[16][64][8];
-typedef int16_t LowPlyHistory[MAX_LPH][4096];
+//[incheck][capture or promotion][cmpt][mts][cmpt][mts]
+typedef int16_t ButterflyHistory[2][4096]; //[color] [from S, to S = move]
+typedef int16_t CapturePieceToHistory[16][64][8]; //[Colored moved piece type] [mts][captured piece type]
+typedef int16_t LowPlyHistory[MAX_LPH][4096];//[depth][from S, to S = move]
 
 struct ExtMove {
   Move move;
