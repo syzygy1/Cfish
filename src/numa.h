@@ -32,7 +32,6 @@ void numa_interleave_memory(void *ptr, size_t size, ULONGLONG mask);
 typedef int NodeMask;
 #define masks_equal(a,b) 1
 #define numa_interleave_memory(a, b, c) do {} while (0)
-#define numa_free(ptr, size) free(ptr)
 #define bind_thread_to_numa_node(a) 0
 
 #endif

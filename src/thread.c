@@ -167,6 +167,16 @@ static void thread_create(int idx)
   Threads.pos[idx]->nativeThread = thread;
 }
 
+static void Gfree(void* ptr,size_t a)
+{
+		#ifdef NUMA
+		if(settings.numaEnabled)
+					return numa_free(ptr,a);
+			else
+					#endif
+						return free(ptr);
+}
+
 
 // thread_destroy() waits for thread termination before returning.
 
@@ -188,33 +198,18 @@ static void thread_destroy(Position *pos)
   CloseHandle(pos->stopEvent);
 #endif
 
-  if (settings.numaEnabled) {
 #ifndef NNUE_PURE
-    numa_free(pos->pawnTable, PAWN_ENTRIES * sizeof(PawnEntry));
-    numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
+    Gfree(pos->pawnTable, PAWN_ENTRIES * sizeof(PawnEntry));
+    Gfree(pos->materialTable, 8192 * sizeof(MaterialEntry));
 #endif
-    numa_free(pos->counterMoves, sizeof(CounterMoveStat));
-    numa_free(pos->mainHistory, sizeof(ButterflyHistory));
-    numa_free(pos->captureHistory, sizeof(CapturePieceToHistory));
-    numa_free(pos->lowPlyHistory, sizeof(LowPlyHistory));
-    numa_free(pos->rootMoves, sizeof(RootMoves));
-    numa_free(pos->stackAllocation, 63 + (MAX_PLY + 110) * sizeof(Stack));
-    numa_free(pos->moveList, 10000 * sizeof(ExtMove));
-    numa_free(pos, sizeof(Position));
-  } else {
-#ifndef NNUE_PURE
-    free(pos->pawnTable);
-    free(pos->materialTable);
-#endif
-    free(pos->counterMoves);
-    free(pos->mainHistory);
-    free(pos->captureHistory);
-    free(pos->lowPlyHistory);
-    free(pos->rootMoves);
-    free(pos->stackAllocation);
-    free(pos->moveList);
-    free(pos);
-  }
+    Gfree(pos->counterMoves, sizeof(CounterMoveStat));
+    Gfree(pos->mainHistory, sizeof(ButterflyHistory));
+    Gfree(pos->captureHistory, sizeof(CapturePieceToHistory));
+    Gfree(pos->lowPlyHistory, sizeof(LowPlyHistory));
+    Gfree(pos->rootMoves, sizeof(RootMoves));
+    Gfree(pos->stackAllocation, 63 + (MAX_PLY + 110) * sizeof(Stack));
+    Gfree(pos->moveList, 10000 * sizeof(ExtMove));
+    Gfree(pos, sizeof(Position));
 }
 
 
