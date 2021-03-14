@@ -272,7 +272,6 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
     if (Pt == BISHOP || Pt == KNIGHT) {
       // Bonus if the piece is on an outpost square or can reach one.
       // Reduced bonus for knights (BadOutpost) if it has few relevant targets.
-      bb = OutpostRanks & ei->attackedBy[Us][PAWN] & ~ei->pe->pawnAttacksSpan[Them];
       bb = OutpostRanks & (ei->attackedBy[Us][PAWN] | shift_bb(Down, pieces_p(PAWN)))
                         & ~ei->pe->pawnAttacksSpan[Them];
       Bitboard targets = pieces_c(Them) & ~pieces_p(PAWN);
