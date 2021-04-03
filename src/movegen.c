@@ -170,21 +170,19 @@ INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
 
 
 INLINE ExtMove *generate_moves(const Position *pos, ExtMove *list,
-    Bitboard target, const Color Us, const int Pt, const bool Checks)
+    Bitboard piecesToMove, Bitboard target, const int Pt, const bool Checks)
 {
   assert(Pt != KING && Pt != PAWN);
 
-  Square from;
+  Bitboard bb = piecesToMove & pieces_p(Pt);
 
-  loop_through_pieces(Us, Pt, from) {
-    if (Checks) {
-      if (    (Pt == BISHOP || Pt == ROOK || Pt == QUEEN)
-          && !(PseudoAttacks[Pt][from] & target & pos->st->checkSquares[Pt]))
-        continue;
+  while (bb) {
+    Square from = pop_lsb(&bb);
 
-      if (blockers_for_king(pos, !Us) & sq_bb(from))
-        continue;
-    }
+    if (   Checks
+	&& (Pt == BISHOP || Pt == ROOK || Pt == QUEEN)
+        && !(PseudoAttacks[Pt][from] & target & pos->st->checkSquares[Pt]))
+      continue;
 
     Bitboard b = attacks_from(Pt, from) & target;
 
@@ -206,11 +204,16 @@ INLINE ExtMove *generate_all(const Position *pos, ExtMove *list,
   const int OOO = make_castling_right(Us, QUEEN_SIDE);
   const bool Checks = Type == QUIET_CHECKS;
 
+  Bitboard piecesToMove = pieces_c(Us);
+
+  if (Type == QUIET_CHECKS)
+    piecesToMove &= ~blockers_for_king(pos, !Us);
+
   list = generate_pawn_moves(pos, list, target, Us, Type);
-  list = generate_moves(pos, list, target, Us, KNIGHT, Checks);
-  list = generate_moves(pos, list, target, Us, BISHOP, Checks);
-  list = generate_moves(pos, list, target, Us, ROOK  , Checks);
-  list = generate_moves(pos, list, target, Us, QUEEN , Checks);
+  list = generate_moves(pos, list, piecesToMove, target, KNIGHT, Checks);
+  list = generate_moves(pos, list, piecesToMove, target, BISHOP, Checks);
+  list = generate_moves(pos, list, piecesToMove, target, ROOK  , Checks);
+  list = generate_moves(pos, list, piecesToMove, target, QUEEN , Checks);
 
   if (Type != QUIET_CHECKS && Type != EVASIONS) {
     Square ksq = square_of(Us, KING);
