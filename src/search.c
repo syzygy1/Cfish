@@ -1120,9 +1120,21 @@ moves_loop: // When in check search starts from here.
       // Reduced depth of the next LMR search
       int lmrDepth = max(newDepth - reduction(improving, depth, moveCount), 0);
 
-      if (   !captureOrPromotion
-          && !givesCheck)
+      if (   captureOrPromotion
+          || givesCheck)
       {
+        // Capture history based pruning when the move doesn't give check
+        if (   !givesCheck
+            && lmrDepth < 1
+            && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(piece_on(to_sq(move)))] < 0)
+          continue;
+
+        // SEE based pruning
+        if (!see_test(pos, move, -218 * depth))
+          continue;
+
+      } else {
+
         // Countermoves based pruning
         if (   lmrDepth < 4 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
@@ -1142,17 +1154,6 @@ moves_loop: // When in check search starts from here.
         // Prune moves with negative SEE at low depths and below a decreasing
         // threshold at higher depths.
         if (!see_test(pos, move, -(30 - min(lmrDepth, 18)) * lmrDepth * lmrDepth))
-          continue;
-
-      } else {
-        // Capture history based pruning when the move doesn't give check
-        if (   !givesCheck
-            && lmrDepth < 1
-            && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(piece_on(to_sq(move)))] < 0)
-          continue;
-
-        // SEE based pruning
-        if (!see_test(pos, move, -218 * depth))
           continue;
       }
     }
