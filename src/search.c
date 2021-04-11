@@ -1227,7 +1227,7 @@ moves_loop: // When in check search starts from here.
 
     // Check extension
     else if (    givesCheck
-             && (is_discovery_check_on_king(pos, !stm(), move) || see_test(pos, move, 0)))
+             && (is_discovered_check_on_king(pos, !stm(), move) || see_test(pos, move, 0)))
       extension = 1;
 
     // Last capture extension
@@ -1292,7 +1292,14 @@ moves_loop: // When in check search starts from here.
       if (singularQuietLMR)
         r--;
 
-      if (!captureOrPromotion) {
+      if (captureOrPromotion) {
+        // Unless giving check, this capture is likely bad
+        if (   !givesCheck
+            && ss->staticEval + PieceValue[EG][captured_piece()] + 210 * depth <= alpha)
+          r++;
+
+      } else {
+
         // Increase reduction if ttMove is a capture
         if (ttCapture)
           r++;
@@ -1326,14 +1333,11 @@ moves_loop: // When in check search starts from here.
           r++;
 
         // Decrease/increase reduction for moves with a good/bad history.
-        r -= ss->statScore / 14884;
-
-      } else {
-
-        // Unless giving check, this capture is likely bad
-        if (   !givesCheck
-            && ss->staticEval + PieceValue[EG][captured_piece()] + 210 * depth <= alpha)
-          r++;
+        if (inCheck)
+          r -= (  (*pos->mainHistory)[!stm()][from_to(move)]
+                + (*cmh)[movedPiece][to_sq(move)] - 4333) / 16384;
+        else
+          r -= ss->statScore / 14884;
       }
 
       Depth d = clamp(newDepth - r, 1, newDepth);

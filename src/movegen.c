@@ -87,7 +87,7 @@ INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
 
       // Add pawn pushes which give discovered check. This is possible only
       // if the pawn is not on the same file as the enemy king, because we
-      // don't generate captures. Note that a possible discovery check
+      // don't generate captures. Note that a possible discovered check
       // promotion has been already generated amongst the captures.
       Bitboard dcCandidatesQuiets = blockers_for_king(pos, Them) & pawnsNotOn7;
       if (dcCandidatesQuiets) {
@@ -152,8 +152,8 @@ INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
 
       // An en passant capture can be an evasion only if the checking piece
       // is the double pushed pawn and so is in the target. Otherwise this
-      // is a discovery check and we are forced to do otherwise.
-      if (Type == EVASIONS && !(target & sq_bb(ep_square() - Up)))
+      // is a discovered check and we are forced to do otherwise.
+      if (Type == EVASIONS && (target & sq_bb(ep_square() + Up)))
         return list;
 
       b1 = pawnsNotOn7 & attacks_from_pawn(ep_square(), Them);

@@ -285,7 +285,7 @@ INLINE Bitboard blockers_for_king(const Position *pos, Color c)
   return pos->st->blockersForKing[c];
 }
 
-INLINE bool is_discovery_check_on_king(const Position *pos, Color c, Move m)
+INLINE bool is_discovered_check_on_king(const Position *pos, Color c, Move m)
 {
   return pos->st->blockersForKing[c] & sq_bb(from_sq(m));
 }
