@@ -759,10 +759,10 @@ bool gives_check_special(const Position *pos, Stack *st, Move m)
 
 // do_move() makes a move. The move is assumed to be legal.
 
-void do_move(Position *pos, Move m, int givesCheck)
+void do_move(Position *pos, Move m)
 {
   assert(move_is_ok(m));
-
+  int givesCheck = gives_check(pos, pos->st, m);
   Key key = key() ^ zob.side;
 
   // Copy some fields of the old state to our new Stack object except the

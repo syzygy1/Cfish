@@ -140,6 +140,7 @@ void search_init(void)
 
 
 // search_clear() resets search state to zero, to obtain reproducible results
+// Search clear is done each time a GO command is sent from the gui to clear history stats
 
 void search_clear(void)
 {
@@ -193,7 +194,7 @@ INLINE uint64_t perft_node(Position *pos, Depth depth, const bool Root)
       cnt = 1;
       nodes++;
     } else {
-      do_move(pos, m->move, gives_check(pos, pos->st, m->move));
+      do_move(pos, m->move);
       cnt = leaf ? (uint64_t)(generate_legal(pos, last) - last)
                  : perft_helper(pos, depth - 1);
       nodes += cnt;
@@ -999,7 +1000,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
         ss->currentMove = move;
         ss->history = &(*pos->counterMoveHistory)[inCheck][captureOrPromotion][moved_piece(move)][to_sq(move)];
         givesCheck = gives_check(pos, ss, move);
-        do_move(pos, move, givesCheck);
+        do_move(pos, move);
 
         // Perform a preliminary qsearch to verify that the move holds
         value =   givesCheck
@@ -1247,7 +1248,7 @@ moves_loop: // When in check search starts from here.
     ss->history = &(*pos->counterMoveHistory)[inCheck][captureOrPromotion][movedPiece][to_sq(move)];
 
     // Step 14. Make the move.
-    do_move(pos, move, givesCheck);
+    do_move(pos, move);
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
@@ -1694,7 +1695,7 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
       continue;
 
     // Make and search the move
-    do_move(pos, move, givesCheck);
+    do_move(pos, move);
     value = PvNode ? givesCheck
                      ? -qsearch_PV_true(pos, ss+1, -beta, -alpha, depth - 1)
                      : -qsearch_PV_false(pos, ss+1, -beta, -alpha, depth - 1)
@@ -2026,7 +2027,7 @@ static int extract_ponder_from_tt(RootMove *rm, Position *pos)
   if (!rm->pv[0])
     return 0;
 
-  do_move(pos, rm->pv[0], gives_check(pos, pos->st, rm->pv[0]));
+  do_move(pos, rm->pv[0]);
   TTEntry *tte = tt_probe(key(), &ttHit);
 
   if (ttHit) {

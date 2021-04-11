@@ -46,6 +46,16 @@ MainThread mainThread;
 CounterMoveHistoryStat **cmhTables = NULL;
 int numCmhTables = 0;
 
+static void* Galloc(size_t a)
+{
+	#ifdef NUMA
+	if(settings.numaEnabled)
+		return numa_alloc(a);
+	else
+	#endif
+		return calloc(a,1);
+}
+
 // thread_init() is where a search thread starts and initialises itself.
 
 static THREAD_FUNC thread_init(void *arg)
@@ -72,10 +82,7 @@ static THREAD_FUNC thread_init(void *arg)
       cmhTables[old++] = NULL;
   }
   if (!cmhTables[t]) {
-    if (settings.numaEnabled)
-      cmhTables[t] = numa_alloc(sizeof(CounterMoveHistoryStat));
-    else
-      cmhTables[t] = calloc(sizeof(CounterMoveHistoryStat), 1);
+      cmhTables[t] = Galloc(sizeof(CounterMoveHistoryStat));
     for (int chk = 0; chk < 2; chk++)
       for (int c = 0; c < 2; c++)
         for (int j = 0; j < 16; j++)
@@ -85,33 +92,20 @@ static THREAD_FUNC thread_init(void *arg)
 
   Position *pos;
 
-  if (settings.numaEnabled) {
-    pos = numa_alloc(sizeof(Position));
+    pos = Galloc(sizeof(Position));
 #ifndef NNUE_PURE
-    pos->pawnTable = numa_alloc(PAWN_ENTRIES * sizeof(PawnEntry));
-    pos->materialTable = numa_alloc(8192 * sizeof(MaterialEntry));
+    pos->pawnTable = Galloc(PAWN_ENTRIES * sizeof(PawnEntry));
+    pos->materialTable = Galloc(8192 * sizeof(MaterialEntry));
 #endif
-    pos->counterMoves = numa_alloc(sizeof(CounterMoveStat));
-    pos->mainHistory = numa_alloc(sizeof(ButterflyHistory));
-    pos->captureHistory = numa_alloc(sizeof(CapturePieceToHistory));
-    pos->lowPlyHistory = numa_alloc(sizeof(LowPlyHistory));
-    pos->rootMoves = numa_alloc(sizeof(RootMoves));
-    pos->stackAllocation = numa_alloc(63 + (MAX_PLY + 110) * sizeof(Stack));
-    pos->moveList = numa_alloc(10000 * sizeof(ExtMove));
-  } else {
-    pos = calloc(sizeof(Position), 1);
-#ifndef NNUE_PURE
-    pos->pawnTable = calloc(PAWN_ENTRIES * sizeof(PawnEntry), 1);
-    pos->materialTable = calloc(8192 * sizeof(MaterialEntry), 1);
-#endif
-    pos->counterMoves = calloc(sizeof(CounterMoveStat), 1);
-    pos->mainHistory = calloc(sizeof(ButterflyHistory), 1);
-    pos->captureHistory = calloc(sizeof(CapturePieceToHistory), 1);
-    pos->lowPlyHistory = calloc(sizeof(LowPlyHistory), 1);
-    pos->rootMoves = calloc(sizeof(RootMoves), 1);
-    pos->stackAllocation = calloc(63 + (MAX_PLY + 110) * sizeof(Stack), 1);
-    pos->moveList = calloc(10000 * sizeof(ExtMove), 1);
-  }
+    pos->counterMoves = Galloc(sizeof(CounterMoveStat));
+    pos->mainHistory = Galloc(sizeof(ButterflyHistory));
+    pos->captureHistory = Galloc(sizeof(CapturePieceToHistory));
+    pos->lowPlyHistory = Galloc(sizeof(LowPlyHistory));
+    pos->rootMoves = Galloc(sizeof(RootMoves));
+    pos->stackAllocation = Galloc(63 + (MAX_PLY + 110) * sizeof(Stack));
+    pos->moveList = Galloc(10000 * sizeof(ExtMove));
+  
+
   pos->stack = (Stack *)(((uintptr_t)pos->stackAllocation + 0x3f) & ~0x3f);
   pos->threadIdx = idx;
   pos->counterMoveHistory = cmhTables[t];
@@ -173,6 +167,16 @@ static void thread_create(int idx)
   Threads.pos[idx]->nativeThread = thread;
 }
 
+static void Gfree(void* ptr,size_t a)
+{
+		#ifdef NUMA
+		if(settings.numaEnabled)
+					return numa_free(ptr,a);
+			else
+					#endif
+						return free(ptr);
+}
+
 
 // thread_destroy() waits for thread termination before returning.
 
@@ -194,33 +198,18 @@ static void thread_destroy(Position *pos)
   CloseHandle(pos->stopEvent);
 #endif
 
-  if (settings.numaEnabled) {
 #ifndef NNUE_PURE
-    numa_free(pos->pawnTable, PAWN_ENTRIES * sizeof(PawnEntry));
-    numa_free(pos->materialTable, 8192 * sizeof(MaterialEntry));
+    Gfree(pos->pawnTable, PAWN_ENTRIES * sizeof(PawnEntry));
+    Gfree(pos->materialTable, 8192 * sizeof(MaterialEntry));
 #endif
-    numa_free(pos->counterMoves, sizeof(CounterMoveStat));
-    numa_free(pos->mainHistory, sizeof(ButterflyHistory));
-    numa_free(pos->captureHistory, sizeof(CapturePieceToHistory));
-    numa_free(pos->lowPlyHistory, sizeof(LowPlyHistory));
-    numa_free(pos->rootMoves, sizeof(RootMoves));
-    numa_free(pos->stackAllocation, 63 + (MAX_PLY + 110) * sizeof(Stack));
-    numa_free(pos->moveList, 10000 * sizeof(ExtMove));
-    numa_free(pos, sizeof(Position));
-  } else {
-#ifndef NNUE_PURE
-    free(pos->pawnTable);
-    free(pos->materialTable);
-#endif
-    free(pos->counterMoves);
-    free(pos->mainHistory);
-    free(pos->captureHistory);
-    free(pos->lowPlyHistory);
-    free(pos->rootMoves);
-    free(pos->stackAllocation);
-    free(pos->moveList);
-    free(pos);
-  }
+    Gfree(pos->counterMoves, sizeof(CounterMoveStat));
+    Gfree(pos->mainHistory, sizeof(ButterflyHistory));
+    Gfree(pos->captureHistory, sizeof(CapturePieceToHistory));
+    Gfree(pos->lowPlyHistory, sizeof(LowPlyHistory));
+    Gfree(pos->rootMoves, sizeof(RootMoves));
+    Gfree(pos->stackAllocation, 63 + (MAX_PLY + 110) * sizeof(Stack));
+    Gfree(pos->moveList, 10000 * sizeof(ExtMove));
+    Gfree(pos, sizeof(Position));
 }
 
 
