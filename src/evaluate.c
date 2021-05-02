@@ -123,7 +123,7 @@ static const Score MobilityBonus[4][32] = {
 // BishopsPawns[distance from edge] contains a file-dependent penalty for
 // pawns on squares of the same color as our bishop.
 static const Score BishopPawns[8] = {
-  S(3, 8), S(3, 9), S(1, 8), S(3, 7), S(3, 7), S(1, 8), S(3, 9), S(3, 8)
+  S(3, 8), S(3, 9), S(2, 8), S(3, 8), S(3, 8), S(2, 8), S(3, 9), S(3, 8)
 };
 
 static const Score RookOnClosedFile = S(10, 5);
@@ -155,17 +155,16 @@ static const Score PassedFile[8] = {
 };
 
 // Assorted bonuses and penalties used by evaluation
-static const Score BadOutpost          = S( -7, 36);
 static const Score BishopKingProtector = S(  6,  9);
 static const Score BishopOnKingRing    = S( 24,  0);
-static const Score BishopOutpost       = S( 31, 23);
+static const Score BishopOutpost       = S( 31, 24);
 static const Score BishopXRayPawns     = S(  4,  5);
 static const Score CorneredBishop      = S( 50, 50);
 static const Score FlankAttacks        = S(  8,  0);
 static const Score Hanging             = S( 69, 36);
 static const Score KnightKingProtector = S(  8,  9);
 static const Score KnightOnQueen       = S( 16, 11);
-static const Score KnightOutpost       = S( 56, 34);
+static const Score KnightOutpost       = S( 57, 38);
 static const Score LongDiagonalBishop  = S( 45,  0);
 static const Score MinorBehindPawn     = S( 18,  3);
 static const Score PawnlessFlank       = S( 17, 95);
@@ -177,6 +176,7 @@ static const Score ThreatByKing        = S( 24, 89);
 static const Score ThreatByPawnPush    = S( 48, 39);
 static const Score ThreatBySafePawn    = S(173, 94);
 static const Score TrappedRook         = S( 55, 13);
+static const Score UncontestedOutpost  = S(  1, 10);
 static const Score WeakQueen           = S( 56, 15);
 static const Score WeakQueenProtection = S( 14,  0);
 
@@ -271,7 +271,7 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
 
     if (Pt == BISHOP || Pt == KNIGHT) {
       // Bonus if the piece is on an outpost square or can reach one.
-      // Reduced bonus for knights (BadOutpost) if it has few relevant targets.
+      // Bonus for knights (UncontestedOutpost) if few relevant targets.
       bb = OutpostRanks & (ei->attackedBy[Us][PAWN] | shift_bb(Down, pieces_p(PAWN)))
                         & ~ei->pe->pawnAttacksSpan[Them];
       Bitboard targets = pieces_c(Them) & ~pieces_p(PAWN);
@@ -279,7 +279,7 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
           && (bb & sq_bb(s) & ~CenterFiles) // on a side outpost
           && !(b & targets)                 // no relevant attacks
           && (!more_than_one(targets & (sq_bb(s) & QueenSide ? QueenSide : KingSide))))
-        score += BadOutpost;
+        score += UncontestedOutpost * popcount(pieces_p(PAWN) & (sq_bb(s) & QueenSide ? QueenSide : KingSide));
       else if (bb & sq_bb(s))
         score += Pt == KNIGHT ? KnightOutpost : BishopOutpost;
 
