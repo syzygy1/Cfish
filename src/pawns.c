@@ -33,6 +33,7 @@
 // Pawn penalties
 static const Score Backward      = S( 6, 23);
 static const Score Doubled       = S(13, 53);
+static const Score DoubledEarly  = S(20, 10);
 static const Score Isolated      = S( 2, 15);
 static const Score WeakLever     = S( 5, 57);
 static const Score WeakUnopposed = S(16, 22);
@@ -83,6 +84,7 @@ INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
 {
   const Color Them  = Us == WHITE ? BLACK : WHITE;
   const int   Up    = Us == WHITE ? NORTH : SOUTH;
+  const int   Down  = Us == WHITE ? SOUTH : NORTH;
 
   Bitboard neighbours, stoppers, doubled, support, phalanx, opposed;
   Bitboard lever, leverPush, blocked;
@@ -122,6 +124,12 @@ INLINE Score pawn_evaluate(const Position *pos, PawnEntry *e, const Color Us)
     neighbours = ourPawns   & adjacent_files_bb(f);
     phalanx    = neighbours & rank_bb_s(s);
     support    = neighbours & rank_bb_s(s - Up);
+
+    if (doubled) {
+      // Additional doubled penalty if none of their pawns is fixed
+      if (!(ourPawns & shift_bb(Down, theirPawns | pawn_attacks_bb(theirPawns, Them))))
+        score -= DoubledEarly;
+    }
 
     // A pawn is backward when it is behind all pawns of the same color on
     // the adjacent files and cannot safely advance.

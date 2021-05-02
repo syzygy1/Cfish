@@ -265,7 +265,8 @@ PURE bool has_game_cycle(const Position *pos, int ply);
 #define captured_piece() (pos->st->capturedPiece)
 
 // Accessing hash keys
-#define key() (pos->st->key)
+#define raw_key() (pos->st->key)
+#define key() (pos->st->rule50 < 14 ? pos->st->key : pos->st->key ^ make_key((pos->st->rule50 - 14) / 8))
 #define material_key() (pos->st->materialKey)
 #define pawn_key() (pos->st->pawnKey)
 

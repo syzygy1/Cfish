@@ -763,7 +763,7 @@ void do_move(Position *pos, Move m, int givesCheck)
 {
   assert(move_is_ok(m));
 
-  Key key = key() ^ zob.side;
+  Key key = pos->st->key ^ zob.side;
 
   // Copy some fields of the old state to our new Stack object except the
   // ones which are going to be recalculated from scratch anyway and then
@@ -1113,7 +1113,7 @@ Key key_after(const Position *pos, Move m)
   Square to = to_sq(m);
   Piece pc = piece_on(from);
   Piece captured = piece_on(to);
-  Key k = key() ^ zob.side;
+  Key k = pos->st->key ^ zob.side;
 
   if (captured)
     k ^= zob.psq[captured][to];

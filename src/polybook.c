@@ -566,7 +566,7 @@ static bool check_do_search(PolyBook *pb, const Position *pos)
                     || pb->akt_position == pb->last_position
                     || pb->akt_anz_pieces > pb->last_anz_pieces
                     || pb->akt_anz_pieces < pb->last_anz_pieces - 2
-                    || key() == 0xB4D30CD15A43432D;
+                    || raw_key() == 0xB4D30CD15A43432D;
 
   // Reset do_search and book depth counter if postion changed more
   // than one move can do or in initial position
