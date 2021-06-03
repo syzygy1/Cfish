@@ -515,9 +515,7 @@ bool is_legal(const Position *pos, Move m)
 
     // For Chess960, verify that moving the castling rook does not discover
     // some hidden checker, e.g. on SQ_A1 when castling rook is on SQ_B1.
-    return   !is_chess960()
-          || !(attacks_bb_rook(to, pieces() ^ sq_bb(to_sq(m)))
-               & pieces_cpp(!us, ROOK, QUEEN));
+    return !is_chess960() || !(blockers_for_king(pos, us) & sq_bb(to_sq(m)));
   }
 
   // If the moving piece is a king, check whether the destination
@@ -622,7 +620,7 @@ bool is_pseudo_legal(const Position *pos, Move m)
     ExtMove list[MAX_MOVES];
     ExtMove *end = generate_quiets(pos, list);
     for (ExtMove *p = list; p < end; p++)
-      if (p->move == m) return is_legal(pos, m);
+      if (p->move == m) return true;
     return false;
   }
 

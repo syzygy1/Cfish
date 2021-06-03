@@ -353,8 +353,9 @@ NOINLINE ExtMove *generate_legal(const Position *pos, ExtMove *list)
   list = checkers() ? generate_evasions(pos, list)
                     : generate_non_evasions(pos, list);
   while (cur != list)
-    if (   (pinned || from_sq(cur->move) == ksq
-                   || type_of_m(cur->move) == ENPASSANT)
+    if (  (  (pinned && pinned & sq_bb(from_sq(cur->move)))
+           || from_sq(cur->move) == ksq
+           || type_of_m(cur->move) == ENPASSANT)
         && !is_legal(pos, cur->move))
       cur->move = (--list)->move;
     else
