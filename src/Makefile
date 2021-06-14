@@ -464,7 +464,9 @@ ifeq ($(COMP),clang)
 
 	ifneq ($(KERNEL),Darwin)
 	ifneq ($(KERNEL),OpenBSD)
+	ifneq ($(KERNEL),FreeBSD)
 		LDFLAGS += -latomic
+	endif
 	endif
 	endif
 
@@ -579,6 +581,10 @@ ifeq ($(optimize),yes)
 		ifeq ($(KERNEL),Darwin)
 			CFLAGS += -mdynamic-no-pic
 		endif
+	endif
+
+	ifeq ($(comp),clang)
+		CFLAGS += -fexperimental-new-pass-manager
 	endif
 endif
 

@@ -31,22 +31,22 @@
 #define S(mg, eg) make_score(mg, eg)
 
 // Pawn penalties
-static const Score Backward      = S( 6, 23);
-static const Score Doubled       = S(13, 53);
-static const Score DoubledEarly  = S(20, 10);
-static const Score Isolated      = S( 2, 15);
-static const Score WeakLever     = S( 5, 57);
-static const Score WeakUnopposed = S(16, 22);
+static const Score Backward      = S( 9, 22);
+static const Score Doubled       = S(13, 51);
+static const Score DoubledEarly  = S(20,  7);
+static const Score Isolated      = S( 3, 15);
+static const Score WeakLever     = S( 4, 58);
+static const Score WeakUnopposed = S(13, 24);
 
 // Bonus for blocked pawns at 5th or 6th rank
-static const Score BlockedPawn[2] = { S(-15, -3), S(-6, 3) };
+static const Score BlockedPawn[2] = { S(-17, -6), S(-9, 2) };
 
 static const Score BlockedStorm[8] = {
   S(0, 0), S(0, 0), S(75, 78), S(-8, 16), S(-6, 10), S(-6, 6), S(0,2)
 };
 
 // Connected pawn bonus
-static const int Connected[8] = { 0, 5, 7, 11, 24, 48, 86 };
+static const int Connected[8] = { 0, 5, 7, 11, 23, 48, 87 };
 
 #undef V
 #define V(mg) S(mg,0)

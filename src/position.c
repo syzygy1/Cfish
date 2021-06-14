@@ -269,6 +269,8 @@ void pos_set(Position *pos, char *fen, int isChess960)
   {
     st->epSquare = make_square(col - 'a', row - '1');
 
+    // We assume a legal FEN, i.e. if epSquare is present, then the previous
+    // move was a legal double pawn push.
     if (!(attackers_to(st->epSquare) & pieces_cp(stm(), PAWN)))
       st->epSquare = 0;
   }

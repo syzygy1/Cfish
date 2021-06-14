@@ -75,7 +75,7 @@ INLINE int futility_move_count(bool improving, Depth depth)
 static Value stat_bonus(Depth depth)
 {
   int d = depth;
-  return d > 14 ? 29 : 8 * d * d + 224 * d - 215;
+  return d > 14 ? 66 : 6 * d * d + 231 * d - 206;
 }
 
 // Add a small random component to draw evaluations to keep search dynamic
@@ -916,10 +916,10 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   // Step 8. Null move search with verification search (is omitted in PV nodes)
   if (   !PvNode
       && (ss-1)->currentMove != MOVE_NULL
-      && (ss-1)->statScore < 22977
+      && (ss-1)->statScore < 22661
       && eval >= beta
       && eval >= ss->staticEval
-      && ss->staticEval >= beta - 30 * depth - 28 * improving + 84 * ss->ttPv + 168
+      && ss->staticEval >= beta - 24 * depth - 34 * improving + 162 * ss->ttPv + 159
       && !excludedMove
       && non_pawn_material_c(stm())
       && (ss->ply >= pos->nmpMinPly || stm() != pos->nmpColor))
@@ -927,7 +927,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     assert(eval - beta >= 0);
 
     // Null move dynamic reduction based on depth and value
-    Depth R = (1015 + 85 * depth) / 256 + min((eval - beta) / 191, 3);
+    Depth R = (1062 + 68 * depth) / 256 + min((eval - beta) / 190, 3);
 
     ss->currentMove = MOVE_NULL;
     ss->history = &(*pos->counterMoveHistory)[0][0][0][0];
@@ -961,7 +961,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
     }
   }
 
-  probCutBeta = beta + 194 - 49 * improving;
+  probCutBeta = beta + 209 - 44 * improving;
 
   // Step 9. ProbCut
   // If we have a good enough capture and a reduced search returns a value
@@ -1106,6 +1106,15 @@ moves_loop: // When in check search starts from here.
 
     givesCheck = gives_check(pos, ss, move);
 
+    // Indicate PvNodes that will probably fail low if node was searched with
+    // non-PV search at depth equal to or greater than current depth and the
+    // result of the search was far below alpha
+    bool likelyFailLow =   PvNode
+                        && ttMove
+                        && (tte_bound(tte) & BOUND_UPPER)
+                        && ttValue < alpha + 200 + 100 * depth
+                        && tte_depth(tte) >= depth;
+
     // Calculate new depth for this move
     newDepth = depth - 1;
 
@@ -1144,11 +1153,11 @@ moves_loop: // When in check search starts from here.
         // Futility pruning: parent node
         if (   lmrDepth < 7
             && !inCheck
-            && ss->staticEval + 254 + 159 * lmrDepth <= alpha
+            && ss->staticEval + 174 + 157 * lmrDepth <= alpha
             &&  (*cmh )[movedPiece][to_sq(move)]
               + (*fmh )[movedPiece][to_sq(move)]
               + (*fmh2)[movedPiece][to_sq(move)]
-              + (*fmh3)[movedPiece][to_sq(move)] / 2 < 26394)
+              + (*fmh3)[movedPiece][to_sq(move)] / 3 < 26237)
           continue;
 
         // Prune moves with negative SEE at low depths and below a decreasing
@@ -1272,8 +1281,9 @@ moves_loop: // When in check search starts from here.
       if (marked)
         r++;
 
-      // Decrease reduction if position is or has been on the PV
-      if (ss->ttPv)
+      // Decrease reduction if position is or has been on the PV and the node
+      // is not likely to fail low
+      if (ss->ttPv && !likelyFailLow)
         r -= 2;
 
       // Increase reduction at root and non-PV nodes when the best move
@@ -1323,21 +1333,21 @@ moves_loop: // When in check search starts from here.
                        + (*fmh )[movedPiece][to_sq(move)]
                        + (*fmh2)[movedPiece][to_sq(move)]
                        + (*pos->mainHistory)[!stm()][from_to(move)]
-                       - 5287;
+                       - 5337;
 
         // Decrease/increase reduction by comparing with opponent's stat score.
-        if (ss->statScore >= -105 && (ss-1)->statScore < -103)
+        if (ss->statScore >= -89 && (ss-1)->statScore < -116)
           r--;
 
-        else if ((ss-1)->statScore >= -122 && ss->statScore < -129)
+        else if ((ss-1)->statScore >= -112 && ss->statScore < -100)
           r++;
 
         // Decrease/increase reduction for moves with a good/bad history.
         if (inCheck)
           r -= (  (*pos->mainHistory)[!stm()][from_to(move)]
-                + (*cmh)[movedPiece][to_sq(move)] - 4333) / 16384;
+                + (*cmh)[movedPiece][to_sq(move)] - 4341) / 16384;
         else
-          r -= ss->statScore / 14884;
+          r -= ss->statScore / 14382;
       }
 
       Depth d = clamp(newDepth - r, 1, newDepth);
@@ -1470,7 +1480,9 @@ moves_loop: // When in check search starts from here.
   else if (bestMove) {
     // Quiet best move: update move sorting heuristics
     if (!is_capture_or_promotion(pos, bestMove)) {
-      int bonus = stat_bonus(depth + (bestValue > beta + PawnValueMg));
+      int bonus =  bestValue > beta + PawnValueMg
+                 ? stat_bonus(depth + 1)
+                 : min(stat_bonus(depth+1), stat_bonus(depth));
       update_quiet_stats(pos, ss, bestMove, bonus, depth);
 
       // Decrease all the other played quiet moves
@@ -1488,8 +1500,7 @@ moves_loop: // When in check search starts from here.
     // killer move in previous ply when it gets refuted
     if (  ((ss-1)->moveCount == 1 + (ss-1)->ttHit || (ss-1)->currentMove == (ss-1)->killers[0])
         && !captured_piece())
-      update_cm_stats(ss-1, piece_on(prevSq), prevSq,
-          -stat_bonus(depth + 1));
+      update_cm_stats(ss-1, piece_on(prevSq), prevSq, -stat_bonus(depth + 1));
   }
   // Bonus for prior countermove that caused the fail low
   else if (   (depth >= 3 || PvNode)
@@ -2082,8 +2093,7 @@ static void TB_rank_root_moves(Position *pos, RootMoves *rm)
     // Sort moves according to TB rank.
     stable_sort(rm->move, rm->size);
 
-    // Only probe during search if DTM and DTZ are not available
-    // and we are winning.
+    // Probe during search only if DTM and DTZ are not available and winning.
     if (dtm_available || dtz_available || rm->move[0].tbRank <= 0)
       TB_Cardinality = 0;
   }
