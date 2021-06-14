@@ -65,7 +65,7 @@ INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
   Bitboard pawnsOn7    = pieces_cp(Us, PAWN) &  TRank7BB;
   Bitboard pawnsNotOn7 = pieces_cp(Us, PAWN) & ~TRank7BB;
 
-  Bitboard enemies =  Type == EVASIONS ? pieces_c(Them) & target
+  Bitboard enemies =  Type == EVASIONS ? checkers()
                     : Type == CAPTURES ? target : pieces_c(Them);
 
   // Single and double pawn pushes, no promotions
@@ -335,7 +335,7 @@ NOINLINE ExtMove *generate_evasions(const Position *pos, ExtMove *list)
 
   // Generate blocking evasions or captures of the checking piece
   Square checksq = lsb(checkers());
-  Bitboard target = between_bb(ksq, checksq) | sq_bb(checksq);
+  Bitboard target = between_bb(ksq, checksq) | checkers();
 
   return us == WHITE ? generate_all(pos, list, target, WHITE, EVASIONS)
                      : generate_all(pos, list, target, BLACK, EVASIONS);

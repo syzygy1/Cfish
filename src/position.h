@@ -91,6 +91,7 @@ struct Stack {
   Value staticEval;
   Value statScore;
   int moveCount;
+  int distanceFromPv;
   bool ttPv;
   bool ttHit;
   uint8_t ply;
@@ -294,12 +295,6 @@ INLINE bool is_discovered_check_on_king(const Position *pos, Color c, Move m)
 INLINE bool pawn_passed(const Position *pos, Color c, Square s)
 {
   return !(pieces_cp(!c, PAWN) & passed_pawn_span(c, s));
-}
-
-INLINE bool advanced_pawn_push(const Position *pos, Move m)
-{
-  return   type_of_p(moved_piece(m)) == PAWN
-        && relative_rank_s(stm(), from_sq(m)) > RANK_4;
 }
 
 INLINE bool opposite_bishops(const Position *pos)

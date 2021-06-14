@@ -701,6 +701,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   moveCount = captureCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
   maxValue = VALUE_INFINITE;
+  if (PvNode) ss->distanceFromPv = 0;
 
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
@@ -1275,8 +1276,13 @@ moves_loop: // When in check search starts from here
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
-    // Step 16. Reduced depth search (LMR). If the move fails high it will be
-    // re-searched at full depth.
+    (ss+1)->distanceFromPv = ss->distanceFromPv + moveCount - 1;
+
+    // Step 16. Late moves reduction / extension (LMR)
+    // We use various heuristics for the children of a node after the first
+    // child has been searched. In general we would like to reduce them, but
+    // there are many cases where we extend a child if it has good chances
+    // to be "interesting".
     if (    depth >= 3
         &&  moveCount > 1 + 2 * rootNode
         && (   !captureOrPromotion
@@ -1365,11 +1371,11 @@ moves_loop: // When in check search starts from here
           r -= ss->statScore / 14790;
       }
 
-      Depth d = clamp(newDepth - r, 1, newDepth);
+      Depth d = clamp(newDepth - r, 1, newDepth + ((ss+1)->distanceFromPv <= 4));
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 
-      doFullDepthSearch = (value > alpha && d != newDepth);
+      doFullDepthSearch = value > alpha && d < newDepth;
       didLMR = true;
     } else {
       doFullDepthSearch = !PvNode || moveCount > 1;
@@ -1668,14 +1674,12 @@ INLINE Value qsearch_node(Position *pos, Stack *ss, Value alpha, Value beta,
 
     moveCount++;
 
-    // Futility pruning
+    // Futility pruning and moveCount pruning
     if (    bestValue > VALUE_TB_LOSS_IN_MAX_PLY
         && !givesCheck
         &&  futilityBase > -VALUE_KNOWN_WIN
-        && !advanced_pawn_push(pos, move))
+        && type_of_m(move) != PROMOTION)
     {
-      assert(type_of_m(move) != ENPASSANT); // Due to !advanced_pawn_push
-
       if (moveCount > 2)
         continue;
 
