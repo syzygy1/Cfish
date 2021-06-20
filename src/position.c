@@ -436,10 +436,11 @@ void pos_fen(const Position *pos, char *str)
 Bitboard slider_blockers(const Position *pos, Bitboard sliders, Square s,
     Bitboard *pinners)
 {
-  Bitboard result = 0, snipers;
+  Bitboard blockers = 0, snipers;
   *pinners = 0;
 
-  // Snipers are sliders that attack square 's'when a piece removed.
+  // Snipers are sliders that attack square 's' when a piece and other
+  // snipers are removed.
   snipers = (  (PseudoAttacks[ROOK  ][s] & pieces_pp(QUEEN, ROOK))
              | (PseudoAttacks[BISHOP][s] & pieces_pp(QUEEN, BISHOP))) & sliders;
   Bitboard occupancy = pieces() ^ snipers;
@@ -448,13 +449,13 @@ Bitboard slider_blockers(const Position *pos, Bitboard sliders, Square s,
     Square sniperSq = pop_lsb(&snipers);
     Bitboard b = between_bb(s, sniperSq) & occupancy;
 
-    if (!more_than_one(b)) {
-      result |= b;
+    if (b && !more_than_one(b)) {
+      blockers |= b;
       if (b & pieces_c(color_of(piece_on(s))))
         *pinners |= sq_bb(sniperSq);
     }
   }
-  return result;
+  return blockers;
 }
 #endif
 
@@ -689,8 +690,7 @@ bool is_pseudo_legal(const Position *pos, Move m)
     // Again we need to be a bit careful.
     if (more_than_one(checkers()))
       return false;
-    if (!((between_bb(lsb(checkers()), square_of(us, KING))
-                                      | checkers()) & sq_bb(to)))
+    if (!(between_bb(square_of(us, KING), lsb(checkers())) & sq_bb(to)))
       return false;
   }
   return true;
@@ -1237,10 +1237,10 @@ bool has_game_cycle(const Position *pos, int ply)
         || (j = H2(moveKey), cuckoo[j] == moveKey))
     {
       Move m = cuckooMove[j];
-      if (!(((Bitboard *)BetweenBB)[m] & pieces())) {
+      if (!((((Bitboard *)BetweenBB)[m] ^ sq_bb(to_sq(m))) & pieces())) {
         if (   ply > i
             || color_of(piece_on(is_empty(from_sq(m)) ? to_sq(m) : from_sq(m))) == stm())
-        return true;
+          return true;
       }
     }
   }

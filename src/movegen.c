@@ -335,7 +335,7 @@ NOINLINE ExtMove *generate_evasions(const Position *pos, ExtMove *list)
 
   // Generate blocking evasions or captures of the checking piece
   Square checksq = lsb(checkers());
-  Bitboard target = between_bb(ksq, checksq) | checkers();
+  Bitboard target = between_bb(ksq, checksq);
 
   return us == WHITE ? generate_all(pos, list, target, WHITE, EVASIONS)
                      : generate_all(pos, list, target, BLACK, EVASIONS);
