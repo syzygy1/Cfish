@@ -180,6 +180,8 @@ static const Score UncontestedOutpost  = S(  1, 10);
 static const Score WeakQueen           = S( 56, 15);
 static const Score WeakQueenProtection = S( 14,  0);
 
+static const Value CorneredBishopV     = 50;
+
 #undef S
 #undef V
 
@@ -321,9 +323,8 @@ INLINE Score evaluate_pieces(const Position *pos, EvalInfo *ei, Score *mobility,
         {
           Square d = pawn_push(Us) + (file_of(s) == FILE_A ? EAST : WEST);
           if (piece_on(s + d) == make_piece(Us, PAWN))
-            score -=  piece_on(s + d + pawn_push(Us))             ? CorneredBishop * 4
-                    : piece_on(s + d + d) == make_piece(Us, PAWN) ? CorneredBishop * 2
-                                                                  : CorneredBishop;
+            score -= !is_empty(s + d + pawn_push(Us)) ? CorneredBishop * 4
+                                                      : CorneredBishop * 3;
         }
       }
     }
@@ -755,7 +756,6 @@ INLINE Value evaluate_winnable(const Position *pos, EvalInfo *ei, Score score)
   return v;
 }
 
-
 // evaluate_classical() is the classical evaluation function. It returns
 // a static evaluation of the position from the point of view of the side
 // to move.
@@ -842,6 +842,35 @@ make_v:
 
 #ifdef NNUE
 int useNNUE;
+
+// fix_FRC() corrects for cornered bishops to fix FRC with NNUE.
+static Value fix_FRC(const Position *pos)
+{
+  if (!(pieces_p(BISHOP) & 0x8100000000000081ULL))
+    return 0;
+
+  Value v = 0;
+
+  if (piece_on(SQ_A1) == W_BISHOP && piece_on(SQ_B2) == W_PAWN)
+    v += !is_empty(SQ_B3) ? -CorneredBishopV * 4
+                          : -CorneredBishopV * 3;
+  if (piece_on(SQ_H1) == W_BISHOP && piece_on(SQ_G2) == W_PAWN)
+    v += !is_empty(SQ_G3) ? -CorneredBishopV * 4
+                          : -CorneredBishopV * 3;
+  if (piece_on(SQ_A8) == B_BISHOP && piece_on(SQ_B7) == B_PAWN)
+    v += !is_empty(SQ_B6) ? CorneredBishopV * 4
+                          : CorneredBishopV * 3;
+  if (piece_on(SQ_H8) == B_BISHOP && piece_on(SQ_G7) == B_PAWN)
+    v += !is_empty(SQ_G6) ? CorneredBishopV * 4
+                          : CorneredBishopV * 3;
+
+  return stm() == WHITE ? v : -v;
+}
+
+#define adjusted_NNUE() \
+  (nnue_evaluate(pos) * (580 + mat / 32 - 4 * rule50_count()) / 1024 + Tempo \
+   + (is_chess960() ? fix_FRC(pos) : 0))
+
 #endif
 
 Value evaluate(const Position *pos)
@@ -850,7 +879,7 @@ Value evaluate(const Position *pos)
 
 #ifdef NNUE
 
-  const int mat = non_pawn_material() + 2 * PawnValueMg * popcount(pieces_p(PAWN));
+  const int mat = non_pawn_material() + 4 * PawnValueMg * popcount(pieces_p(PAWN));
   if (useNNUE == EVAL_HYBRID) {
     Value psq = abs(eg_value(psq_score()));
     int r50 = 16 + rule50_count();
@@ -860,17 +889,17 @@ Value evaluate(const Position *pos)
     bool strongClassical = non_pawn_material() < 2 * RookValueMg && popcount(pieces_p(PAWN)) < 2;
     v =  classical || strongClassical
        ? evaluate_classical(pos)
-       : nnue_evaluate(pos) * (641 + mat / 32 - 4 * rule50_count()) / 1024 + Tempo;
+       : adjusted_NNUE();
 
     if (   classical && largePsq && !strongClassical
         && (   abs(v) * 16 < NNUEThreshold2 * r50
             || (   opposite_bishops(pos)
                 && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50
                 && !(pos->nodes & 0xB))))
-      v = nnue_evaluate(pos) * (641 + mat / 32 - 4 * rule50_count()) / 1024 + Tempo;
+      v = adjusted_NNUE();
 
   } else if (useNNUE == EVAL_PURE)
-    v = nnue_evaluate(pos) * (641 + mat / 32 - 4 * rule50_count()) / 1024 + Tempo;
+    v = adjusted_NNUE();
   else
     v = evaluate_classical(pos);
 
@@ -891,9 +920,9 @@ Value evaluate(const Position *pos)
 Value evaluate(const Position *pos)
 {
   Value v;
-  int mat = non_pawn_material() + 2 * PawnValueMg * popcount(pieces_p(PAWN));
+  int mat = non_pawn_material() + 4 * PawnValueMg * popcount(pieces_p(PAWN));
 
-  v = nnue_evaluate(pos) * (641 + mat / 32 - 4 * rule50_count()) / 1024 + Tempo;
+  v = adjusted_NNUE();
   v = v * (100 - rule50_count()) / 100;
   return clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 }

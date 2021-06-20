@@ -701,7 +701,6 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
   moveCount = captureCount = quietCount =  ss->moveCount = 0;
   bestValue = -VALUE_INFINITE;
   maxValue = VALUE_INFINITE;
-  if (PvNode) ss->distanceFromPv = 0;
 
   // Check for the available remaining time
   if (load_rlx(pos->resetCalls)) {
@@ -1276,8 +1275,6 @@ moves_loop: // When in check search starts from here
     // HACK: Fix bench after introduction of 2-fold MultiPV bug
     if (rootNode) pos->st[-1].key ^= pos->rootKeyFlip;
 
-    (ss+1)->distanceFromPv = ss->distanceFromPv + moveCount - 1;
-
     // Step 16. Late moves reduction / extension (LMR)
     // We use various heuristics for the children of a node after the first
     // child has been searched. In general we would like to reduce them, but
@@ -1371,7 +1368,7 @@ moves_loop: // When in check search starts from here
           r -= ss->statScore / 14790;
       }
 
-      Depth d = clamp(newDepth - r, 1, newDepth + ((ss+1)->distanceFromPv <= 4));
+      Depth d = clamp(newDepth - r, 1, newDepth + (r < -1 && moveCount <= 5));
 
       value = -search_NonPV(pos, ss+1, -(alpha+1), d, 1);
 

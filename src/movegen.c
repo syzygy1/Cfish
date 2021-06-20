@@ -314,24 +314,14 @@ NOINLINE ExtMove *generate_evasions(const Position *pos, ExtMove *list)
 
   Color us = stm();
   Square ksq = square_of(us, KING);
-  Bitboard sliderAttacks = 0;
-  Bitboard sliders = checkers() & ~pieces_pp(KNIGHT, PAWN);
-
-  // Find all the squares attacked by slider checkers. We will remove them
-  // from the king evasions in order to skip known illegal moves, which
-  // avoids any useless legality checks later on.
-  while (sliders) {
-    Square checksq = pop_lsb(&sliders);
-    sliderAttacks |= LineBB[ksq][checksq] ^ sq_bb(checksq);
-  }
 
   // Generate evasions for king, capture and non capture moves
-  Bitboard b = attacks_from_king(ksq) & ~pieces_c(us) & ~sliderAttacks;
+  Bitboard b = attacks_from_king(ksq) & ~pieces_c(us);
   while (b)
-      (list++)->move = make_move(ksq, pop_lsb(&b));
+    (list++)->move = make_move(ksq, pop_lsb(&b));
 
   if (more_than_one(checkers()))
-      return list; // Double check, only a king move can save the day
+    return list; // Double check, only a king move can save the day
 
   // Generate blocking evasions or captures of the checking piece
   Square checksq = lsb(checkers());

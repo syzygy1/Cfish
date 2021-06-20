@@ -525,7 +525,7 @@ bool is_legal(const Position *pos, Move m)
   // square is attacked by the opponent. Castling moves are checked
   // for legality during move generation.
   if (pieces_p(KING) & sq_bb(from))
-    return !(attackers_to(to) & pieces_c(!us));
+    return !(attackers_to_occ(pos, to, pieces() ^ sq_bb(from)) & pieces_c(!us));
 
   // A non-king move is legal if and only if it is not pinned or it
   // is moving along the ray towards or away from the king.
