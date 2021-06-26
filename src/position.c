@@ -347,7 +347,8 @@ static void set_state(Position *pos, Stack *st)
 #endif
   }
 
-  if (st->epSquare != 0)
+// emulate a bug in Stockfish
+//  if (st->epSquare != 0)
     st->key ^= zob.enpassant[file_of(st->epSquare)];
 
   if (stm() == BLACK)
