@@ -100,9 +100,6 @@ struct Skill {
 //  Move best = 0;
 };
 
-// Breadcrumbs are used to mark nodes as being search by a given thread
-static _Atomic uint64_t breadcrumbs[1024];
-
 static Value search_PV(Position *pos, Stack *ss, Value alpha, Value beta,
     Depth depth);
 static Value search_NonPV(Position *pos, Stack *ss, Value alpha, Depth depth,
@@ -1063,26 +1060,6 @@ moves_loop: // When in check search starts from here
                       && (tte_bound(tte) & BOUND_UPPER)
                       && tte_depth(tte) >= depth;
 
-  // Check for a breadcrumb and leave one if none found
-  _Atomic uint64_t *crumb = NULL;
-  bool marked = false;
-  if (ss->ply < 8) {
-    crumb = &breadcrumbs[posKey & 1023];
-    // The next line assumes there are at most 65535 search threads
-    uint64_t v = (posKey & ~0xffffULL) | (pos->threadIdx + 1), expected = 0ULL;
-    // If no crumb is in place yet, leave ours
-    if (!atomic_compare_exchange_strong_explicit(crumb, &expected, v,
-          memory_order_relaxed, memory_order_relaxed))
-    {
-      // Some crumb was in place already. Its value is now in expected.
-      crumb = NULL;
-      // Was the crumb is for the same position and was left by another thread?
-      v ^= expected;
-      if (v != 0 && (v & ~0xffffULL) == 0)
-        marked = true;
-    }
-  }
-
   // Step 12. Loop through moves
   // Loop through all pseudo-legal moves until no moves remain or a beta
   // cutoff occurs
@@ -1217,10 +1194,8 @@ moves_loop: // When in check search starts from here
       // assume that this expected cut-node is not singular, i.e. multiple
       // moves fail high. We therefore prune the whole subtree by returning
       // a soft bound.
-      else if (singularBeta >= beta) {
-        if (crumb) store_rlx(*crumb, 0);
+      else if (singularBeta >= beta)
         return singularBeta;
-      }
 
       // If the eval of ttMove is greater than beta we also check whether
       // there is another move that pushes it over beta. If so, we prune.
@@ -1235,10 +1210,8 @@ moves_loop: // When in check search starts from here
         value = search_NonPV(pos, ss, beta - 1, (depth + 3) / 2, cutNode);
         ss->excludedMove = 0;
 
-        if (value >= beta) {
-          if (crumb) store_rlx(*crumb, 0);
+        if (value >= beta)
           return beta;
-        }
       }
 
       // The call to search_NonPV with the same value of ss messed up our
@@ -1286,10 +1259,6 @@ moves_loop: // When in check search starts from here
       // Decrease reduction if the ttHit runing average is large
       if (pos->ttHitAverage > 537 * ttHitAverageResolution * ttHitAverageWindow / 1024)
         r--;
-
-      // Increase reduction if other threads are searching this position.
-      if (marked)
-        r++;
 
       // Decrease reduction if position is or has been on the PV and the node
       // is not likely to fail low
@@ -1396,10 +1365,8 @@ moves_loop: // When in check search starts from here
     // Finished searching the move. If a stop occurred, the return value of
     // the search cannot be trusted, and we return immediately without
     // updating best move, PV and TT.
-    if (load_rlx(Threads.stop)) {
-      if (crumb) store_rlx(*crumb, 0);
+    if (load_rlx(Threads.stop))
       return 0;
-    }
 
     if (rootNode) {
       RootMove *rm = NULL;
@@ -1459,8 +1426,6 @@ moves_loop: // When in check search starts from here
         quietsSearched[quietCount++] = move;
     }
   }
-
-  if (crumb) store_rlx(*crumb, 0);
 
   // The following condition would detect a stop only after move loop has
   // been completed. But in this case bestValue is valid because we have
@@ -2113,9 +2078,6 @@ void start_thinking(Position *root, bool ponderMode)
   Threads.stop = false;
   Threads.increaseDepth = true;
   Threads.ponder = ponderMode;
-
-  for (int i = 0; i < 1024; i++)
-    store_rlx(breadcrumbs[i], 0);
 
   // Generate all legal moves.
   ExtMove list[MAX_MOVES];
