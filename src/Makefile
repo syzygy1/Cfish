@@ -381,6 +381,16 @@ ifeq ($(ARCH),ppc-64)
 	prefetch = yes
 endif
 
+ifneq ($(findstring e2k,$(ARCH)),)
+	arch = e2k
+	bits = 64
+	sse = yes
+	sse2 = yes
+	ssse3 = yes
+	sse41 = yes
+	popcnt = yes
+endif
+
 endif
 
 ifeq ($(avx2),yes)
@@ -820,6 +830,7 @@ help:
 	@echo "armv7-neon              > ARMv7 32-bit with popcnt and neon"
 	@echo "armv7                   > ARMv7 32-bit"
 	@echo "apple-silicon           > Apple silicon ARM64"
+	@echo "e2k                     > Elbrus 2000"
 	@echo "general-64              > unspecified 64-bit"
 	@echo "general-32              > unspecified 32-bit"
 	@echo ""
@@ -948,7 +959,8 @@ config-sanity: net
 	@test "$(optimize)" = "yes" || test "$(optimize)" = "no"
 	@test "$(arch)" = "any" || test "$(arch)" = "x86_64" || test "$(arch)" = "i386" || \
 	 test "$(arch)" = "ppc64" || test "$(arch)" = "ppc" || \
-	 test "$(arch)" = "armv7" || test "$(arch)" = "armv8" || test "$(arch)" = "arm64"
+	 test "$(arch)" = "armv7" || test "$(arch)" = "armv8" || test "$(arch)" = "arm64" || \
+	 test "$(arch)" = "e2k"
 	@test "$(bits)" = "32" || test "$(bits)" = "64"
 	@test "$(prefetch)" = "yes" || test "$(prefetch)" = "no"
 	@test "$(popcnt)" = "yes" || test "$(popcnt)" = "no"

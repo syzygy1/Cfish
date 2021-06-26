@@ -971,14 +971,6 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
            && ttValue != VALUE_NONE
            && ttValue < probCutBeta))
   {
-    if (   ss->ttHit
-        && tte_depth(tte) >= depth - 3
-        && ttValue != VALUE_NONE
-        && ttValue >= probCutBeta
-        && ttMove
-        && is_capture_or_promotion(pos, ttMove))
-      return probCutBeta;
-
     mp_init_pc(pos, ttMove, probCutBeta - ss->staticEval);
     int probCutCount = 2 + 2 * cutNode;
     bool ttPv = ss->ttPv;
@@ -1136,7 +1128,7 @@ moves_loop: // When in check search starts from here
       } else {
 
         // Countermoves based pruning
-        if (   lmrDepth < 4 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
+        if (   lmrDepth < 4
             && (*cmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold
             && (*fmh )[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
           continue;
@@ -1278,14 +1270,7 @@ moves_loop: // When in check search starts from here
       if (singularQuietLMR)
         r--;
 
-      if (captureOrPromotion) {
-        // Unless giving check, this capture is likely bad
-        if (   !givesCheck
-            && ss->staticEval + PieceValue[EG][captured_piece()] + 210 * depth <= alpha)
-          r++;
-
-      } else {
-
+      if (!captureOrPromotion) {
         // Increase reduction if ttMove is a capture
         if (ttCapture)
           r++;
@@ -1304,18 +1289,7 @@ moves_loop: // When in check search starts from here
                        + (*pos->mainHistory)[!stm()][from_to(move)]
                        - 4741;
 
-        // Decrease/increase reduction by comparing with opponent's stat score.
-        if (ss->statScore >= -89 && (ss-1)->statScore < -116)
-          r--;
-
-        else if ((ss-1)->statScore >= -112 && ss->statScore < -100)
-          r++;
-
-        // Decrease/increase reduction for moves with a good/bad history.
-        if (inCheck)
-          r -= (  (*pos->mainHistory)[!stm()][from_to(move)]
-                + (*cmh)[movedPiece][to_sq(move)] - 3833) / 16384;
-        else
+        if (!inCheck)
           r -= ss->statScore / 14790;
       }
 
