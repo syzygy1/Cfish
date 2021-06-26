@@ -16,5 +16,6 @@ typedef struct {
 void nnue_init(void);
 void nnue_free(void);
 Value nnue_evaluate(const Position *pos);
+void nnue_export_net(void);
 
 #endif

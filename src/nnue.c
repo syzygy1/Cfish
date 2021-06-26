@@ -581,6 +581,18 @@ static void init_weights(const void *evalData)
 #endif
 }
 
+void nnue_export_net(void) {
+#ifdef NNUE_EMBEDDED
+  FILE *F = fopen(DefaultEvalFile, "wb");
+  if (F) {
+    fwrite(gNetworkData, gNetworkSize, 1, F);
+    fclose(F);
+  }
+#else
+  printf("No embedded network fie.\n");
+#endif
+}
+
 static bool verify_net(const void *evalData, size_t size)
 {
   if (size != 21022697) return false;

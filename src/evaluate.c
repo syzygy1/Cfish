@@ -27,6 +27,7 @@
 #include "nnue.h"
 #endif
 #include "pawns.h"
+#include "timeman.h"
 
 #ifndef NNUE_PURE
 
@@ -868,8 +869,8 @@ static Value fix_FRC(const Position *pos)
 }
 
 #define adjusted_NNUE() \
-  (nnue_evaluate(pos) * (580 + mat / 32 - 4 * rule50_count()) / 1024 + Tempo \
-   + (is_chess960() ? fix_FRC(pos) : 0))
+  (nnue_evaluate(pos) * (580 + mat / 32 - 4 * rule50_count()) / 1024 \
+   + Time.tempoNNUE + (is_chess960() ? fix_FRC(pos) : 0))
 
 #endif
 

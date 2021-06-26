@@ -87,6 +87,12 @@ void time_init(Color us, int ply)
   Time.optimumTime = optScale * timeLeft;
   Time.maximumTime = min(0.8 * Limits.time[us] - moveOverhead, maxScale * Time.optimumTime);
 
+  if (use_time_management()) {
+    int strength = log(max(1, (int)(Time.optimumTime * Threads.numThreads  / 10))) * 60;
+    Time.tempoNNUE = clamp((strength + 264) / 24, 18, 30);
+  } else
+    Time.tempoNNUE = 28; // default for no time given
+
   if (option_value(OPT_PONDER))
     Time.optimumTime += Time.optimumTime / 4;
 }

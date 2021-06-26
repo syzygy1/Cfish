@@ -33,6 +33,7 @@ struct TimeManagement {
   int optimumTime;
   int maximumTime;
   int64_t availableNodes;
+  int tempoNNUE;
 };
 
 extern struct TimeManagement Time;

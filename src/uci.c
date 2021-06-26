@@ -345,6 +345,7 @@ void uci_loop(int argc, char **argv)
       benchmark(&pos, str_buf);
     }
     else if (strcmp(token, "compiler") == 0)  print_compiler_info();
+    else if (strcmp(token, "export_net") == 0) nnue_export_net();
     else if (strncmp(token, "#", 1)) {
       printf("Unknown command: %s %s\n", token, str);
       fflush(stdout);

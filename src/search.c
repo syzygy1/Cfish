@@ -1055,6 +1055,14 @@ moves_loop: // When in check search starts from here
   value = bestValue;
   singularQuietLMR = moveCountPruning = false;
 
+  // Indicate PvNodes that will probably fail low if node was searched with
+  // non-PV search at depth equal to or greater than current depth and the
+  // result of the search was far below alpha
+  bool likelyFailLow =   PvNode
+                      && ttMove
+                      && (tte_bound(tte) & BOUND_UPPER)
+                      && tte_depth(tte) >= depth;
+
   // Check for a breadcrumb and leave one if none found
   _Atomic uint64_t *crumb = NULL;
   bool marked = false;
@@ -1120,15 +1128,6 @@ moves_loop: // When in check search starts from here
     movedPiece = moved_piece(move);
 
     givesCheck = gives_check(pos, ss, move);
-
-    // Indicate PvNodes that will probably fail low if node was searched with
-    // non-PV search at depth equal to or greater than current depth and the
-    // result of the search was far below alpha
-    bool likelyFailLow =   PvNode
-                        && ttMove
-                        && (tte_bound(tte) & BOUND_UPPER)
-                        && ttValue < alpha + 200 + 100 * depth
-                        && tte_depth(tte) >= depth;
 
     // Calculate new depth for this move
     newDepth = depth - 1;
@@ -1251,11 +1250,6 @@ moves_loop: // When in check search starts from here
 
     }
 
-    // Check extension
-    else if (    givesCheck
-             && (is_discovered_check_on_king(pos, !stm(), move) || see_test(pos, move, 0)))
-      extension = 1;
-
     // Add extension to new depth
     newDepth += extension;
 
@@ -1307,9 +1301,6 @@ moves_loop: // When in check search starts from here
       if ((rootNode || !PvNode) && pos->rootDepth > 10 && pos->bestMoveChanges <= 2)
         r++;
 
-      if (moveCountPruning && !formerPv)
-        r++;
-
       // Decrease reduction if opponent's move count is high
       if ((ss-1)->moveCount > 13)
         r--;
@@ -1337,13 +1328,6 @@ moves_loop: // When in check search starts from here
         // Increase reduction for cut nodes
         if (cutNode)
           r += 2;
-
-        // Decrease reduction for moves that escape a capture. Filter out
-        // castling moves, because they are coded as "king captures rook" and
-        // hence break make_move().
-        else if (   type_of_m(move) == NORMAL
-                 && !see_test(pos, reverse_move(move), 0))
-          r -= 2 + ss->ttPv - (type_of_p(movedPiece) == PAWN);
 
         ss->statScore =  (*cmh )[movedPiece][to_sq(move)]
                        + (*fmh )[movedPiece][to_sq(move)]
