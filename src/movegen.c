@@ -60,18 +60,16 @@ INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
   const int      Right    = Us == WHITE ? NORTH_EAST : SOUTH_WEST;
   const int      Left     = Us == WHITE ? NORTH_WEST : SOUTH_EAST;
 
-  Bitboard emptySquares;
+  const Bitboard emptySquares =  Type == QUIETS || Type == QUIET_CHECKS
+                               ? target : ~pieces();
+  const Bitboard enemies =  Type == EVASIONS ? checkers()
+                          : Type == CAPTURES ? target : pieces_c(Them);
 
   Bitboard pawnsOn7    = pieces_cp(Us, PAWN) &  TRank7BB;
   Bitboard pawnsNotOn7 = pieces_cp(Us, PAWN) & ~TRank7BB;
 
-  Bitboard enemies =  Type == EVASIONS ? checkers()
-                    : Type == CAPTURES ? target : pieces_c(Them);
-
   // Single and double pawn pushes, no promotions
   if (Type != CAPTURES) {
-    emptySquares = Type == QUIETS || Type == QUIET_CHECKS ? target : ~pieces();
-
     Bitboard b1 = shift_bb(Up, pawnsNotOn7)   & emptySquares;
     Bitboard b2 = shift_bb(Up, b1 & TRank3BB) & emptySquares;
 
@@ -82,21 +80,11 @@ INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
 
     if (Type == QUIET_CHECKS) {
       Stack *st = pos->st;
-      b1 &= attacks_from_pawn(st->ksq, Them);
-      b2 &= attacks_from_pawn(st->ksq, Them);
 
-      // Add pawn pushes which give discovered check. This is possible only
-      // if the pawn is not on the same file as the enemy king, because we
-      // don't generate captures. Note that a possible discovered check
-      // promotion has been already generated amongst the captures.
-      Bitboard dcCandidatesQuiets = blockers_for_king(pos, Them) & pawnsNotOn7;
-      if (dcCandidatesQuiets) {
-        Bitboard dc1 = shift_bb(Up, dcCandidatesQuiets) & emptySquares & ~file_bb_s(st->ksq);
-        Bitboard dc2 = shift_bb(Up, dc1 & TRank3BB) & emptySquares;
-
-        b1 |= dc1;
-        b2 |= dc2;
-      }
+      // A quiet check is either a direct check or a discovered check.
+      Bitboard dcCandidatePawns = blockers_for_king(pos, Them) & ~file_bb_s(st->ksq);
+      b1 &= attacks_from_pawn(st->ksq, Them) | shift_bb(Up, dcCandidatePawns);
+      b2 &= attacks_from_pawn(st->ksq, Them) | shift_bb(Up+Up, dcCandidatePawns);
     }
 
     while (b1) {
@@ -112,15 +100,12 @@ INLINE ExtMove *generate_pawn_moves(const Position *pos, ExtMove *list,
 
   // Promotions and underpromotions
   if (pawnsOn7 && (Type != EVASIONS || (target & TRank8BB))) {
-    if (Type == CAPTURES)
-      emptySquares = ~pieces();
-
-    if (Type == EVASIONS)
-      emptySquares &= target;
-
     Bitboard b1 = shift_bb(Right, pawnsOn7) & enemies;
     Bitboard b2 = shift_bb(Left , pawnsOn7) & enemies;
     Bitboard b3 = shift_bb(Up   , pawnsOn7) & emptySquares;
+
+    if (Type == EVASIONS)
+      b3 &= target;
 
     while (b1)
       list = make_promotions(list, pop_lsb(&b1), pos->st->ksq, Type, Right);
@@ -178,7 +163,6 @@ INLINE ExtMove *generate_moves(const Position *pos, ExtMove *list,
 
   while (bb) {
     Square from = pop_lsb(&bb);
-
     Bitboard b = attacks_bb(Pt, from, pieces()) & target;
 
     if (Checks && (Pt == QUEEN || !(blockers_for_king(pos, !Us) & sq_bb(from))))

@@ -1209,6 +1209,8 @@ moves_loop: // When in check search starts from here
       if (value < singularBeta) {
         extension = 1;
         singularQuietLMR = !ttCapture;
+        if (!PvNode && value < singularBeta - 140)
+          extension = 2;
       }
 
       // Multi-cut pruning. Our ttMove is assumed to fail high, and now we
@@ -1282,7 +1284,8 @@ moves_loop: // When in check search starts from here
             || ss->staticEval + PieceValue[EG][captured_piece()] <= alpha
             || cutNode
             || (!PvNode && !formerPv && (*pos->captureHistory)[movedPiece][to_sq(move)][type_of_p(captured_piece())] < 3678)
-            || pos->ttHitAverage < 432 * ttHitAverageResolution * ttHitAverageWindow / 1024))
+            || pos->ttHitAverage < 432 * ttHitAverageResolution * ttHitAverageWindow / 1024)
+        && (!PvNode || ss->ply > 1 || pos->threadIdx % 4 != 3))
     {
       Depth r = reduction(improving, depth, moveCount);
 
