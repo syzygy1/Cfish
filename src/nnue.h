@@ -9,7 +9,8 @@
 enum { ACC_EMPTY, ACC_COMPUTED, ACC_INIT };
 
 typedef struct {
-  alignas(64) int16_t accumulation[2][256];
+  alignas(64) int16_t accumulation[2][512];
+  alignas(64) int32_t accumulation_psqt[2][8];
   uint8_t state[2];
 } Accumulator;
 

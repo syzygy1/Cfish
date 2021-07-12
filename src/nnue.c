@@ -52,28 +52,29 @@ INCBIN(Network, DefaultEvalFile);
 #endif
 
 enum {
-  PS_W_PAWN   =  1,
-  PS_B_PAWN   =  1 * 64 + 1,
-  PS_W_KNIGHT =  2 * 64 + 1,
-  PS_B_KNIGHT =  3 * 64 + 1,
-  PS_W_BISHOP =  4 * 64 + 1,
-  PS_B_BISHOP =  5 * 64 + 1,
-  PS_W_ROOK   =  6 * 64 + 1,
-  PS_B_ROOK   =  7 * 64 + 1,
-  PS_W_QUEEN  =  8 * 64 + 1,
-  PS_B_QUEEN  =  9 * 64 + 1,
-  PS_END      = 10 * 64 + 1
+  PS_W_PAWN   =  0,
+  PS_B_PAWN   =  1 * 64,
+  PS_W_KNIGHT =  2 * 64,
+  PS_B_KNIGHT =  3 * 64,
+  PS_W_BISHOP =  4 * 64,
+  PS_B_BISHOP =  5 * 64,
+  PS_W_ROOK   =  6 * 64,
+  PS_B_ROOK   =  7 * 64,
+  PS_W_QUEEN  =  8 * 64,
+  PS_B_QUEEN  =  9 * 64,
+  PS_KING     = 10 * 64,
+  PS_END      = 11 * 64
 };
 
 uint32_t PieceToIndex[2][16] = {
-  { 0, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, 0, 0,
-    0, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, 0, 0 },
-  { 0, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, 0, 0,
-    0, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, 0, 0 }
+  { 0, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, PS_KING, 0,
+    0, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, PS_KING, 0 },
+  { 0, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, PS_KING, 0,
+    0, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, PS_KING, 0 }
 };
 
 // Version of the evaluation file
-static const uint32_t NnueVersion = 0x7AF32F16u;
+static const uint32_t NnueVersion = 0x7AF32F20u;
 
 // Constants used in evaluation value calculation
 enum {
@@ -82,8 +83,10 @@ enum {
 };
 
 enum {
-  kHalfDimensions = 256,
-  FtInDims = 64 * PS_END, // 64 * 641
+  kHalfDimensions = 512,
+  kPsqtBuckets = 8,
+  kLayerStacks = 8,
+  FtInDims = 64 * PS_END, // 64 * 704
 };
 
 // USE_MMX generates _mm_empty() instructions, so undefine if not needed
@@ -91,42 +94,58 @@ enum {
 #undef USE_MMX
 #endif
 
-static_assert(kHalfDimensions % 256 == 0, "kHalfDimensions should be a multiple of 256");
+static_assert(kHalfDimensions % 512 == 0, "kHalfDimensions should be a multiple of 512");
 
 #define VECTOR
 
 #ifdef USE_AVX512
 #define SIMD_WIDTH 512
+#define PSQT_SIMD_WIDTH 256
 typedef __m512i vec8_t, vec16_t;
+typedef __m256i vec32_psqt_t;
 typedef __mmask64 mask_t;
 #define vec_add_16(a,b) _mm512_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm512_sub_epi16(a,b)
+#define vec_add_psqt_32(a,b) _mm256_add_epi32(a,b)
+#define vec_sub_psqt_32(a,b) _mm256_sub_epi32(a,b)
 #define vec_packs(a,b) _mm512_packs_epi16(a,b)
 #define vec_mask_pos(a) _mm512_cmpgt_epi8_mask(a,_mm512_setzero_si512())
 #define vec_clip_8(a,b) _mm512_max_epi8(vec_packs(a,b),_mm512_setzero_si512())
-#define NUM_REGS 8 // only 8 are needed
+#define vec_zero_psqt() _mm256_setzero_si256()
+#define NUM_REGS 16 // only 16 are needed
+#define NUM_PSQT_REGS 1
 
 #elif USE_AVX2
 #define SIMD_WIDTH 256
+#define PSQT_SIMD_WIDTH 256
 typedef __m256i vec8_t, vec16_t;
+typedef __m256i vec32_psqt_t;
 typedef uint32_t mask_t;
 #define vec_add_16(a,b) _mm256_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm256_sub_epi16(a,b)
+#define vec_add_psqt_32(a,b) _mm256_add_epi32(a,b)
+#define vec_sub_psqt_32(a,b) _mm256_sub_epi32(a,b)
 #define vec_packs(a,b) _mm256_packs_epi16(a,b)
 #define vec_mask_pos(a) _mm256_movemask_epi8(_mm256_cmpgt_epi8(a,_mm256_setzero_si256()))
 #define vec_clip_8(a,b) _mm256_max_epi8(vec_packs(a,b),_mm256_setzero_si256())
+#define vec_zero_psqt() _mm256_setzero_si256()
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
 #define NUM_REGS 8
 #endif
+#define NUM_PSQT_REGS 1
 
 #elif USE_SSE2
 #define SIMD_WIDTH 128
+#define PSQT_SIMD_WIDTH 128
 typedef __m128i vec8_t, vec16_t;
+typedef __m128i vec32_psqt_t;
 typedef uint16_t mask_t;
 #define vec_add_16(a,b) _mm_add_epi16(a,b)
 #define vec_sub_16(a,b) _mm_sub_epi16(a,b)
+#define vec_add_psqt_32(a,b) _mm_add_epi32(a,b)
+#define vec_sub_psqt_32(a,b) _mm_sub_epi32(a,b)
 #define vec_packs(a,b) _mm_packs_epi16(a,b)
 #define vec_mask_pos(a) _mm_movemask_epi8(_mm_cmpgt_epi8(a,_mm_setzero_si128()))
 #ifdef USE_SSE41
@@ -136,18 +155,24 @@ typedef uint16_t mask_t;
 #else
 #define vec_clip_16(a) _mm_min_epi16(_mm_max_epi16(a,_mm_setzero_si128()),_mm_set1_epi16(127))
 #endif
+#define vec_zero_psqt() _mm_setzero_si128()
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
 #define NUM_REGS 8
 #endif
+#define NUM_PSQT_REGS 2
 
 #elif USE_MMX
 #define SIMD_WIDTH 64
+#define PSQT_SIMD_WIDTH 64
 typedef __m64 vec8_t, vec16_t;
+typedef __m64 vec32_psqt_t;
 typedef uint8_t mask_t;
 #define vec_add_16(a,b) _mm_add_pi16(a,b)
 #define vec_sub_16(a,b) _mm_sub_pi16(a,b)
+#define vec_add_psqt_32(a,b) _mm_add_pi32(a,b)
+#define vec_sub_psqt_32(a,b) _mm_sub_pi32(a,b)
 #define vec_packs(a,b) _mm_packs_pi16(a,b)
 #define vec_mask_pos(a) _mm_movemask_pi8(_mm_cmpgt_pi8(a,_mm_setzero_si64()))
 #ifdef USE_SSE
@@ -155,23 +180,31 @@ typedef uint8_t mask_t;
 #else
 #define vec_clip_16(a) _mm_subs_pu16(_mm_add_pi16(_mm_adds_pi16(a, _mm_set1_pi16(0x7f80)), _mm_set1_pi16(0x0080)), _mm_set1_pi16(-0x8000))
 #endif
+#define vec_zero_psqt() 0
 #define NUM_REGS 8
+#define NUM_PSQT_REGS 4
 
 #elif USE_NEON
 #define SIMD_WIDTH 128
+#define PSQT_SIMD_WIDTH 128
 typedef int8x16_t vec8_t;
 typedef int16x8_t vec16_t;
+typedef int32x4_t vec32_psqt_t;
 typedef uint16_t mask_t;
 #define vec_add_16(a,b) vaddq_s16(a,b)
 #define vec_sub_16(a,b) vsubq_s16(a,b)
+#define vec_add_psqt_32(a,b) vaddq_s32(a,b)
+#define vec_sub_psqt_32(a,b) vsubq_s32(a,b)
 #define vec_packs(a,b) vcombine_s8(vqmovn_s16(a),vqmovn_s16(b))
 #define vec_mask_pos(a) neon_movemask(vcgtq_s8(a,vdupq_n_s8(0)))
 #define vec_clip_8(a,b) vmaxq_s8(vec_packs(a,b),vdupq_n_s8(0))
+#define vec_zero_psqt() vec32_psqt_t{0}
 #ifdef IS_64BIT
 #define NUM_REGS 16
 #else
 #define NUM_REGS 8
 #endif
+#define NUM_PSQT_REGS 2
 
 #else
 #undef VECTOR
@@ -220,12 +253,12 @@ INLINE int neon_movemask(uint8x16_t v)
 
 typedef struct {
   unsigned size;
-  unsigned values[30];
+  unsigned values[32];
 } IndexList;
 
 INLINE Square orient(Color c, Square s)
 {
-  return s ^ (c == WHITE ? 0x00 : 0x3f);
+  return s ^ (c == WHITE ? 0x00 : 0x38);
 }
 
 INLINE unsigned make_index(Color c, Square s, Piece pc, Square ksq)
@@ -237,7 +270,7 @@ static void append_active_indices(const Position *pos, const Color c,
     IndexList *active)
 {
   Square ksq = orient(c, square_of(c, KING));
-  Bitboard bb = pieces() & ~pieces_p(KING);
+  Bitboard bb = pieces();
   while (bb) {
     Square s = pop_lsb(&bb);
     active->values[active->size++] = make_index(c, s, piece_on(s), ksq);
@@ -250,7 +283,6 @@ static void append_changed_indices(const Position *pos, const Color c,
   Square ksq = orient(c, square_of(c, KING));
   for (int i = 0; i < dp->dirtyNum; i++) {
     Piece pc = dp->pc[i];
-    if (type_of_p(pc) == KING) continue;
     if (dp->from[i] != SQ_NONE)
       removed->values[removed->size++] = make_index(c, dp->from[i], pc, ksq);
     if (dp->to[i] != SQ_NONE)
@@ -333,10 +365,12 @@ INLINE int32_t output_layer(const out_t *input, const int32_t *biases,
 // Input feature converter
 static int16_t *ft_biases; // [kHalfDimensions]
 static int16_t *ft_weights; // [kHalfDimenions * FtInDims]
+static int32_t *ft_weights_psqt; // [kHalfDimenions * FtInDims]
 static alloc_t ft_alloc;
 
 #ifdef VECTOR
 #define TILE_HEIGHT (NUM_REGS * SIMD_WIDTH / 16)
+#define PSQT_TILE_HEIGHT  (NUM_PSQT_REGS * PSQT_SIMD_WIDTH / 32)
 #endif
 
 // Calculate cumulative value using difference calculation if possible
@@ -344,10 +378,11 @@ INLINE void update_accumulator(const Position *pos, const Color c)
 {
 #ifdef VECTOR
   vec16_t acc[NUM_REGS];
+  vec32_psqt_t acc_psqt[NUM_PSQT_REGS];
 #endif
 
   Stack *st = pos->st;
-  int gain = popcount(pieces()) - 2;
+  int gain = popcount(pieces());
   while (st->accumulator.state[c] == ACC_EMPTY) {
     DirtyPiece *dp = &st->dirtyPiece;
     if (   dp->pc[0] == make_piece(c, KING)
@@ -399,28 +434,67 @@ INLINE void update_accumulator(const Position *pos, const Color c)
           accTile[j] = acc[j];
       }
     }
+
+    for (unsigned i = 0; i < kPsqtBuckets / PSQT_TILE_HEIGHT; i++) {
+      vec32_psqt_t *accTile = (vec32_psqt_t *)&st->accumulator.accumulation_psqt[c][i * PSQT_TILE_HEIGHT];
+      for (unsigned j = 0; j < NUM_PSQT_REGS; j++)
+        acc_psqt[j] = accTile[j];
+      for (unsigned l = 0; stack[l]; l++) {
+        // Difference calculation for the deactivated features
+        for (unsigned k = 0; k < removed[l].size; k++) {
+          unsigned index = removed[l].values[k];
+          const unsigned offset = kPsqtBuckets * index + i * PSQT_TILE_HEIGHT;
+          vec32_psqt_t *column = (vec32_psqt_t *)&ft_weights_psqt[offset];
+          for (unsigned j = 0; j < NUM_PSQT_REGS; j++)
+            acc_psqt[j] = vec_sub_psqt_32(acc_psqt[j], column[j]);
+        }
+
+        // Difference calculation for the activated features
+        for (unsigned k = 0; k < added[l].size; k++) {
+          unsigned index = added[l].values[k];
+          const unsigned offset = kPsqtBuckets * index + i * PSQT_TILE_HEIGHT;
+          vec32_psqt_t *column = (vec32_psqt_t *)&ft_weights_psqt[offset];
+          for (unsigned j = 0; j < NUM_PSQT_REGS; j++)
+            acc_psqt[j] = vec_add_psqt_32(acc_psqt[j], column[j]);
+        }
+
+        accTile = (vec32_psqt_t *)&stack[l]->accumulator.accumulation_psqt[c][i * PSQT_TILE_HEIGHT];
+        for (unsigned j = 0; j < NUM_PSQT_REGS; j++)
+          accTile[j] = acc_psqt[j];
+      }
+    }
 #else
     for (unsigned l = 0; stack[l]; l++) {
       memcpy(&stack[l]->accumulator.accumulation[c],
           &st->accumulator.accumulation[c], kHalfDimensions * sizeof(int16_t));
+      memcpy(&stack[l]->accumulator.accumulation_psqt[c],
+          &st->accumulator.accumulation_psqt[c], kPsqtBuckets * sizeof(int32_t));
       st = stack[l];
 
       // Difference calculation for the deactivated features
       for (unsigned k = 0; k < removed[l].size; k++) {
         unsigned index = removed[l].values[k];
         const unsigned offset = kHalfDimensions * index;
+        const unsigned offset_psqt = kPsqtBuckets * index;
 
         for (unsigned j = 0; j < kHalfDimensions; j++)
           st->accumulator.accumulation[c][j] -= ft_weights[offset + j];
+
+        for (unsigned j = 0; j < kPsqtBuckets; j++)
+          st->accumulator.accumulation_psqt[c][j] -= ft_weights_psqt[offset_psqt + j];
       }
 
       // Difference calculation for the activated features
       for (unsigned k = 0; k < added[l].size; k++) {
         unsigned index = added[l].values[k];
         const unsigned offset = kHalfDimensions * index;
+        const unsigned offset_psqt = kPsqtBuckets * index;
 
         for (unsigned j = 0; j < kHalfDimensions; j++)
           st->accumulator.accumulation[c][j] += ft_weights[offset + j];
+
+        for (unsigned j = 0; j < kPsqtBuckets; j++)
+          st->accumulator.accumulation_psqt[c][j] += ft_weights_psqt[offset_psqt + j];
       }
     }
 #endif
@@ -448,31 +522,64 @@ INLINE void update_accumulator(const Position *pos, const Color c)
       for (unsigned j = 0; j < NUM_REGS; j++)
         accTile[j] = acc[j];
     }
+
+    for (unsigned i = 0; i < kPsqtBuckets / PSQT_TILE_HEIGHT; i++) {
+      for (unsigned j = 0; j < NUM_PSQT_REGS; j++)
+        acc_psqt[j] = vec_zero_psqt();
+
+      for (unsigned k = 0; k < active.size; k++) {
+        unsigned index = active.values[k];
+        unsigned offset = kPsqtBuckets * index + i * PSQT_TILE_HEIGHT;
+        vec32_psqt_t *column = (vec32_psqt_t *)&ft_weights_psqt[offset];
+        for (unsigned j = 0; j < NUM_PSQT_REGS; j++)
+          acc_psqt[j] = vec_add_psqt_32(acc_psqt[j], column[j]);
+      }
+
+      vec32_psqt_t *accTile = (vec32_psqt_t *)&accumulator->accumulation_psqt[c][i * PSQT_TILE_HEIGHT];
+      for (unsigned j = 0; j < NUM_PSQT_REGS; j++)
+        accTile[j] = acc_psqt[j];
+    }
 #else
     memcpy(accumulator->accumulation[c], ft_biases,
         kHalfDimensions * sizeof(int16_t));
+    memset(accumulator->accumulation_psqt[c], 0,
+        kPsqtBuckets * sizeof(int32_t));
 
     for (unsigned k = 0; k < active.size; k++) {
       unsigned index = active.values[k];
       unsigned offset = kHalfDimensions * index;
+      unsigned offset_psqt = kPsqtBuckets * index;
 
       for (unsigned j = 0; j < kHalfDimensions; j++)
         accumulator->accumulation[c][j] += ft_weights[offset + j];
+
+      for (unsigned j = 0; j < kPsqtBuckets; j++)
+        accumulator->accumulation_psqt[c][j] += ft_weights_psqt[offset_psqt + j];
     }
 #endif
   }
 }
 
 // Convert input features
-INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
+INLINE bool transform(const Position *pos, clipped_t *output, mask_t *outMask, int32_t psqtBucket, int32_t* psqt_val)
 {
   (void)outMask;
   update_accumulator(pos, WHITE);
   update_accumulator(pos, BLACK);
 
-  int16_t (*accumulation)[2][256] = &pos->st->accumulator.accumulation;
+  int16_t (*accumulation)[2][512] = &pos->st->accumulator.accumulation;
+  int32_t (*accumulation_psqt)[2][8] = &pos->st->accumulator.accumulation_psqt;
 
   const Color perspectives[2] = { stm(), !stm() };
+
+  *psqt_val = (
+      (*accumulation_psqt)[perspectives[0]][psqtBucket]
+    - (*accumulation_psqt)[perspectives[1]][psqtBucket]
+  ) / 2;
+
+  if (abs(*psqt_val) > 1400 * FV_SCALE)
+    return true;
+
   for (unsigned p = 0; p < 2; p++) {
     const unsigned offset = kHalfDimensions * p;
 
@@ -510,6 +617,8 @@ INLINE void transform(const Position *pos, clipped_t *output, mask_t *outMask)
 #endif
 
   }
+
+  return false;
 }
 
 #ifndef USE_NEON
@@ -521,64 +630,73 @@ INLINE unsigned bit_shuffle(unsigned v, int left, int right, unsigned mask)
 }
 #endif
 
-enum {
-  TransformerStart = 3 * 4 + 177,
-  NetworkStart = TransformerStart + 4 + 2 * 256 + 2 * 256 * 64 * 641
-};
-
 #include "nnue-regular.c"
 #include "nnue-sparse.c"
 
-static const char *read_hidden_weights(weight_t *w, unsigned dims,
+static const char *read_hidden_weights(weight_t *w, unsigned outDims, unsigned dims,
     const char *d)
 {
-  for (unsigned r = 0; r < 32; r++)
+  for (unsigned r = 0; r < outDims; r++)
+  {
     for (unsigned c = 0; c < dims; c++)
       w[wt_idx(r, c, dims)] = *d++;
+  }
 
   return d;
 }
 
-static void init_weights(const void *evalData)
+static bool init_weights(const void *evalData, unsigned size)
 {
   if (!ft_biases) {
     if (settings.largePages)
-      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1), true,
+      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1) + (4 * kPsqtBuckets * FtInDims), true,
           &ft_alloc);
     if (!ft_biases)
-      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1), false,
+      ft_biases = allocate_memory(2 * kHalfDimensions * (FtInDims + 1) + (4 * kPsqtBuckets * FtInDims), false,
           &ft_alloc);
     if (!ft_biases) {
       fprintf(stdout, "Could not allocate enough memory.\n");
       exit(EXIT_FAILURE);
     }
     ft_weights = ft_biases + kHalfDimensions;
+    ft_weights_psqt = (int32_t*)(ft_weights + kHalfDimensions * FtInDims);
   }
 
-  const char *d = (const char *)evalData + TransformerStart + 4;
+  const char *d = (const char *)evalData;
+  unsigned s = readu_le_u32(d+8);
+  d += 4 + 4 + 4 + s + 4;
 
   // Read transformer
   for (unsigned i = 0; i < kHalfDimensions; i++, d += 2)
     ft_biases[i] = readu_le_u16(d);
   for (unsigned i = 0; i < kHalfDimensions * FtInDims; i++, d += 2)
     ft_weights[i] = readu_le_u16(d);
+  for (unsigned i = 0; i < kPsqtBuckets * FtInDims; i++, d += 4)
+    ft_weights_psqt[i] = readu_le_u32(d);
 
   // Read network
-  d += 4;
-  for (unsigned i = 0; i < 32; i++, d += 4)
-    hidden1_biases[i] = readu_le_u32(d);
-  d = read_hidden_weights(hidden1_weights, 512, d);
-  for (unsigned i = 0; i < 32; i++, d += 4)
-    hidden2_biases[i] = readu_le_u32(d);
-  d = read_hidden_weights(hidden2_weights, 32, d);
-  for (unsigned i = 0; i < 1; i++, d += 4)
-    output_biases[i] = readu_le_u32(d);
-  read_output_weights(output_weights, d);
+  for (unsigned k = 0; k < kLayerStacks; ++k) {
+    d += 4;
+    for (unsigned i = 0; i < 16; i++, d += 4)
+      hidden1_biases[k][i] = readu_le_u32(d);
+    d = read_hidden_weights(hidden1_weights[k], 16, 1024, d);
+
+    for (unsigned i = 0; i < 32; i++, d += 4)
+      hidden2_biases[k][i] = readu_le_u32(d);
+    d = read_hidden_weights(hidden2_weights[k], 32, 32, d);
+
+    for (unsigned i = 0; i < 1; i++, d += 4)
+      output_biases[k][i] = readu_le_u32(d);
+
+    d = read_output_weights(output_weights[k], d);
 
 #if defined(NNUE_SPARSE) && defined(USE_AVX2)
-  permute_biases(hidden1_biases);
-  permute_biases(hidden2_biases);
+    permute_biases(hidden1_biases[k]);
+    permute_biases(hidden2_biases[k]);
 #endif
+  }
+
+  return d == ((const char*)evalData) + size;
 }
 
 void nnue_export_net(void) {
@@ -595,14 +713,8 @@ void nnue_export_net(void) {
 
 static bool verify_net(const void *evalData, size_t size)
 {
-  if (size != 21022697) return false;
-
   const char *d = evalData;
   if (readu_le_u32(d) != NnueVersion) return false;
-  if (readu_le_u32(d + 4) != 0x3e5aa6eeU) return false;
-  if (readu_le_u32(d + 8) != 177) return false;
-  if (readu_le_u32(d + TransformerStart) != 0x5d69d7b8) return false;
-  if (readu_le_u32(d + NetworkStart) != 0x63337156) return false;
 
   return true;
 }
@@ -630,7 +742,7 @@ static bool load_eval_file(const char *evalFile)
 
   bool success = verify_net(evalData, size);
   if (success)
-    init_weights(evalData);
+    success = init_weights(evalData, size);
   if (mapping) unmap_file(evalData, mapping);
   return success;
 }
