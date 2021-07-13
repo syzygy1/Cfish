@@ -20,6 +20,8 @@ static alignas(64) int32_t hidden1_biases[8][16];
 static alignas(64) int32_t hidden2_biases[8][32];
 static int32_t output_biases[8][1];
 
+#endif
+
 INLINE void affine_propagate(clipped_t *input, int32_t *output,
     unsigned inDims, unsigned outDims, int32_t *biases, weight_t *weights)
 {
@@ -532,6 +534,7 @@ INLINE void clip_propagate(int32_t *input, clipped_t *output, unsigned numDims)
 #endif
 }
 
+#ifdef NNUE_REGULAR
 struct NetData {
   alignas(64) clipped_t input[1024];
   int32_t hidden1_values[32];
@@ -583,8 +586,9 @@ Value nnue_evaluate(const Position *pos)
     return (out_value + psqt_val) / FV_SCALE;
   }
 }
+#endif
 
-static const char* read_output_weights(weight_t *w, const char *d)
+static const char* read_output_weights_dense(weight_t *w, const char *d)
 {
   for (unsigned i = 0; i < 32; i++) {
     unsigned c = i;
@@ -598,7 +602,7 @@ static const char* read_output_weights(weight_t *w, const char *d)
   return d;
 }
 
-INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
+INLINE unsigned wt_idx_dense(unsigned r, unsigned c, unsigned dims)
 {
   (void)dims;
 
@@ -624,5 +628,3 @@ INLINE unsigned wt_idx(unsigned r, unsigned c, unsigned dims)
 
   return k;
 }
-
-#endif
