@@ -215,17 +215,17 @@ typedef uint8_t mask_t; // dummy
 
 #ifdef NNUE_SPARSE
 typedef int8_t clipped_t;
-#if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_AVX2))
-typedef int16_t weight_t, out_t;
+#if (defined(USE_MMX) || (defined(USE_SSE2))) && !(defined(USE_SSSE3) && !AVOID_USE_SSSE3)
+typedef int16_t weight_t_sparse, out_t_sparse;
 #else
-typedef int8_t weight_t, out_t;
+typedef int8_t weight_t_sparse, out_t_sparse;
 #endif
-#else
+#endif
+
 #if defined(USE_MMX) || (defined(USE_SSE2) && !defined(USE_SSSE3))
 typedef int16_t weight_t, out_t, clipped_t;
 #else
 typedef int8_t weight_t, out_t, clipped_t;
-#endif
 #endif
 
 #if defined(USE_MMX) && !defined(USE_SSE)
@@ -290,8 +290,8 @@ static void append_changed_indices(const Position *pos, const Color c,
   }
 }
 
-INLINE int32_t output_layer(const out_t *input, const int32_t *biases,
-    const out_t *weights)
+INLINE int32_t output_layer(const clipped_t *input, const int32_t *biases,
+    const weight_t *weights)
 {
 #if defined(USE_AVX2)
   __m256i *iv = (__m256i *)input;
@@ -310,7 +310,7 @@ INLINE int32_t output_layer(const out_t *input, const int32_t *biases,
 #elif defined(USE_SSE2)
   __m128i *iv = (__m128i *)input;
   __m128i *row = (__m128i *)weights;
-#if defined(USE_SSSE3) && !defined(NNUE_SPARSE)
+#if defined(USE_SSSE3)
   const __m128i kOnes = _mm_set1_epi16(1);
   __m128i p0 = _mm_madd_epi16(_mm_maddubs_epi16(iv[0], row[0]), kOnes);
   __m128i p1 = _mm_madd_epi16(_mm_maddubs_epi16(iv[1], row[1]), kOnes);
@@ -633,17 +633,31 @@ INLINE unsigned bit_shuffle(unsigned v, int left, int right, unsigned mask)
 #include "nnue-regular.c"
 #include "nnue-sparse.c"
 
-static const char *read_hidden_weights(weight_t *w, unsigned outDims, unsigned dims,
+static const char *read_hidden_weights_dense(weight_t *w, unsigned outDims, unsigned dims,
     const char *d)
 {
   for (unsigned r = 0; r < outDims; r++)
   {
     for (unsigned c = 0; c < dims; c++)
-      w[wt_idx(r, c, dims)] = *d++;
+      w[wt_idx_dense(r, c, dims)] = *d++;
   }
 
   return d;
 }
+
+#if defined (NNUE_SPARSE)
+static const char *read_hidden_weights_sparse(weight_t_sparse *w, unsigned outDims, unsigned dims,
+    const char *d)
+{
+  for (unsigned r = 0; r < outDims; r++)
+  {
+    for (unsigned c = 0; c < dims; c++)
+      w[wt_idx_sparse(r, c, dims)] = *d++;
+  }
+
+  return d;
+}
+#endif
 
 static bool init_weights(const void *evalData, unsigned size)
 {
@@ -679,21 +693,20 @@ static bool init_weights(const void *evalData, unsigned size)
     d += 4;
     for (unsigned i = 0; i < 16; i++, d += 4)
       hidden1_biases[k][i] = readu_le_u32(d);
-    d = read_hidden_weights(hidden1_weights[k], 16, 1024, d);
+#if defined (NNUE_SPARSE)
+    d = read_hidden_weights_sparse(hidden1_weights[k], 16, 1024, d);
+#else
+    d = read_hidden_weights_dense(hidden1_weights[k], 16, 1024, d);
+#endif
 
     for (unsigned i = 0; i < 32; i++, d += 4)
       hidden2_biases[k][i] = readu_le_u32(d);
-    d = read_hidden_weights(hidden2_weights[k], 32, 32, d);
+    d = read_hidden_weights_dense(hidden2_weights[k], 32, 32, d);
 
     for (unsigned i = 0; i < 1; i++, d += 4)
       output_biases[k][i] = readu_le_u32(d);
 
-    d = read_output_weights(output_weights[k], d);
-
-#if defined(NNUE_SPARSE) && defined(USE_AVX2)
-    permute_biases(hidden1_biases[k]);
-    permute_biases(hidden2_biases[k]);
-#endif
+    d = read_output_weights_dense(output_weights[k], d);
   }
 
   return d == ((const char*)evalData) + size;
