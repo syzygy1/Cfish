@@ -869,7 +869,7 @@ static Value fix_FRC(const Position *pos)
 }
 
 #define adjusted_NNUE() \
-  (nnue_evaluate(pos) * (580 + mat / 32 - 4 * rule50_count()) / 1024 \
+  (nnue_evaluate(pos) * (903 + mat) / 1024 \
    + Time.tempoNNUE + (is_chess960() ? fix_FRC(pos) : 0))
 
 #endif
@@ -880,12 +880,12 @@ Value evaluate(const Position *pos)
 
 #ifdef NNUE
 
-  const int mat = non_pawn_material() + 4 * PawnValueMg * popcount(pieces_p(PAWN));
+  const int mat = 28 * non_pawn_material() / 1024 + 28 * popcount(pieces_p(PAWN));
   if (useNNUE == EVAL_HYBRID) {
     Value psq = abs(eg_value(psq_score()));
     int r50 = 16 + rule50_count();
     bool largePsq = psq * 16 > (NNUEThreshold1 + non_pawn_material() / 64) * r50;
-    bool classical = largePsq || (psq > PawnValueMg / 4 && !(pos->nodes & 0x0B));
+    bool classical = largePsq;
 
     bool lowPieceEndgame =   non_pawn_material() == BishopValueMg
                           || (non_pawn_material() < 2 * RookValueMg
@@ -896,8 +896,7 @@ Value evaluate(const Position *pos)
     if (   classical && largePsq && !lowPieceEndgame
         && (   abs(v) * 16 < NNUEThreshold2 * r50
             || (   opposite_bishops(pos)
-                && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50
-                && !(pos->nodes & 0xB))))
+                && abs(v) * 16 < (NNUEThreshold1 + non_pawn_material() / 64) * r50)))
       v = adjusted_NNUE();
 
   } else if (useNNUE == EVAL_PURE)
