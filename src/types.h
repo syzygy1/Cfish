@@ -277,7 +277,7 @@ extern Value PieceValue[2][16];
 
 extern uint32_t NonPawnPieceValue[16];
 
-#define SQUARE_FLIP(s) (sq ^ 0x38)
+#define SQUARE_FLIP(sq) ((sq) ^ 0x38)
 
 #define mate_in(ply) ((Value)(VALUE_MATE - (ply)))
 #define mated_in(ply) ((Value)(-VALUE_MATE + (ply)))
