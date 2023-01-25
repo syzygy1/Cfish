@@ -78,6 +78,23 @@ INLINE Bitboard attacks_bb_rook(Square s, Bitboard occupied)
 
   return _mm_cvtsi128_si64(_mm_or_si128(slide2, _mm_unpackhi_epi64(slide2, slide2)));
 
+#elif defined(__BMI__)
+    // North bits: set mask bits lower than occupied LS1B
+  // Bitboard mask = ((Bitboard(*)[2]) rook_mask_NS)[s][0];
+  Bitboard mask = 0x0101010101010100 << s;
+  Bitboard slides = _blsmsk_u64(occupied & mask) & mask;
+
+    // South bits: flip vertical to simulate MS1B by LS1B
+  // mask = ((Bitboard(*)[2]) rook_mask_NS)[s][1];
+  mask = 0x0101010101010100 << SQUARE_FLIP(s);
+  slides |= __builtin_bswap64(_blsmsk_u64(__builtin_bswap64(occupied) & mask) & mask);
+
+    // East-West: from precomputed table
+  int r8 = rank_of(s) * 8;
+  // slides |= (Bitboard)(rook_attacks_EW[_bextr_u64(occupied, r8 + 1, 6) * 8 + file_of(s)]) << r8;
+  slides |= (Bitboard)(rook_attacks_EW[((occupied >> r8) & 0x7e) * 4 + file_of(s)]) << r8;
+  return slides;
+
 #else
   // flip vertical to simulate MS1B by LS1B
   const __m128i swapl2h = _mm_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1, 0);
