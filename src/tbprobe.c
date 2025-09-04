@@ -680,7 +680,7 @@ static void init_indices(void)
   // Binomial[k][n] = Bin(n, k)
   for (j = 0; j < 64; j++)
     Binomial[0][j] = 1;
-  for (i = 0; i < 7; i++)
+  for (i = 1; i < 7; i++)
     for (j = 1; j < 64; j++)
       Binomial[i][j] = Binomial[i - 1][j - 1] + Binomial[i][j - 1];
 
