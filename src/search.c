@@ -53,7 +53,7 @@ static const uint64_t ttHitAverageWindow     = 4096;
 static const uint64_t ttHitAverageResolution = 1024;
 
 INLINE int futility_margin(Depth d, bool improving) {
-  return 234 * (d - improving);
+  return 231 * (d - improving);
 }
 
 // Reductions lookup tables, initialized at startup
@@ -916,7 +916,7 @@ INLINE Value search_node(Position *pos, Stack *ss, Value alpha, Value beta,
       && (ss-1)->statScore < 24185
       && eval >= beta
       && eval >= ss->staticEval
-      && ss->staticEval >= beta - 24 * depth - 34 * improving + 162 * ss->ttPv + 159
+      && ss->staticEval >= beta - 22 * depth - 34 * improving + 162 * ss->ttPv + 159
       && !excludedMove
       && non_pawn_material_c(stm())
       && (ss->ply >= pos->nmpMinPly || stm() != pos->nmpColor))
@@ -1287,7 +1287,7 @@ moves_loop: // When in check search starts from here
                        + (*fmh )[movedPiece][to_sq(move)]
                        + (*fmh2)[movedPiece][to_sq(move)]
                        + (*pos->mainHistory)[!stm()][from_to(move)]
-                       - 4741;
+                       - 4791;
 
         if (!inCheck)
           r -= ss->statScore / 14790;
